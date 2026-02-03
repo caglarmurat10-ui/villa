@@ -55,7 +55,6 @@ export const GoogleService = {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          type: 'villa',
           ...reservation,
           id: reservation.id.toString()
         })

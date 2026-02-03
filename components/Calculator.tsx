@@ -61,7 +61,7 @@ export default function Calculator({ isOpen, onClose }: CalculatorProps) {
         const rawTotal = nights * price;
         const discountedTotal = rawTotal - (rawTotal * (discount / 100));
 
-        return { nights, rawTotal, discountedTotal, discountAmount: rawTotal - discountedTotal };
+        return { nights, rawTotal, discountedTotal, discountAmount: rawTotal - discountedTotal, discount };
     };
 
     const result = calculate();
