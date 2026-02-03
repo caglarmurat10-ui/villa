@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Villa Rezervasyon Yedekleri</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; color: #333; }
+        h1 { border-bottom: 2px solid #eee; padding-bottom: 0.5rem; }
+        .backup-info { background: #f5f5f5; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; }
+        #data-preview { white-space: pre-wrap; background: #282c34; color: #abb2bf; padding: 1rem; border-radius: 8px; overflow-x: auto; font-family: monospace; }
+    </style>
+</head>
+<body>
+    <h1>Villa Rezervasyon Yedek Dosyası</h1>
+    
+    <div class="backup-info">
+        <p>Bu dosya uygulamanın verilerini yerel olarak yedeklemek için oluşturulmuştur.</p>
+        <p><strong>Son Güncelleme:</strong> <span id="last-updated">-</span></p>
+        <p>Veriler aşağıdaki gizli JSON bloğunda saklanmaktadır.</p>
+    </div>
+
+    <h2>Ham Veri Önizleme</h2>
+    <div id="data-preview">Veri yok veya yüklenemedi...</div>
+
+    <!-- BU BÖLÜM OTOMATİK OLARAK GÜNCELLENİR. LÜTFEN ELLE DEĞİŞTİRMEYİNİZ. -->
+    <script id="villa-data" type="application/json">[]</script>
+    <!-- ------------------------------------------------------------------ -->
+
+    <script>
+        try {
+            const dataScript = document.getElementById('villa-data');
+            const preview = document.getElementById('data-preview');
+            const data = JSON.parse(dataScript.textContent);
+            
+            preview.textContent = JSON.stringify(data, null, 2);
+            document.getElementById('last-updated').textContent = new Date().toLocaleString();
+            
+            console.log("Yedeklenen veri yüklendi:", data);
+        } catch (e) {
+            console.error("Veri okuma hatası:", e);
+            document.getElementById('data-preview').textContent = "Hata: Veri okunamadı. JSON formatı bozuk olabilir.";
+        }
+    </script>
+</body>
+</html>

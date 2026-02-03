@@ -12,21 +12,16 @@ export interface VillaReservation {
   commAmt: number;
 }
 
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwtXRJCAZB5UOxX9SIDxS9pwR9QXAcdJdT1xXhsDPMw2KlAKpvNfyYrKrh3o9IiEaXong/exec";
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwFecxccz6SP5tyPW0Mz2BB8h2xVaIu7iaTwZM1eIr8yKcs8ZIf22eoCjfVGUADdwOn-A/exec";
 
 export const GoogleService = {
-  async loadData(): Promise<VillaReservation[]> {
+  async loadData(): Promise<VillaReservation[] | null> {
     try {
-      const response = await fetch(`${GOOGLE_SCRIPT_URL}?type=villa`);
+      // Use the local proxy to avoid CORS issues
+      const response = await fetch('/api/proxy');
       if (!response.ok) throw new Error('Network response was not ok');
 
-      const text = await response.text();
-      // Handle empty or error responses gracefully
-      if (!text || text.includes("Error")) {
-        return [];
-      }
-
-      const data = JSON.parse(text);
+      const data = await response.json();
       if (Array.isArray(data)) {
         return data.map((item: any) => ({
           ...item,
@@ -38,10 +33,10 @@ export const GoogleService = {
           commAmt: parseFloat(item.commAmt)
         }));
       }
-      return [];
+      return []; // Return empty array only if valid JSON frame but empty list
     } catch (error) {
       console.error("Google Cloud Load Error:", error);
-      return [];
+      return null;
     }
   },
 
@@ -59,6 +54,13 @@ export const GoogleService = {
           id: reservation.id.toString()
         })
       });
+
+      // Trigger Backup (Fire and forget, but ideally we want latest data)
+      // Since Google Script is slow to update read consistency, we might just fetch what we can
+      // Or simply trigger a reload and backup.
+      // For now, let's fetch the latest data from Google to be sure, then backup.
+      this.backupToLocal();
+
       return true;
     } catch (error) {
       console.error("Google Cloud Save Error:", error);
@@ -80,9 +82,33 @@ export const GoogleService = {
           id: id
         })
       });
+
+      this.backupToLocal();
+
       return true;
     } catch (error) {
       console.error("Google Cloud Delete Error:", error);
+      return false;
+    }
+  },
+
+  async backupToLocal(): Promise<boolean> {
+    try {
+      // Fetch latest data from Google to ensure consistency
+      // Note: There might be a slight delay in Google Sheets updating, so we might need a small delay?
+      // But let's try direct fetch first.
+      const data = await this.loadData();
+      if (!data) return false;
+
+      const res = await fetch('/api/backup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ data })
+      });
+      console.log('Backup sync initiated.');
+      return res.ok;
+    } catch (e) {
+      console.error('Backup Sync Error:', e);
       return false;
     }
   }
@@ -115,8 +141,29 @@ export const PriceService = {
       { id: 5, apart: 'Destan', start: '2026-07-01', end: '2026-08-31', price: 4000 },
       { id: 6, apart: 'Destan', start: '2026-09-01', end: '2026-09-30', price: 3000 },
     ];
-    localStorage.setItem('villa_prices', JSON.stringify(defaults));
+    localStorage.setItem('villa_prices_v2', JSON.stringify(defaults));
     return defaults;
+  },
+
+  calculateTotal: (apart: 'Safira' | 'Destan', cin: string, cout: string) => {
+    const prices = PriceService.getPrices();
+    const start = new Date(cin);
+    const end = new Date(cout);
+    let total = 0;
+    let nights = 0;
+
+    // Iterate through each night
+    for (let d = new Date(start); d < end; d.setDate(d.getDate() + 1)) {
+      const dateStr = d.toISOString().split('T')[0];
+      // Find price for this specific night
+      const p = prices.find(p => p.apart === apart && dateStr >= p.start && dateStr <= p.end);
+      if (p) {
+        total += p.price;
+      }
+      nights++;
+    }
+
+    return { total, avg: nights > 0 ? total / nights : 0 };
   },
 
   addPrice: (range: PriceRange) => {

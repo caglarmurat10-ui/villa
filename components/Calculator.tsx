@@ -34,13 +34,23 @@ export default function Calculator({ isOpen, onClose }: CalculatorProps) {
 
     // Auto-Calculate Price on Date/Apart Change
     useEffect(() => {
-        if (inputs.apart && inputs.cin) {
-            const found = prices.find(p => p.apart === inputs.apart && inputs.cin >= p.start && inputs.cin <= p.end);
-            if (found) {
-                setInputs(prev => ({ ...prev, price: found.price.toString() }));
+        if (inputs.apart && inputs.cin && inputs.cout) {
+            const { avg } = PriceService.calculateTotal(inputs.apart as 'Safira' | 'Destan', inputs.cin, inputs.cout);
+            if (avg > 0) {
+                setInputs(prev => ({ ...prev, price: avg.toFixed(2) }));
+            }
+        } else if (inputs.apart && inputs.cin) {
+            // Fallback single day lookup if calculateTotal cannot run yet (e.g. no checkout date)
+            // Or we just wait for both. Let's wait for both for accuracy, 
+            // but maybe the user wants to see a price just by picking start date? 
+            // The old logic allowed picking start date.
+            // Let's keep it simple: ONLY update if we have a range, OR we can peek one day.
+            const { avg } = PriceService.calculateTotal(inputs.apart as 'Safira' | 'Destan', inputs.cin, inputs.cin); // Check single day
+            if (avg > 0) {
+                setInputs(prev => ({ ...prev, price: avg.toFixed(2) }));
             }
         }
-    }, [inputs.cin, inputs.apart, prices]);
+    }, [inputs.cin, inputs.cout, inputs.apart, prices]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
         setInputs({ ...inputs, [e.target.id]: e.target.value });

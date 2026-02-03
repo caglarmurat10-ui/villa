@@ -25,9 +25,13 @@ export default function Home() {
   const loadData = async () => {
     setLoading(true);
     const cloudData = await GoogleService.loadData();
-    if (cloudData) {
+    if (cloudData !== null) {
       setData(cloudData);
       setSynced(true);
+    } else {
+      setSynced(false);
+      // Optional: Try to load from local backup if cloud fails?
+      // For now just show offline status
     }
     setLoading(false);
   };

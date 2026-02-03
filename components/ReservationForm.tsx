@@ -35,15 +35,15 @@ export default function ReservationForm({ onSave, config, editingItem, onCancelE
     useEffect(() => {
         // Only auto-update if NOT editing an existing item (to avoid overwriting custom prices)
         // Or if the user explicitly changes dates while editing
-        if (!editingItem || (editingItem && (formData.cin !== editingItem.cin || formData.apart !== editingItem.apart))) {
-            if (formData.apart && formData.cin) {
-                const found = prices.find(p => p.apart === formData.apart && formData.cin >= p.start && formData.cin <= p.end);
-                if (found) {
-                    setFormData(prev => ({ ...prev, price: found.price.toString() }));
+        if (!editingItem || (editingItem && (formData.cin !== editingItem.cin || formData.cout !== editingItem.cout || formData.apart !== editingItem.apart))) {
+            if (formData.apart && formData.cin && formData.cout) {
+                const { avg } = PriceService.calculateTotal(formData.apart as 'Safira' | 'Destan', formData.cin, formData.cout);
+                if (avg > 0) {
+                    setFormData(prev => ({ ...prev, price: avg.toFixed(2) }));
                 }
             }
         }
-    }, [formData.cin, formData.apart, prices, editingItem]);
+    }, [formData.cin, formData.cout, formData.apart, prices, editingItem]);
 
     useEffect(() => {
         if (editingItem) {

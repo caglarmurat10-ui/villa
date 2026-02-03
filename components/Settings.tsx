@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { X, Plus, Trash2, Settings as SettingsIcon } from "lucide-react";
-import { PriceService, PriceRange } from "@/services/api";
+import { X, Plus, Trash2, Settings as SettingsIcon, Save } from "lucide-react";
+import { PriceService, PriceRange, GoogleService } from "@/services/api";
 
 interface SettingsProps {
     isOpen: boolean;
@@ -43,6 +43,15 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
         setPrices(PriceService.deletePrice(id));
     };
 
+    const handleBackup = async () => {
+        const success = await GoogleService.backupToLocal();
+        if (success) {
+            alert("Yedekleme Başarılı! ✅\n'villa.html' dosyası güncellendi.");
+        } else {
+            alert("Yedekleme Hatası! ❌");
+        }
+    };
+
     return (
         isOpen ? (
             <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
@@ -51,9 +60,18 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
                         <h2 className="text-lg font-bold text-indigo-400 flex items-center gap-2">
                             <SettingsIcon className="w-5 h-5" /> Ayarlar & Fiyatlar
                         </h2>
-                        <button onClick={onClose} className="text-gray-400 hover:text-white">
-                            <X className="w-6 h-6" />
-                        </button>
+                        <div className="flex gap-2">
+                            <button
+                                onClick={handleBackup}
+                                className="p-2 bg-emerald-500/10 text-emerald-400 rounded-lg hover:bg-emerald-500/20 transition-colors flex items-center gap-2 text-xs font-bold uppercase"
+                                title="Verileri 'villa.html' dosyasına yedekle"
+                            >
+                                <Save className="w-4 h-4" /> Yedekle
+                            </button>
+                            <button onClick={onClose} className="text-gray-400 hover:text-white">
+                                <X className="w-6 h-6" />
+                            </button>
+                        </div>
                     </div>
 
                     <div className="space-y-6">
