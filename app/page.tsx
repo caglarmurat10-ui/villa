@@ -81,7 +81,7 @@ export default function Home() {
       <header className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">
-            Apart Takip
+            Apart Takip v2.1
           </h1>
           <p className="text-[10px] uppercase tracking-widest font-bold flex items-center gap-1">
             {loading ? (
