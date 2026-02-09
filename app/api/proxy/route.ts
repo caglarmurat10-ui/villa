@@ -5,7 +5,7 @@ const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwFecxccz6SP5
 export async function GET(request: Request) {
     try {
         // Forward the request to Google Script
-        const response = await fetch(`${GOOGLE_SCRIPT_URL}?type=villa`, {
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
             cache: 'no-store', // Important: Ensure we always get fresh data
         });
 
@@ -27,6 +27,45 @@ export async function GET(request: Request) {
         return NextResponse.json(data);
     } catch (error) {
         console.error('Proxy Error:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}
+
+export async function POST(request: Request) {
+    try {
+        const body = await request.json();
+
+        // Google Script'e isteği ilet
+        const response = await fetch(GOOGLE_SCRIPT_URL, {
+            method: 'POST',
+            body: JSON.stringify(body),
+            headers: {
+                'Content-Type': 'application/json',
+            },
+        });
+
+        // Google Script redirect dönebilir (302), fetch bunu takip eder.
+        // Sonuçta text veya json dönebilir.
+        const text = await response.text();
+
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch (e) {
+            // Eğer JSON değilse, muhtemelen HTML hata sayfası veya success text dönmüştür
+            // Google Apps Script bazen JSON yerine HTML döner (auth vs için)
+            console.warn("Google Script non-JSON response:", text);
+            // Basit başarı kontrolü
+            if (response.ok) {
+                return NextResponse.json({ success: true, raw: text });
+            }
+            return NextResponse.json({ error: 'Invalid response from Google' }, { status: 502 });
+        }
+
+        return NextResponse.json(data);
+
+    } catch (error) {
+        console.error('Proxy POST Error:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

@@ -81,7 +81,7 @@ export default function TransactionList({ reservations, onRefresh, onEdit }: Tra
                             <tr>
                                 <th className="p-4">Misafir</th>
                                 <th className="p-4">Tarih</th>
-                                <th className="p-4 text-right">Net</th>
+                                <th className="p-4 text-right">Durum</th>
                                 <th className="p-4 text-right">İşlem</th>
                             </tr>
                         </thead>
@@ -100,8 +100,27 @@ export default function TransactionList({ reservations, onRefresh, onEdit }: Tra
                                         <div className="text-gray-400 text-[10px]">{item.cin}</div>
                                         <div className="font-medium text-rose-400 text-[10px]">{item.cout}</div>
                                     </td>
-                                    <td className="p-4 font-bold text-emerald-400 text-right">
-                                        ₺{Math.floor(item.net).toLocaleString('tr-TR')}
+                                    <td className="p-4 text-right">
+                                        <div className="flex flex-col items-end gap-0.5">
+                                            {/* Remaining */}
+                                            {item.remaining && item.remaining > 0 ? (
+                                                <div className="text-rose-400 font-bold bg-rose-400/10 px-1.5 py-0.5 rounded">
+                                                    KALAN: ₺{Math.round(item.remaining).toLocaleString()}
+                                                </div>
+                                            ) : (
+                                                <div className="text-emerald-400 font-bold text-[10px] flex items-center gap-1">
+                                                    ÖDENDİ ✅
+                                                </div>
+                                            )}
+
+                                            {/* Details */}
+                                            <div className="text-[9px] text-gray-500 mt-1">
+                                                Brüt: ₺{Math.round(item.brut).toLocaleString()} | Kom: ₺{Math.round(item.commAmt).toLocaleString()}
+                                            </div>
+                                            <div className="text-[10px] text-gray-300">
+                                                Net: <b>₺{Math.round(item.net).toLocaleString()}</b>
+                                            </div>
+                                        </div>
                                     </td>
                                     <td className="p-4 text-right">
                                         <div className="flex justify-end gap-1">

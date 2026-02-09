@@ -1,40 +1,49 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { motion } from "framer-motion";
-import { Save, Calendar as CalIcon, User, Calculator } from "lucide-react";
-import { GoogleService, PriceService, PriceRange, VillaReservation } from "@/services/api";
+import { GoogleService, VillaReservation, PriceService } from "@/services/api";
+import { Save, Loader2, Calendar, User, CreditCard } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface ReservationFormProps {
     onSave: () => void;
+    editingItem: VillaReservation | null;
+    onCancelEdit: () => void;
     config: { commission: number };
-    editingItem?: VillaReservation | null;
-    onCancelEdit?: () => void;
 }
 
-export default function ReservationForm({ onSave, config, editingItem, onCancelEdit }: ReservationFormProps) {
+export default function ReservationForm({ onSave, editingItem, onCancelEdit, config }: ReservationFormProps) {
     const [loading, setLoading] = useState(false);
-    const [prices, setPrices] = useState<PriceRange[]>([]);
     const [formData, setFormData] = useState({
         apart: 'Safira',
         name: '',
         cin: '',
         cout: '',
-        price: ''
+        price: '',
+        paidAmt: '',
+        commissionRate: config.commission.toString()
     });
 
-    useEffect(() => {
-        const loadPrices = () => setPrices(PriceService.getPrices());
-        loadPrices();
+    const [prices, setPrices] = useState<any[]>([]);
 
-        window.addEventListener('price-update', loadPrices);
-        return () => window.removeEventListener('price-update', loadPrices);
+    useEffect(() => {
+        setPrices(PriceService.getPrices());
+
+        const handlePriceUpdate = () => setPrices(PriceService.getPrices());
+        const handleConfigUpdate = () => {
+            // Opsiyonel: Config değişince formu güncellemek istersek
+        };
+
+        window.addEventListener('price-update', handlePriceUpdate);
+        window.addEventListener('config-update', handleConfigUpdate);
+        return () => {
+            window.removeEventListener('price-update', handlePriceUpdate);
+            window.removeEventListener('config-update', handleConfigUpdate);
+        };
     }, []);
 
     // Auto-Fetch Price Logic
     useEffect(() => {
-        // Only auto-update if NOT editing an existing item (to avoid overwriting custom prices)
-        // Or if the user explicitly changes dates while editing
         if (!editingItem || (editingItem && (formData.cin !== editingItem.cin || formData.cout !== editingItem.cout || formData.apart !== editingItem.apart))) {
             if (formData.apart && formData.cin && formData.cout) {
                 const { avg } = PriceService.calculateTotal(formData.apart as 'Safira' | 'Destan', formData.cin, formData.cout);
@@ -45,45 +54,41 @@ export default function ReservationForm({ onSave, config, editingItem, onCancelE
         }
     }, [formData.cin, formData.cout, formData.apart, prices, editingItem]);
 
+    // Populate Form on Edit
     useEffect(() => {
         if (editingItem) {
+            const impliedCommRate = editingItem.brut > 0 ? (editingItem.commAmt / editingItem.brut) * 100 : config.commission;
+
             setFormData({
                 apart: editingItem.apart,
                 name: editingItem.name,
                 cin: editingItem.cin,
                 cout: editingItem.cout,
-                price: editingItem.price.toString()
+                price: editingItem.price.toString(),
+                paidAmt: editingItem.paidAmt ? editingItem.paidAmt.toString() : '',
+                commissionRate: impliedCommRate.toFixed(1)
             });
-        } else {
-            setFormData({ apart: 'Safira', name: '', cin: '', cout: '', price: '' });
         }
-    }, [editingItem]);
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        setFormData({ ...formData, [e.target.id]: e.target.value });
-    };
-
-    const calculate = () => {
-        if (!formData.cin || !formData.cout || !formData.price) return null;
-        const cinDate = new Date(formData.cin);
-        const coutDate = new Date(formData.cout);
-        const diffTime = Math.abs(coutDate.getTime() - cinDate.getTime());
-        const nights = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-        if (nights <= 0) return null;
-
-        const price = parseFloat(formData.price);
-        const brut = nights * price;
-        const net = brut * (1 - config.commission / 100);
-
-        return { nights, brut, net };
-    };
+    }, [editingItem, config.commission]);
 
     const handleSubmit = async () => {
-        const calc = calculate();
-        if (!calc || !formData.name) return alert("Lütfen tüm alanları doldurun.");
+        if (!formData.name || !formData.cin || !formData.cout || !formData.price) {
+            alert("Lütfen tüm zorunlu alanları doldurun");
+            return;
+        }
 
         setLoading(true);
+
+        const nights = Math.ceil((new Date(formData.cout).getTime() - new Date(formData.cin).getTime()) / (1000 * 60 * 60 * 24));
+        const price = parseFloat(formData.price);
+        const commRate = parseFloat(formData.commissionRate) || 0;
+        const paidAmt = parseFloat(formData.paidAmt) || 0;
+
+        const brut = nights * price;
+        const commAmt = brut * (commRate / 100);
+        const net = brut - commAmt;
+        const remaining = net - paidAmt;
+
         const entry: VillaReservation = {
             id: editingItem ? editingItem.id : Date.now(),
             type: 'villa',
@@ -91,118 +96,188 @@ export default function ReservationForm({ onSave, config, editingItem, onCancelE
             name: formData.name,
             cin: formData.cin,
             cout: formData.cout,
-            nights: calc.nights,
-            brut: calc.brut,
-            net: calc.net,
-            price: parseFloat(formData.price),
-            commAmt: calc.brut - calc.net
+            nights: nights,
+            brut: brut,
+            net: net,
+            price: price,
+            commAmt: commAmt,
+            paidAmt: paidAmt,
+            remaining: remaining
         };
 
         const success = await GoogleService.saveData(entry);
         setLoading(false);
 
         if (success) {
-            alert(editingItem ? "Güncelleme Başarılı! ✅" : "Kayıt Başarılı! ✅");
             if (!editingItem) {
-                setFormData({ apart: 'Safira', name: '', cin: '', cout: '', price: '' });
+                setFormData({
+                    apart: 'Safira',
+                    name: '',
+                    cin: '',
+                    cout: '',
+                    price: '',
+                    paidAmt: '',
+                    commissionRate: config.commission.toString()
+                });
             }
-            onSave(); // Refresh data
+            // Başarılı kayıttan sonra yerel yedeği güncelle
+            // Note: saveData zaten backupToLocal çağırıyor ama burada garanti olsun
+            onSave();
         } else {
-            alert("Hata oluştu! ❌");
+            alert("Kaydetme başarısız oldu!");
         }
     };
 
-    const calc = calculate();
+    // Live Calculation
+    const getCalculation = () => {
+        const start = new Date(formData.cin);
+        const end = new Date(formData.cout);
+        const nights = !isNaN(start.getTime()) && !isNaN(end.getTime()) ? Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) : 0;
+        const price = parseFloat(formData.price) || 0;
+        const commRate = parseFloat(formData.commissionRate) || 0;
+        const paid = parseFloat(formData.paidAmt) || 0;
+
+        const brut = nights * price;
+        const commAmt = brut * (commRate / 100);
+        const net = brut - commAmt;
+        const remaining = net - paid;
+
+        return { nights, brut, commAmt, net, remaining };
+    };
+
+    const calc = getCalculation();
 
     return (
-        <div className="glass-panel p-5 rounded-3xl mb-6 border border-white/5 bg-gray-900/40">
-            <h3 className="text-sm font-bold mb-4 flex items-center gap-2 text-white">
-                <User className="w-4 h-4 text-emerald-400" /> Yeni Rezervasyon
-            </h3>
+        <div className="glass-panel p-6 rounded-3xl border border-white/10 shadow-2xl mb-8 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
 
-            <div className="grid grid-cols-2 gap-3 mb-3">
-                <div className="space-y-1">
-                    <label className="text-[10px] text-gray-400 uppercase font-bold ml-1">Apart</label>
-                    <select
-                        id="apart"
-                        value={formData.apart}
-                        onChange={handleChange}
-                        className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl p-3 text-xs outline-none focus:border-emerald-500 transition-colors"
-                    >
-                        <option value="Safira">Safira Apart</option>
-                        <option value="Destan">Destan Apart</option>
-                    </select>
-                </div>
-                <div className="space-y-1">
-                    <label className="text-[10px] text-gray-400 uppercase font-bold ml-1">Misafir</label>
-                    <input
-                        type="text"
-                        id="name"
-                        value={formData.name}
-                        onChange={handleChange}
-                        placeholder="Ad Soyad"
-                        className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl p-3 text-xs outline-none focus:border-emerald-500 transition-colors"
-                    />
-                </div>
-            </div>
+            <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
+                {editingItem ? '✏️ Rezervasyonu Düzenle' : '✨ Yeni Rezervasyon'}
+            </h2>
 
-            <div className="grid grid-cols-2 gap-3 mb-3">
-                <div className="space-y-1">
-                    <label className="text-[10px] text-gray-400 uppercase font-bold ml-1">Giriş</label>
-                    <input
-                        type="date"
-                        id="cin"
-                        value={formData.cin}
-                        onChange={handleChange}
-                        className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl p-3 text-xs outline-none focus:border-emerald-500 transition-colors"
-                    />
-                </div>
-                <div className="space-y-1">
-                    <label className="text-[10px] text-gray-400 uppercase font-bold ml-1">Çıkış</label>
-                    <input
-                        type="date"
-                        id="cout"
-                        value={formData.cout}
-                        onChange={handleChange}
-                        className="w-full bg-gray-800 border border-gray-700 text-white rounded-xl p-3 text-xs outline-none focus:border-emerald-500 transition-colors"
-                    />
-                </div>
-            </div>
-
-            <div className="mb-4 space-y-1">
-                <label className="text-[10px] text-indigo-400 ml-1 font-bold uppercase">Gecelik Fiyat (₺)</label>
-                <div className="relative">
-                    <input
-                        type="number"
-                        id="price"
-                        value={formData.price}
-                        onChange={handleChange}
-                        placeholder="0"
-                        className="w-full bg-gray-800 border border-indigo-500/30 text-white rounded-xl p-3 text-xs outline-none focus:border-indigo-500 transition-colors pl-8"
-                    />
-                    <span className="absolute left-3 top-3 text-gray-500 text-xs">₺</span>
-                </div>
-            </div>
-
-            {/* Live Calculation Preview */}
-            {calc && (
-                <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    className="mb-4 p-3 bg-emerald-500/10 rounded-xl border border-emerald-500/20 text-xs"
-                >
-                    <div className="flex justify-between items-end">
-                        <div>
-                            <p className="text-emerald-400 font-bold">{calc.nights} Gece x ₺{formData.price}</p>
-                            <p className="text-[10px] text-gray-400">Komisyon: ₺{Math.round(calc.brut - calc.net)}</p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-[10px] text-gray-400 uppercase">Net Kazanç</p>
-                            <p className="text-lg font-bold text-white">₺{Math.round(calc.net).toLocaleString()}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div className="space-y-4">
+                    <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Apart Seçimi</label>
+                        <div className="grid grid-cols-2 gap-2 mt-1">
+                            {['Safira', 'Destan'].map((opt) => (
+                                <button
+                                    key={opt}
+                                    onClick={() => setFormData({ ...formData, apart: opt })}
+                                    className={`p-3 rounded-xl text-sm font-bold transition-all ${formData.apart === opt
+                                        ? (opt === 'Safira' ? 'bg-indigo-600 shadow-lg shadow-indigo-500/30' : 'bg-emerald-600 shadow-lg shadow-emerald-500/30')
+                                        : 'bg-gray-800 hover:bg-gray-700'
+                                        }`}
+                                >
+                                    {opt}
+                                </button>
+                            ))}
                         </div>
                     </div>
-                </motion.div>
-            )}
+
+                    <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Misafir Adı</label>
+                        <div className="relative mt-1">
+                            <User className="absolute left-3 top-3 w-4 h-4 text-gray-500" />
+                            <input
+                                type="text"
+                                value={formData.name}
+                                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                                placeholder="Ad Soyad"
+                                className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-3 pl-10 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all outline-none"
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="text-xs font-bold text-gray-400 uppercase ml-1">Giriş</label>
+                            <input
+                                type="date"
+                                value={formData.cin}
+                                onChange={(e) => setFormData({ ...formData, cin: e.target.value })}
+                                className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-3 text-sm focus:border-indigo-500 outline-none mt-1"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-400 uppercase ml-1">Çıkış</label>
+                            <input
+                                type="date"
+                                value={formData.cout}
+                                onChange={(e) => setFormData({ ...formData, cout: e.target.value })}
+                                className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-3 text-sm focus:border-indigo-500 outline-none mt-1"
+                            />
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="text-xs font-bold text-gray-400 uppercase ml-1">Gecelik (₺)</label>
+                            <input
+                                type="number"
+                                value={formData.price}
+                                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                                placeholder="0.00"
+                                className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-3 text-sm focus:border-indigo-500 outline-none mt-1 font-mono"
+                            />
+                        </div>
+                        <div>
+                            <label className="text-xs font-bold text-gray-400 uppercase ml-1">Komisyon (%)</label>
+                            <input
+                                type="number"
+                                value={formData.commissionRate}
+                                onChange={(e) => setFormData({ ...formData, commissionRate: e.target.value })}
+                                placeholder="%"
+                                className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-3 text-sm focus:border-amber-500 outline-none mt-1 font-mono text-amber-400"
+                            />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div className="mb-6">
+                <label className="text-xs font-bold text-emerald-400 uppercase ml-1">Alınan Ödeme (₺)</label>
+                <div className="relative mt-1">
+                    <CreditCard className="absolute left-3 top-3 w-4 h-4 text-emerald-500" />
+                    <input
+                        type="number"
+                        value={formData.paidAmt}
+                        onChange={(e) => setFormData({ ...formData, paidAmt: e.target.value })}
+                        placeholder="Kapora vs."
+                        className="w-full bg-emerald-900/10 border border-emerald-500/30 rounded-xl p-3 pl-10 text-emerald-300 focus:border-emerald-500 outline-none font-mono"
+                    />
+                </div>
+            </div>
+
+            {/* Live Summary */}
+            <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-black/20 rounded-2xl p-4 mb-6 border border-white/5"
+            >
+                <div className="grid grid-cols-4 gap-2 text-center divide-x divide-white/10">
+                    <div>
+                        <p className="text-[10px] text-gray-400 uppercase">Gece</p>
+                        <p className="text-lg font-bold">{calc.nights}</p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-gray-400 uppercase">Brüt</p>
+                        <p className="text-lg font-bold">₺{calc.brut.toLocaleString()}</p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-gray-400 uppercase">Net</p>
+                        <p className="text-lg font-bold text-indigo-400">₺{Math.floor(calc.net).toLocaleString()}</p>
+                    </div>
+                    <div>
+                        <p className="text-[10px] text-gray-400 uppercase">Kalan Bakiye</p>
+                        <p className={`text-lg font-bold ${calc.remaining > 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                            ₺{Math.round(calc.remaining).toLocaleString()}
+                        </p>
+                    </div>
+                </div>
+            </motion.div>
 
             <div className="flex gap-2">
                 <button
@@ -212,8 +287,8 @@ export default function ReservationForm({ onSave, config, editingItem, onCancelE
                 >
                     {loading ? (
                         <>
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            {editingItem ? 'Güncelleniyor' : 'Kaydediliyor'}
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                            {editingItem ? 'Güncelleniyor...' : 'Kaydediliyor...'}
                         </>
                     ) : (
                         <>
@@ -225,7 +300,7 @@ export default function ReservationForm({ onSave, config, editingItem, onCancelE
                 {editingItem && onCancelEdit && (
                     <button
                         onClick={onCancelEdit}
-                        className="bg-gray-700 text-white p-4 rounded-xl font-bold text-xs uppercase"
+                        className="bg-gray-700 text-white p-4 rounded-xl font-bold text-xs uppercase hover:bg-gray-600 transition-colors"
                     >
                         İptal
                     </button>

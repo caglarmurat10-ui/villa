@@ -23,15 +23,32 @@ export default function Home() {
   const config = { commission: 10 };
 
   const loadData = async () => {
-    setLoading(true);
+    // 1. Fast Load from Backup (Optimistic)
+    // Sadece ilk yüklemede veya data boşsa loading göster, yoksa gösterme (arkada yenile)
+    if (data.length === 0) setLoading(true);
+
+    try {
+      const backupRes = await fetch('/api/backup');
+      if (backupRes.ok) {
+        const backupData = await backupRes.json();
+        if (Array.isArray(backupData) && backupData.length > 0) {
+          setData(backupData);
+          setLoading(false); // Hızlıca ekrana bas
+        }
+      }
+    } catch (e) {
+      console.error("Backup load failed", e);
+    }
+
+    // 2. Sync with Cloud (Authoritative)
+    setSynced(false); // Senkronizasyon başlıyor
     const cloudData = await GoogleService.loadData();
+
     if (cloudData !== null) {
       setData(cloudData);
       setSynced(true);
     } else {
-      setSynced(false);
-      // Optional: Try to load from local backup if cloud fails?
-      // For now just show offline status
+      // Cloud başarısız olsa da elimizde backup verisi olabilir, synced=false kalır
     }
     setLoading(false);
   };

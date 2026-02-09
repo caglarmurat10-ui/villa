@@ -46,7 +46,7 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
     const handleBackup = async () => {
         const success = await GoogleService.backupToLocal();
         if (success) {
-            alert("Yedekleme Başarılı! ✅\n'villa.html' dosyası güncellendi.");
+            alert("Senkronizasyon Başarılı! ✅\nTüm veriler (Fiyatlar & Rezervasyonlar) 'villa.html' dosyasına kaydedildi.");
         } else {
             alert("Yedekleme Hatası! ❌");
         }
@@ -75,6 +75,24 @@ export default function Settings({ isOpen, onClose }: SettingsProps) {
                     </div>
 
                     <div className="space-y-6">
+                        {/* Commission Rate Settings */}
+                        <div className="bg-white/5 p-4 rounded-xl border border-white/5 space-y-3">
+                            <p className="text-[10px] uppercase font-bold text-gray-400">Varsayılan Komisyon Oranı (%)</p>
+                            <div className="flex gap-2">
+                                <input
+                                    type="number"
+                                    placeholder="%"
+                                    className="bg-gray-800 p-2 rounded-lg text-xs w-full text-white"
+                                    defaultValue={typeof window !== 'undefined' ? localStorage.getItem('villa_commission_rate') || '10' : '10'}
+                                    onChange={(e) => {
+                                        localStorage.setItem('villa_commission_rate', e.target.value);
+                                        // Notify app
+                                        window.dispatchEvent(new Event('config-update'));
+                                    }}
+                                />
+                            </div>
+                        </div>
+
                         {/* Add New Range */}
                         <div className="bg-white/5 p-4 rounded-xl border border-white/5 space-y-3">
                             <p className="text-[10px] uppercase font-bold text-gray-400">Yeni Fiyat Ekle</p>
