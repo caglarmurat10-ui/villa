@@ -212,42 +212,16 @@ export default function ReservationForm({ onSave, editingItem, onCancelEdit, con
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                        <div>
-                            <label className="text-xs font-bold text-gray-400 uppercase ml-1">Gecelik (₺)</label>
-                            <input
-                                type="number"
-                                value={formData.price}
-                                onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                                placeholder="0.00"
-                                className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-3 text-sm focus:border-indigo-500 outline-none mt-1 font-mono"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-xs font-bold text-gray-400 uppercase ml-1">Komisyon (%)</label>
-                            <input
-                                type="number"
-                                value={formData.commissionRate}
-                                onChange={(e) => setFormData({ ...formData, commissionRate: e.target.value })}
-                                placeholder="%"
-                                className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-3 text-sm focus:border-amber-500 outline-none mt-1 font-mono text-amber-400"
-                            />
-                        </div>
+                    <div>
+                        <label className="text-xs font-bold text-gray-400 uppercase ml-1">Gecelik (₺)</label>
+                        <input
+                            type="number"
+                            value={formData.price}
+                            onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                            placeholder="0.00"
+                            className="w-full bg-gray-800/50 border border-gray-700 rounded-xl p-3 text-sm focus:border-indigo-500 outline-none mt-1 font-mono"
+                        />
                     </div>
-                </div>
-            </div>
-
-            <div className="mb-6">
-                <label className="text-xs font-bold text-emerald-400 uppercase ml-1">Alınan Ödeme (₺)</label>
-                <div className="relative mt-1">
-                    <CreditCard className="absolute left-3 top-3 w-4 h-4 text-emerald-500" />
-                    <input
-                        type="number"
-                        value={formData.paidAmt}
-                        onChange={(e) => setFormData({ ...formData, paidAmt: e.target.value })}
-                        placeholder="Kapora vs."
-                        className="w-full bg-emerald-900/10 border border-emerald-500/30 rounded-xl p-3 pl-10 text-emerald-300 focus:border-emerald-500 outline-none font-mono"
-                    />
                 </div>
             </div>
 
