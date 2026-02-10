@@ -52,8 +52,22 @@ export const GoogleService = {
           const rawCin = getVal(['cin', 'Başlangıç', 'Baslangic', 'Giris']);
           const rawCout = getVal(['cout', 'Bitiş', 'Bitis', 'Cikis']);
 
-          // Fix Date Format (e.g. 2026-03-31T21:00:00.000Z -> 2026-03-31)
-          const fmtDate = (d: any) => typeof d === 'string' ? d.split('T')[0] : d;
+          // Fix Date Format (e.g. 2026-03-31T21:00:00.000Z -> 2026-04-01 in Local)
+          const fmtDate = (d: any) => {
+            if (!d) return '';
+            if (typeof d === 'string' && d.includes('T')) {
+              const date = new Date(d);
+              // Force Turkey Time (UTC+3)
+              // Add 3 hours in milliseconds
+              const trTime = new Date(date.getTime() + (3 * 60 * 60 * 1000));
+
+              const year = trTime.getUTCFullYear();
+              const month = String(trTime.getUTCMonth() + 1).padStart(2, '0');
+              const day = String(trTime.getUTCDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            }
+            return typeof d === 'string' ? d.split('T')[0] : d;
+          };
 
           const idVal = parseInt(getVal(['id', 'ID']) || '0');
           const priceVal = parseFloat(getVal(['price', 'Fiyat', 'Gecelik']) || '0');
@@ -107,7 +121,18 @@ export const GoogleService = {
           const rawCout = getVal(['cout', 'Bitiş', 'Bitis', 'Cikis']);
 
           // Fix Date Format
-          const fmtDate = (d: any) => typeof d === 'string' ? d.split('T')[0] : d;
+          const fmtDate = (d: any) => {
+            if (!d) return '';
+            if (typeof d === 'string' && d.includes('T')) {
+              const date = new Date(d);
+              // Use local time for date extraction
+              const year = date.getFullYear();
+              const month = String(date.getMonth() + 1).padStart(2, '0');
+              const day = String(date.getDate()).padStart(2, '0');
+              return `${year}-${month}-${day}`;
+            }
+            return typeof d === 'string' ? d.split('T')[0] : d;
+          };
 
           const idVal = parseInt(getVal(['id', 'ID']) || '0');
           const priceVal = parseFloat(getVal(['price', 'Fiyat', 'Gecelik']) || '0');
