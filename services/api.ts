@@ -10,35 +10,46 @@ export interface VillaReservation {
   net: number;
   price: number;
   commAmt: number;
-  paidAmt?: number; // Alınan Ödeme (Kapora vs)
-  remaining?: number; // Kalan Bakiye
+  paidAmt?: number;
+  remaining?: number;
 }
 
 const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwFecxccz6SP5tyPW0Mz2BB8h2xVaIu7iaTwZM1eIr8yKcs8ZIf22eoCjfVGUADdwOn-A/exec";
 
 export const GoogleService = {
   async loadData(): Promise<VillaReservation[] | null> {
+    // YENİ: 10 saniyelik zaman aşımı kontrolcüsü
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
     try {
-      const response = await fetch('/api/proxy');
-      if (!response.ok) throw new Error('Network response was not ok');
+      // YENİ: Vercel önbelleğini kırmak için dinamik zaman damgası (t) ve cache ayarları
+      const response = await fetch(`/api/proxy?t=${Date.now()}`, {
+        signal: controller.signal,
+        cache: 'no-store', // Next.js'e bu isteği asla önbelleğe almamasını söyler
+        headers: {
+          'Pragma': 'no-cache',
+          'Cache-Control': 'no-cache'
+        }
+      });
+      
+      clearTimeout(timeoutId);
+
+      if (!response.ok) throw new Error(`Network response was not ok: ${response.status}`);
 
       const data = await response.json();
 
-      // Handle Structured Data (New/v18 format)
       if (data && data.reservations && Array.isArray(data.reservations)) {
-        // Sync Prices if available
         if (data.prices && Array.isArray(data.prices)) {
           localStorage.setItem('villa_prices_v2', JSON.stringify(data.prices));
           window.dispatchEvent(new Event('price-update'));
         }
-        // Sync Config if available
         if (data.config && data.config.commission) {
           localStorage.setItem('villa_commission_rate', data.config.commission);
           window.dispatchEvent(new Event('config-update'));
         }
 
         return data.reservations.map((item: any) => {
-          // Helper to find value by multiple possible keys (case-insensitive)
           const getVal = (keys: string[]) => {
             for (const k of keys) {
               if (item[k] !== undefined) return item[k];
@@ -52,15 +63,11 @@ export const GoogleService = {
           const rawCin = getVal(['cin', 'Başlangıç', 'Baslangic', 'Giris']);
           const rawCout = getVal(['cout', 'Bitiş', 'Bitis', 'Cikis']);
 
-          // Fix Date Format (e.g. 2026-03-31T21:00:00.000Z -> 2026-04-01 in Local)
           const fmtDate = (d: any) => {
             if (!d) return '';
             if (typeof d === 'string' && d.includes('T')) {
               const date = new Date(d);
-              // Force Turkey Time (UTC+3)
-              // Add 3 hours in milliseconds
               const trTime = new Date(date.getTime() + (3 * 60 * 60 * 1000));
-
               const year = trTime.getUTCFullYear();
               const month = String(trTime.getUTCMonth() + 1).padStart(2, '0');
               const day = String(trTime.getUTCDate()).padStart(2, '0');
@@ -74,7 +81,6 @@ export const GoogleService = {
           const cinVal = fmtDate(rawCin) || '';
           const coutVal = fmtDate(rawCout) || '';
 
-          // Calculate derived values if missing
           const start = new Date(cinVal);
           const end = new Date(coutVal);
           const nightsVal = !isNaN(start.getTime()) && !isNaN(end.getTime())
@@ -83,11 +89,10 @@ export const GoogleService = {
 
           const brutVal = nightsVal * priceVal;
           const commVal = parseFloat(getVal(['commAmt', 'Komisyon', 'comm']) || '0');
-          // If comm is missing, use default from Config or calculate? For now 0 if missing.
 
           return {
             ...item,
-            id: idVal || Date.now(), // Fallback ID
+            id: idVal || Date.now(),
             apart: getVal(['apart', 'Apart']) || 'Safira',
             name: getVal(['name', 'Misafir', 'Ad']) || 'Misafir',
             cin: cinVal,
@@ -103,10 +108,8 @@ export const GoogleService = {
         });
       }
 
-      // Handle Legacy Array
       if (Array.isArray(data)) {
         return data.map((item: any) => {
-          // Helper to find value by multiple possible keys (case-insensitive)
           const getVal = (keys: string[]) => {
             for (const k of keys) {
               if (item[k] !== undefined) return item[k];
@@ -120,12 +123,10 @@ export const GoogleService = {
           const rawCin = getVal(['cin', 'Başlangıç', 'Baslangic', 'Giris']);
           const rawCout = getVal(['cout', 'Bitiş', 'Bitis', 'Cikis']);
 
-          // Fix Date Format
           const fmtDate = (d: any) => {
             if (!d) return '';
             if (typeof d === 'string' && d.includes('T')) {
               const date = new Date(d);
-              // Use local time for date extraction
               const year = date.getFullYear();
               const month = String(date.getMonth() + 1).padStart(2, '0');
               const day = String(date.getDate()).padStart(2, '0');
@@ -139,7 +140,6 @@ export const GoogleService = {
           const cinVal = fmtDate(rawCin) || '';
           const coutVal = fmtDate(rawCout) || '';
 
-          // Calculate derived values if missing
           const start = new Date(cinVal);
           const end = new Date(coutVal);
           const nightsVal = !isNaN(start.getTime()) && !isNaN(end.getTime())
@@ -168,6 +168,7 @@ export const GoogleService = {
       }
       return [];
     } catch (error) {
+      clearTimeout(timeoutId);
       console.error("Google Cloud Load Error:", error);
       return null;
     }
@@ -175,9 +176,12 @@ export const GoogleService = {
 
   async saveData(reservation: VillaReservation) {
     try {
-      const response = await fetch('/api/proxy', {
+      const response = await fetch(`/api/proxy?t=${Date.now()}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
         body: JSON.stringify({
           ...reservation,
           id: reservation.id.toString(),
@@ -200,9 +204,12 @@ export const GoogleService = {
 
   async deleteData(id: number) {
     try {
-      const response = await fetch('/api/proxy', {
+      const response = await fetch(`/api/proxy?t=${Date.now()}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-cache'
+        },
         body: JSON.stringify({
           type: 'villa',
           action: 'delete',
@@ -224,11 +231,10 @@ export const GoogleService = {
     try {
       let reservations = await this.loadData();
 
-      // If cloud load fails, try to keep existing reservations from backup
       if (reservations === null) {
         console.warn("Cloud load failed, attempting to read existing backup to preserve reservations...");
         try {
-          const existingRes = await fetch('/api/backup');
+          const existingRes = await fetch(`/api/backup?t=${Date.now()}`);
           if (existingRes.ok) {
             const existingData = await existingRes.json();
             if (existingData.reservations) {
@@ -240,7 +246,6 @@ export const GoogleService = {
         }
       }
 
-      // If still null (both cloud and local read failed), use empty array but CONTINUE to save prices
       if (reservations === null) reservations = [];
 
       const prices = PriceService.getPrices();
@@ -262,7 +267,7 @@ export const GoogleService = {
 export interface PriceRange {
   id: number;
   apart: 'Safira' | 'Destan';
-  start: string; // YYYY-MM-DD
+  start: string;
   end: string;
   price: number;
 }
@@ -296,7 +301,7 @@ export const PriceService = {
 
   syncWithBackup: async () => {
     try {
-      const res = await fetch('/api/backup');
+      const res = await fetch(`/api/backup?t=${Date.now()}`);
       if (res.ok) {
         const data = await res.json();
         if (data.prices && Array.isArray(data.prices) && data.prices.length > 0) {
