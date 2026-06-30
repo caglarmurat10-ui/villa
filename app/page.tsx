@@ -8,6 +8,7 @@ import ReservationForm from "@/components/ReservationForm";
 import TransactionList from "@/components/TransactionList";
 import Calculator from "@/components/Calculator";
 import Settings from "@/components/Settings";
+import FilterBar from "@/components/FilterBar"; // YENİ: Filtre bileşenimizi içe aktarıyoruz
 import { GoogleService, VillaReservation } from "@/services/api";
 import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon } from "lucide-react";
 
@@ -18,13 +19,15 @@ export default function Home() {
   const [editingItem, setEditingItem] = useState<VillaReservation | null>(null);
   const [showCalculator, setShowCalculator] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  
+  // YENİ: Hangi filtrenin aktif olduğunu tutan State (Varsayılan: Tümü)
+  const [activeFilter, setActiveFilter] = useState<'All' | 'Safira' | 'Destan'>('All');
 
   // Configuration (Could be dynamic later)
   const config = { commission: 10 };
 
   const loadData = async () => {
     // 1. Fast Load from Backup (Optimistic)
-    // Sadece ilk yüklemede veya data boşsa loading göster, yoksa gösterme (arkada yenile)
     if (data.length === 0) setLoading(true);
 
     try {
@@ -33,7 +36,7 @@ export default function Home() {
         const backupData = await backupRes.json();
         if (Array.isArray(backupData) && backupData.length > 0) {
           setData(backupData);
-          setLoading(false); // Hızlıca ekrana bas
+          setLoading(false); 
         }
       }
     } catch (e) {
@@ -41,15 +44,13 @@ export default function Home() {
     }
 
     // 2. Sync with Cloud (Authoritative)
-    setSynced(false); // Senkronizasyon başlıyor
+    setSynced(false); 
     const cloudData = await GoogleService.loadData();
 
     if (cloudData !== null) {
       setData(cloudData);
       setSynced(true);
-    } else {
-      // Cloud başarısız olsa da elimizde backup verisi olabilir, synced=false kalır
-    }
+    } 
     setLoading(false);
   };
 
@@ -67,8 +68,13 @@ export default function Home() {
     setEditingItem(null);
   };
 
-  // Derived Stats
-  const stats = data.reduce((acc, curr) => ({
+  // YENİ: Tüm veriyi seçili filtreye göre süzüyoruz
+  const filteredData = activeFilter === 'All' 
+    ? data 
+    : data.filter(item => item.apart === activeFilter);
+
+  // GÜNCELLENDİ: İstatistikleri artık süzülmüş (filteredData) veriler üzerinden hesaplıyoruz
+  const stats = filteredData.reduce((acc, curr) => ({
     brut: acc.brut + (curr.brut || 0),
     comm: acc.comm + (curr.commAmt || 0),
     net: acc.net + (curr.net || 0)
@@ -109,9 +115,13 @@ export default function Home() {
         </div>
       </header>
 
+      {/* YENİ: Menü Filtresi */}
+      <FilterBar activeFilter={activeFilter} setFilter={setActiveFilter} />
+
       <Dashboard stats={stats} />
 
-      <Calendar reservations={data} />
+      {/* GÜNCELLENDİ: Sadece filtrelenmiş veriyi gönderiyoruz */}
+      <Calendar reservations={filteredData} />
 
       <ReservationForm
         onSave={handleSaveComplete}
@@ -120,8 +130,9 @@ export default function Home() {
         onCancelEdit={() => setEditingItem(null)}
       />
 
+      {/* GÜNCELLENDİ: Sadece filtrelenmiş veriyi gönderiyoruz */}
       <TransactionList
-        reservations={data}
+        reservations={filteredData}
         onRefresh={loadData}
         onEdit={handleEdit}
       />
