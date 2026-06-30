@@ -1,46 +1,588 @@
 <!DOCTYPE html>
-<html lang="tr">
+<html lang="tr" class="h-full">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Villa Rezervasyon Yedekleri</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Apart Pro v16.2 - Hızlı Senkronizasyon & Filtre</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; line-height: 1.5; color: #333; }
-        h1 { border-bottom: 2px solid #eee; padding-bottom: 0.5rem; }
-        .backup-info { background: #f5f5f5; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; }
-        #data-preview { white-space: pre-wrap; background: #282c34; color: #abb2bf; padding: 1rem; border-radius: 8px; overflow-x: auto; font-family: monospace; }
+        body { font-family: 'Outfit', sans-serif; background: #0f172a; color: white; margin: 0; padding: 12px; }
+        .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.1); }
+        .btn-grad { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); }
+        .btn-update { background: linear-gradient(135deg, #10b981 0%, #059669 100%); }
+        .btn-backup { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); }
+        input, select { background: #1e293b !important; border: 1px solid #334155 !important; color: white !important; border-radius: 10px; padding: 10px; width: 100%; outline: none; }
+        .edit-mode { border: 2px solid #10b981 !important; box-shadow: 0 0 20px rgba(16, 185, 129, 0.2); }
+        .alert-pulse { animation: pulse-red 2s infinite; }
+        @keyframes pulse-red { 0% { opacity: 0.85; } 50% { opacity: 1; transform: scale(1.01); } 100% { opacity: 0.85; } }
+        .calendar-day { min-height: 45px; transition: all 0.2s; }
     </style>
 </head>
-<body>
-    <h1>Villa Rezervasyon Yedek Dosyası</h1>
-    
-    <div class="backup-info">
-        <p>Bu dosya uygulamanın verilerini yerel olarak yedeklemek için oluşturulmuştur.</p>
-        <p><strong>Son Güncelleme:</strong> <span id="last-updated">-</span></p>
-        <p>Veriler aşağıdaki gizli JSON bloğunda saklanmaktadır.</p>
+<body class="pb-24">
+    <script>
+        // Google Apps Script API URL
+        const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwFecxccz6SP5tyPW0Mz2BB8h2xVaIu7iaTwZM1eIr8yKcs8ZIf22eoCjfVGUADdwOn-A/exec";
+    </script>
+
+    <div class="max-w-4xl mx-auto">
+        <div id="notif-area" class="mb-4"></div>
+
+        <!-- Üst Bilgi ve Butonlar -->
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-xl font-bold">Apart <span class="text-indigo-400">Takip</span></h1>
+                <p id="ui-status" class="text-gray-400 text-[10px] uppercase tracking-widest">Sistem Başlatılıyor...</p>
+            </div>
+            <div class="flex gap-1">
+                <button onclick="forceBackup()" id="backup-btn" class="p-2 btn-backup rounded-lg text-[10px] font-bold text-white shadow-lg uppercase">☁️ Eşitle</button>
+                <button onclick="toggleCalc()" class="p-2 glass rounded-lg text-[10px] font-bold border border-amber-500/50 text-amber-400">🧮</button>
+                <button onclick="openSettings()" class="p-2 glass rounded-lg text-[10px] font-bold border border-indigo-500/50">⚙️</button>
+            </div>
+        </div>
+
+        <!-- Global Filtreleme Menüsü -->
+        <div class="flex gap-2 mb-4 bg-slate-800/50 p-1 rounded-xl border border-white/5">
+            <button onclick="setGlobalFilter('All')" id="btn-filter-All" class="flex-1 p-2 rounded-lg text-[10px] font-bold bg-white/10 text-white transition-all uppercase tracking-widest">Tüm Birimler</button>
+            <button onclick="setGlobalFilter('Safira')" id="btn-filter-Safira" class="flex-1 p-2 rounded-lg text-[10px] font-bold text-gray-400 hover:bg-white/5 transition-all uppercase tracking-widest">Safira</button>
+            <button onclick="setGlobalFilter('Destan')" id="btn-filter-Destan" class="flex-1 p-2 rounded-lg text-[10px] font-bold text-gray-400 hover:bg-white/5 transition-all uppercase tracking-widest">Destan</button>
+        </div>
+
+        <!-- Finansal Özet Tablosu -->
+        <div class="grid grid-cols-3 gap-2 mb-6 text-center">
+            <div class="glass p-3 rounded-2xl border-b-2 border-emerald-500">
+                <p class="text-[9px] text-gray-400 uppercase">Brüt</p>
+                <p id="total-brut" class="text-xs font-bold text-emerald-400">₺0</p>
+            </div>
+            <div class="glass p-3 rounded-2xl border-b-2 border-amber-500">
+                <p class="text-[9px] text-gray-400 uppercase">Komisyon</p>
+                <p id="total-comm" class="text-xs font-bold text-amber-400">₺0</p>
+            </div>
+            <div class="glass p-3 rounded-2xl border-b-2 border-rose-500">
+                <p class="text-[9px] text-gray-400 uppercase">Net Kar</p>
+                <p id="total-net" class="text-xs font-bold text-rose-400">₺0</p>
+            </div>
+        </div>
+
+        <!-- Takvim Modülü -->
+        <div class="glass rounded-3xl p-5 mb-6 border border-white/5">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-sm font-bold flex items-center gap-2">📅 Doluluk Takvimi</h3>
+                <div class="flex items-center gap-3">
+                    <button onclick="changeMonth(-1)" class="p-1 px-3 glass rounded-lg text-xs hover:bg-white/10"><</button>
+                    <span id="current-month-display" class="text-xs font-bold min-w-[100px] text-center uppercase tracking-wider">Ay Yükleniyor</span>
+                    <button onclick="changeMonth(1)" class="p-1 px-3 glass rounded-lg text-xs hover:bg-white/10">></button>
+                </div>
+            </div>
+            <div class="grid grid-cols-7 gap-1 text-center text-[9px] text-gray-500 mb-2 font-bold">
+                <div>PT</div><div>SA</div><div>ÇA</div><div>PE</div><div>CU</div><div>CT</div><div>PA</div>
+            </div>
+            <div id="calendar-grid" class="grid grid-cols-7 gap-1"></div>
+        </div>
+
+        <!-- Yeni Rezervasyon Formu -->
+        <div id="form-container" class="glass p-5 rounded-3xl mb-6 border border-white/5 transition-all">
+            <h3 id="form-title" class="text-sm font-bold mb-4 flex items-center gap-2">📋 Yeni Rezervasyon</h3>
+            <input type="hidden" id="edit-id" value="">
+            
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <select id="apart" onchange="autoCalculate()">
+                    <option value="Safira">Safira Apart</option>
+                    <option value="Destan">Destan Apart</option>
+                </select>
+                <input type="text" id="guest-name" placeholder="Misafir Adı">
+            </div>
+            <div class="grid grid-cols-2 gap-3 mb-3">
+                <input type="date" id="checkIn" onchange="autoCalculate()">
+                <input type="date" id="checkOut" onchange="autoCalculate()">
+            </div>
+            <div class="mb-4">
+                <label class="text-[10px] text-indigo-400 ml-1 font-bold">Gecelik Fiyat (₺)</label>
+                <input type="number" id="manual-price" placeholder="₺">
+            </div>
+            
+            <div class="flex gap-2">
+                <button onclick="saveRes()" id="save-btn" class="btn-grad flex-[4] p-4 rounded-xl font-bold shadow-lg active:scale-95 transition-all uppercase">Kaydet</button>
+                <button id="cancel-edit" onclick="resetForm()" class="hidden flex-1 bg-slate-700 p-4 rounded-xl font-bold text-xs text-white">İPTAL</button>
+            </div>
+        </div>
+
+        <!-- İşlem Geçmişi Listesi -->
+        <div class="glass rounded-3xl overflow-hidden shadow-xl">
+            <div class="p-4 border-b border-white/5 bg-white/5 flex justify-between items-center">
+                <h3 class="text-sm font-bold text-gray-300 tracking-tighter">İşlem Geçmişi</h3>
+                <span id="res-count" class="text-[10px] bg-indigo-500 px-2 py-0.5 rounded-full">0 Kayıt</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs">
+                    <thead class="text-gray-500 border-b border-white/5 bg-slate-800/30 uppercase text-[9px]">
+                        <tr>
+                            <th class="p-4">Misafir/Apart</th>
+                            <th class="p-4">Giriş-Çıkış</th>
+                            <th class="p-4 text-right">Net</th>
+                            <th class="p-4 text-right">İşlem</th>
+                        </tr>
+                    </thead>
+                    <tbody id="list-body" class="divide-y divide-white/5"></tbody>
+                </table>
+            </div>
+        </div>
     </div>
 
-    <h2>Ham Veri Önizleme</h2>
-    <div id="data-preview">Veri yok veya yüklenemedi...</div>
+    <!-- Hızlı Hesaplama Modalı -->
+    <div id="calc-modal" class="hidden fixed inset-0 bg-black/95 backdrop-blur-xl z-[60] p-6 flex items-center justify-center">
+        <div class="w-full max-w-md glass p-6 rounded-3xl border border-amber-500/30">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-lg font-bold text-amber-400 flex items-center gap-2">🧮 Hızlı Hesapla</h2>
+                <button onclick="toggleCalc()" class="text-gray-400 text-3xl">&times;</button>
+            </div>
+            <div class="space-y-4">
+                <select id="calc-apart" onchange="quickCalc()"><option value="Safira">Safira Apart</option><option value="Destan">Destan Apart</option></select>
+                <div class="grid grid-cols-2 gap-2">
+                    <input type="date" id="calc-in" onchange="quickCalc()">
+                    <input type="date" id="calc-out" onchange="quickCalc()">
+                </div>
+                <input type="number" id="calc-price" placeholder="Fiyat" oninput="quickCalc()">
+                <input type="number" id="calc-discount" placeholder="İndirim %" oninput="quickCalc()" class="border-amber-500/30 !bg-amber-500/5">
+                <div class="bg-indigo-500/10 p-5 rounded-2xl border border-indigo-500/20 mt-4">
+                    <div class="flex justify-between items-end">
+                        <div><p id="calc-detail" class="text-[10px] text-indigo-300 font-medium">--</p><div id="calc-result" class="text-2xl font-bold text-white mt-1">₺0</div></div>
+                        <div class="text-right"><p id="calc-savings" class="text-[10px] text-emerald-400 font-bold"></p></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-    <!-- BU BÖLÜM OTOMATİK OLARAK GÜNCELLENİR. LÜTFEN ELLE DEĞİŞTİRMEYİNİZ. -->
-    <script id="villa-data" type="application/json">[]</script>
-    <!-- ------------------------------------------------------------------ -->
+    <!-- Ayarlar Modalı -->
+    <div id="settings-modal" class="hidden fixed inset-0 bg-black/95 backdrop-blur-xl z-50 p-6 overflow-y-auto">
+        <div class="max-w-md mx-auto">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-xl font-bold text-indigo-400">⚙️ Ayarlar & Fiyatlar</h2>
+                <button onclick="closeSettings()" class="text-gray-400 text-2xl">&times;</button>
+            </div>
+            <div class="glass p-5 rounded-2xl mb-4 border border-indigo-500/20">
+                <label class="text-[10px] font-bold text-gray-400 uppercase block mb-2">Sabit Komisyon Oranı (%)</label>
+                <div class="flex gap-2">
+                    <input type="number" id="global-comm" placeholder="%">
+                    <button onclick="saveGlobalConfig()" class="bg-emerald-600 px-4 rounded-xl font-bold text-xs text-white">Kaydet</button>
+                </div>
+            </div>
+             <div class="glass p-5 rounded-2xl border border-indigo-500/20">
+                <p class="text-[10px] text-gray-400 mb-4 uppercase font-bold">Dönemsel Fiyatlar</p>
+                <div class="space-y-3">
+                    <select id="price-apart"><option value="Safira">Safira</option><option value="Destan">Destan</option></select>
+                    <div class="grid grid-cols-2 gap-2"><input type="date" id="range-start"><input type="date" id="range-end"></div>
+                    <input type="number" id="range-price" placeholder="Gecelik ₺">
+                    <button onclick="addPriceRange()" class="w-full bg-indigo-600 p-3 rounded-xl font-bold text-xs">FİYATI EKLE</button>
+                </div>
+                <div id="price-list" class="mt-4 space-y-2"></div>
+            </div>
+        </div>
+    </div>
 
     <script>
-        try {
-            const dataScript = document.getElementById('villa-data');
-            const preview = document.getElementById('data-preview');
-            const data = JSON.parse(dataScript.textContent);
+        // State Management - Temel Veriler
+        let db = JSON.parse(localStorage.getItem('ap_pro_v16_db')) || [];
+        let priceRanges = JSON.parse(localStorage.getItem('ap_price_ranges')) || [];
+        let config = JSON.parse(localStorage.getItem('ap_config')) || { commission: 10 };
+        let currentViewDate = new Date();
+        
+        // Global Filtreleme Değişkeni
+        let globalFilter = 'All';
+
+        // İş Mantığı: Global Filtreleme (UI ve State'i günceller)
+        function setGlobalFilter(filterVal) {
+            globalFilter = filterVal;
+            const filters = ['All', 'Safira', 'Destan'];
             
-            preview.textContent = JSON.stringify(data, null, 2);
-            document.getElementById('last-updated').textContent = new Date().toLocaleString();
-            
-            console.log("Yedeklenen veri yüklendi:", data);
-        } catch (e) {
-            console.error("Veri okuma hatası:", e);
-            document.getElementById('data-preview').textContent = "Hata: Veri okunamadı. JSON formatı bozuk olabilir.";
+            filters.forEach(id => {
+                const btn = document.getElementById(`btn-filter-${id}`);
+                if (btn) {
+                    btn.className = id === filterVal
+                        ? "flex-1 p-2 rounded-lg text-[10px] font-bold bg-white/10 text-white transition-all uppercase tracking-widest"
+                        : "flex-1 p-2 rounded-lg text-[10px] font-bold text-gray-400 hover:bg-white/5 transition-all uppercase tracking-widest";
+                }
+            });
+            render(); 
         }
+
+        // Bulut İşlemleri: Güvenli Eşitleme (Error Handling)
+        async function forceBackup() {
+            const btn = document.getElementById('backup-btn');
+            const status = document.getElementById('ui-status');
+            const originalText = btn.innerText;
+            
+            btn.disabled = true;
+            btn.innerText = "⏳ Yazılıyor...";
+            status.innerText = "Buluta Gönderiliyor...";
+            
+            // Yerel veriyi garanti altına al
+            localStorage.setItem('ap_pro_v16_db', JSON.stringify(db));
+
+            try {
+                const payload = { action: 'bulk_sync', data: db };
+                const response = await fetch(GOOGLE_SCRIPT_URL, { 
+                    method: 'POST', 
+                    body: JSON.stringify(payload)
+                });
+                
+                const result = await response.json();
+
+                if(result.status === 'success') {
+                    btn.innerText = "✅ Eşitlendi";
+                    status.innerText = "Bulut Güncel ✅";
+                    status.style.color = "#10b981";
+                    btn.classList.remove('alert-pulse');
+                } else {
+                    throw new Error(result.message || "Bilinmeyen sunucu hatası");
+                }
+            } catch(e) { 
+                console.error("Sync Hatası:", e);
+                btn.innerText = "❌ Hata";
+                status.innerText = "Bağlantı Hatası! Local Aktif";
+                status.style.color = "#f43f5e";
+            } finally {
+                setTimeout(() => { 
+                    btn.innerText = originalText; 
+                    btn.disabled = false; 
+                }, 2500);
+            }
+        }
+
+        // Bulut İşlemleri: Güvenli Veri Çekme (Timeout Controller)
+        async function loadDataFromCloud() {
+            const status = document.getElementById('ui-status');
+            status.innerText = "Bulut Bekleniyor (Max 8sn)...";
+            status.style.color = "#fbbf24";
+            
+            // İstek uzun sürerse kilitlenmeyi önlemek için zaman aşımı ekleniyor
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 8000); 
+
+            try {
+                const response = await fetch(GOOGLE_SCRIPT_URL, {
+                    signal: controller.signal
+                });
+                
+                clearTimeout(timeoutId); // Yanıt başarılı olursa sayacı iptal et
+                
+                if (!response.ok) throw new Error(`HTTP Error: ${response.status}`);
+                
+                const cloudData = await response.json();
+                
+                if(Array.isArray(cloudData)) {
+                    if(cloudData.length > 0) {
+                        // Veri tiplerini güvenli hale getir
+                        db = cloudData.map(item => ({
+                            ...item,
+                            id: parseInt(item.id),
+                            nights: parseInt(item.nights),
+                            brut: parseFloat(item.brut) || 0,
+                            net: parseFloat(item.net) || 0,
+                            price: parseFloat(item.price) || 0,
+                            commAmt: parseFloat(item.commAmt) || 0
+                        }));
+                        localStorage.setItem('ap_pro_v16_db', JSON.stringify(db));
+                        status.innerText = "Bulut Bağlantısı Başarılı ✅"; 
+                        status.style.color = "#10b981";
+                    } else {
+                         status.innerText = "Bulut Boş (Local Aktif)";
+                         status.style.color = "#94a3b8";
+                    }
+                    render(); // Yeni verilerle arayüzü çiz
+                }
+            } catch(error) { 
+                clearTimeout(timeoutId);
+                console.warn("Bulut eşitleme hatası, yerel verilerle devam ediliyor:", error);
+                
+                if (error.name === 'AbortError') {
+                    status.innerText = "Sunucu Zaman Aşımı (Local Aktif)";
+                } else {
+                    status.innerText = "Ağ Hatası (Local Aktif)";
+                }
+                status.style.color = "#f43f5e"; 
+                
+                render(); // Hata alınsa bile yerel verilerle sistemi ayağa kaldır
+            }
+        }
+
+        // CRUD: Rezervasyon Ekle / Güncelle
+        function saveRes() {
+            const editId = document.getElementById('edit-id').value;
+            const name = document.getElementById('guest-name').value;
+            const cin = document.getElementById('checkIn').value;
+            const cout = document.getElementById('checkOut').value;
+            const price = parseFloat(document.getElementById('manual-price').value);
+            
+            // Veri Doğrulama (Validation)
+            if(!name || !cin || !cout || isNaN(price)) return alert("Lütfen tüm alanları eksiksiz doldurun!");
+            if(new Date(cin) >= new Date(cout)) return alert("Çıkış tarihi giriş tarihinden sonra olmalıdır!");
+            
+            const nights = Math.ceil((new Date(cout) - new Date(cin)) / 86400000);
+            const brut = nights * price;
+            const commAmt = brut * (config.commission / 100);
+            const net = brut - commAmt;
+            
+            const entry = { 
+                id: editId ? parseInt(editId) : Date.now(), 
+                name, 
+                apart: document.getElementById('apart').value, 
+                cin, cout, nights, brut, net, price, commAmt 
+            };
+
+            if(editId) {
+                db = db.map(x => x.id === entry.id ? entry : x);
+            } else {
+                db.push(entry);
+            }
+            
+            localStorage.setItem('ap_pro_v16_db', JSON.stringify(db));
+            
+            // Aktif filtre seçeneğine göre formu hizala
+            if (globalFilter !== 'All') document.getElementById('apart').value = globalFilter; 
+            
+            render(); 
+            resetForm();
+            
+            // Eşitleme Uyarısı (UX)
+            const backupBtn = document.getElementById('backup-btn');
+            backupBtn.classList.add('alert-pulse');
+            document.getElementById('ui-status').innerText = "Değişiklik var! Eşitleyin ⚠️";
+            document.getElementById('ui-status').style.color = "#fbbf24";
+        }
+
+        // CRUD: Kayıt Sil
+        function deleteEntry(id) { 
+            if(confirm("Bu kaydı silmek istediğinize emin misiniz?")) { 
+                db = db.filter(x => x.id !== id);
+                localStorage.setItem('ap_pro_v16_db', JSON.stringify(db));
+                render();
+                document.getElementById('backup-btn').classList.add('alert-pulse');
+            } 
+        }
+
+        // CRUD: Düzenleme Moduna Geç
+        function editEntry(id) {
+            const item = db.find(x => x.id == id);
+            if(!item) return;
+            
+            document.getElementById('edit-id').value = item.id;
+            document.getElementById('apart').value = item.apart;
+            document.getElementById('guest-name').value = item.name;
+            document.getElementById('checkIn').value = item.cin;
+            document.getElementById('checkOut').value = item.cout;
+            document.getElementById('manual-price').value = item.price;
+            
+            const formContainer = document.getElementById('form-container');
+            formContainer.classList.add('edit-mode');
+            document.getElementById('form-title').innerText = "✏️ Düzenle: " + item.name;
+            
+            const saveBtn = document.getElementById('save-btn');
+            saveBtn.innerText = "GÜNCELLE";
+            saveBtn.classList.replace('btn-grad', 'btn-update');
+            document.getElementById('cancel-edit').classList.remove('hidden');
+            formContainer.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+
+        function resetForm() {
+            document.getElementById('edit-id').value = ""; 
+            document.getElementById('guest-name').value = "";
+            document.getElementById('manual-price').value = ""; 
+            
+            const formContainer = document.getElementById('form-container');
+            formContainer.classList.remove('edit-mode');
+            document.getElementById('form-title').innerText = "📋 Yeni Rezervasyon"; 
+            
+            if (globalFilter !== 'All') document.getElementById('apart').value = globalFilter;
+            
+            const saveBtn = document.getElementById('save-btn');
+            saveBtn.innerText = "Kaydet";
+            saveBtn.classList.remove('btn-update'); 
+            saveBtn.classList.add('btn-grad');
+            document.getElementById('cancel-edit').classList.add('hidden');
+        }
+
+        // UI Güncelleme Merkezi
+        function render() {
+            const body = document.getElementById('list-body');
+            const notif = document.getElementById('notif-area');
+            body.innerHTML = ""; 
+            notif.innerHTML = "";
+            
+            let totalBrut = 0, totalComm = 0, totalNet = 0;
+            const today = new Date(); 
+            today.setHours(0,0,0,0);
+            
+            // 1. Adım: Veritabanını aktif filtreye göre süz
+            const filteredDb = globalFilter === 'All' ? db : db.filter(x => x.apart === globalFilter);
+            
+            if(filteredDb.length === 0) {
+                body.innerHTML = "<tr><td colspan='4' class='p-4 text-center text-gray-500'>Henüz kayıt yok.</td></tr>";
+            }
+
+            // 2. Adım: Filtrelenmiş verilerle DOM'u oluştur
+            filteredDb.sort((a,b) => new Date(b.cin) - new Date(a.cin)).forEach(item => {
+                totalBrut += item.brut || 0; 
+                totalComm += item.commAmt || 0; 
+                totalNet += item.net || 0;
+                
+                // Yaklaşan Çıkış Bildirimleri (Notification System)
+                const coutDate = new Date(item.cout); 
+                coutDate.setHours(0,0,0,0);
+                const diffDays = Math.ceil((coutDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)); 
+
+                if(diffDays === 0 || diffDays === 1) {
+                   const color = diffDays === 0 ? "border-rose-500 bg-rose-500/10 text-rose-300" : "border-amber-500 bg-amber-500/10 text-amber-300";
+                   const txt = diffDays === 0 ? "BUGÜN ÇIKIYOR!" : "Yarın çıkacak.";
+                   notif.innerHTML += `<div class="alert-pulse p-3 rounded-xl mb-2 flex items-center justify-between border ${color}"><div class="flex items-center gap-2"><span>🔔</span><div><div class="font-bold text-xs">${item.name} (${item.apart})</div><div class="text-[10px] font-bold">${txt}</div></div></div><div class="text-[10px] bg-black/30 px-2 py-1 rounded">${item.cout}</div></div>`;
+                }
+
+                body.innerHTML += `<tr class="hover:bg-white/5 transition-colors border-b border-white/5">
+                    <td class="p-4"><div class="font-bold text-white">${item.name}</div><span class="text-[9px] uppercase font-bold text-indigo-400">${item.apart}</span></td>
+                    <td class="p-4"><div class="text-gray-400 text-[10px]">G: ${item.cin}</div><div class="font-medium text-rose-400 text-[10px]">Ç: ${item.cout}</div></td>
+                    <td class="p-4 font-bold text-emerald-400 text-right">₺${Math.floor(item.net).toLocaleString('tr-TR')}</td>
+                    <td class="p-4 text-right">
+                        <button onclick="editEntry(${item.id})" class="bg-indigo-500/20 p-2 rounded-lg text-indigo-400 hover:text-white mr-1">✏️</button>
+                        <button onclick="deleteEntry(${item.id})" class="bg-rose-500/20 p-2 rounded-lg text-rose-500 hover:text-white">🗑️</button>
+                    </td>
+                </tr>`;
+            });
+
+            // Metrikleri Güncelle
+            document.getElementById('total-brut').innerText = "₺" + totalBrut.toLocaleString('tr-TR');
+            document.getElementById('total-comm').innerText = "₺" + totalComm.toLocaleString('tr-TR');
+            document.getElementById('total-net').innerText = "₺" + totalNet.toLocaleString('tr-TR');
+            document.getElementById('res-count').innerText = filteredDb.length + " Kayıt";
+            
+            // Takvimi render et
+            renderCalendar();
+        }
+
+        // Dinamik Takvim Sistemi
+        function renderCalendar() {
+            const grid = document.getElementById('calendar-grid');
+            const display = document.getElementById('current-month-display');
+            grid.innerHTML = "";
+            
+            const year = currentViewDate.getFullYear();
+            const month = currentViewDate.getMonth();
+            display.innerText = new Intl.DateTimeFormat('tr-TR', { month: 'long', year: 'numeric' }).format(currentViewDate);
+            
+            const firstDay = new Date(year, month, 1).getDay();
+            const daysInMonth = new Date(year, month + 1, 0).getDate();
+            const startDay = firstDay === 0 ? 6 : firstDay - 1;
+            
+            for (let i = 0; i < startDay; i++) grid.innerHTML += `<div></div>`;
+            
+            for (let day = 1; day <= daysInMonth; day++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                
+                // Tarih bazlı rezervasyon eşleşmesi
+                let bookings = db.filter(res => dateStr >= res.cin && dateStr < res.cout);
+                
+                // Aktif global filtreye göre takvim renklerini ayarla
+                if (globalFilter !== 'All') {
+                    bookings = bookings.filter(res => res.apart === globalFilter);
+                }
+                
+                let bgColor = "bg-slate-800/40"; // Varsayılan Boş Gün
+                if(bookings.length > 0) {
+                    bgColor = bookings[0].apart === 'Safira' ? 'bg-indigo-600/80' : 'bg-emerald-600/80';
+                    if(bookings.length > 1 && globalFilter === 'All') bgColor = "bg-gradient-to-br from-indigo-600 to-emerald-600";
+                }
+                
+                grid.innerHTML += `<div class="calendar-day ${bgColor} rounded-lg flex flex-col items-center justify-center border border-white/5 relative">
+                    <span class="text-[11px] font-bold">${day}</span>
+                    ${bookings.length > 0 ? `<span class="text-[6px] opacity-80 absolute bottom-1">Dolu</span>` : ''}
+                </div>`;
+            }
+        }
+
+        // Yardımcı Araçlar: Otomatik ve Hızlı Fiyat Hesaplamaları
+        function autoCalculate() { 
+            const apart = document.getElementById('apart').value;
+            const cinStr = document.getElementById('checkIn').value;
+            if(!cinStr) return;
+            let foundPrice = 0;
+            priceRanges.forEach(r => { if(r.apart === apart && cinStr >= r.start && cinStr <= r.end) foundPrice = r.price; });
+            if(foundPrice > 0) document.getElementById('manual-price').value = foundPrice;
+        }
+
+        function quickCalc() {
+            const apart = document.getElementById('calc-apart').value;
+            const cinStr = document.getElementById('calc-in').value;
+            const priceInput = document.getElementById('calc-price');
+
+            if (window.event && (window.event.target.id === 'calc-in' || window.event.target.id === 'calc-apart')) {
+                let foundPrice = 0;
+                priceRanges.forEach(r => { if(r.apart === apart && cinStr >= r.start && cinStr <= r.end) foundPrice = r.price; });
+                if (foundPrice > 0) priceInput.value = foundPrice;
+            }
+
+            const price = parseFloat(priceInput.value) || 0;
+            const discount = parseFloat(document.getElementById('calc-discount').value) || 0;
+            const cin = new Date(cinStr);
+            const cout = new Date(document.getElementById('calc-out').value);
+
+            if (cin && cout && cout > cin) {
+                const nights = Math.ceil((cout - cin) / 86400000);
+                let rawTotal = nights * price;
+                let discountedTotal = rawTotal - (rawTotal * (discount / 100));
+                document.getElementById('calc-result').innerText = "₺" + discountedTotal.toLocaleString('tr-TR');
+                document.getElementById('calc-detail').innerText = `${nights} Gece x ₺${price}`;
+                document.getElementById('calc-savings').innerText = discount > 0 ? `-%${discount} İndirim` : "";
+            } else {
+                document.getElementById('calc-result').innerText = "₺0";
+            }
+        }
+
+        // Sistem İçi Navigasyon
+        function changeMonth(step) { currentViewDate.setMonth(currentViewDate.getMonth() + step); renderCalendar(); }
+        function toggleCalc() { document.getElementById('calc-modal').classList.toggle('hidden'); }
+        function openSettings() { document.getElementById('global-comm').value = config.commission; renderPriceList(); document.getElementById('settings-modal').classList.remove('hidden'); }
+        function closeSettings() { document.getElementById('settings-modal').classList.add('hidden'); }
+        
+        function saveGlobalConfig() { 
+            config.commission = parseFloat(document.getElementById('global-comm').value) || 0; 
+            localStorage.setItem('ap_config', JSON.stringify(config)); 
+            alert("Sistem ayarları güncellendi!"); 
+        }
+
+        function addPriceRange() {
+            const apart = document.getElementById('price-apart').value;
+            const start = document.getElementById('range-start').value;
+            const end = document.getElementById('range-end').value;
+            const price = parseFloat(document.getElementById('range-price').value);
+            
+            if(!start || !end || isNaN(price)) return alert("Tüm alanları doldurun.");
+            
+            priceRanges.push({ id: Date.now(), apart, start, end, price });
+            localStorage.setItem('ap_price_ranges', JSON.stringify(priceRanges));
+            renderPriceList();
+        }
+
+        function renderPriceList() {
+            const list = document.getElementById('price-list');
+            list.innerHTML = `<h3 class="text-[9px] font-bold text-gray-500 mb-2 uppercase tracking-widest">Kayıtlı Fiyatlar</h3>`;
+            priceRanges.forEach(r => {
+                list.innerHTML += `<div class="glass p-3 rounded-xl flex justify-between items-center text-[10px] border border-white/5"><div><b>${r.apart}</b>: ${r.start} / ${r.end}<div class="text-emerald-400 font-bold">₺${r.price}</div></div><button onclick="removePriceRange(${r.id})" class="text-rose-500 font-bold p-1">SİL</button></div>`;
+            });
+        }
+        
+        function removePriceRange(id) { 
+            priceRanges = priceRanges.filter(r => r.id !== id); 
+            localStorage.setItem('ap_price_ranges', JSON.stringify(priceRanges)); 
+            renderPriceList(); 
+        }
+
+        // Uygulama Başlatıcı
+        window.onload = () => { 
+            // Önce lokal verilerle arayüzü hızla çiz
+            render(); 
+            // Sonra arka planda bulutu kontrol et
+            loadDataFromCloud(); 
+        };
     </script>
 </body>
 </html>
