@@ -8,8 +8,6 @@ interface CalendarProps {
     reservations: VillaReservation[];
 }
 
-// CLEAN CODE: Renk paletini tek bir merkeze topladık.
-// İleride renkleri değiştirmek istersen sadece bu bloğu (blue, rose vb.) güncellemen yeterli.
 const APART_COLORS = {
     Safira: { 
         bg: "bg-blue-600/80", 
@@ -32,10 +30,9 @@ export default function Calendar({ reservations }: CalendarProps) {
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
 
-    // Calendar Logic
     const firstDay = new Date(year, month, 1).getDay();
     const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const startDay = firstDay === 0 ? 6 : firstDay - 1; // Start from Monday
+    const startDay = firstDay === 0 ? 6 : firstDay - 1; // Pazartesiden başlat
 
     const changeMonth = (delta: number) => {
         setCurrentDate(new Date(year, month + delta, 1));
@@ -43,8 +40,6 @@ export default function Calendar({ reservations }: CalendarProps) {
 
     const getDayContent = (day: number) => {
         const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-        // Find reservations for this day
         const activeRes = reservations.filter(r => dateStr >= r.cin && dateStr < r.cout);
 
         let bgColor = "bg-white/5";
@@ -52,13 +47,16 @@ export default function Calendar({ reservations }: CalendarProps) {
         let status = "";
 
         if (activeRes.length > 0) {
-            if (activeRes.length > 1) {
-                // Overlap (Çakışma veya Tüm Birimler seçili durumu)
+            // MENTÖRLÜK DOKUNUŞU: O günkü rezervasyonların hangi apartlara ait olduğunu benzersiz olarak listeliyoruz (Örn: Sadece Destan)
+            const uniqueAparts = Array.from(new Set(activeRes.map(r => r.apart)));
+
+            if (uniqueAparts.length > 1) {
+                // Eğer aynı gün HEM Safira HEM Destan doluysa (Tüm Birimler sekmesinde)
                 bgColor = APART_COLORS.Overlap.bg;
                 borderColor = "border-white/20";
             } else {
-                // Güvenli tip ataması ile ilgili apartın renklerini çekiyoruz
-                const apart = activeRes[0].apart as 'Safira' | 'Destan';
+                // Aynı apartta giriş-çıkış çakışması olsa bile kendi orijinal rengini korur
+                const apart = uniqueAparts[0] as 'Safira' | 'Destan';
                 bgColor = APART_COLORS[apart]?.bg || bgColor;
                 borderColor = APART_COLORS[apart]?.border || borderColor;
             }
@@ -85,12 +83,10 @@ export default function Calendar({ reservations }: CalendarProps) {
                 </div>
             </div>
 
-            {/* Header Days */}
             <div className="grid grid-cols-7 gap-1 text-center text-[9px] text-gray-500 mb-2 font-bold uppercase">
                 <div>Pt</div><div>Sa</div><div>Ça</div><div>Pe</div><div>Cu</div><div>Ct</div><div>Pa</div>
             </div>
 
-            {/* Grid */}
             <div className="grid grid-cols-7 gap-1">
                 {Array.from({ length: startDay }).map((_, i) => (
                     <div key={`empty-${i}`} />
@@ -110,7 +106,6 @@ export default function Calendar({ reservations }: CalendarProps) {
                 })}
             </div>
 
-            {/* Legend */}
             <div className="flex gap-4 mt-4 justify-center text-[9px] font-bold uppercase tracking-widest text-gray-400">
                 <div className="flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${APART_COLORS.Safira.dot}`}></span> Safira</div>
                 <div className="flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${APART_COLORS.Destan.dot}`}></span> Destan</div>
