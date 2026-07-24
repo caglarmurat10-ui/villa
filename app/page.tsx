@@ -82,17 +82,23 @@ export default function Home() {
 
   const safeData = Array.isArray(data) ? data : [];
 
-  // Komisyon ve net tutar dinamik hesaplama
+  // Bugünün Tarihi
+  const todayStr = '2026-07-24';
+  const getTomorrowStr = () => '2026-07-25';
+  const tomorrowStr = getTomorrowStr();
+
+  // Komisyon, Net Tutar ve Geçmiş Rezervasyon Tahsilat Otomasyonu
   const processedData = useMemo(() => {
     return safeData.map(item => {
       if (!item) return item;
       const brut = Number(item.brut) || (Number(item.nights || 0) * Number(item.price || 0));
       const commAmt = Number(item.commAmt) > 0 ? Number(item.commAmt) : (brut * commission / 100);
       const net = brut - commAmt;
-      const paidAmt = Number(item.paidAmt) || 0;
-      const remaining = Number(item.remaining) !== undefined && !isNaN(Number(item.remaining)) 
-        ? Number(item.remaining) 
-        : Math.max(brut - paidAmt, 0);
+
+      // Geçmiş rezervasyonlar tamamen tahsil edilmiş sayılır
+      const isCompleted = item.cout && item.cout < todayStr;
+      const paidAmt = isCompleted ? brut : (Number(item.paidAmt) || 0);
+      const remaining = isCompleted ? 0 : Math.max(brut - paidAmt, 0);
 
       return {
         ...item,
@@ -103,21 +109,23 @@ export default function Home() {
         remaining
       };
     });
-  }, [safeData, commission]);
+  }, [safeData, commission, todayStr]);
 
   // Önce Villa Filtresi (All, Safira, Destan)
   const filteredByVilla = useMemo(() => activeFilter === 'All'
     ? processedData
     : processedData.filter(item => item && item.apart === activeFilter), [activeFilter, processedData]);
 
-  // Bugünün Tarihi ve Çıkış Yaklaşanlar Hesaplaması (Aktif vs Tamamlanan)
-  const todayStr = new Date().toISOString().split('T')[0];
-  const getTomorrowStr = () => {
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().split('T')[0];
-  };
-  const tomorrowStr = getTomorrowStr();
+  // İLK REZERVASYondan SON REZERVASYONA KADAR TÜM DÖNEMİN GENEL ÖZETİ (Tahsilat Kartı İçin)
+  const overallStats = useMemo(() => filteredByVilla.reduce((acc, curr) => ({
+    brut: acc.brut + (curr?.brut || 0),
+    comm: acc.comm + (curr?.commAmt || 0),
+    net: acc.net + (curr?.net || 0),
+    paid: acc.paid + (curr?.paidAmt || 0),
+    remaining: acc.remaining + (curr?.remaining || 0),
+    reservations: acc.reservations + 1,
+    nights: acc.nights + (curr?.nights || 0)
+  }), { brut: 0, comm: 0, net: 0, paid: 0, remaining: 0, reservations: 0, nights: 0 }), [filteredByVilla]);
 
   const activeReservations = useMemo(() => 
     filteredByVilla.filter(item => item && item.cout >= todayStr), 
@@ -132,7 +140,7 @@ export default function Home() {
     activeReservations.filter(item => item && (item.cout === todayStr || item.cout === tomorrowStr)), 
   [activeReservations, todayStr, tomorrowStr]);
 
-  // Ekranda gösterilecek nihai veri setini sekmeye göre belirliyoruz
+  // Ekranda (Takvim ve Listede) gösterilecek nihai veri setini sekmeye göre belirliyoruz
   const filteredData = useMemo(() => 
     reservationTab === 'active' ? activeReservations : completedReservations,
   [reservationTab, activeReservations, completedReservations]);
@@ -141,11 +149,9 @@ export default function Home() {
     brut: acc.brut + (curr?.brut || 0),
     comm: acc.comm + (curr?.commAmt || 0),
     net: acc.net + (curr?.net || 0),
-    paid: acc.paid + (curr?.paidAmt || 0),
-    remaining: acc.remaining + (curr?.remaining || 0),
     reservations: acc.reservations + 1,
     nights: acc.nights + (curr?.nights || 0)
-  }), { brut: 0, comm: 0, net: 0, paid: 0, remaining: 0, reservations: 0, nights: 0 }), [filteredData]);
+  }), { brut: 0, comm: 0, net: 0, reservations: 0, nights: 0 }), [filteredData]);
 
   // VİLLA BAZLI AYRIŞTIRMA (Safira ve Destan Karşılaştırmalı Özet)
   const villaBreakdown = useMemo(() => {
@@ -155,19 +161,15 @@ export default function Home() {
       brut: acc.brut + (curr.brut || 0),
       comm: acc.comm + (curr.commAmt || 0),
       net: acc.net + (curr.net || 0),
-      paid: acc.paid + (curr.paidAmt || 0),
-      remaining: acc.remaining + (curr.remaining || 0),
       count: acc.count + 1
-    }), { brut: 0, comm: 0, net: 0, paid: 0, remaining: 0, count: 0 });
+    }), { brut: 0, comm: 0, net: 0, count: 0 });
 
     const destan = activeSet.filter(i => i.apart === 'Destan').reduce((acc, curr) => ({
       brut: acc.brut + (curr.brut || 0),
       comm: acc.comm + (curr.commAmt || 0),
       net: acc.net + (curr.net || 0),
-      paid: acc.paid + (curr.paidAmt || 0),
-      remaining: acc.remaining + (curr.remaining || 0),
       count: acc.count + 1
-    }), { brut: 0, comm: 0, net: 0, paid: 0, remaining: 0, count: 0 });
+    }), { brut: 0, comm: 0, net: 0, count: 0 });
 
     return { safira, destan };
   }, [activeReservations, completedReservations, reservationTab]);
@@ -241,24 +243,24 @@ export default function Home() {
 
       <Dashboard stats={stats} />
 
-      {/* TAHSİLAT & BAKİYE ÖZETİ KARTI (YENİ) */}
+      {/* TAHSİLAT & BAKİYE ÖZETİ KARTI (İLK REZERVASYONDAN SON REZERVASYONA TÜM DÖNEM) */}
       <div className="bg-gradient-to-r from-gray-900 via-indigo-950/40 to-gray-900 border border-indigo-500/30 rounded-2xl p-5 mb-6 shadow-xl">
         <div className="flex items-center gap-2 mb-3 border-b border-gray-800 pb-2">
           <Wallet className="w-5 h-5 text-indigo-400" />
-          <h3 className="font-extrabold text-indigo-300 text-sm tracking-wide uppercase">Genel Tahsilat & Alacak Takibi</h3>
+          <h3 className="font-extrabold text-indigo-300 text-sm tracking-wide uppercase">Genel Tahsilat & Alacak Takibi (Tüm Dönem)</h3>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
           <div className="bg-gray-950/60 p-3.5 rounded-xl border border-gray-800">
             <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Toplam Alınacak (Brüt)</p>
-            <p className="text-xl font-black text-emerald-400 mt-1">₺{stats.brut.toLocaleString('tr-TR')}</p>
+            <p className="text-xl font-black text-emerald-400 mt-1">₺{overallStats.brut.toLocaleString('tr-TR')}</p>
           </div>
           <div className="bg-gray-950/60 p-3.5 rounded-xl border border-gray-800">
             <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Toplam Alınan (Tahsil Edilen)</p>
-            <p className="text-xl font-black text-sky-400 mt-1">₺{stats.paid.toLocaleString('tr-TR')}</p>
+            <p className="text-xl font-black text-sky-400 mt-1">₺{overallStats.paid.toLocaleString('tr-TR')}</p>
           </div>
           <div className="bg-gray-950/60 p-3.5 rounded-xl border border-gray-800">
             <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Toplam Kalan Alacak</p>
-            <p className="text-xl font-black text-rose-400 mt-1">₺{stats.remaining.toLocaleString('tr-TR')}</p>
+            <p className="text-xl font-black text-rose-400 mt-1">₺{overallStats.remaining.toLocaleString('tr-TR')}</p>
           </div>
         </div>
       </div>
