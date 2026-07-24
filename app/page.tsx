@@ -8,7 +8,7 @@ import Calculator from "@/components/Calculator";
 import Settings from "@/components/Settings";
 import FilterBar from "@/components/FilterBar";
 import { GoogleService, VillaReservation } from "@/services/api";
-import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon, Bell, Home as HomeIcon, Wallet, MessageSquare, MapPin, Phone } from "lucide-react";
+import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon, Home as HomeIcon, Wallet, MessageSquare, Phone, Send, Calendar as CalendarIcon } from "lucide-react";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -22,10 +22,13 @@ export default function Home() {
   const [activeFilter, setActiveFilter] = useState<'All' | 'Safira' | 'Destan'>('All');
   const [commission, setCommission] = useState(10);
 
+  // Görünüm Sekmesi: 'dashboard' (Ana Ekran) veya 'messages' (Mesaj Yönetimi)
+  const [viewMode, setViewMode] = useState<'dashboard' | 'messages'>('dashboard');
+
   // Misafir telefon numaralarını localStorage ile senkronize tutma
   const [phoneInputs, setPhoneInputs] = useState<Record<string, string>>({});
 
-  // Aktif veya Tamamlanan Rezervasyon Sekme Filtresi
+  // Aktif veya Tamamlanan Rezervasyon Sekme Filtresi (Ana ekran içi)
   const [reservationTab, setReservationTab] = useState<'active' | 'completed'>('active');
 
   const loadData = async () => {
@@ -108,8 +111,6 @@ export default function Home() {
 
   // Bugünün Tarihi
   const todayStr = '2026-07-24';
-  const getTomorrowStr = () => '2026-07-25';
-  const tomorrowStr = getTomorrowStr();
 
   // Komisyon, Net Tutar ve Geçmiş Rezervasyon Tahsilat Otomasyonu
   const processedData = useMemo(() => {
@@ -158,16 +159,6 @@ export default function Home() {
     filteredByVilla.filter(item => item && item.cout < todayStr), 
   [filteredByVilla, todayStr]);
 
-  // Çıkışı bugün veya yarın olanlar
-  const approachingCheckouts = useMemo(() => 
-    activeReservations.filter(item => item && (item.cout === todayStr || item.cout === tomorrowStr)), 
-  [activeReservations, todayStr, tomorrowStr]);
-
-  // Gelecek tüm aktif girişler
-  const upcomingCheckins = useMemo(() => 
-    activeReservations.filter(item => item && item.cin >= todayStr), 
-  [activeReservations, todayStr]);
-
   const filteredData = useMemo(() => 
     reservationTab === 'active' ? activeReservations : completedReservations,
   [reservationTab, activeReservations, completedReservations]);
@@ -192,7 +183,7 @@ export default function Home() {
     return { safira, destan };
   }, [activeReservations, completedReservations, reservationTab]);
 
-  // Telefon numarasını temizleyip wa.me formatına uygun hale getirme
+  // WhatsApp URL oluşturucu
   const getWhatsAppUrl = (phone: string, text: string) => {
     const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
     const encodedText = encodeURIComponent(text);
@@ -254,215 +245,207 @@ export default function Home() {
         </div>
       </header>
 
-      {/* GELECEK REZERVASYONLAR İÇİN KONUM & BİLGİ GÖNDERME PANELİ */}
-      {upcomingCheckins.length > 0 && (
-        <div className="mb-6 p-4 bg-sky-500/15 border border-sky-500/30 rounded-2xl text-sky-300 shadow-lg space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <span className="p-2 bg-sky-500/20 rounded-xl text-sky-400">
-                <MapPin className="w-5 h-5" />
-              </span>
-              <div>
-                <h4 className="font-bold text-sm">Gelecek Misafirlere Konum & Bilgi Gönder</h4>
-                <p className="text-xs text-sky-200/90 mt-0.5">Numarayı girin; bu numara çıkış panelinde de otomatik hatırlanacaktır.</p>
-              </div>
-            </div>
-            <span className="px-3 py-1 bg-sky-500/20 rounded-full text-xs font-bold border border-sky-500/40">
-              {upcomingCheckins.length} Gelecek Misafir
-            </span>
+      {/* ANA GÖRÜNÜM SEKMELERİ (DASHBOARD vs WHATSAPP MESAJ PANELİ) */}
+      <div className="flex space-x-2 mb-6 bg-gray-900/80 p-1.5 rounded-2xl border border-gray-800 w-fit">
+        <button 
+          onClick={() => setViewMode('dashboard')}
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'dashboard' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+        >
+          <CalendarIcon className="w-4 h-4" /> Ana Takip & Finans
+        </button>
+        <button 
+          onClick={() => setViewMode('messages')}
+          className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'messages' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+        >
+          <MessageSquare className="w-4 h-4" /> WhatsApp Mesaj Paneli ({activeReservations.length})
+        </button>
+      </div>
+
+      {/* ==================================================== */}
+      {/* 1. WHATSAPP MESAJ YÖNETİMİ SEKMESİ */}
+      {/* ==================================================== */}
+      {viewMode === 'messages' && (
+        <div className="space-y-6 animate-fadeIn">
+          <div className="bg-gradient-to-r from-gray-900 via-sky-950/30 to-gray-900 border border-sky-500/30 rounded-2xl p-5 shadow-xl">
+            <h3 className="text-base font-black text-sky-300 mb-1 flex items-center gap-2">
+              <Send className="w-5 h-5 text-sky-400" /> Misafir İletişim & Otomasyon Paneli
+            </h3>
+            <p className="text-xs text-gray-300">
+              Girişte yazdığınız telefon numaraları otomatik olarak kaydedilir. Çıkış gününde veya dilediğiniz an aynı numarayla çıkış/yorum hatırlatması gönderebilirsiniz.
+            </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-sky-500/25 max-h-72 overflow-y-auto">
-            {upcomingCheckins.map(r => {
-              const rKey = String(r.id || '');
-              return (
-                <div key={rKey} className="flex flex-col gap-2 bg-black/40 p-3 rounded-xl border border-sky-500/20">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-white">{r.name}</span>
-                    <span className="text-sky-200/70">({r.apart} - Giriş: {r.cin})</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Phone className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Tel: 905XXXXXXXXX"
-                        value={phoneInputs[rKey] || ''}
-                        onChange={(e) => handlePhoneChange(r.id, e.target.value)}
-                        className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
-                      />
+          <div className="grid grid-cols-1 gap-4">
+            {activeReservations.length === 0 ? (
+              <div className="text-center py-12 bg-gray-900/50 rounded-2xl border border-gray-800 text-gray-400 text-sm">
+                Aktif veya gelecek rezervasyon bulunmuyor.
+              </div>
+            ) : (
+              activeReservations.map(r => {
+                const rKey = String(r.id || '');
+                return (
+                  <div key={rKey} className="bg-gray-900/90 border border-gray-800 rounded-2xl p-4 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${r.apart === 'Safira' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-pink-500/20 text-pink-300 border border-pink-500/30'}`}>
+                          {r.apart}
+                        </span>
+                        <h4 className="font-extrabold text-white text-sm">{r.name}</h4>
+                      </div>
+                      <p className="text-xs text-gray-400">
+                        Giriş: <span className="text-sky-300 font-semibold">{r.cin}</span> &nbsp;|&nbsp; Çıkış: <span className="text-amber-300 font-semibold">{r.cout}</span>
+                      </p>
                     </div>
-                    <button
-                      onClick={() => sendCheckinWhatsApp(r.id, r.apart)}
-                      className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow transition-all whitespace-nowrap"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" /> Konum Gönder
-                    </button>
+
+                    <div className="flex flex-col sm:flex-row items-center gap-3">
+                      {/* Telefon Giriş Alanı */}
+                      <div className="relative w-full sm:w-56">
+                        <Phone className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                        <input
+                          type="text"
+                          placeholder="Tel: 905XXXXXXXXX"
+                          value={phoneInputs[rKey] || ''}
+                          onChange={(e) => handlePhoneChange(r.id, e.target.value)}
+                          className="w-full bg-gray-950 border border-gray-700 rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-500"
+                        />
+                      </div>
+
+                      {/* Aksiyon Butonları */}
+                      <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <button
+                          onClick={() => sendCheckinWhatsApp(r.id, r.apart)}
+                          className="flex-1 sm:flex-none px-3.5 py-2 bg-sky-600 hover:bg-sky-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow transition-all"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" /> Konum Gönder
+                        </button>
+                        <button
+                          onClick={() => sendCheckoutWhatsApp(r.id, r.apart)}
+                          className="flex-1 sm:flex-none px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 shadow transition-all"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" /> Çıkış & Yorum At
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       )}
 
-      {/* ÇIKIŞI YAKLAŞANLAR BİLDİRİM PANELİ & HATIRLATMA + YORUM LİNKİ */}
-      {approachingCheckouts.length > 0 && (
-        <div className="mb-6 p-4 bg-amber-500/15 border border-amber-500/30 rounded-2xl text-amber-300 shadow-lg space-y-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <span className="p-2 bg-amber-500/20 rounded-xl text-amber-400">
-                <Bell className="w-5 h-5" />
-              </span>
-              <div>
-                <h4 className="font-bold text-sm">Çıkışı Yaklaşan Misafirler Var!</h4>
-                <p className="text-xs text-amber-200/90 mt-0.5">Girişte girdiğiniz numara burada otomatik görünür. Çıkış hatırlatması atabilirsiniz.</p>
-              </div>
-            </div>
-            <span className="px-3 py-1 bg-amber-500/20 rounded-full text-xs font-bold border border-amber-500/40">
-              {approachingCheckouts.length} Misafir
-            </span>
+      {/* ==================================================== */}
+      {/* 2. ANA TAKİP & FİNANS DASHBOARD SEKMESİ */}
+      {/* ==================================================== */}
+      {viewMode === 'dashboard' && (
+        <div className="space-y-6 animate-fadeIn">
+          <FilterBar activeFilter={activeFilter} setFilter={setActiveFilter} />
+
+          {/* AKTİF VE TAMAMLANAN REZERVASYON SEKMELERİ */}
+          <div className="flex space-x-2 bg-gray-900/60 p-1.5 rounded-2xl border border-gray-800 w-fit">
+            <button 
+              onClick={() => setReservationTab('active')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${reservationTab === 'active' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+            >
+              Aktif / Gelecek Rezervasyonlar ({activeReservations.length})
+            </button>
+            <button 
+              onClick={() => setReservationTab('completed')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${reservationTab === 'completed' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+            >
+              Tamamlanan / Arşiv ({completedReservations.length})
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-amber-500/20">
-            {approachingCheckouts.map(r => {
-              const rKey = String(r.id || '');
-              return (
-                <div key={rKey} className="flex flex-col gap-2 bg-black/40 p-3 rounded-xl border border-amber-500/20">
-                  <div className="flex justify-between items-center text-xs">
-                    <span className="font-bold text-white">{r.name}</span>
-                    <span className="text-amber-200/70">({r.apart} - Çıkış: {r.cout})</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="relative flex-1">
-                      <Phone className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Tel: 905XXXXXXXXX"
-                        value={phoneInputs[rKey] || ''}
-                        onChange={(e) => handlePhoneChange(r.id, e.target.value)}
-                        className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
-                      />
-                    </div>
-                    <button
-                      onClick={() => sendCheckoutWhatsApp(r.id, r.apart)}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow transition-all whitespace-nowrap"
-                    >
-                      <MessageSquare className="w-3.5 h-3.5" /> Çıkış & Yorum At
-                    </button>
-                  </div>
+          {/* TAHSİLAT & BAKİYE ÖZETİ KARTI */}
+          <div className="bg-gradient-to-r from-gray-900 via-indigo-950/40 to-gray-900 border border-indigo-500/30 rounded-2xl p-5 shadow-xl">
+            <div className="flex items-center gap-2 mb-3 border-b border-gray-800 pb-2">
+              <Wallet className="w-5 h-5 text-indigo-400" />
+              <h3 className="font-extrabold text-indigo-300 text-sm tracking-wide uppercase">Genel Tahsilat & Alacak Takibi (Tüm Dönem)</h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+              <div className="bg-gray-950/60 p-3.5 rounded-xl border border-gray-800">
+                <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Toplam Alınacak (Brüt)</p>
+                <p className="text-xl font-black text-emerald-400 mt-1">₺{overallStats.brut.toLocaleString('tr-TR')}</p>
+              </div>
+              <div className="bg-gray-950/60 p-3.5 rounded-xl border border-gray-800">
+                <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Toplam Alınan (Tahsil Edilen)</p>
+                <p className="text-xl font-black text-sky-400 mt-1">₺{overallStats.paid.toLocaleString('tr-TR')}</p>
+              </div>
+              <div className="bg-gray-950/60 p-3.5 rounded-xl border border-gray-800">
+                <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Toplam Kalan Alacak</p>
+                <p className="text-xl font-black text-rose-400 mt-1">₺{overallStats.remaining.toLocaleString('tr-TR')}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* VİLLA BAZLI KARŞILAŞTIRMALI ÖZET KARTI */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Safira Özet */}
+            <div className="bg-gray-900/90 border border-purple-500/30 rounded-2xl p-5 shadow-xl">
+              <div className="flex justify-between items-center mb-3 border-b border-gray-800 pb-2">
+                <h3 className="font-extrabold text-purple-400 flex items-center gap-2">
+                  <HomeIcon className="w-4 h-4" /> Safira Villası
+                </h3>
+                <span className="text-xs bg-purple-500/10 text-purple-300 px-2.5 py-1 rounded-full font-semibold">{villaBreakdown.safira.count} Rezervasyon</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
+                  <p className="text-[10px] text-gray-400 uppercase font-bold">Brüt Gelir</p>
+                  <p className="text-sm md:text-base font-black text-emerald-400 mt-1">₺{villaBreakdown.safira.brut.toLocaleString('tr-TR')}</p>
                 </div>
-              );
-            })}
+                <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
+                  <p className="text-[10px] text-gray-400 uppercase font-bold">Komisyon</p>
+                  <p className="text-sm md:text-base font-black text-amber-400 mt-1">₺{villaBreakdown.safira.comm.toLocaleString('tr-TR')}</p>
+                </div>
+                <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
+                  <p className="text-[10px] text-gray-400 uppercase font-bold">Net Kalan</p>
+                  <p className="text-sm md:text-base font-black text-indigo-400 mt-1">₺{villaBreakdown.safira.net.toLocaleString('tr-TR')}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Destan Özet */}
+            <div className="bg-gray-900/90 border border-pink-500/30 rounded-2xl p-5 shadow-xl">
+              <div className="flex justify-between items-center mb-3 border-b border-gray-800 pb-2">
+                <h3 className="font-extrabold text-pink-400 flex items-center gap-2">
+                  <HomeIcon className="w-4 h-4" /> Destan Villası
+                </h3>
+                <span className="text-xs bg-pink-500/10 text-pink-300 px-2.5 py-1 rounded-full font-semibold">{villaBreakdown.destan.count} Rezervasyon</span>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
+                  <p className="text-[10px] text-gray-400 uppercase font-bold">Brüt Gelir</p>
+                  <p className="text-sm md:text-base font-black text-emerald-400 mt-1">₺{villaBreakdown.destan.brut.toLocaleString('tr-TR')}</p>
+                </div>
+                <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
+                  <p className="text-[10px] text-gray-400 uppercase font-bold">Komisyon</p>
+                  <p className="text-sm md:text-base font-black text-amber-400 mt-1">₺{villaBreakdown.destan.comm.toLocaleString('tr-TR')}</p>
+                </div>
+                <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
+                  <p className="text-[10px] text-gray-400 uppercase font-bold">Net Kalan</p>
+                  <p className="text-sm md:text-base font-black text-indigo-400 mt-1">₺{villaBreakdown.destan.net.toLocaleString('tr-TR')}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid lg:grid-cols-[1.25fr_0.75fr] gap-6 items-start">
+            <div>
+              <Calendar reservations={filteredData} activeVilla={activeFilter} />
+              <TransactionList reservations={filteredData} onRefresh={loadData} onEdit={(item) => { setEditingItem(item); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+            </div>
+            <ReservationForm
+              onSave={() => { loadData(); setEditingItem(null); }}
+              config={{ commission }}
+              reservations={safeData}
+              editingItem={editingItem}
+              onCancelEdit={() => setEditingItem(null)}
+              defaultVilla={activeFilter === 'All' ? 'Safira' : activeFilter}
+            />
           </div>
         </div>
       )}
-
-      <FilterBar activeFilter={activeFilter} setFilter={setActiveFilter} />
-
-      {/* AKTİF VE TAMAMLANAN REZERVASYON SEKMELERİ */}
-      <div className="flex space-x-2 my-6 bg-gray-900/60 p-1.5 rounded-2xl border border-gray-800 w-fit">
-        <button 
-          onClick={() => setReservationTab('active')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${reservationTab === 'active' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
-        >
-          Aktif / Gelecek Rezervasyonlar ({activeReservations.length})
-        </button>
-        <button 
-          onClick={() => setReservationTab('completed')}
-          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${reservationTab === 'completed' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
-        >
-          Tamamlanan / Arşiv ({completedReservations.length})
-        </button>
-      </div>
-
-      {/* TAHSİLAT & BAKİYE ÖZETİ KARTI */}
-      <div className="bg-gradient-to-r from-gray-900 via-indigo-950/40 to-gray-900 border border-indigo-500/30 rounded-2xl p-5 mb-6 shadow-xl">
-        <div className="flex items-center gap-2 mb-3 border-b border-gray-800 pb-2">
-          <Wallet className="w-5 h-5 text-indigo-400" />
-          <h3 className="font-extrabold text-indigo-300 text-sm tracking-wide uppercase">Genel Tahsilat & Alacak Takibi (Tüm Dönem)</h3>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
-          <div className="bg-gray-950/60 p-3.5 rounded-xl border border-gray-800">
-            <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Toplam Alınacak (Brüt)</p>
-            <p className="text-xl font-black text-emerald-400 mt-1">₺{overallStats.brut.toLocaleString('tr-TR')}</p>
-          </div>
-          <div className="bg-gray-950/60 p-3.5 rounded-xl border border-gray-800">
-            <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Toplam Alınan (Tahsil Edilen)</p>
-            <p className="text-xl font-black text-sky-400 mt-1">₺{overallStats.paid.toLocaleString('tr-TR')}</p>
-          </div>
-          <div className="bg-gray-950/60 p-3.5 rounded-xl border border-gray-800">
-            <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Toplam Kalan Alacak</p>
-            <p className="text-xl font-black text-rose-400 mt-1">₺{overallStats.remaining.toLocaleString('tr-TR')}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* VİLLA BAZLI KARŞILAŞTIRMALI ÖZET KARTI */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-        {/* Safira Özet */}
-        <div className="bg-gray-900/90 border border-purple-500/30 rounded-2xl p-5 shadow-xl">
-          <div className="flex justify-between items-center mb-3 border-b border-gray-800 pb-2">
-            <h3 className="font-extrabold text-purple-400 flex items-center gap-2">
-              <HomeIcon className="w-4 h-4" /> Safira Villası
-            </h3>
-            <span className="text-xs bg-purple-500/10 text-purple-300 px-2.5 py-1 rounded-full font-semibold">{villaBreakdown.safira.count} Rezervasyon</span>
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
-              <p className="text-[10px] text-gray-400 uppercase font-bold">Brüt Gelir</p>
-              <p className="text-sm md:text-base font-black text-emerald-400 mt-1">₺{villaBreakdown.safira.brut.toLocaleString('tr-TR')}</p>
-            </div>
-            <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
-              <p className="text-[10px] text-gray-400 uppercase font-bold">Komisyon</p>
-              <p className="text-sm md:text-base font-black text-amber-400 mt-1">₺{villaBreakdown.safira.comm.toLocaleString('tr-TR')}</p>
-            </div>
-            <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
-              <p className="text-[10px] text-gray-400 uppercase font-bold">Net Kalan</p>
-              <p className="text-sm md:text-base font-black text-indigo-400 mt-1">₺{villaBreakdown.safira.net.toLocaleString('tr-TR')}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Destan Özet */}
-        <div className="bg-gray-900/90 border border-pink-500/30 rounded-2xl p-5 shadow-xl">
-          <div className="flex justify-between items-center mb-3 border-b border-gray-800 pb-2">
-            <h3 className="font-extrabold text-pink-400 flex items-center gap-2">
-              <HomeIcon className="w-4 h-4" /> Destan Villası
-            </h3>
-            <span className="text-xs bg-pink-500/10 text-pink-300 px-2.5 py-1 rounded-full font-semibold">{villaBreakdown.destan.count} Rezervasyon</span>
-          </div>
-          <div className="grid grid-cols-3 gap-2 text-center">
-            <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
-              <p className="text-[10px] text-gray-400 uppercase font-bold">Brüt Gelir</p>
-              <p className="text-sm md:text-base font-black text-emerald-400 mt-1">₺{villaBreakdown.destan.brut.toLocaleString('tr-TR')}</p>
-            </div>
-            <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
-              <p className="text-[10px] text-gray-400 uppercase font-bold">Komisyon</p>
-              <p className="text-sm md:text-base font-black text-amber-400 mt-1">₺{villaBreakdown.destan.comm.toLocaleString('tr-TR')}</p>
-            </div>
-            <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
-              <p className="text-[10px] text-gray-400 uppercase font-bold">Net Kalan</p>
-              <p className="text-sm md:text-base font-black text-indigo-400 mt-1">₺{villaBreakdown.destan.net.toLocaleString('tr-TR')}</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid lg:grid-cols-[1.25fr_0.75fr] gap-6 items-start">
-        <div>
-          <Calendar reservations={filteredData} activeVilla={activeFilter} />
-          <TransactionList reservations={filteredData} onRefresh={loadData} onEdit={(item) => { setEditingItem(item); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
-        </div>
-        <ReservationForm
-          onSave={() => { loadData(); setEditingItem(null); }}
-          config={{ commission }}
-          reservations={safeData}
-          editingItem={editingItem}
-          onCancelEdit={() => setEditingItem(null)}
-          defaultVilla={activeFilter === 'All' ? 'Safira' : activeFilter}
-        />
-      </div>
 
       <Settings isOpen={showSettings} onClose={() => setShowSettings(false)} />
     </main>
