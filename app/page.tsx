@@ -138,7 +138,7 @@ export default function Home() {
     activeReservations.filter(item => item && (item.cout === todayStr || item.cout === tomorrowStr)), 
   [activeReservations, todayStr, tomorrowStr]);
 
-  // Gelecek tüm aktif girişler (Artık sadece bugün/yarın değil, tüm gelecek girişler listelenir)
+  // Gelecek tüm aktif girişler
   const upcomingCheckins = useMemo(() => 
     activeReservations.filter(item => item && item.cin >= todayStr), 
   [activeReservations, todayStr]);
@@ -167,24 +167,24 @@ export default function Home() {
     return { safira, destan };
   }, [activeReservations, completedReservations, reservationTab]);
 
-  // ÇIKIŞ İÇİN ÖZEL HATIRLATMA VE YORUM LİNKİ WHATSAPP MESAJI
-  const sendCheckoutWhatsApp = (name: string, apart: string) => {
+  // ÇIKIŞ İÇİN ÖZEL HATIRLATMA VE YORUM LİNKİ WHATSAPP MESAJI (İsimsiz)
+  const sendCheckoutWhatsApp = (apart: string) => {
     const reviewLink = apart === 'Safira' 
       ? 'https://g.page/r/CV4SGDD8Hr_7EBM/review' 
       : 'https://g.page/r/CZMpV_CdinkEEBM/review';
 
-    const text = `Merhaba ${name}, yarın çıkışınız var çıkışlar 9 ile 10 arasındadır ben saat 10 doğru gelirim sizde hazırlanmış olursunuz iyi günler dilerim\n\nGörüşleriniz bizim için çok değerli. Değerlendirmeniz için: ${reviewLink}`;
+    const text = `Merhaba, yarın çıkışınız var çıkışlar 9 ile 10 arasındadır ben saat 10 doğru gelirim sizde hazırlanmış olursunuz iyi günler dilerim\n\nGörüşleriniz bizim için çok değerli. Değerlendirmeniz için: ${reviewLink}`;
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
     window.open(url, '_blank');
   };
 
-  // VİLLA BAZLI GİRİŞ VE KONUM WHATSAPP MESAJI
-  const sendCheckinWhatsApp = (name: string, apart: string) => {
+  // VİLLA BAZLI GİRİŞ VE KONUM WHATSAPP MESAJI (İsimsiz)
+  const sendCheckinWhatsApp = (apart: string) => {
     let text = '';
     if (apart === 'Destan') {
-      text = `Merhaba ${name} ben Murat villanın konumunu atıyorum girişler saat 16 ile 22 arasındadır. Yaklaşınca haber verirsiniz. Hayırlı yolculuklar\n\nhttps://maps.app.goo.gl/QmWfNNF9ikQ5G1CFA?g_st=aw`;
+      text = `Merhaba, ben Murat villanın konumunu atıyorum girişler saat 16 ile 22 arasındadır. Yaklaşınca haber verirsiniz. Hayırlı yolculuklar\n\nhttps://maps.app.goo.gl/QmWfNNF9ikQ5G1CFA?g_st=aw`;
     } else {
-      text = `Merhaba ${name} ben Murat villanın konumunu atıyorum girişler saat 16 ile 22 arasındadır. Ödeme girişte nakit olarak yapılmaktadır. Yaklaşınca haber verirsiniz. Hayırlı yolculuklar\n\nhttps://maps.app.goo.gl/QPmffSfmcw3KeBEs9`;
+      text = `Merhaba, ben Murat villanın konumunu atıyorum girişler saat 16 ile 22 arasındadır. Ödeme girişte nakit olarak yapılmaktadır. Yaklaşınca haber verirsiniz. Hayırlı yolculuklar\n\nhttps://maps.app.goo.gl/QPmffSfmcw3KeBEs9`;
     }
 
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
@@ -246,7 +246,7 @@ export default function Home() {
                   <span className="text-sky-200/70 block">({r.apart} - Giriş: {r.cin})</span>
                 </div>
                 <button
-                  onClick={() => sendCheckinWhatsApp(r.name, r.apart)}
+                  onClick={() => sendCheckinWhatsApp(r.apart)}
                   className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition-all whitespace-nowrap"
                 >
                   <MessageSquare className="w-3.5 h-3.5" /> Konum Gönder
@@ -283,7 +283,7 @@ export default function Home() {
                   <span className="text-amber-200/70 block">({r.apart} - Çıkış: {r.cout})</span>
                 </div>
                 <button
-                  onClick={() => sendCheckoutWhatsApp(r.name, r.apart)}
+                  onClick={() => sendCheckoutWhatsApp(r.apart)}
                   className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition-all whitespace-nowrap"
                 >
                   <MessageSquare className="w-3.5 h-3.5" /> Çıkış & Yorum At
