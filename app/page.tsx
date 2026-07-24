@@ -12,6 +12,9 @@ import { GoogleService, VillaReservation } from "@/services/api";
 import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon } from "lucide-react";
 
 export default function Home() {
+  // MENTÖRLÜK DOKUNUŞU 1: Error 418'i engelleyen kalkanımız (Mounted State)
+  const [mounted, setMounted] = useState(false);
+
   const [data, setData] = useState<VillaReservation[]>(() => GoogleService.getLocalData());
   const [loading, setLoading] = useState(true);
   const [synced, setSynced] = useState(false);
@@ -47,6 +50,9 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // MENTÖRLÜK DOKUNUŞU 2: Sistem tarayıcıya tam oturunca kalkanı kaldırıyoruz
+    setMounted(true);
+
     const refreshLocalData = () => setData(GoogleService.getLocalData());
     const readCommission = () => {
       const value = Number(localStorage.getItem('villa_commission_rate') || 10);
@@ -61,6 +67,16 @@ export default function Home() {
       window.removeEventListener('villa-data-update', refreshLocalData);
     };
   }, []);
+
+  // MENTÖRLÜK DOKUNUŞU 3: Eğer sistem henüz oturmadıysa ekranı kilitleyip animasyon gösteriyoruz (Hata burada önleniyor)
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f172a] text-white">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-400 mb-4" />
+        <p className="text-sm font-bold uppercase tracking-widest text-gray-400">Sistem Başlatılıyor...</p>
+      </div>
+    );
+  }
 
   const filteredData = useMemo(() => activeFilter === 'All'
     ? data
