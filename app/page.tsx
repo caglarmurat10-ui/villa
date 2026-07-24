@@ -9,7 +9,7 @@ import Calculator from "@/components/Calculator";
 import Settings from "@/components/Settings";
 import FilterBar from "@/components/FilterBar";
 import { GoogleService, VillaReservation } from "@/services/api";
-import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon } from "lucide-react";
+import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon, Bell } from "lucide-react";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -22,6 +22,9 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'All' | 'Safira' | 'Destan'>('All');
   const [commission, setCommission] = useState(10);
+
+  // YENİ: Aktif veya Tamamlanan Rezervasyon Sekme Filtresi
+  const [reservationTab, setReservationTab] = useState<'active' | 'completed'>('active');
 
   const loadData = async () => {
     if (!data || data.length === 0) setLoading(true);
@@ -52,7 +55,6 @@ export default function Home() {
     setMounted(true);
 
     const refreshLocalData = () => {
-      // Güvenlik: Eğer fonksiyon yoksa çökmeyi önle
       if (typeof GoogleService.getLocalData === 'function') {
         const local = GoogleService.getLocalData();
         if (Array.isArray(local)) setData(local);
@@ -78,12 +80,39 @@ export default function Home() {
     };
   }, []);
 
-  // MENTÖRLÜK DOKUNUŞU: Tüm Hook'lar (useMemo) Erken-Dönüş (return) işleminden ÖNCEYE alındı!
   const safeData = Array.isArray(data) ? data : [];
 
-  const filteredData = useMemo(() => activeFilter === 'All'
+  // 1. Önce Villa Filtresi (All, Safira, Destan)
+  const filteredByVilla = useMemo(() => activeFilter === 'All'
     ? safeData
     : safeData.filter(item => item && item.apart === activeFilter), [activeFilter, safeData]);
+
+  // 2. YENİ: Bugünün Tarihi ve Çıkış Yaklaşanlar Hesaplaması (Aktif vs Tamamlanan)
+  const todayStr = new Date().toISOString().split('T')[0];
+  const getTomorrowStr = () => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().split('T')[0];
+  };
+  const tomorrowStr = getTomorrowStr();
+
+  const activeReservations = useMemo(() => 
+    filteredByVilla.filter(item => item && item.cout >= todayStr), 
+  [filteredByVilla, todayStr]);
+
+  const completedReservations = useMemo(() => 
+    filteredByVilla.filter(item => item && item.cout < todayStr), 
+  [filteredByVilla, todayStr]);
+
+  // Çıkışı bugün veya yarın olanlar (Bildirim için)
+  const approachingCheckouts = useMemo(() => 
+    activeReservations.filter(item => item && (item.cout === todayStr || item.cout === tomorrowStr)), 
+  [activeReservations, todayStr, tomorrowStr]);
+
+  // Ekranda (Takvim ve Listede) gösterilecek nihai veri setini sekmeye göre belirliyoruz
+  const filteredData = useMemo(() => 
+    reservationTab === 'active' ? activeReservations : completedReservations,
+  [reservationTab, activeReservations, completedReservations]);
 
   const stats = useMemo(() => filteredData.reduce((acc, curr) => ({
     brut: acc.brut + (curr?.brut || 0),
@@ -95,7 +124,6 @@ export default function Home() {
     nights: acc.nights + (curr?.nights || 0)
   }), { brut: 0, comm: 0, net: 0, paid: 0, remaining: 0, reservations: 0, nights: 0 }), [filteredData]);
 
-  // HATA ÇÖZÜMÜ: Yükleme ekranı artık kancaları (Hook) engellemeyecek şekilde EN SONA yerleştirildi.
   if (!mounted) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f172a] text-white">
@@ -125,7 +153,44 @@ export default function Home() {
         </div>
       </header>
 
+      {/* YENİ: ÇIKIŞI YAKLAŞANLAR BİLDİRİM PANELİ */}
+      {approachingCheckouts.length > 0 && (
+        <div className="mb-6 p-4 bg-amber-500/15 border border-amber-500/30 rounded-2xl text-amber-300 flex items-center justify-between shadow-lg animate-pulse">
+          <div className="flex items-center space-x-3">
+            <span className="p-2 bg-amber-500/20 rounded-xl text-amber-400">
+              <Bell className="w-5 h-5" />
+            </span>
+            <div>
+              <h4 className="font-bold text-sm">Çıkışı Yaklaşan Misafirler Var!</h4>
+              <p className="text-xs text-amber-200/90 mt-0.5">
+                {approachingCheckouts.map(r => `${r.name} (${r.apart} - Çıkış: ${r.cout})`).join(', ')} için çıkış vakti geldi veya yarın doluyor.
+              </p>
+            </div>
+          </div>
+          <span className="px-3 py-1 bg-amber-500/20 rounded-full text-xs font-bold border border-amber-500/40">
+            {approachingCheckouts.length} Misafir
+          </span>
+        </div>
+      )}
+
       <FilterBar activeFilter={activeFilter} setFilter={setActiveFilter} />
+
+      {/* YENİ: AKTİF VE TAMAMLANAN REZERVASYON SEKMELERİ */}
+      <div className="flex space-x-2 my-6 bg-gray-900/60 p-1.5 rounded-2xl border border-gray-800 w-fit">
+        <button 
+          onClick={() => setReservationTab('active')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${reservationTab === 'active' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+        >
+          Aktif / Gelecek Rezervasyonlar ({activeReservations.length})
+        </button>
+        <button 
+          onClick={() => setReservationTab('completed')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all ${reservationTab === 'completed' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+        >
+          Tamamlanan / Arşiv ({completedReservations.length})
+        </button>
+      </div>
+
       <Dashboard stats={stats} />
 
       <div className="grid lg:grid-cols-[1.25fr_0.75fr] gap-6 items-start">
