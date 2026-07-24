@@ -138,10 +138,10 @@ export default function Home() {
     activeReservations.filter(item => item && (item.cout === todayStr || item.cout === tomorrowStr)), 
   [activeReservations, todayStr, tomorrowStr]);
 
-  // Girişi bugün veya yarın olanlar
+  // Gelecek tüm aktif girişler (Artık sadece bugün/yarın değil, tüm gelecek girişler listelenir)
   const upcomingCheckins = useMemo(() => 
-    activeReservations.filter(item => item && (item.cin === todayStr || item.cin === tomorrowStr)), 
-  [activeReservations, todayStr, tomorrowStr]);
+    activeReservations.filter(item => item && item.cin >= todayStr), 
+  [activeReservations, todayStr]);
 
   const filteredData = useMemo(() => 
     reservationTab === 'active' ? activeReservations : completedReservations,
@@ -220,7 +220,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* GİRİŞİ YAKLAŞANLAR (VİLLA BAZLI KONUM & BİLGİ GÖNDER) */}
+      {/* GELECEK REZERVASYONLAR İÇİN KONUM & BİLGİ GÖNDERME PANELİ */}
       {upcomingCheckins.length > 0 && (
         <div className="mb-6 p-4 bg-sky-500/15 border border-sky-500/30 rounded-2xl text-sky-300 shadow-lg space-y-3">
           <div className="flex items-center justify-between">
@@ -229,16 +229,16 @@ export default function Home() {
                 <MapPin className="w-5 h-5" />
               </span>
               <div>
-                <h4 className="font-bold text-sm">Girişi Yaklaşan Misafirler (Konum & Bilgi At)</h4>
-                <p className="text-xs text-sky-200/90 mt-0.5">Misafirin kalacağı villaya özel mesaj otomatik hazırlanır.</p>
+                <h4 className="font-bold text-sm">Gelecek Misafirlere Konum & Bilgi Gönder</h4>
+                <p className="text-xs text-sky-200/90 mt-0.5">Mevcut müşteri içerideyken dahi sıradaki misafirlere konum gönderebilirsiniz.</p>
               </div>
             </div>
             <span className="px-3 py-1 bg-sky-500/20 rounded-full text-xs font-bold border border-sky-500/40">
-              {upcomingCheckins.length} Misafir
+              {upcomingCheckins.length} Gelecek Misafir
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-sky-500/20">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-sky-500/25 max-h-60 overflow-y-auto">
             {upcomingCheckins.map(r => (
               <div key={r.id} className="flex items-center justify-between bg-black/30 p-2.5 rounded-xl border border-sky-500/20">
                 <div className="text-xs">
@@ -247,9 +247,9 @@ export default function Home() {
                 </div>
                 <button
                   onClick={() => sendCheckinWhatsApp(r.name, r.apart)}
-                  className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition-all"
+                  className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition-all whitespace-nowrap"
                 >
-                  <MessageSquare className="w-3.5 h-3.5" /> {r.apart} Konum Gönder
+                  <MessageSquare className="w-3.5 h-3.5" /> Konum Gönder
                 </button>
               </div>
             ))}
@@ -257,7 +257,7 @@ export default function Home() {
         </div>
       )}
 
-      {/* ÇIKIŞI YAKLAŞANLAR BİLDİRİM PANELİ & HATIRLATMA MESAJI */}
+      {/* ÇIKIŞI YAKLAŞANLAR BİLDİRİM PANELİ & HATIRLATMA + YORUM LİNKİ */}
       {approachingCheckouts.length > 0 && (
         <div className="mb-6 p-4 bg-amber-500/15 border border-amber-500/30 rounded-2xl text-amber-300 shadow-lg space-y-3">
           <div className="flex items-center justify-between">
@@ -284,9 +284,9 @@ export default function Home() {
                 </div>
                 <button
                   onClick={() => sendCheckoutWhatsApp(r.name, r.apart)}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition-all"
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition-all whitespace-nowrap"
                 >
-                  <MessageSquare className="w-3.5 h-3.5" /> Çıkış Hatırlatması At
+                  <MessageSquare className="w-3.5 h-3.5" /> Çıkış & Yorum At
                 </button>
               </div>
             ))}
