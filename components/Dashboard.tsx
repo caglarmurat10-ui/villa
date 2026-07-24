@@ -1,24 +1,39 @@
-"use client";
+import React from 'react';
 
-interface DashboardProps {
-  stats: { brut: number; comm: number; net: number; paid: number; remaining: number; reservations: number; nights: number; }
+interface DashboardStats {
+  brut: number;
+  comm: number;
+  net: number;
+  reservations: number;
+  nights: number;
 }
 
-const money = (value: number) => `₺${value.toLocaleString('tr-TR', { maximumFractionDigits: 0 })}`;
+interface DashboardProps {
+  stats: DashboardStats;
+}
 
 export default function Dashboard({ stats }: DashboardProps) {
-  const cards = [
-    ['Brüt Gelir', money(stats.brut), 'text-emerald-400'],
-    ['Komisyon', money(stats.comm), 'text-amber-400'],
-    ['Size Kalan', money(stats.net), 'text-indigo-300'],
-    ['Tahsil Edilen', money(stats.paid), 'text-cyan-400'],
-    ['Kalan Ödeme', money(stats.remaining), 'text-rose-400'],
-    ['Rezervasyon', `${stats.reservations} kayıt · ${stats.nights} gece`, 'text-white'],
-  ];
-  return <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-    {cards.map(([label, value, color]) => <div key={label} className="glass-panel p-4 rounded-2xl min-h-24 flex flex-col justify-between">
-      <p className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">{label}</p>
-      <p className={`text-base font-black ${color}`}>{value}</p>
-    </div>)}
-  </div>;
+  return (
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-4 shadow-lg">
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Brüt Gelir</p>
+        <p className="text-xl md:text-2xl font-black text-emerald-400 mt-1">₺{stats.brut.toLocaleString('tr-TR')}</p>
+      </div>
+
+      <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-4 shadow-lg">
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Komisyon Tutarı</p>
+        <p className="text-xl md:text-2xl font-black text-amber-400 mt-1">₺{stats.comm.toLocaleString('tr-TR')}</p>
+      </div>
+
+      <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-4 shadow-lg">
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Size Kalan (Net)</p>
+        <p className="text-xl md:text-2xl font-black text-indigo-400 mt-1">₺{stats.net.toLocaleString('tr-TR')}</p>
+      </div>
+
+      <div className="bg-gray-900/80 border border-gray-800 rounded-2xl p-4 shadow-lg">
+        <p className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Toplam Kayıt</p>
+        <p className="text-xl md:text-2xl font-black text-sky-400 mt-1">{stats.reservations} Rezervasyon</p>
+      </div>
+    </div>
+  );
 }
