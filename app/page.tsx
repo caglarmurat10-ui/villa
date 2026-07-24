@@ -14,7 +14,6 @@ import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon } from
 export default function Home() {
   const [mounted, setMounted] = useState(false);
 
-  // ÇELİK YELEK 1: Başlangıçta boş array ([]). Erken "localStorage" çağrısı kaldırıldı (SSR Çökmesini engeller).
   const [data, setData] = useState<VillaReservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [synced, setSynced] = useState(false);
@@ -52,15 +51,14 @@ export default function Home() {
   useEffect(() => {
     setMounted(true);
 
-    // ÇELİK YELEK 2: Verileri sadece sistem tarayıcıya tam olarak oturduktan sonra çağırıyoruz.
     const refreshLocalData = () => {
+      // Güvenlik: Eğer fonksiyon yoksa çökmeyi önle
       if (typeof GoogleService.getLocalData === 'function') {
         const local = GoogleService.getLocalData();
         if (Array.isArray(local)) setData(local);
       }
     };
 
-    // İlk yüklemede yerel veriyi almayı deniyoruz
     refreshLocalData();
 
     const readCommission = () => {
@@ -80,16 +78,7 @@ export default function Home() {
     };
   }, []);
 
-  if (!mounted) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f172a] text-white">
-        <Loader2 className="w-8 h-8 animate-spin text-indigo-400 mb-4" />
-        <p className="text-sm font-bold uppercase tracking-widest text-gray-400">Sistem Başlatılıyor...</p>
-      </div>
-    );
-  }
-
-  // ÇELİK YELEK 3: Gelen veri boş veya tanımsız (undefined) ise sistemi çökertmek yerine boş array [] atarız.
+  // MENTÖRLÜK DOKUNUŞU: Tüm Hook'lar (useMemo) Erken-Dönüş (return) işleminden ÖNCEYE alındı!
   const safeData = Array.isArray(data) ? data : [];
 
   const filteredData = useMemo(() => activeFilter === 'All'
@@ -105,6 +94,16 @@ export default function Home() {
     reservations: acc.reservations + 1,
     nights: acc.nights + (curr?.nights || 0)
   }), { brut: 0, comm: 0, net: 0, paid: 0, remaining: 0, reservations: 0, nights: 0 }), [filteredData]);
+
+  // HATA ÇÖZÜMÜ: Yükleme ekranı artık kancaları (Hook) engellemeyecek şekilde EN SONA yerleştirildi.
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f172a] text-white">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-400 mb-4" />
+        <p className="text-sm font-bold uppercase tracking-widest text-gray-400">Sistem Başlatılıyor...</p>
+      </div>
+    );
+  }
 
   return (
     <main className="max-w-6xl mx-auto p-4 md:p-8 min-h-screen">
