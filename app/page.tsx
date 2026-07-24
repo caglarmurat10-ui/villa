@@ -182,9 +182,9 @@ export default function Home() {
   const sendCheckinWhatsApp = (name: string, apart: string) => {
     let text = '';
     if (apart === 'Destan') {
-      text = `Merhaba ${name}, ben Murat. Villanın konumunu atıyorum: https://maps.app.goo.gl/QmWfNNF9ikQ5G1CFA?g_st=aw Girişler saat 16 ile 22 arasındadır. Yaklaşınca haber verirsiniz. Hayırlı yolculuklar!`;
+      text = `Merhaba ${name} ben Murat villanın konumunu atıyorum girişler saat 16 ile 22 arasındadır. Yaklaşınca haber verirsiniz. Hayırlı yolculuklar\n\nhttps://maps.app.goo.gl/QmWfNNF9ikQ5G1CFA?g_st=aw`;
     } else {
-      text = `Merhaba ${name}, ben Murat. Safira villamızın konumunu atıyorum: [Safira Konum Linki] Girişler saat 16 ile 22 arasındadır. Yaklaşınca haber verirsiniz. Hayırlı yolculuklar!`;
+      text = `Merhaba ${name} ben Murat villanın konumunu atıyorum girişler saat 16 ile 22 arasındadır. Ödeme girişte nakit olarak yapılmaktadır. Yaklaşınca haber verirsiniz. Hayırlı yolculuklar\n\nhttps://maps.app.goo.gl/QPmffSfmcw3KeBEs9`;
     }
 
     const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
