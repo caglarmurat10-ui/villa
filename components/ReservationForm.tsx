@@ -3,7 +3,6 @@ import { useState, useEffect } from "react";
 import { VillaReservation, GoogleService, PriceService } from "@/services/api";
 import { Loader2 } from "lucide-react";
 
-// MENTÖRLÜK DOKUNUŞU: TypeScript'in kızdığı 'reservations' ve 'defaultVilla' özellikleri buraya eklendi.
 interface Props {
   onSave: () => void;
   config: { commission: number };
@@ -14,7 +13,6 @@ interface Props {
 }
 
 export default function ReservationForm({ onSave, config, editingItem, onCancelEdit, defaultVilla }: Props) {
-  // Filtre barında hangi apart seçiliyse formda otomatik o seçili gelir
   const [apart, setApart] = useState<'Safira' | 'Destan'>(defaultVilla === 'Destan' ? 'Destan' : 'Safira');
   const [name, setName] = useState('');
   const [cin, setCin] = useState('');
@@ -43,6 +41,9 @@ export default function ReservationForm({ onSave, config, editingItem, onCancelE
 
   const handleSave = async (e: React.MouseEvent) => {
     e.preventDefault(); 
+    
+    // MENTÖRLÜK DOKUNUŞU 1: RADAR SİNYALİ
+    console.log("🚨 KAYDET BUTONUNA BASILDI! 🚨 Veriler:", { apart, name, cin, cout, price });
 
     if (!name) return alert("Lütfen misafir adını girin.");
     if (!cin) return alert("Lütfen giriş tarihini seçin.");
@@ -78,9 +79,12 @@ export default function ReservationForm({ onSave, config, editingItem, onCancelE
     };
 
     try {
+      console.log("⏳ Google'a veri gönderiliyor...");
       const success = await GoogleService.saveData(reservation);
       
       if (success) {
+        console.log("✅ Başarıyla kaydedildi!");
+        alert("Kayıt Başarılı!");
         setName('');
         setCin('');
         setCout('');
@@ -162,7 +166,9 @@ export default function ReservationForm({ onSave, config, editingItem, onCancelE
         </div>
 
         <div className="flex gap-2 pt-2">
+          {/* MENTÖRLÜK DOKUNUŞU 2: type="button" eklendi, böylece form davranışları bypass edildi. */}
           <button 
+            type="button"
             onClick={handleSave}
             disabled={isSaving}
             className="flex-1 bg-gradient-to-r from-indigo-500 to-purple-500 text-white font-bold py-4 rounded-xl shadow-lg hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-2"
@@ -171,6 +177,7 @@ export default function ReservationForm({ onSave, config, editingItem, onCancelE
           </button>
           {editingItem && (
             <button 
+              type="button"
               onClick={() => {
                 setName(''); setCin(''); setCout(''); setPrice(''); onCancelEdit();
               }}
