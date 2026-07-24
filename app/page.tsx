@@ -22,7 +22,7 @@ export default function Home() {
   const [activeFilter, setActiveFilter] = useState<'All' | 'Safira' | 'Destan'>('All');
   const [commission, setCommission] = useState(10);
 
-  // Misafir telefon numaralarını tutmak için state (Rezervasyon ID -> Telefon Numarası)
+  // Misafir telefon numaralarını tutmak için state
   const [phoneInputs, setPhoneInputs] = useState<Record<string, string>>({});
 
   // Aktif veya Tamamlanan Rezervasyon Sekme Filtresi
@@ -178,18 +178,19 @@ export default function Home() {
   };
 
   // ÇIKIŞ İÇİN WHATSAPP MESAJI
-  const sendCheckoutWhatsApp = (reservationId: string, apart: string) => {
+  const sendCheckoutWhatsApp = (reservationId: string | number | undefined, apart: string) => {
     const reviewLink = apart === 'Safira' 
       ? 'https://g.page/r/CV4SGDD8Hr_7EBM/review' 
       : 'https://g.page/r/CZMpV_CdinkEEBM/review';
 
     const text = `Merhaba, yarın çıkışınız var çıkışlar 9 ile 10 arasındadır ben saat 10 doğru gelirim sizde hazırlanmış olursunuz iyi günler dilerim\n\nGörüşleriniz bizim için çok değerli. Değerlendirmeniz için: ${reviewLink}`;
-    const phone = phoneInputs[reservationId] || '';
+    const key = String(reservationId || '');
+    const phone = phoneInputs[key] || '';
     window.open(getWhatsAppUrl(phone, text), '_blank');
   };
 
   // GİRİŞ İÇİN WHATSAPP MESAJI
-  const sendCheckinWhatsApp = (reservationId: string, apart: string) => {
+  const sendCheckinWhatsApp = (reservationId: string | number | undefined, apart: string) => {
     let text = '';
     if (apart === 'Destan') {
       text = `Merhaba, ben Murat villanın konumunu atıyorum girişler saat 16 ile 22 arasındadır. Yaklaşınca haber verirsiniz. Hayırlı yolculuklar\n\nhttps://maps.app.goo.gl/QmWfNNF9ikQ5G1CFA?g_st=aw`;
@@ -197,7 +198,8 @@ export default function Home() {
       text = `Merhaba, ben Murat villanın konumunu atıyorum girişler saat 16 ile 22 arasındadır. Ödeme girişte nakit olarak yapılmaktadır. Yaklaşınca haber verirsiniz. Hayırlı yolculuklar\n\nhttps://maps.app.goo.gl/QPmffSfmcw3KeBEs9`;
     }
 
-    const phone = phoneInputs[reservationId] || '';
+    const key = String(reservationId || '');
+    const phone = phoneInputs[key] || '';
     window.open(getWhatsAppUrl(phone, text), '_blank');
   };
 
@@ -249,32 +251,35 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-sky-500/25 max-h-72 overflow-y-auto">
-            {upcomingCheckins.map(r => (
-              <div key={r.id} className="flex flex-col gap-2 bg-black/40 p-3 rounded-xl border border-sky-500/20">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-white">{r.name}</span>
-                  <span className="text-sky-200/70">({r.apart} - Giriş: {r.cin})</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Phone className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Tel: 905XXXXXXXXX"
-                      value={phoneInputs[r.id] || ''}
-                      onChange={(e) => setPhoneInputs({ ...phoneInputs, [r.id]: e.target.value })}
-                      className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
-                    />
+            {upcomingCheckins.map(r => {
+              const rKey = String(r.id || '');
+              return (
+                <div key={rKey} className="flex flex-col gap-2 bg-black/40 p-3 rounded-xl border border-sky-500/20">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-white">{r.name}</span>
+                    <span className="text-sky-200/70">({r.apart} - Giriş: {r.cin})</span>
                   </div>
-                  <button
-                    onClick={() => sendCheckinWhatsApp(r.id, r.apart)}
-                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow transition-all whitespace-nowrap"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5" /> Konum Gönder
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Phone className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Tel: 905XXXXXXXXX"
+                        value={phoneInputs[rKey] || ''}
+                        onChange={(e) => setPhoneInputs({ ...phoneInputs, [rKey]: e.target.value })}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
+                      />
+                    </div>
+                    <button
+                      onClick={() => sendCheckinWhatsApp(r.id, r.apart)}
+                      className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow transition-all whitespace-nowrap"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" /> Konum Gönder
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
@@ -298,32 +303,35 @@ export default function Home() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-amber-500/20">
-            {approachingCheckouts.map(r => (
-              <div key={r.id} className="flex flex-col gap-2 bg-black/40 p-3 rounded-xl border border-amber-500/20">
-                <div className="flex justify-between items-center text-xs">
-                  <span className="font-bold text-white">{r.name}</span>
-                  <span className="text-amber-200/70">({r.apart} - Çıkış: {r.cout})</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="relative flex-1">
-                    <Phone className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-                    <input
-                      type="text"
-                      placeholder="Tel: 905XXXXXXXXX"
-                      value={phoneInputs[r.id] || ''}
-                      onChange={(e) => setPhoneInputs({ ...phoneInputs, [r.id]: e.target.value })}
-                      className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
-                    />
+            {approachingCheckouts.map(r => {
+              const rKey = String(r.id || '');
+              return (
+                <div key={rKey} className="flex flex-col gap-2 bg-black/40 p-3 rounded-xl border border-amber-500/20">
+                  <div className="flex justify-between items-center text-xs">
+                    <span className="font-bold text-white">{r.name}</span>
+                    <span className="text-amber-200/70">({r.apart} - Çıkış: {r.cout})</span>
                   </div>
-                  <button
-                    onClick={() => sendCheckoutWhatsApp(r.id, r.apart)}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow transition-all whitespace-nowrap"
-                  >
-                    <MessageSquare className="w-3.5 h-3.5" /> Çıkış & Yorum At
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex-1">
+                      <Phone className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Tel: 905XXXXXXXXX"
+                        value={phoneInputs[rKey] || ''}
+                        onChange={(e) => setPhoneInputs({ ...phoneInputs, [rKey]: e.target.value })}
+                        className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+                    <button
+                      onClick={() => sendCheckoutWhatsApp(r.id, r.apart)}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow transition-all whitespace-nowrap"
+                    >
+                      <MessageSquare className="w-3.5 h-3.5" /> Çıkış & Yorum At
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}
