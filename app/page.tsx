@@ -8,7 +8,7 @@ import Calculator from "@/components/Calculator";
 import Settings from "@/components/Settings";
 import FilterBar from "@/components/FilterBar";
 import { GoogleService, VillaReservation } from "@/services/api";
-import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon, Home as HomeIcon, Wallet, MessageSquare, Phone, Send, Calendar as CalendarIcon } from "lucide-react";
+import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon, Home as HomeIcon, Wallet, MessageSquare, Phone, Send, Calendar as CalendarIcon, Bell } from "lucide-react";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -111,6 +111,8 @@ export default function Home() {
 
   // Bugünün Tarihi
   const todayStr = '2026-07-24';
+  const getTomorrowStr = () => '2026-07-25';
+  const tomorrowStr = getTomorrowStr();
 
   // Komisyon, Net Tutar ve Geçmiş Rezervasyon Tahsilat Otomasyonu
   const processedData = useMemo(() => {
@@ -158,6 +160,11 @@ export default function Home() {
   const completedReservations = useMemo(() => 
     filteredByVilla.filter(item => item && item.cout < todayStr), 
   [filteredByVilla, todayStr]);
+
+  // Çıkışı bugün veya yarın olanlar (Hatırlatma için)
+  const approachingCheckouts = useMemo(() => 
+    activeReservations.filter(item => item && (item.cout === todayStr || item.cout === tomorrowStr)), 
+  [activeReservations, todayStr, tomorrowStr]);
 
   const filteredData = useMemo(() => 
     reservationTab === 'active' ? activeReservations : completedReservations,
@@ -266,12 +273,67 @@ export default function Home() {
       {/* ==================================================== */}
       {viewMode === 'messages' && (
         <div className="space-y-6 animate-fadeIn">
+          {/* ÇIKIŞI YAKLAŞANLAR ÖZEL HATIRLATMA PANELİ */}
+          {approachingCheckouts.length > 0 && (
+            <div className="p-4 bg-amber-500/15 border border-amber-500/30 rounded-2xl text-amber-300 shadow-lg space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <span className="p-2 bg-amber-500/20 rounded-xl text-amber-400">
+                    <Bell className="w-5 h-5" />
+                  </span>
+                  <div>
+                    <h4 className="font-bold text-sm">Çıkışı Bugün veya Yarın Olan Misafirler Var!</h4>
+                    <p className="text-xs text-amber-200/90 mt-0.5">Aşağıdaki misafirler için çıkış vakti geldi, hemen hatırlatma mesajı atabilirsiniz.</p>
+                  </div>
+                </div>
+                <span className="px-3 py-1 bg-amber-500/20 rounded-full text-xs font-bold border border-amber-500/40">
+                  {approachingCheckouts.length} Misafir
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-amber-500/20">
+                {approachingCheckouts.map(r => {
+                  const rKey = String(r.id || '');
+                  return (
+                    <div key={`approach-${rKey}`} className="flex flex-col gap-2 bg-black/40 p-3 rounded-xl border border-amber-500/20">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="font-bold text-white flex items-center gap-1.5">
+                          <span className={`px-2 py-0.5 rounded text-[9px] font-extrabold ${r.apart === 'Safira' ? 'bg-purple-500/30 text-purple-200' : 'bg-pink-500/30 text-pink-200'}`}>{r.apart}</span>
+                          {r.name}
+                        </span>
+                        <span className="text-amber-200/80 font-semibold">Çıkış: {r.cout}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <Phone className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                          <input
+                            type="text"
+                            placeholder="Tel: 905XXXXXXXXX"
+                            value={phoneInputs[rKey] || ''}
+                            onChange={(e) => handlePhoneChange(r.id, e.target.value)}
+                            className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                          />
+                        </div>
+                        <button
+                          onClick={() => sendCheckoutWhatsApp(r.id, r.apart)}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow transition-all whitespace-nowrap"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" /> Çıkış & Yorum At
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           <div className="bg-gradient-to-r from-gray-900 via-sky-950/30 to-gray-900 border border-sky-500/30 rounded-2xl p-5 shadow-xl">
             <h3 className="text-base font-black text-sky-300 mb-1 flex items-center gap-2">
-              <Send className="w-5 h-5 text-sky-400" /> Misafir İletişim & Otomasyon Paneli
+              <Send className="w-5 h-5 text-sky-400" /> Tüm Aktif Misafir İletişim Listesi
             </h3>
             <p className="text-xs text-gray-300">
-              Girişte yazdığınız telefon numaraları otomatik olarak kaydedilir. Çıkış gününde veya dilediğiniz an aynı numarayla çıkış/yorum hatırlatması gönderebilirsiniz.
+              Giriş veya çıkış işlemleri için hangi villada kimin kaldığını görüp telefon numaralarını yönetebilir, tek tıkla WhatsApp mesajı gönderebilirsiniz.
             </p>
           </div>
 
@@ -288,7 +350,7 @@ export default function Home() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${r.apart === 'Safira' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-pink-500/20 text-pink-300 border border-pink-500/30'}`}>
-                          {r.apart}
+                          {r.apart} Villası
                         </span>
                         <h4 className="font-extrabold text-white text-sm">{r.name}</h4>
                       </div>
