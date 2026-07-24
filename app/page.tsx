@@ -23,7 +23,7 @@ export default function Home() {
   const [activeFilter, setActiveFilter] = useState<'All' | 'Safira' | 'Destan'>('All');
   const [commission, setCommission] = useState(10);
 
-  // YENİ: Aktif veya Tamamlanan Rezervasyon Sekme Filtresi
+  // Aktif veya Tamamlanan Rezervasyon Sekme Filtresi
   const [reservationTab, setReservationTab] = useState<'active' | 'completed'>('active');
 
   const loadData = async () => {
@@ -82,12 +82,28 @@ export default function Home() {
 
   const safeData = Array.isArray(data) ? data : [];
 
-  // 1. Önce Villa Filtresi (All, Safira, Destan)
-  const filteredByVilla = useMemo(() => activeFilter === 'All'
-    ? safeData
-    : safeData.filter(item => item && item.apart === activeFilter), [activeFilter, safeData]);
+  // KOMİSYON VE NET TUTAR DÜZELTMESİ: Eksik komisyonları güncel orana göre dinamik hesapla
+  const processedData = useMemo(() => {
+    return safeData.map(item => {
+      if (!item) return item;
+      const brut = Number(item.brut) || (Number(item.nights || 0) * Number(item.price || 0));
+      const commAmt = Number(item.commAmt) > 0 ? Number(item.commAmt) : (brut * commission / 100);
+      const net = brut - commAmt;
+      return {
+        ...item,
+        brut,
+        commAmt,
+        net
+      };
+    });
+  }, [safeData, commission]);
 
-  // 2. YENİ: Bugünün Tarihi ve Çıkış Yaklaşanlar Hesaplaması (Aktif vs Tamamlanan)
+  // Önce Villa Filtresi (All, Safira, Destan)
+  const filteredByVilla = useMemo(() => activeFilter === 'All'
+    ? processedData
+    : processedData.filter(item => item && item.apart === activeFilter), [activeFilter, processedData]);
+
+  // Bugünün Tarihi ve Çıkış Yaklaşanlar Hesaplaması (Aktif vs Tamamlanan)
   const todayStr = new Date().toISOString().split('T')[0];
   const getTomorrowStr = () => {
     const d = new Date();
@@ -118,11 +134,9 @@ export default function Home() {
     brut: acc.brut + (curr?.brut || 0),
     comm: acc.comm + (curr?.commAmt || 0),
     net: acc.net + (curr?.net || 0),
-    paid: acc.paid + (curr?.paidAmt || 0),
-    remaining: acc.remaining + Math.max(curr?.remaining || 0, 0),
     reservations: acc.reservations + 1,
     nights: acc.nights + (curr?.nights || 0)
-  }), { brut: 0, comm: 0, net: 0, paid: 0, remaining: 0, reservations: 0, nights: 0 }), [filteredData]);
+  }), { brut: 0, comm: 0, net: 0, reservations: 0, nights: 0 }), [filteredData]);
 
   if (!mounted) {
     return (
@@ -153,7 +167,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* YENİ: ÇIKIŞI YAKLAŞANLAR BİLDİRİM PANELİ */}
+      {/* ÇIKIŞI YAKLAŞANLAR BİLDİRİM PANELİ */}
       {approachingCheckouts.length > 0 && (
         <div className="mb-6 p-4 bg-amber-500/15 border border-amber-500/30 rounded-2xl text-amber-300 flex items-center justify-between shadow-lg animate-pulse">
           <div className="flex items-center space-x-3">
@@ -175,7 +189,7 @@ export default function Home() {
 
       <FilterBar activeFilter={activeFilter} setFilter={setActiveFilter} />
 
-      {/* YENİ: AKTİF VE TAMAMLANAN REZERVASYON SEKMELERİ */}
+      {/* AKTİF VE TAMAMLANAN REZERVASYON SEKMELERİ */}
       <div className="flex space-x-2 my-6 bg-gray-900/60 p-1.5 rounded-2xl border border-gray-800 w-fit">
         <button 
           onClick={() => setReservationTab('active')}
