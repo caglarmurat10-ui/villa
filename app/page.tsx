@@ -344,7 +344,7 @@ export default function Home() {
                     {/* Safira */}
                     <div className="bg-purple-950/20 border border-purple-500/20 p-3 rounded-xl space-y-1">
                       <div className="flex justify-between items-center text-xs">
-                        <span className="font-extrabold text-purple-300">Safira Villası</span>
+                        <span className="font-extrabold text-purple-300">Safira</span>
                         <span className="text-gray-300">{item.safira?.name}</span>
                       </div>
                       <p className="text-[11px] text-gray-400">
@@ -355,7 +355,7 @@ export default function Home() {
                     {/* Destan */}
                     <div className="bg-pink-950/20 border border-pink-500/20 p-3 rounded-xl space-y-1">
                       <div className="flex justify-between items-center text-xs">
-                        <span className="font-extrabold text-pink-300">Destan Villası</span>
+                        <span className="font-extrabold text-pink-300">Destan</span>
                         <span className="text-gray-300">{item.destan?.name}</span>
                       </div>
                       <p className="text-[11px] text-gray-400">
@@ -452,7 +452,7 @@ export default function Home() {
                     <div className="space-y-1">
                       <div className="flex items-center gap-2">
                         <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-bold ${r.apart === 'Safira' ? 'bg-purple-500/20 text-purple-300 border border-purple-500/30' : 'bg-pink-500/20 text-pink-300 border border-pink-500/30'}`}>
-                          {r.apart} Villası
+                          {r.apart}
                         </span>
                         <h4 className="font-extrabold text-white text-sm">{r.name}</h4>
                       </div>
@@ -549,7 +549,7 @@ export default function Home() {
             <div className="bg-gray-900/90 border border-purple-500/30 rounded-2xl p-5 shadow-xl">
               <div className="flex justify-between items-center mb-3 border-b border-gray-800 pb-2">
                 <h3 className="font-extrabold text-purple-400 flex items-center gap-2">
-                  <HomeIcon className="w-4 h-4" /> Safira Villası
+                  <HomeIcon className="w-4 h-4" /> Safira
                 </h3>
                 <span className="text-xs bg-purple-500/10 text-purple-300 px-2.5 py-1 rounded-full font-semibold">{villaBreakdown.safira.count} Rezervasyon</span>
               </div>
@@ -573,7 +573,7 @@ export default function Home() {
             <div className="bg-gray-900/90 border border-pink-500/30 rounded-2xl p-5 shadow-xl">
               <div className="flex justify-between items-center mb-3 border-b border-gray-800 pb-2">
                 <h3 className="font-extrabold text-pink-400 flex items-center gap-2">
-                  <HomeIcon className="w-4 h-4" /> Destan Villası
+                  <HomeIcon className="w-4 h-4" /> Destan
                 </h3>
                 <span className="text-xs bg-pink-500/10 text-pink-300 px-2.5 py-1 rounded-full font-semibold">{villaBreakdown.destan.count} Rezervasyon</span>
               </div>
