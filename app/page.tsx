@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Dashboard from "@/components/Dashboard";
 import Calendar from "@/components/Calendar";
 import ReservationForm from "@/components/ReservationForm";
 import TransactionList from "@/components/TransactionList";
@@ -95,7 +94,6 @@ export default function Home() {
       const commAmt = Number(item.commAmt) > 0 ? Number(item.commAmt) : (brut * commission / 100);
       const net = brut - commAmt;
 
-      // Geçmiş rezervasyonlar tamamen tahsil edilmiş sayılır
       const isCompleted = item.cout && item.cout < todayStr;
       const paidAmt = isCompleted ? brut : (Number(item.paidAmt) || 0);
       const remaining = isCompleted ? 0 : Math.max(brut - paidAmt, 0);
@@ -116,7 +114,7 @@ export default function Home() {
     ? processedData
     : processedData.filter(item => item && item.apart === activeFilter), [activeFilter, processedData]);
 
-  // İLK REZERVASYondan SON REZERVASYONA KADAR TÜM DÖNEMİN GENEL ÖZETİ (Tahsilat Kartı İçin)
+  // TÜM DÖNEMİN GENEL ÖZETİ
   const overallStats = useMemo(() => filteredByVilla.reduce((acc, curr) => ({
     brut: acc.brut + (curr?.brut || 0),
     comm: acc.comm + (curr?.commAmt || 0),
@@ -144,14 +142,6 @@ export default function Home() {
   const filteredData = useMemo(() => 
     reservationTab === 'active' ? activeReservations : completedReservations,
   [reservationTab, activeReservations, completedReservations]);
-
-  const stats = useMemo(() => filteredData.reduce((acc, curr) => ({
-    brut: acc.brut + (curr?.brut || 0),
-    comm: acc.comm + (curr?.commAmt || 0),
-    net: acc.net + (curr?.net || 0),
-    reservations: acc.reservations + 1,
-    nights: acc.nights + (curr?.nights || 0)
-  }), { brut: 0, comm: 0, net: 0, reservations: 0, nights: 0 }), [filteredData]);
 
   // VİLLA BAZLI AYRIŞTIRMA (Safira ve Destan Karşılaştırmalı Özet)
   const villaBreakdown = useMemo(() => {
@@ -203,7 +193,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* ÇIKIŞI YAKLAŞANLAR BİLDİRİM PANELİ */}
+      {/* ÇIKIŞI YAKLAŞANlar BİLDİRİM PANELİ */}
       {approachingCheckouts.length > 0 && (
         <div className="mb-6 p-4 bg-amber-500/15 border border-amber-500/30 rounded-2xl text-amber-300 flex items-center justify-between shadow-lg animate-pulse">
           <div className="flex items-center space-x-3">
@@ -241,9 +231,7 @@ export default function Home() {
         </button>
       </div>
 
-      <Dashboard stats={stats} />
-
-      {/* TAHSİLAT & BAKİYE ÖZETİ KARTI (İLK REZERVASYONDAN SON REZERVASYONA TÜM DÖNEM) */}
+      {/* TAHSİLAT & BAKİYE ÖZETİ KARTI */}
       <div className="bg-gradient-to-r from-gray-900 via-indigo-950/40 to-gray-900 border border-indigo-500/30 rounded-2xl p-5 mb-6 shadow-xl">
         <div className="flex items-center gap-2 mb-3 border-b border-gray-800 pb-2">
           <Wallet className="w-5 h-5 text-indigo-400" />
