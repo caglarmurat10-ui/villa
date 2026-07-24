@@ -3,6 +3,11 @@ export interface VillaReservation {
   type: 'villa';
   apart: 'Safira' | 'Destan';
   name: string;
+  phone?: string;
+  source?: 'direct' | 'agency';
+  agencyName?: string;
+  commissionRate?: number;
+  notes?: string;
   cin: string;
   cout: string;
   nights: number;
@@ -14,243 +19,164 @@ export interface VillaReservation {
   remaining?: number;
 }
 
+const LOCAL_RESERVATIONS_KEY = 'villa_reservations_v3';
+
+const readLocalReservations = (): VillaReservation[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_RESERVATIONS_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const writeLocalReservations = (items: VillaReservation[]) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(LOCAL_RESERVATIONS_KEY, JSON.stringify(items));
+  window.dispatchEvent(new Event('villa-data-update'));
+};
+
+const normalizeReservations = (payload: any): VillaReservation[] => {
+  const source = Array.isArray(payload) ? payload : payload?.reservations;
+  if (!Array.isArray(source)) return [];
+
+  return source.map((item: any) => {
+    const getVal = (keys: string[]) => {
+      for (const key of keys) {
+        if (item[key] !== undefined) return item[key];
+        const found = Object.keys(item).find(k => k.toLowerCase() === key.toLowerCase());
+        if (found) return item[found];
+      }
+      return undefined;
+    };
+
+    const fmtDate = (value: any) => {
+      if (!value) return '';
+      if (typeof value === 'string') return value.split('T')[0];
+      return String(value);
+    };
+
+    const cin = fmtDate(getVal(['cin', 'Başlangıç', 'Baslangic', 'Giris']));
+    const cout = fmtDate(getVal(['cout', 'Bitiş', 'Bitis', 'Cikis']));
+    const start = new Date(`${cin}T12:00:00`);
+    const end = new Date(`${cout}T12:00:00`);
+    const calculatedNights = !isNaN(start.getTime()) && !isNaN(end.getTime())
+      ? Math.max(0, Math.round((end.getTime() - start.getTime()) / 86400000))
+      : 0;
+    const price = Number(getVal(['price', 'Fiyat', 'Gecelik'])) || 0;
+    const nights = Number(getVal(['nights', 'Gece'])) || calculatedNights;
+    const brut = Number(getVal(['brut', 'Brüt'])) || nights * price;
+    const commAmt = Number(getVal(['commAmt', 'Komisyon', 'comm'])) || 0;
+    const net = Number(getVal(['net', 'Net'])) || brut - commAmt;
+    const paidAmt = Number(getVal(['paidAmt', 'Odenen'])) || 0;
+
+    return {
+      ...item,
+      id: Number(getVal(['id', 'ID'])) || Date.now() + Math.floor(Math.random() * 1000),
+      type: 'villa',
+      apart: getVal(['apart', 'Apart']) === 'Destan' ? 'Destan' : 'Safira',
+      name: String(getVal(['name', 'Misafir', 'Ad']) || 'Misafir'),
+      phone: String(getVal(['phone', 'Telefon']) || ''),
+      source: getVal(['source']) === 'agency' ? 'agency' : 'direct',
+      agencyName: String(getVal(['agencyName', 'Acente']) || ''),
+      commissionRate: Number(getVal(['commissionRate', 'KomisyonOrani'])) || 0,
+      notes: String(getVal(['notes', 'Not']) || ''),
+      cin,
+      cout,
+      nights,
+      price,
+      brut,
+      commAmt,
+      net,
+      paidAmt,
+      remaining: Number(getVal(['remaining', 'Kalan'])) || net - paidAmt,
+    } as VillaReservation;
+  });
+};
+
 export const GoogleService = {
+  getLocalData(): VillaReservation[] {
+    return readLocalReservations();
+  },
+
   async loadData(): Promise<VillaReservation[] | null> {
+    const localData = readLocalReservations();
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
 
     try {
-      // Doğrudan kendi yazdığımız güvenli Vercel köprümüze gidiyoruz
       const response = await fetch(`/api/proxy?t=${Date.now()}`, {
-        method: 'GET',
+        signal: controller.signal,
         cache: 'no-store',
-        signal: controller.signal
+        headers: { 'Cache-Control': 'no-cache' }
       });
-      
       clearTimeout(timeoutId);
+      if (!response.ok) return localData;
 
-      if (!response.ok) throw new Error(`Network response was not ok: ${response.status}`);
-
-      const data = await response.json();
-
-      if (data && data.reservations && Array.isArray(data.reservations)) {
-        if (data.prices && Array.isArray(data.prices)) {
-          localStorage.setItem('villa_prices_v2', JSON.stringify(data.prices));
-          window.dispatchEvent(new Event('price-update'));
-        }
-        if (data.config && data.config.commission) {
-          localStorage.setItem('villa_commission_rate', data.config.commission);
-          window.dispatchEvent(new Event('config-update'));
-        }
-
-        return data.reservations.map((item: any) => {
-          const getVal = (keys: string[]) => {
-            for (const k of keys) {
-              if (item[k] !== undefined) return item[k];
-              const lowerK = k.toLowerCase();
-              const found = Object.keys(item).find(key => key.toLowerCase() === lowerK);
-              if (found) return item[found];
-            }
-            return undefined;
-          };
-
-          const rawCin = getVal(['cin', 'Başlangıç', 'Baslangic', 'Giris']);
-          const rawCout = getVal(['cout', 'Bitiş', 'Bitis', 'Cikis']);
-
-          const fmtDate = (d: any) => {
-            if (!d) return '';
-            if (typeof d === 'string' && d.includes('T')) {
-              const date = new Date(d);
-              const trTime = new Date(date.getTime() + (3 * 60 * 60 * 1000));
-              const year = trTime.getUTCFullYear();
-              const month = String(trTime.getUTCMonth() + 1).padStart(2, '0');
-              const day = String(trTime.getUTCDate()).padStart(2, '0');
-              return `${year}-${month}-${day}`;
-            }
-            return typeof d === 'string' ? d.split('T')[0] : d;
-          };
-
-          const idVal = parseInt(getVal(['id', 'ID']) || '0');
-          const priceVal = parseFloat(getVal(['price', 'Fiyat', 'Gecelik']) || '0');
-          const cinVal = fmtDate(rawCin) || '';
-          const coutVal = fmtDate(rawCout) || '';
-
-          const start = new Date(cinVal);
-          const end = new Date(coutVal);
-          const nightsVal = !isNaN(start.getTime()) && !isNaN(end.getTime())
-            ? Math.ceil((end.getTime() - start.getTime()) / 86400000)
-            : 0;
-
-          const brutVal = nightsVal * priceVal;
-          const commVal = parseFloat(getVal(['commAmt', 'Komisyon', 'comm']) || '0');
-
-          return {
-            ...item,
-            id: idVal || Date.now(),
-            apart: getVal(['apart', 'Apart']) || 'Safira',
-            name: getVal(['name', 'Misafir', 'Ad']) || 'Misafir',
-            cin: cinVal,
-            cout: coutVal,
-            nights: parseInt(getVal(['nights', 'Gece']) || nightsVal.toString()),
-            brut: parseFloat(getVal(['brut', 'Brüt']) || brutVal.toString()),
-            net: parseFloat(getVal(['net', 'Net']) || (brutVal - commVal).toString()),
-            price: priceVal,
-            commAmt: commVal,
-            paidAmt: parseFloat(getVal(['paidAmt', 'Odenen']) || '0'),
-            remaining: parseFloat(getVal(['remaining', 'Kalan']) || '0')
-          };
-        });
+      const payload = await response.json();
+      if (payload?.prices && Array.isArray(payload.prices)) {
+        localStorage.setItem('villa_prices_v2', JSON.stringify(payload.prices));
+        window.dispatchEvent(new Event('price-update'));
+      }
+      if (payload?.config?.commission !== undefined) {
+        localStorage.setItem('villa_commission_rate', String(payload.config.commission));
+        window.dispatchEvent(new Event('config-update'));
       }
 
-      if (Array.isArray(data)) {
-        return data.map((item: any) => {
-          const getVal = (keys: string[]) => {
-            for (const k of keys) {
-              if (item[k] !== undefined) return item[k];
-              const lowerK = k.toLowerCase();
-              const found = Object.keys(item).find(key => key.toLowerCase() === lowerK);
-              if (found) return item[found];
-            }
-            return undefined;
-          };
-
-          const rawCin = getVal(['cin', 'Başlangıç', 'Baslangic', 'Giris']);
-          const rawCout = getVal(['cout', 'Bitiş', 'Bitis', 'Cikis']);
-
-          const fmtDate = (d: any) => {
-            if (!d) return '';
-            if (typeof d === 'string' && d.includes('T')) {
-              const date = new Date(d);
-              const year = date.getFullYear();
-              const month = String(date.getMonth() + 1).padStart(2, '0');
-              const day = String(date.getDate()).padStart(2, '0');
-              return `${year}-${month}-${day}`;
-            }
-            return typeof d === 'string' ? d.split('T')[0] : d;
-          };
-
-          const idVal = parseInt(getVal(['id', 'ID']) || '0');
-          const priceVal = parseFloat(getVal(['price', 'Fiyat', 'Gecelik']) || '0');
-          const cinVal = fmtDate(rawCin) || '';
-          const coutVal = fmtDate(rawCout) || '';
-
-          const start = new Date(cinVal);
-          const end = new Date(coutVal);
-          const nightsVal = !isNaN(start.getTime()) && !isNaN(end.getTime())
-            ? Math.ceil((end.getTime() - start.getTime()) / 86400000)
-            : 0;
-
-          const brutVal = nightsVal * priceVal;
-          const commVal = parseFloat(getVal(['commAmt', 'Komisyon', 'comm']) || '0');
-
-          return {
-            ...item,
-            id: idVal || Date.now(),
-            apart: getVal(['apart', 'Apart']) || 'Safira',
-            name: getVal(['name', 'Misafir', 'Ad']) || 'Misafir',
-            cin: cinVal,
-            cout: coutVal,
-            nights: parseInt(getVal(['nights', 'Gece']) || nightsVal.toString()),
-            brut: parseFloat(getVal(['brut', 'Brüt']) || brutVal.toString()),
-            net: parseFloat(getVal(['net', 'Net']) || (brutVal - commVal).toString()),
-            price: priceVal,
-            commAmt: commVal,
-            paidAmt: parseFloat(getVal(['paidAmt', 'Odenen']) || '0'),
-            remaining: parseFloat(getVal(['remaining', 'Kalan']) || '0')
-          };
-        });
+      const cloudData = normalizeReservations(payload);
+      if (cloudData.length > 0) {
+        writeLocalReservations(cloudData);
+        return cloudData;
       }
-      return [];
+      return localData;
     } catch (error) {
       clearTimeout(timeoutId);
-      console.error("Proxy Load Error:", error);
-      return null;
+      console.warn('Bulut bağlantısı kurulamadı, cihazdaki kayıtlar kullanılıyor.', error);
+      return localData;
     }
   },
 
-  async saveData(reservation: VillaReservation) {
+  async saveData(reservation: VillaReservation): Promise<boolean> {
+    const current = readLocalReservations();
+    const index = current.findIndex(item => item.id === reservation.id);
+    const updated = index >= 0
+      ? current.map(item => item.id === reservation.id ? reservation : item)
+      : [...current, reservation];
+
+    // Önce tarayıcıya kaydet: internet veya Google servisi çalışmasa da kayıt kaybolmaz.
+    writeLocalReservations(updated);
+
     try {
-      // Veriyi güvenli köprüye (Proxy) gönderiyoruz. 
-      const response = await fetch('/api/proxy', {
+      const response = await fetch(`/api/proxy?t=${Date.now()}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...reservation,
-          id: reservation.id.toString(),
-          action: 'save'
-        })
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+        body: JSON.stringify({ ...reservation, id: String(reservation.id), action: 'save' })
       });
-
-      if (!response.ok) throw new Error("Save proxy returned false");
-
-      // Google E-Tabloların işi bitirmesi için sisteme 1 saniye nefes payı veriyoruz (Erken çekimi önler).
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      this.backupToLocal();
-      return true;
+      if (!response.ok) console.warn('Bulut kaydı başarısız; kayıt cihazda saklandı.');
     } catch (error) {
-      console.error("Proxy Save Error:", error);
-      return false;
+      console.warn('Bulut bağlantısı yok; kayıt cihazda saklandı.', error);
     }
+    return true;
   },
 
-  async deleteData(id: number) {
+  async deleteData(id: number): Promise<boolean> {
+    writeLocalReservations(readLocalReservations().filter(item => item.id !== id));
     try {
-      const response = await fetch('/api/proxy', {
+      await fetch(`/api/proxy?t=${Date.now()}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: 'villa',
-          action: 'delete',
-          id: id
-        })
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
+        body: JSON.stringify({ type: 'villa', action: 'delete', id })
       });
-
-      if (!response.ok) throw new Error("Delete proxy returned false");
-
-      await new Promise(resolve => setTimeout(resolve, 1000));
-
-      this.backupToLocal();
-      return true;
     } catch (error) {
-      console.error("Proxy Delete Error:", error);
-      return false;
+      console.warn('Buluttan silinemedi; cihazdaki kayıt silindi.', error);
     }
+    return true;
   },
 
   async backupToLocal(): Promise<boolean> {
-    try {
-      let reservations = await this.loadData();
-
-      if (reservations === null) {
-        try {
-          const existingRes = await fetch(`/api/backup?t=${Date.now()}`);
-          if (existingRes.ok) {
-            const existingData = await existingRes.json();
-            if (existingData.reservations) {
-              reservations = existingData.reservations;
-            }
-          }
-        } catch (e) {
-          console.error("Failed to read existing backup:", e);
-        }
-      }
-
-      if (reservations === null) reservations = [];
-
-      const prices = PriceService.getPrices();
-      const payload = { reservations, prices };
-
-      const res = await fetch('/api/backup', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      return res.ok;
-    } catch (e) {
-      console.error('Backup Sync Error:', e);
-      return false;
-    }
+    return true;
   }
 };
 

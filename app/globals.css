@@ -90,3 +90,33 @@ select {
   background-size: 1.5em 1.5em;
   padding-right: 2.5rem;
 }
+.label {
+  display: block;
+  margin-left: 0.25rem;
+  font-size: 0.65rem;
+  line-height: 1rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9ca3af;
+}
+
+.input-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 0.85rem;
+  width: 1rem;
+  height: 1rem;
+  color: #6b7280;
+}
+
+.summary-label {
+  font-size: 0.6rem;
+  line-height: 0.9rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+}
+
+textarea, input { user-select: text; }

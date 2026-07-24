@@ -1,115 +1,70 @@
 "use client";
 
-import { useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useMemo, useState } from "react";
+import { ChevronLeft, ChevronRight, LogIn, LogOut } from "lucide-react";
 import { VillaReservation } from "@/services/api";
 
-interface CalendarProps {
-    reservations: VillaReservation[];
-}
+interface CalendarProps { reservations: VillaReservation[]; activeVilla: 'All' | 'Safira' | 'Destan'; }
 
-const APART_COLORS = {
-    Safira: { 
-        bg: "bg-blue-600/80", 
-        border: "border-blue-500/50", 
-        dot: "bg-blue-500" 
-    },
-    Destan: { 
-        bg: "bg-rose-600/80", 
-        border: "border-rose-500/50", 
-        dot: "bg-rose-500" 
-    },
-    Overlap: { 
-        bg: "bg-gradient-to-br from-blue-600 to-rose-600" 
-    }
+const COLORS = {
+  Safira: "bg-blue-600/80 border-blue-400/50",
+  Destan: "bg-rose-600/80 border-rose-400/50",
 };
 
-export default function Calendar({ reservations }: CalendarProps) {
-    const [currentDate, setCurrentDate] = useState(new Date());
+export default function Calendar({ reservations, activeVilla }: CalendarProps) {
+  const [currentDate, setCurrentDate] = useState(new Date());
+  const [selectedDay, setSelectedDay] = useState<string | null>(null);
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  const firstDay = new Date(year, month, 1).getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const startDay = firstDay === 0 ? 6 : firstDay - 1;
+  const dateString = (day: number) => `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
 
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
+  const selectedReservations = useMemo(() => selectedDay
+    ? reservations.filter(r => selectedDay >= r.cin && selectedDay < r.cout)
+    : [], [reservations, selectedDay]);
 
-    const firstDay = new Date(year, month, 1).getDay();
-    const daysInMonth = new Date(year, month + 1, 0).getDate();
-    const startDay = firstDay === 0 ? 6 : firstDay - 1; // Pazartesiden başlat
+  return <section className="glass-panel p-5 rounded-3xl mb-6">
+    <div className="flex flex-wrap justify-between items-center gap-3 mb-4">
+      <div>
+        <h3 className="font-black text-white">{activeVilla === 'All' ? 'Tüm Villalar' : `${activeVilla} Villası`} Takvimi</h3>
+        <p className="text-xs text-gray-400">Dolu bir güne dokunarak misafiri görebilirsiniz.</p>
+      </div>
+      <div className="flex items-center gap-2">
+        <button onClick={() => setCurrentDate(new Date(year, month - 1, 1))} className="p-2 glass rounded-lg"><ChevronLeft className="w-4 h-4" /></button>
+        <span className="text-xs font-bold min-w-[120px] text-center uppercase text-gray-300">{new Intl.DateTimeFormat('tr-TR', { month: 'long', year: 'numeric' }).format(currentDate)}</span>
+        <button onClick={() => setCurrentDate(new Date(year, month + 1, 1))} className="p-2 glass rounded-lg"><ChevronRight className="w-4 h-4" /></button>
+      </div>
+    </div>
 
-    const changeMonth = (delta: number) => {
-        setCurrentDate(new Date(year, month + delta, 1));
-    };
+    <div className="grid grid-cols-7 gap-1 text-center text-[9px] text-gray-500 mb-2 font-bold uppercase">
+      {['Pt','Sa','Ça','Pe','Cu','Ct','Pa'].map(d => <div key={d}>{d}</div>)}
+    </div>
+    <div className="grid grid-cols-7 gap-1">
+      {Array.from({ length: startDay }).map((_, i) => <div key={`e-${i}`} />)}
+      {Array.from({ length: daysInMonth }).map((_, i) => {
+        const day = i + 1;
+        const date = dateString(day);
+        const active = reservations.filter(r => date >= r.cin && date < r.cout);
+        const villas = Array.from(new Set(active.map(r => r.apart)));
+        const color = villas.length > 1 ? 'bg-gradient-to-br from-blue-600 to-rose-600 border-white/20' : villas.length === 1 ? COLORS[villas[0] as 'Safira'|'Destan'] : 'bg-white/[0.03] border-white/5';
+        const hasCheckIn = reservations.some(r => r.cin === date);
+        const hasCheckOut = reservations.some(r => r.cout === date);
+        return <button key={day} onClick={() => setSelectedDay(date)} className={`min-h-[58px] ${color} rounded-xl border relative transition hover:scale-[1.03] ${selectedDay === date ? 'ring-2 ring-white' : ''}`}>
+          <span className={`text-xs font-bold ${active.length ? 'text-white' : 'text-gray-500'}`}>{day}</span>
+          {active.length > 0 && <span className="block text-[7px] text-white/90 mt-1 truncate px-1">{active[0].name}</span>}
+          <span className="absolute bottom-1 left-1 flex gap-0.5">{hasCheckIn && <LogIn className="w-2.5 h-2.5" />}{hasCheckOut && <LogOut className="w-2.5 h-2.5" />}</span>
+        </button>;
+      })}
+    </div>
 
-    const getDayContent = (day: number) => {
-        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const activeRes = reservations.filter(r => dateStr >= r.cin && dateStr < r.cout);
-
-        let bgColor = "bg-white/5";
-        let borderColor = "border-white/5";
-        let status = "";
-
-        if (activeRes.length > 0) {
-            // MENTÖRLÜK DOKUNUŞU: O günkü rezervasyonların hangi apartlara ait olduğunu benzersiz olarak listeliyoruz (Örn: Sadece Destan)
-            const uniqueAparts = Array.from(new Set(activeRes.map(r => r.apart)));
-
-            if (uniqueAparts.length > 1) {
-                // Eğer aynı gün HEM Safira HEM Destan doluysa (Tüm Birimler sekmesinde)
-                bgColor = APART_COLORS.Overlap.bg;
-                borderColor = "border-white/20";
-            } else {
-                // Aynı apartta giriş-çıkış çakışması olsa bile kendi orijinal rengini korur
-                const apart = uniqueAparts[0] as 'Safira' | 'Destan';
-                bgColor = APART_COLORS[apart]?.bg || bgColor;
-                borderColor = APART_COLORS[apart]?.border || borderColor;
-            }
-            status = "Dolu";
-        }
-
-        return { bgColor, borderColor, status };
-    };
-
-    return (
-        <div className="glass-panel p-5 rounded-3xl mb-6 border border-white/5 bg-gray-900/40">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-sm font-bold flex items-center gap-2 text-white">📅 Doluluk Takvimi</h3>
-                <div className="flex items-center gap-3">
-                    <button onClick={() => changeMonth(-1)} className="p-1 px-3 glass rounded-lg hover:bg-white/10 text-white transition-colors">
-                        <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className="text-xs font-bold min-w-[100px] text-center uppercase tracking-wider text-gray-300">
-                        {new Intl.DateTimeFormat('tr-TR', { month: 'long', year: 'numeric' }).format(currentDate)}
-                    </span>
-                    <button onClick={() => changeMonth(1)} className="p-1 px-3 glass rounded-lg hover:bg-white/10 text-white transition-colors">
-                        <ChevronRight className="w-4 h-4" />
-                    </button>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-7 gap-1 text-center text-[9px] text-gray-500 mb-2 font-bold uppercase">
-                <div>Pt</div><div>Sa</div><div>Ça</div><div>Pe</div><div>Cu</div><div>Ct</div><div>Pa</div>
-            </div>
-
-            <div className="grid grid-cols-7 gap-1">
-                {Array.from({ length: startDay }).map((_, i) => (
-                    <div key={`empty-${i}`} />
-                ))}
-                {Array.from({ length: daysInMonth }).map((_, i) => {
-                    const day = i + 1;
-                    const { bgColor, borderColor, status } = getDayContent(day);
-                    return (
-                        <div
-                            key={day}
-                            className={`min-h-[45px] ${bgColor} rounded-lg flex flex-col items-center justify-center border ${borderColor} relative transition-all duration-300`}
-                        >
-                            <span className={`text-[11px] font-bold ${status ? 'text-white' : 'text-gray-500'}`}>{day}</span>
-                            {status && <span className="text-[6px] opacity-80 absolute bottom-1 text-white uppercase">{status}</span>}
-                        </div>
-                    );
-                })}
-            </div>
-
-            <div className="flex gap-4 mt-4 justify-center text-[9px] font-bold uppercase tracking-widest text-gray-400">
-                <div className="flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${APART_COLORS.Safira.dot}`}></span> Safira</div>
-                <div className="flex items-center gap-1"><span className={`w-2 h-2 rounded-full ${APART_COLORS.Destan.dot}`}></span> Destan</div>
-            </div>
-        </div>
-    );
+    {selectedDay && <div className="mt-4 p-4 rounded-2xl bg-black/20 border border-white/5">
+      <p className="text-xs font-bold text-gray-300 mb-2">{new Intl.DateTimeFormat('tr-TR', { dateStyle: 'long' }).format(new Date(`${selectedDay}T12:00:00`))}</p>
+      {selectedReservations.length === 0 ? <p className="text-xs text-gray-500">Bu tarihte villa boş.</p> : selectedReservations.map(r => <div key={r.id} className="flex justify-between gap-3 py-2 border-t border-white/5 first:border-0">
+        <div><p className="text-sm font-bold">{r.name}</p><p className="text-[10px] text-gray-400">{r.apart} · {r.cin} → {r.cout}</p></div>
+        <p className="text-xs font-bold text-indigo-300">₺{r.net.toLocaleString('tr-TR')}</p>
+      </div>)}
+    </div>}
+  </section>;
 }

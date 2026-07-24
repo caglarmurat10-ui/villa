@@ -47,8 +47,7 @@ export async function POST(request: Request) {
         const backupFilePath = path.join(process.cwd(), 'public', 'villa.html');
 
         if (!fs.existsSync(backupFilePath)) {
-            // Dosya yoksa bile hata fırlatma, ön yüzü kilitlememek için başarılı dön
-            return NextResponse.json({ success: true, message: 'Backup file not found, skipping local write.' });
+            return NextResponse.json({ success: false, error: 'Backup file not found' }, { status: 404 });
         }
 
         let htmlContent = fs.readFileSync(backupFilePath, 'utf-8');
@@ -63,18 +62,11 @@ export async function POST(request: Request) {
                 htmlContent = htmlContent.replace(dateRegex, `$1${new Date().toLocaleString('tr-TR')}$3`);
             }
 
-            // MENTÖRLÜK DOKUNUŞU: Vercel Çözümü
-            // Dosyaya yazmayı dener. Vercel'in "Read-Only" kısıtlamasına takılırsa sistemi çökertmez.
-            try {
-                fs.writeFileSync(backupFilePath, htmlContent, 'utf-8');
-            } catch (writeError) {
-                console.warn("Vercel Ortamı: Salt Okunur (Read-Only) kısıtlaması nedeniyle fiziksel yazma atlandı. Veriler Google Bulut'ta güvende.");
-            }
+            fs.writeFileSync(backupFilePath, htmlContent, 'utf-8');
 
-            // Sistem kilitlenmesin ve buton çalışmaya devam etsin diye "Başarılı" dönüyoruz
-            return NextResponse.json({ success: true, message: 'Backup processed' });
+            return NextResponse.json({ success: true, message: 'Backup successful' });
         } else {
-            return NextResponse.json({ success: true, message: 'Data script tag not found, local write skipped' });
+            return NextResponse.json({ success: false, error: 'Data script tag not found in template' }, { status: 500 });
         }
 
     } catch (error) {
