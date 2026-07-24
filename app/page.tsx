@@ -9,7 +9,7 @@ import Calculator from "@/components/Calculator";
 import Settings from "@/components/Settings";
 import FilterBar from "@/components/FilterBar";
 import { GoogleService, VillaReservation } from "@/services/api";
-import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon, Bell, Home as HomeIcon } from "lucide-react";
+import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon, Bell, Home as HomeIcon, Wallet } from "lucide-react";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -89,11 +89,18 @@ export default function Home() {
       const brut = Number(item.brut) || (Number(item.nights || 0) * Number(item.price || 0));
       const commAmt = Number(item.commAmt) > 0 ? Number(item.commAmt) : (brut * commission / 100);
       const net = brut - commAmt;
+      const paidAmt = Number(item.paidAmt) || 0;
+      const remaining = Number(item.remaining) !== undefined && !isNaN(Number(item.remaining)) 
+        ? Number(item.remaining) 
+        : Math.max(brut - paidAmt, 0);
+
       return {
         ...item,
         brut,
         commAmt,
-        net
+        net,
+        paidAmt,
+        remaining
       };
     });
   }, [safeData, commission]);
@@ -134,9 +141,11 @@ export default function Home() {
     brut: acc.brut + (curr?.brut || 0),
     comm: acc.comm + (curr?.commAmt || 0),
     net: acc.net + (curr?.net || 0),
+    paid: acc.paid + (curr?.paidAmt || 0),
+    remaining: acc.remaining + (curr?.remaining || 0),
     reservations: acc.reservations + 1,
     nights: acc.nights + (curr?.nights || 0)
-  }), { brut: 0, comm: 0, net: 0, reservations: 0, nights: 0 }), [filteredData]);
+  }), { brut: 0, comm: 0, net: 0, paid: 0, remaining: 0, reservations: 0, nights: 0 }), [filteredData]);
 
   // VİLLA BAZLI AYRIŞTIRMA (Safira ve Destan Karşılaştırmalı Özet)
   const villaBreakdown = useMemo(() => {
@@ -146,15 +155,19 @@ export default function Home() {
       brut: acc.brut + (curr.brut || 0),
       comm: acc.comm + (curr.commAmt || 0),
       net: acc.net + (curr.net || 0),
+      paid: acc.paid + (curr.paidAmt || 0),
+      remaining: acc.remaining + (curr.remaining || 0),
       count: acc.count + 1
-    }), { brut: 0, comm: 0, net: 0, count: 0 });
+    }), { brut: 0, comm: 0, net: 0, paid: 0, remaining: 0, count: 0 });
 
     const destan = activeSet.filter(i => i.apart === 'Destan').reduce((acc, curr) => ({
       brut: acc.brut + (curr.brut || 0),
       comm: acc.comm + (curr.commAmt || 0),
       net: acc.net + (curr.net || 0),
+      paid: acc.paid + (curr.paidAmt || 0),
+      remaining: acc.remaining + (curr.remaining || 0),
       count: acc.count + 1
-    }), { brut: 0, comm: 0, net: 0, count: 0 });
+    }), { brut: 0, comm: 0, net: 0, paid: 0, remaining: 0, count: 0 });
 
     return { safira, destan };
   }, [activeReservations, completedReservations, reservationTab]);
@@ -227,6 +240,28 @@ export default function Home() {
       </div>
 
       <Dashboard stats={stats} />
+
+      {/* TAHSİLAT & BAKİYE ÖZETİ KARTI (YENİ) */}
+      <div className="bg-gradient-to-r from-gray-900 via-indigo-950/40 to-gray-900 border border-indigo-500/30 rounded-2xl p-5 mb-6 shadow-xl">
+        <div className="flex items-center gap-2 mb-3 border-b border-gray-800 pb-2">
+          <Wallet className="w-5 h-5 text-indigo-400" />
+          <h3 className="font-extrabold text-indigo-300 text-sm tracking-wide uppercase">Genel Tahsilat & Alacak Takibi</h3>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+          <div className="bg-gray-950/60 p-3.5 rounded-xl border border-gray-800">
+            <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Toplam Alınacak (Brüt)</p>
+            <p className="text-xl font-black text-emerald-400 mt-1">₺{stats.brut.toLocaleString('tr-TR')}</p>
+          </div>
+          <div className="bg-gray-950/60 p-3.5 rounded-xl border border-gray-800">
+            <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Toplam Alınan (Tahsil Edilen)</p>
+            <p className="text-xl font-black text-sky-400 mt-1">₺{stats.paid.toLocaleString('tr-TR')}</p>
+          </div>
+          <div className="bg-gray-950/60 p-3.5 rounded-xl border border-gray-800">
+            <p className="text-[11px] text-gray-400 uppercase font-bold tracking-wider">Toplam Kalan Alacak</p>
+            <p className="text-xl font-black text-rose-400 mt-1">₺{stats.remaining.toLocaleString('tr-TR')}</p>
+          </div>
+        </div>
+      </div>
 
       {/* VİLLA BAZLI KARŞILAŞTIRMALI ÖZET KARTI */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
