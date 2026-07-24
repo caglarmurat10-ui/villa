@@ -207,6 +207,15 @@ export default function Home() {
     reservationTab === 'active' ? activeReservations : completedReservations,
   [reservationTab, activeReservations, completedReservations]);
 
+  // İşlem geçmişi için listeleri villa bazlı ayırma
+  const safiraTransactionList = useMemo(() => 
+    filteredData.filter(item => item && item.apart === 'Safira'), 
+  [filteredData]);
+
+  const destanTransactionList = useMemo(() => 
+    filteredData.filter(item => item && item.apart === 'Destan'), 
+  [filteredData]);
+
   const villaBreakdown = useMemo(() => {
     const activeSet = reservationTab === 'active' ? activeReservations : completedReservations;
     
@@ -595,10 +604,38 @@ export default function Home() {
           </div>
 
           <div className="grid lg:grid-cols-[1.25fr_0.75fr] gap-6 items-start">
-            <div>
+            <div className="space-y-6">
               <Calendar reservations={filteredData} activeVilla={activeFilter} />
-              <TransactionList reservations={filteredData} onRefresh={loadData} onEdit={(item) => { setEditingItem(item); window.scrollTo({ top: 0, behavior: 'smooth' }); }} />
+
+              {/* SAFİRA İŞLEM GEÇMİŞİ */}
+              {(activeFilter === 'All' || activeFilter === 'Safira') && (
+                <div className="space-y-2">
+                  <h3 className="text-purple-400 font-extrabold text-sm flex items-center gap-2 px-1">
+                    <HomeIcon className="w-4 h-4" /> Safira İşlem Geçmişi ({safiraTransactionList.length})
+                  </h3>
+                  <TransactionList 
+                    reservations={safiraTransactionList} 
+                    onRefresh={loadData} 
+                    onEdit={(item) => { setEditingItem(item); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
+                  />
+                </div>
+              )}
+
+              {/* DESTAN İŞLEM GEÇMİŞİ */}
+              {(activeFilter === 'All' || activeFilter === 'Destan') && (
+                <div className="space-y-2">
+                  <h3 className="text-pink-400 font-extrabold text-sm flex items-center gap-2 px-1">
+                    <HomeIcon className="w-4 h-4" /> Destan İşlem Geçmişi ({destanTransactionList.length})
+                  </h3>
+                  <TransactionList 
+                    reservations={destanTransactionList} 
+                    onRefresh={loadData} 
+                    onEdit={(item) => { setEditingItem(item); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
+                  />
+                </div>
+              )}
             </div>
+
             <ReservationForm
               onSave={() => { loadData(); setEditingItem(null); }}
               config={{ commission }}
