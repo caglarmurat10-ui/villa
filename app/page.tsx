@@ -22,7 +22,7 @@ export default function Home() {
   const [activeFilter, setActiveFilter] = useState<'All' | 'Safira' | 'Destan'>('All');
   const [commission, setCommission] = useState(10);
 
-  // Misafir telefon numaralarını tutmak için state
+  // Misafir telefon numaralarını localStorage ile senkronize tutma
   const [phoneInputs, setPhoneInputs] = useState<Record<string, string>>({});
 
   // Aktif veya Tamamlanan Rezervasyon Sekme Filtresi
@@ -56,6 +56,16 @@ export default function Home() {
   useEffect(() => {
     setMounted(true);
 
+    // Kayıtlı telefon numaralarını localStorage'dan yükle
+    try {
+      const savedPhones = localStorage.getItem('villa_guest_phones');
+      if (savedPhones) {
+        setPhoneInputs(JSON.parse(savedPhones));
+      }
+    } catch (e) {
+      console.error("Failed to load saved phones", e);
+    }
+
     const refreshLocalData = () => {
       if (typeof GoogleService.getLocalData === 'function') {
         const local = GoogleService.getLocalData();
@@ -81,6 +91,18 @@ export default function Home() {
       window.removeEventListener('villa-data-update', refreshLocalData);
     };
   }, []);
+
+  // Telefon numarası değiştiğinde localStorage'a kaydet
+  const handlePhoneChange = (id: string | number, val: string) => {
+    const key = String(id);
+    const updated = { ...phoneInputs, [key]: val };
+    setPhoneInputs(updated);
+    try {
+      localStorage.setItem('villa_guest_phones', JSON.stringify(updated));
+    } catch (e) {
+      console.error("Failed to save phone", e);
+    }
+  };
 
   const safeData = Array.isArray(data) ? data : [];
 
@@ -242,7 +264,7 @@ export default function Home() {
               </span>
               <div>
                 <h4 className="font-bold text-sm">Gelecek Misafirlere Konum & Bilgi Gönder</h4>
-                <p className="text-xs text-sky-200/90 mt-0.5">Telefon numarasını girip/yapıştırarak dilediğiniz misafire konum atabilirsiniz.</p>
+                <p className="text-xs text-sky-200/90 mt-0.5">Numarayı girin; bu numara çıkış panelinde de otomatik hatırlanacaktır.</p>
               </div>
             </div>
             <span className="px-3 py-1 bg-sky-500/20 rounded-full text-xs font-bold border border-sky-500/40">
@@ -266,7 +288,7 @@ export default function Home() {
                         type="text"
                         placeholder="Tel: 905XXXXXXXXX"
                         value={phoneInputs[rKey] || ''}
-                        onChange={(e) => setPhoneInputs({ ...phoneInputs, [rKey]: e.target.value })}
+                        onChange={(e) => handlePhoneChange(r.id, e.target.value)}
                         className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
                       />
                     </div>
@@ -294,7 +316,7 @@ export default function Home() {
               </span>
               <div>
                 <h4 className="font-bold text-sm">Çıkışı Yaklaşan Misafirler Var!</h4>
-                <p className="text-xs text-amber-200/90 mt-0.5">Telefon numarası girerek çıkış hatırlatması ve yorum linki gönderebilirsiniz.</p>
+                <p className="text-xs text-amber-200/90 mt-0.5">Girişte girdiğiniz numara burada otomatik görünür. Çıkış hatırlatması atabilirsiniz.</p>
               </div>
             </div>
             <span className="px-3 py-1 bg-amber-500/20 rounded-full text-xs font-bold border border-amber-500/40">
@@ -318,7 +340,7 @@ export default function Home() {
                         type="text"
                         placeholder="Tel: 905XXXXXXXXX"
                         value={phoneInputs[rKey] || ''}
-                        onChange={(e) => setPhoneInputs({ ...phoneInputs, [rKey]: e.target.value })}
+                        onChange={(e) => handlePhoneChange(r.id, e.target.value)}
                         className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
                       />
                     </div>
