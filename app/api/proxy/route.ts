@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwFecxccz6SP5tyPW0Mz2BB8h2xVaIu7iaTwZM1eIr8yKcs8ZIf22eoCjfVGUADdwOn-A/exec";
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1BYl27EHMBWqmz_1AegfZWLGmm-u-Qkdn8zrrcwDjyO-JOA0HTu966Bce_felgEXvQQ/exec";
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
