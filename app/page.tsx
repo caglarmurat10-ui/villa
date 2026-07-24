@@ -8,7 +8,7 @@ import Calculator from "@/components/Calculator";
 import Settings from "@/components/Settings";
 import FilterBar from "@/components/FilterBar";
 import { GoogleService, VillaReservation } from "@/services/api";
-import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon, Bell, Home as HomeIcon, Wallet, MessageSquare, MapPin } from "lucide-react";
+import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon, Bell, Home as HomeIcon, Wallet, MessageSquare, MapPin, Phone } from "lucide-react";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -21,6 +21,9 @@ export default function Home() {
   const [showSettings, setShowSettings] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'All' | 'Safira' | 'Destan'>('All');
   const [commission, setCommission] = useState(10);
+
+  // Misafir telefon numaralarını tutmak için state (Rezervasyon ID -> Telefon Numarası)
+  const [phoneInputs, setPhoneInputs] = useState<Record<string, string>>({});
 
   // Aktif veya Tamamlanan Rezervasyon Sekme Filtresi
   const [reservationTab, setReservationTab] = useState<'active' | 'completed'>('active');
@@ -167,19 +170,26 @@ export default function Home() {
     return { safira, destan };
   }, [activeReservations, completedReservations, reservationTab]);
 
-  // ÇIKIŞ İÇİN ÖZEL HATIRLATMA VE YORUM LİNKİ WHATSAPP MESAJI (İsimsiz)
-  const sendCheckoutWhatsApp = (apart: string) => {
+  // Telefon numarasını temizleyip wa.me formatına uygun hale getirme
+  const getWhatsAppUrl = (phone: string, text: string) => {
+    const cleanPhone = phone ? phone.replace(/\D/g, '') : '';
+    const encodedText = encodeURIComponent(text);
+    return cleanPhone ? `https://wa.me/${cleanPhone}?text=${encodedText}` : `https://wa.me/?text=${encodedText}`;
+  };
+
+  // ÇIKIŞ İÇİN WHATSAPP MESAJI
+  const sendCheckoutWhatsApp = (reservationId: string, apart: string) => {
     const reviewLink = apart === 'Safira' 
       ? 'https://g.page/r/CV4SGDD8Hr_7EBM/review' 
       : 'https://g.page/r/CZMpV_CdinkEEBM/review';
 
     const text = `Merhaba, yarın çıkışınız var çıkışlar 9 ile 10 arasındadır ben saat 10 doğru gelirim sizde hazırlanmış olursunuz iyi günler dilerim\n\nGörüşleriniz bizim için çok değerli. Değerlendirmeniz için: ${reviewLink}`;
-    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
+    const phone = phoneInputs[reservationId] || '';
+    window.open(getWhatsAppUrl(phone, text), '_blank');
   };
 
-  // VİLLA BAZLI GİRİŞ VE KONUM WHATSAPP MESAJI (İsimsiz)
-  const sendCheckinWhatsApp = (apart: string) => {
+  // GİRİŞ İÇİN WHATSAPP MESAJI
+  const sendCheckinWhatsApp = (reservationId: string, apart: string) => {
     let text = '';
     if (apart === 'Destan') {
       text = `Merhaba, ben Murat villanın konumunu atıyorum girişler saat 16 ile 22 arasındadır. Yaklaşınca haber verirsiniz. Hayırlı yolculuklar\n\nhttps://maps.app.goo.gl/QmWfNNF9ikQ5G1CFA?g_st=aw`;
@@ -187,8 +197,8 @@ export default function Home() {
       text = `Merhaba, ben Murat villanın konumunu atıyorum girişler saat 16 ile 22 arasındadır. Ödeme girişte nakit olarak yapılmaktadır. Yaklaşınca haber verirsiniz. Hayırlı yolculuklar\n\nhttps://maps.app.goo.gl/QPmffSfmcw3KeBEs9`;
     }
 
-    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-    window.open(url, '_blank');
+    const phone = phoneInputs[reservationId] || '';
+    window.open(getWhatsAppUrl(phone, text), '_blank');
   };
 
   if (!mounted) {
@@ -230,7 +240,7 @@ export default function Home() {
               </span>
               <div>
                 <h4 className="font-bold text-sm">Gelecek Misafirlere Konum & Bilgi Gönder</h4>
-                <p className="text-xs text-sky-200/90 mt-0.5">Mevcut müşteri içerideyken dahi sıradaki misafirlere konum gönderebilirsiniz.</p>
+                <p className="text-xs text-sky-200/90 mt-0.5">Telefon numarasını girip/yapıştırarak dilediğiniz misafire konum atabilirsiniz.</p>
               </div>
             </div>
             <span className="px-3 py-1 bg-sky-500/20 rounded-full text-xs font-bold border border-sky-500/40">
@@ -238,19 +248,31 @@ export default function Home() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-sky-500/25 max-h-60 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-sky-500/25 max-h-72 overflow-y-auto">
             {upcomingCheckins.map(r => (
-              <div key={r.id} className="flex items-center justify-between bg-black/30 p-2.5 rounded-xl border border-sky-500/20">
-                <div className="text-xs">
+              <div key={r.id} className="flex flex-col gap-2 bg-black/40 p-3 rounded-xl border border-sky-500/20">
+                <div className="flex justify-between items-center text-xs">
                   <span className="font-bold text-white">{r.name}</span>
-                  <span className="text-sky-200/70 block">({r.apart} - Giriş: {r.cin})</span>
+                  <span className="text-sky-200/70">({r.apart} - Giriş: {r.cin})</span>
                 </div>
-                <button
-                  onClick={() => sendCheckinWhatsApp(r.apart)}
-                  className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition-all whitespace-nowrap"
-                >
-                  <MessageSquare className="w-3.5 h-3.5" /> Konum Gönder
-                </button>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Phone className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Tel: 905XXXXXXXXX"
+                      value={phoneInputs[r.id] || ''}
+                      onChange={(e) => setPhoneInputs({ ...phoneInputs, [r.id]: e.target.value })}
+                      className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white focus:outline-none focus:border-sky-500"
+                    />
+                  </div>
+                  <button
+                    onClick={() => sendCheckinWhatsApp(r.id, r.apart)}
+                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow transition-all whitespace-nowrap"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" /> Konum Gönder
+                  </button>
+                </div>
               </div>
             ))}
           </div>
@@ -267,7 +289,7 @@ export default function Home() {
               </span>
               <div>
                 <h4 className="font-bold text-sm">Çıkışı Yaklaşan Misafirler Var!</h4>
-                <p className="text-xs text-amber-200/90 mt-0.5">Aşağıdaki misafirler için çıkış vakti geldi veya yarın doluyor.</p>
+                <p className="text-xs text-amber-200/90 mt-0.5">Telefon numarası girerek çıkış hatırlatması ve yorum linki gönderebilirsiniz.</p>
               </div>
             </div>
             <span className="px-3 py-1 bg-amber-500/20 rounded-full text-xs font-bold border border-amber-500/40">
@@ -275,19 +297,31 @@ export default function Home() {
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-amber-500/20">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-amber-500/20">
             {approachingCheckouts.map(r => (
-              <div key={r.id} className="flex items-center justify-between bg-black/30 p-2.5 rounded-xl border border-amber-500/20">
-                <div className="text-xs">
+              <div key={r.id} className="flex flex-col gap-2 bg-black/40 p-3 rounded-xl border border-amber-500/20">
+                <div className="flex justify-between items-center text-xs">
                   <span className="font-bold text-white">{r.name}</span>
-                  <span className="text-amber-200/70 block">({r.apart} - Çıkış: {r.cout})</span>
+                  <span className="text-amber-200/70">({r.apart} - Çıkış: {r.cout})</span>
                 </div>
-                <button
-                  onClick={() => sendCheckoutWhatsApp(r.apart)}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition-all whitespace-nowrap"
-                >
-                  <MessageSquare className="w-3.5 h-3.5" /> Çıkış & Yorum At
-                </button>
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1">
+                    <Phone className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Tel: 905XXXXXXXXX"
+                      value={phoneInputs[r.id] || ''}
+                      onChange={(e) => setPhoneInputs({ ...phoneInputs, [r.id]: e.target.value })}
+                      className="w-full bg-gray-900 border border-gray-700 rounded-lg pl-8 pr-2 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                    />
+                  </div>
+                  <button
+                    onClick={() => sendCheckoutWhatsApp(r.id, r.apart)}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1 shadow transition-all whitespace-nowrap"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" /> Çıkış & Yorum At
+                  </button>
+                </div>
               </div>
             ))}
           </div>
