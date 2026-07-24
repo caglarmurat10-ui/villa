@@ -15,7 +15,6 @@ export interface VillaReservation {
 }
 
 export const GoogleService = {
-  // 1. Önbellek sorununu çözen Yerel Hafıza Okuyucu
   getLocalData(): VillaReservation[] {
     if (typeof window === 'undefined') return [];
     try {
@@ -29,7 +28,6 @@ export const GoogleService = {
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
-      // Vercel Cache'ini kırmak için URL'nin sonuna anlık milisaniye ekliyoruz
       const response = await fetch(`/api/proxy?t=${new Date().getTime()}`, {
         method: 'GET',
         headers: { 'Cache-Control': 'no-cache, no-store, must-revalidate' },
@@ -72,7 +70,6 @@ export const GoogleService = {
         const rawCin = getVal(['cin', 'Başlangıç', 'Baslangic', 'Giris']);
         const rawCout = getVal(['cout', 'Bitiş', 'Bitis', 'Cikis']);
 
-        // 2. TARİH KAYMASINI ÖNLEYEN ZIRH: Her zaman Türkiye saatine (GMT+3) göre sabitler.
         const fmtDate = (d: any) => {
           if (!d) return '';
           if (typeof d === 'string' && d.includes('T')) {
@@ -127,7 +124,6 @@ export const GoogleService = {
 
   async saveData(reservation: VillaReservation) {
     try {
-      // 3. ANINDA GÜNCELLEME (Optimistic UI): Google'ı beklemeden veriyi takvime anında çiziyoruz!
       let currentLocal = this.getLocalData();
       const existingIdx = currentLocal.findIndex(r => r.id === reservation.id);
       if (existingIdx >= 0) {
@@ -138,7 +134,6 @@ export const GoogleService = {
       localStorage.setItem('villa_reservations_cache', JSON.stringify(currentLocal));
       window.dispatchEvent(new Event('villa-data-update'));
 
-      // 4. ÇİFTE ANAHTAR: Google Sheets (Excel) sütunlarının veriyi yutmasını engellemek için Türkçe isimleri de gönderiyoruz.
       const payload = {
         ...reservation,
         id: reservation.id.toString(),
@@ -154,15 +149,18 @@ export const GoogleService = {
         Komisyon: reservation.commAmt
       };
 
-      await fetch('/api/proxy', {
+      const res = await fetch('/api/proxy', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
 
-      // Google'ın dosyaya yazmasını garantiye almak için 4 saniye nefes payı
+      if (!res.ok) {
+        console.error("Proxy save returned not ok:", res.status);
+        return false;
+      }
+
       setTimeout(() => this.backupToLocal(), 4000);
-      
       return true;
     } catch (error) {
       console.error("Proxy Save Error:", error);
