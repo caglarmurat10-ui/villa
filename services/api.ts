@@ -14,17 +14,16 @@ export interface VillaReservation {
   remaining?: number;
 }
 
-const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwFecxccz6SP5tyPW0Mz2BB8h2xVaIu7iaTwZM1eIr8yKcs8ZIf22eoCjfVGUADdwOn-A/exec";
-
 export const GoogleService = {
   async loadData(): Promise<VillaReservation[] | null> {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
-      const response = await fetch(`${GOOGLE_SCRIPT_URL}?t=${Date.now()}`, {
+      // Doğrudan kendi yazdığımız güvenli Vercel köprümüze gidiyoruz
+      const response = await fetch(`/api/proxy?t=${Date.now()}`, {
         method: 'GET',
-        redirect: 'follow',
+        cache: 'no-store',
         signal: controller.signal
       });
       
@@ -164,20 +163,17 @@ export const GoogleService = {
       return [];
     } catch (error) {
       clearTimeout(timeoutId);
-      console.error("Google Cloud Load Error:", error);
+      console.error("Proxy Load Error:", error);
       return null;
     }
   },
 
   async saveData(reservation: VillaReservation) {
     try {
-      // MENTÖRLÜK DOKUNUŞU 1: Hayalet Modu (no-cors) ile güvenlik duvarını by-pass ediyoruz.
-      await fetch(GOOGLE_SCRIPT_URL, {
+      // Veriyi güvenli köprüye (Proxy) gönderiyoruz. 
+      const response = await fetch('/api/proxy', {
         method: 'POST',
-        mode: 'no-cors', 
-        headers: { 
-          'Content-Type': 'text/plain;charset=utf-8' 
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...reservation,
           id: reservation.id.toString(),
@@ -185,26 +181,24 @@ export const GoogleService = {
         })
       });
 
-      // MENTÖRLÜK DOKUNUŞU 2: Google E-Tabloların veriyi işleyip kaydetmesi için 1.5 saniye mühlet veriyoruz.
-      // Yoksa sistem çok hızlı davrandığı için tablo güncellenmeden eski veriyi çeker.
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      if (!response.ok) throw new Error("Save proxy returned false");
+
+      // Google E-Tabloların işi bitirmesi için sisteme 1 saniye nefes payı veriyoruz (Erken çekimi önler).
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       this.backupToLocal();
       return true;
     } catch (error) {
-      console.error("Google Cloud Save Error:", error);
+      console.error("Proxy Save Error:", error);
       return false;
     }
   },
 
   async deleteData(id: number) {
     try {
-      await fetch(GOOGLE_SCRIPT_URL, {
+      const response = await fetch('/api/proxy', {
         method: 'POST',
-        mode: 'no-cors',
-        headers: { 
-          'Content-Type': 'text/plain;charset=utf-8' 
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: 'villa',
           action: 'delete',
@@ -212,12 +206,14 @@ export const GoogleService = {
         })
       });
 
-      await new Promise(resolve => setTimeout(resolve, 1500));
+      if (!response.ok) throw new Error("Delete proxy returned false");
+
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       this.backupToLocal();
       return true;
     } catch (error) {
-      console.error("Google Cloud Delete Error:", error);
+      console.error("Proxy Delete Error:", error);
       return false;
     }
   },
