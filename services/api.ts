@@ -43,32 +43,72 @@ export const GoogleService = {
       let parsedReservations: VillaReservation[] = [];
 
       if (data && data.reservations && Array.isArray(data.reservations)) {
+        // FİYATLARI VE AYARLARI AKILLI OKUMA
         if (data.prices && Array.isArray(data.prices)) {
-          localStorage.setItem('villa_prices_v2', JSON.stringify(data.prices));
-          window.dispatchEvent(new Event('price-update'));
+          const mappedPrices = data.prices.map((p: any, idx: number) => {
+            const getPVal = (keys: string[]) => {
+              const keysObj = Object.keys(p);
+              for (const kw of keys) {
+                const found = keysObj.find(k => k && k.toLowerCase().includes(kw.toLowerCase()));
+                if (found && p[found] !== undefined && p[found] !== '') return p[found];
+              }
+              return '';
+            };
+            
+            const rawStart = getPVal(['start', 'başlangıç', 'baslangic', 'giris', 'giriş']);
+            const rawEnd = getPVal(['end', 'bitiş', 'bitis', 'cikis', 'çıkış']);
+            
+            const fmtDate = (d: any) => {
+              if (!d) return '';
+              if (typeof d === 'string' && d.includes('T')) {
+                const date = new Date(d);
+                if (!isNaN(date.getTime())) {
+                    const trTime = new Date(date.getTime() + (3 * 60 * 60 * 1000));
+                    return trTime.toISOString().split('T')[0];
+                }
+              }
+              return typeof d === 'string' ? d.split('T')[0] : d;
+            };
+
+            return {
+              id: parseInt(getPVal(['id']) || '0') || (Date.now() + idx),
+              apart: getPVal(['apart', 'villa', 'birim']) || 'Safira',
+              start: fmtDate(rawStart) || '',
+              end: fmtDate(rawEnd) || '',
+              price: parseFloat(getPVal(['price', 'fiyat', 'gecelik']) || '0')
+            };
+          }).filter(p => p.start && p.end);
+
+          if (mappedPrices.length > 0) {
+            localStorage.setItem('villa_prices_v2', JSON.stringify(mappedPrices));
+            window.dispatchEvent(new Event('price-update'));
+          }
         }
+
         if (data.config && data.config.commission) {
-          localStorage.setItem('villa_commission_rate', data.config.commission);
+          localStorage.setItem('villa_commission_rate', data.config.commission.toString());
           window.dispatchEvent(new Event('config-update'));
         }
+
         parsedReservations = data.reservations;
       } else if (Array.isArray(data)) {
         parsedReservations = data;
       }
 
-      const formattedData = parsedReservations.map((item: any) => {
-        const getVal = (keys: string[]) => {
-          for (const k of keys) {
-            if (item[k] !== undefined) return item[k];
-            const lowerK = k.toLowerCase();
-            const found = Object.keys(item).find(key => key.toLowerCase() === lowerK);
-            if (found) return item[found];
+      const formattedData = parsedReservations.map((item: any, index: number) => {
+        const getVal = (targetKeywords: string[]) => {
+          const keys = Object.keys(item);
+          for (const kw of targetKeywords) {
+            const foundKey = keys.find(k => k && k.toLowerCase().includes(kw.toLowerCase()));
+            if (foundKey && item[foundKey] !== undefined && item[foundKey] !== '') {
+              return item[foundKey];
+            }
           }
           return undefined;
         };
 
-        const rawCin = getVal(['cin', 'Başlangıç', 'Baslangic', 'Giris']);
-        const rawCout = getVal(['cout', 'Bitiş', 'Bitis', 'Cikis']);
+        const rawCin = getVal(['cin', 'başlangıç', 'baslangic', 'giris', 'giriş']);
+        const rawCout = getVal(['cout', 'bitiş', 'bitis', 'cikis', 'çıkış']);
 
         const fmtDate = (d: any) => {
           if (!d) return '';
@@ -84,7 +124,7 @@ export const GoogleService = {
 
         const cinVal = fmtDate(rawCin) || '';
         const coutVal = fmtDate(rawCout) || '';
-        const priceVal = parseFloat(getVal(['price', 'Fiyat', 'Gecelik']) || '0');
+        const priceVal = parseFloat(getVal(['price', 'fiyat', 'gecelik']) || '0');
         
         const start = new Date(cinVal);
         const end = new Date(coutVal);
@@ -93,22 +133,22 @@ export const GoogleService = {
           : 0;
 
         const brutVal = nightsVal * priceVal;
-        const commVal = parseFloat(getVal(['commAmt', 'Komisyon', 'comm']) || '0');
+        const commVal = parseFloat(getVal(['commamt', 'komisyon']) || '0');
 
         return {
           ...item,
-          id: parseInt(getVal(['id', 'ID']) || '0') || Date.now(),
-          apart: getVal(['apart', 'Apart']) || 'Safira',
-          name: getVal(['name', 'Misafir', 'Ad']) || 'Misafir',
+          id: parseInt(getVal(['id']) || '0') || (Date.now() + index),
+          apart: getVal(['apart', 'villa', 'birim']) || 'Safira',
+          name: getVal(['name', 'misafir', 'ad', 'musteri']) || 'Misafir',
           cin: cinVal,
           cout: coutVal,
-          nights: parseInt(getVal(['nights', 'Gece']) || nightsVal.toString()),
-          brut: parseFloat(getVal(['brut', 'Brüt']) || brutVal.toString()),
-          net: parseFloat(getVal(['net', 'Net']) || (brutVal - commVal).toString()),
+          nights: parseInt(getVal(['nights', 'gece']) || nightsVal.toString()),
+          brut: parseFloat(getVal(['brut', 'brüt']) || brutVal.toString()),
+          net: parseFloat(getVal(['net']) || (brutVal - commVal).toString()),
           price: priceVal,
           commAmt: commVal,
-          paidAmt: parseFloat(getVal(['paidAmt', 'Odenen']) || '0'),
-          remaining: parseFloat(getVal(['remaining', 'Kalan']) || '0')
+          paidAmt: parseFloat(getVal(['paidamt', 'odenen', 'ödenen']) || '0'),
+          remaining: parseFloat(getVal(['remaining', 'kalan']) || '0')
         };
       });
 
@@ -155,10 +195,7 @@ export const GoogleService = {
         body: JSON.stringify(payload)
       });
 
-      if (!res.ok) {
-        console.error("Proxy save returned not ok:", res.status);
-        return false;
-      }
+      if (!res.ok) return false;
 
       setTimeout(() => this.backupToLocal(), 4000);
       return true;
