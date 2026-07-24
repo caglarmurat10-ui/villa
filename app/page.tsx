@@ -8,7 +8,7 @@ import Calculator from "@/components/Calculator";
 import Settings from "@/components/Settings";
 import FilterBar from "@/components/FilterBar";
 import { GoogleService, VillaReservation } from "@/services/api";
-import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon, Bell, Home as HomeIcon, Wallet } from "lucide-react";
+import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon, Bell, Home as HomeIcon, Wallet, MessageSquare } from "lucide-react";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -138,12 +138,12 @@ export default function Home() {
     activeReservations.filter(item => item && (item.cout === todayStr || item.cout === tomorrowStr)), 
   [activeReservations, todayStr, tomorrowStr]);
 
-  // Ekranda (Takvim ve Listede) gösterilecek nihai veri setini sekmeye göre belirliyoruz
+  // Ekranda gösterilecek nihai veri setini sekmeye göre belirliyoruz
   const filteredData = useMemo(() => 
     reservationTab === 'active' ? activeReservations : completedReservations,
   [reservationTab, activeReservations, completedReservations]);
 
-  // VİLLA BAZLI AYRIŞTIRMA (Safira ve Destan Karşılaştırmalı Özet)
+  // VİLLA BAZLI AYRIŞTIRMA
   const villaBreakdown = useMemo(() => {
     const activeSet = reservationTab === 'active' ? activeReservations : completedReservations;
     
@@ -163,6 +163,13 @@ export default function Home() {
 
     return { safira, destan };
   }, [activeReservations, completedReservations, reservationTab]);
+
+  // WHATSAPP MESAJ GÖNDERME FONKSİYONU
+  const sendWhatsAppMessage = (name: string, apart: string, cout: string) => {
+    const text = `Merhaba ${name}, ${apart} villamızdaki konaklamanızı umarız keyifli geçirmişsinizdir. ${cout} tarihindeki çıkışınız için hatırlatma yapmak isteriz. İyi yolculuklar dileriz!`;
+    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
 
   if (!mounted) {
     return (
@@ -193,23 +200,41 @@ export default function Home() {
         </div>
       </header>
 
-      {/* ÇIKIŞI YAKLAŞANlar BİLDİRİM PANELİ */}
+      {/* ÇIKIŞI YAKLAŞANLAR BİLDİRİM PANELİ & WHATSAPP BUTONLARI */}
       {approachingCheckouts.length > 0 && (
-        <div className="mb-6 p-4 bg-amber-500/15 border border-amber-500/30 rounded-2xl text-amber-300 flex items-center justify-between shadow-lg animate-pulse">
-          <div className="flex items-center space-x-3">
-            <span className="p-2 bg-amber-500/20 rounded-xl text-amber-400">
-              <Bell className="w-5 h-5" />
-            </span>
-            <div>
-              <h4 className="font-bold text-sm">Çıkışı Yaklaşan Misafirler Var!</h4>
-              <p className="text-xs text-amber-200/90 mt-0.5">
-                {approachingCheckouts.map(r => `${r.name} (${r.apart} - Çıkış: ${r.cout})`).join(', ')} için çıkış vakti geldi veya yarın doluyor.
-              </p>
+        <div className="mb-6 p-4 bg-amber-500/15 border border-amber-500/30 rounded-2xl text-amber-300 shadow-lg space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-3">
+              <span className="p-2 bg-amber-500/20 rounded-xl text-amber-400">
+                <Bell className="w-5 h-5" />
+              </span>
+              <div>
+                <h4 className="font-bold text-sm">Çıkışı Yaklaşan Misafirler Var!</h4>
+                <p className="text-xs text-amber-200/90 mt-0.5">Aşağıdaki misafirler için çıkış vakti geldi veya yarın doluyor.</p>
+              </div>
             </div>
+            <span className="px-3 py-1 bg-amber-500/20 rounded-full text-xs font-bold border border-amber-500/40">
+              {approachingCheckouts.length} Misafir
+            </span>
           </div>
-          <span className="px-3 py-1 bg-amber-500/20 rounded-full text-xs font-bold border border-amber-500/40">
-            {approachingCheckouts.length} Misafir
-          </span>
+
+          {/* Misafir Bazlı Hızlı WhatsApp Gönderim Alanı */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2 border-t border-amber-500/20">
+            {approachingCheckouts.map(r => (
+              <div key={r.id} className="flex items-center justify-between bg-black/30 p-2.5 rounded-xl border border-amber-500/20">
+                <div className="text-xs">
+                  <span className="font-bold text-white">{r.name}</span>
+                  <span className="text-amber-200/70 block">({r.apart} - Çıkış: {r.cout})</span>
+                </div>
+                <button
+                  onClick={() => sendWhatsAppMessage(r.name, r.apart, r.cout)}
+                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition-all"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" /> WhatsApp
+                </button>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
