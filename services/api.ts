@@ -43,7 +43,6 @@ export const GoogleService = {
       let parsedReservations: VillaReservation[] = [];
 
       if (data && data.reservations && Array.isArray(data.reservations)) {
-        // FİYATLARI VE AYARLARI AKILLI OKUMA
         if (data.prices && Array.isArray(data.prices)) {
           const mappedPrices = data.prices.map((p: any, idx: number) => {
             const getPVal = (keys: string[]) => {
@@ -77,7 +76,7 @@ export const GoogleService = {
               end: fmtDate(rawEnd) || '',
               price: parseFloat(getPVal(['price', 'fiyat', 'gecelik']) || '0')
             };
-          }).filter(p => p.start && p.end);
+          }).filter((p: any) => p.start && p.end);
 
           if (mappedPrices.length > 0) {
             localStorage.setItem('villa_prices_v2', JSON.stringify(mappedPrices));
@@ -107,8 +106,8 @@ export const GoogleService = {
           return undefined;
         };
 
-        const rawCin = getVal(['cin', 'başlangıç', 'baslangic', 'giris', 'giriş']);
-        const rawCout = getVal(['cout', 'bitiş', 'bitis', 'cikis', 'çıkış']);
+        const rawCin = getVal(['checkin', 'cin', 'başlangıç', 'baslangic', 'giris', 'giriş']);
+        const rawCout = getVal(['checkout', 'cout', 'bitiş', 'bitis', 'cikis', 'çıkış']);
 
         const fmtDate = (d: any) => {
           if (!d) return '';
@@ -142,7 +141,7 @@ export const GoogleService = {
           name: getVal(['name', 'misafir', 'ad', 'musteri']) || 'Misafir',
           cin: cinVal,
           cout: coutVal,
-          nights: parseInt(getVal(['nights', 'gece']) || nightsVal.toString()),
+          nights: parseInt(getVal(['nights', 'gece', 'nights']) || nightsVal.toString()),
           brut: parseFloat(getVal(['brut', 'brüt']) || brutVal.toString()),
           net: parseFloat(getVal(['net']) || (brutVal - commVal).toString()),
           price: priceVal,
@@ -178,15 +177,14 @@ export const GoogleService = {
         ...reservation,
         id: reservation.id.toString(),
         action: 'save',
-        Baslangic: reservation.cin,
-        Bitis: reservation.cout,
-        Misafir: reservation.name,
+        CheckIn: reservation.cin,
+        CheckOut: reservation.cout,
+        Name: reservation.name,
         Apart: reservation.apart,
-        Fiyat: reservation.price,
-        Gece: reservation.nights,
-        Brüt: reservation.brut,
-        Net: reservation.net,
-        Komisyon: reservation.commAmt
+        Price: reservation.price,
+        Nights: reservation.nights,
+        Brut: reservation.brut,
+        Net: reservation.net
       };
 
       const res = await fetch('/api/proxy', {
