@@ -3,22 +3,25 @@ import { useState, useEffect } from "react";
 import { VillaReservation, GoogleService, PriceService } from "@/services/api";
 import { Loader2 } from "lucide-react";
 
+// MENTÖRLÜK DOKUNUŞU: TypeScript'in kızdığı 'reservations' ve 'defaultVilla' özellikleri buraya eklendi.
 interface Props {
   onSave: () => void;
   config: { commission: number };
-  editingItem: VillaReservation | null;
+  editingItem?: VillaReservation | null;
   onCancelEdit: () => void;
+  reservations?: any; 
+  defaultVilla?: string; 
 }
 
-export default function ReservationForm({ onSave, config, editingItem, onCancelEdit }: Props) {
-  const [apart, setApart] = useState<'Safira' | 'Destan'>('Safira');
+export default function ReservationForm({ onSave, config, editingItem, onCancelEdit, defaultVilla }: Props) {
+  // Filtre barında hangi apart seçiliyse formda otomatik o seçili gelir
+  const [apart, setApart] = useState<'Safira' | 'Destan'>(defaultVilla === 'Destan' ? 'Destan' : 'Safira');
   const [name, setName] = useState('');
   const [cin, setCin] = useState('');
   const [cout, setCout] = useState('');
   const [price, setPrice] = useState('');
   const [isSaving, setIsSaving] = useState(false);
 
-  // Düzenleme moduna geçilirse form alanlarını doldur
   useEffect(() => {
     if (editingItem) {
       setApart(editingItem.apart);
@@ -26,10 +29,11 @@ export default function ReservationForm({ onSave, config, editingItem, onCancelE
       setCin(editingItem.cin);
       setCout(editingItem.cout);
       setPrice(editingItem.price.toString());
+    } else if (defaultVilla) {
+      setApart(defaultVilla === 'Destan' ? 'Destan' : 'Safira');
     }
-  }, [editingItem]);
+  }, [editingItem, defaultVilla]);
 
-  // Tarih seçildiğinde otomatik fiyat hesaplama
   useEffect(() => {
     if (!editingItem && cin && cout) {
        const calc = PriceService.calculateTotal(apart, cin, cout);
@@ -38,9 +42,8 @@ export default function ReservationForm({ onSave, config, editingItem, onCancelE
   }, [apart, cin, cout, editingItem]);
 
   const handleSave = async (e: React.MouseEvent) => {
-    e.preventDefault(); // Butonun sayfayı yenilemesini engeller
+    e.preventDefault(); 
 
-    // 1. SESSİZ HATALARI ÖNLEME: Eksik varsa artık ekrana uyarı verecek!
     if (!name) return alert("Lütfen misafir adını girin.");
     if (!cin) return alert("Lütfen giriş tarihini seçin.");
     if (!cout) return alert("Lütfen çıkış tarihini seçin.");
@@ -50,7 +53,6 @@ export default function ReservationForm({ onSave, config, editingItem, onCancelE
     const end = new Date(cout);
     if (start >= end) return alert("Çıkış tarihi, giriş tarihinden sonra olmalıdır!");
 
-    // Kaydediliyor animasyonunu başlat
     setIsSaving(true);
 
     const nights = Math.ceil((end.getTime() - start.getTime()) / 86400000);
@@ -76,17 +78,15 @@ export default function ReservationForm({ onSave, config, editingItem, onCancelE
     };
 
     try {
-      // 2. DOĞRUDAN API İLETİŞİMİ
       const success = await GoogleService.saveData(reservation);
       
       if (success) {
-        // İşlem başarılıysa formu temizle
         setName('');
         setCin('');
         setCout('');
         setPrice('');
         if (editingItem) onCancelEdit();
-        onSave(); // Ana sayfadaki listeyi güncelle
+        onSave(); 
       } else {
         alert("Bağlantı başarısız oldu. Lütfen internetinizi kontrol edip tekrar deneyin.");
       }
@@ -94,7 +94,7 @@ export default function ReservationForm({ onSave, config, editingItem, onCancelE
       console.error("Save Error:", error);
       alert("Kayıt sırasında beklenmeyen bir sistem hatası oluştu.");
     } finally {
-      setIsSaving(false); // Butonu tekrar aktif et
+      setIsSaving(false); 
     }
   };
 
