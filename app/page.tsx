@@ -8,7 +8,7 @@ import Calculator from "@/components/Calculator";
 import Settings from "@/components/Settings";
 import FilterBar from "@/components/FilterBar";
 import { GoogleService, VillaReservation } from "@/services/api";
-import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon, Home as HomeIcon, Wallet, MessageSquare, Phone, Send, Calendar as CalendarIcon, Bell } from "lucide-react";
+import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon, Home as HomeIcon, Wallet, MessageSquare, Phone, Send, Calendar as CalendarIcon, Bell, AlertTriangle } from "lucide-react";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -22,8 +22,8 @@ export default function Home() {
   const [activeFilter, setActiveFilter] = useState<'All' | 'Safira' | 'Destan'>('All');
   const [commission, setCommission] = useState(10);
 
-  // Görünüm Sekmesi: 'dashboard' (Ana Ekran) veya 'messages' (Mesaj Yönetimi)
-  const [viewMode, setViewMode] = useState<'dashboard' | 'messages'>('dashboard');
+  // Görünüm Sekmesi: 'dashboard' (Ana Ekran) | 'messages' (Mesaj Paneli) | 'overlaps' (Çakışan Günler)
+  const [viewMode, setViewMode] = useState<'dashboard' | 'messages' | 'overlaps'>('dashboard');
 
   // Misafir telefon numaralarını localStorage ile senkronize tutma
   const [phoneInputs, setPhoneInputs] = useState<Record<string, string>>({});
@@ -166,6 +166,24 @@ export default function Home() {
     activeReservations.filter(item => item && (item.cout === todayStr || item.cout === tomorrowStr)), 
   [activeReservations, todayStr, tomorrowStr]);
 
+  // Safira ve Destan villaları arasında tarihi çakışan (aynı anda dolu olunan) rezervasyon çiftlerini bulma
+  const overlappingReservations = useMemo(() => {
+    const safiraRes = processedData.filter(r => r && r.apart === 'Safira' && r.cin && r.cout);
+    const destanRes = processedData.filter(r => r && r.apart === 'Destan' && r.cin && r.cout);
+    const conflicts: { safira: VillaReservation; destan: VillaReservation }[] = [];
+
+    safiraRes.forEach(s => {
+      destanRes.forEach(d => {
+        // Tarih çakışma kontrolü: Başlangıç1 < Bitiş2 ve Başlangıç2 < Bitiş1
+        if (s.cin < d.cout && d.cin < s.cout) {
+          conflicts.push({ safira: s, destan: d });
+        }
+      });
+    });
+
+    return conflicts;
+  }, [processedData]);
+
   const filteredData = useMemo(() => 
     reservationTab === 'active' ? activeReservations : completedReservations,
   [reservationTab, activeReservations, completedReservations]);
@@ -252,24 +270,80 @@ export default function Home() {
         </div>
       </header>
 
-      {/* ANA GÖRÜNÜM SEKMELERİ (DASHBOARD vs WHATSAPP MESAJ PANELİ) */}
-      <div className="flex space-x-2 mb-6 bg-gray-900/80 p-1.5 rounded-2xl border border-gray-800 w-fit">
+      {/* ANA GÖRÜNÜM SEKMELERİ (DASHBOARD vs WHATSAPP MESAJ vs ÇAKIŞAN GÜNLER) */}
+      <div className="flex flex-wrap gap-2 mb-6 bg-gray-900/80 p-1.5 rounded-2xl border border-gray-800 w-fit">
         <button 
           onClick={() => setViewMode('dashboard')}
-          className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'dashboard' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'dashboard' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
         >
           <CalendarIcon className="w-4 h-4" /> Ana Takip & Finans
         </button>
         <button 
           onClick={() => setViewMode('messages')}
-          className={`px-5 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'messages' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'messages' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
         >
           <MessageSquare className="w-4 h-4" /> WhatsApp Mesaj Paneli ({activeReservations.length})
+        </button>
+        <button 
+          onClick={() => setViewMode('overlaps')}
+          className={`px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 ${viewMode === 'overlaps' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-white'}`}
+        >
+          <AlertTriangle className="w-4 h-4 text-amber-400" /> Çakışan Günler ({overlappingReservations.length})
         </button>
       </div>
 
       {/* ==================================================== */}
-      {/* 1. WHATSAPP MESAJ YÖNETİMİ SEKMESİ */}
+      {/* 1. ÇAKIŞAN GÜNLER SEKMESİ */}
+      {/* ==================================================== */}
+      {viewMode === 'overlaps' && (
+        <div className="space-y-6 animate-fadeIn">
+          <div className="bg-gradient-to-r from-gray-900 via-amber-950/30 to-gray-900 border border-amber-500/30 rounded-2xl p-5 shadow-xl">
+            <h3 className="text-base font-black text-amber-300 mb-1 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-400" /> Safira ve Destan Çakışan Rezervasyon Günleri
+            </h3>
+            <p className="text-xs text-gray-300">
+              İki villanın aynı tarihlerde eş zamanlı dolu olduğu (çakıştığı) dönemler aşağıda listelenmiştir. Yoğun günlerde temizlik ve operasyonları bu listeye göre planlayabilirsiniz.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 gap-4">
+            {overlappingReservations.length === 0 ? (
+              <div className="text-center py-12 bg-gray-900/50 rounded-2xl border border-gray-800 text-gray-400 text-sm">
+                İki villa arasında tarihleri çakışan herhangi bir rezervasyon bulunmuyor.
+              </div>
+            ) : (
+              overlappingReservations.map((item, idx) => (
+                <div key={idx} className="bg-gray-900/90 border border-amber-500/30 rounded-2xl p-4 shadow-lg grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                  {/* Safira Tarafı */}
+                  <div className="bg-purple-950/20 border border-purple-500/20 p-3 rounded-xl space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-extrabold text-purple-300">Safira Villası</span>
+                      <span className="text-gray-300">{item.safira.name}</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400">
+                      Giriş: <span className="text-white font-semibold">{item.safira.cin}</span> | Çıkış: <span className="text-white font-semibold">{item.safira.cout}</span>
+                    </p>
+                  </div>
+
+                  {/* Destan Tarafı */}
+                  <div className="bg-pink-950/20 border border-pink-500/20 p-3 rounded-xl space-y-1">
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="font-extrabold text-pink-300">Destan Villası</span>
+                      <span className="text-gray-300">{item.destan.name}</span>
+                    </div>
+                    <p className="text-[11px] text-gray-400">
+                      Giriş: <span className="text-white font-semibold">{item.destan.cin}</span> | Çıkış: <span className="text-white font-semibold">{item.destan.cout}</span>
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ==================================================== */}
+      {/* 2. WHATSAPP MESAJ YÖNETİMİ SEKMESİ */}
       {/* ==================================================== */}
       {viewMode === 'messages' && (
         <div className="space-y-6 animate-fadeIn">
@@ -397,7 +471,7 @@ export default function Home() {
       )}
 
       {/* ==================================================== */}
-      {/* 2. ANA TAKİP & FİNANS DASHBOARD SEKMESİ */}
+      {/* 3. ANA TAKİP & FİNANS DASHBOARD SEKMESİ */}
       {/* ==================================================== */}
       {viewMode === 'dashboard' && (
         <div className="space-y-6 animate-fadeIn">
