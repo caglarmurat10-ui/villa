@@ -12,10 +12,10 @@ import { GoogleService, VillaReservation } from "@/services/api";
 import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon } from "lucide-react";
 
 export default function Home() {
-  // MENTÖRLÜK DOKUNUŞU 1: Error 418'i engelleyen kalkanımız (Mounted State)
   const [mounted, setMounted] = useState(false);
 
-  const [data, setData] = useState<VillaReservation[]>(() => GoogleService.getLocalData());
+  // ÇELİK YELEK 1: Başlangıçta boş array ([]). Erken "localStorage" çağrısı kaldırıldı (SSR Çökmesini engeller).
+  const [data, setData] = useState<VillaReservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [synced, setSynced] = useState(false);
   const [editingItem, setEditingItem] = useState<VillaReservation | null>(null);
@@ -25,7 +25,7 @@ export default function Home() {
   const [commission, setCommission] = useState(10);
 
   const loadData = async () => {
-    if (data.length === 0) setLoading(true);
+    if (!data || data.length === 0) setLoading(true);
     try {
       const backupRes = await fetch('/api/backup');
       if (backupRes.ok) {
@@ -42,7 +42,7 @@ export default function Home() {
 
     setSynced(false);
     const cloudData = await GoogleService.loadData();
-    if (cloudData !== null) {
+    if (cloudData !== null && Array.isArray(cloudData)) {
       setData(cloudData);
       setSynced(true);
     }
@@ -50,25 +50,36 @@ export default function Home() {
   };
 
   useEffect(() => {
-    // MENTÖRLÜK DOKUNUŞU 2: Sistem tarayıcıya tam oturunca kalkanı kaldırıyoruz
     setMounted(true);
 
-    const refreshLocalData = () => setData(GoogleService.getLocalData());
+    // ÇELİK YELEK 2: Verileri sadece sistem tarayıcıya tam olarak oturduktan sonra çağırıyoruz.
+    const refreshLocalData = () => {
+      if (typeof GoogleService.getLocalData === 'function') {
+        const local = GoogleService.getLocalData();
+        if (Array.isArray(local)) setData(local);
+      }
+    };
+
+    // İlk yüklemede yerel veriyi almayı deniyoruz
+    refreshLocalData();
+
     const readCommission = () => {
       const value = Number(localStorage.getItem('villa_commission_rate') || 10);
       setCommission(Number.isFinite(value) ? value : 10);
     };
+
     readCommission();
     window.addEventListener('config-update', readCommission);
     window.addEventListener('villa-data-update', refreshLocalData);
+    
     loadData();
+    
     return () => {
       window.removeEventListener('config-update', readCommission);
       window.removeEventListener('villa-data-update', refreshLocalData);
     };
   }, []);
 
-  // MENTÖRLÜK DOKUNUŞU 3: Eğer sistem henüz oturmadıysa ekranı kilitleyip animasyon gösteriyoruz (Hata burada önleniyor)
   if (!mounted) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f172a] text-white">
@@ -78,18 +89,21 @@ export default function Home() {
     );
   }
 
+  // ÇELİK YELEK 3: Gelen veri boş veya tanımsız (undefined) ise sistemi çökertmek yerine boş array [] atarız.
+  const safeData = Array.isArray(data) ? data : [];
+
   const filteredData = useMemo(() => activeFilter === 'All'
-    ? data
-    : data.filter(item => item.apart === activeFilter), [activeFilter, data]);
+    ? safeData
+    : safeData.filter(item => item && item.apart === activeFilter), [activeFilter, safeData]);
 
   const stats = useMemo(() => filteredData.reduce((acc, curr) => ({
-    brut: acc.brut + (curr.brut || 0),
-    comm: acc.comm + (curr.commAmt || 0),
-    net: acc.net + (curr.net || 0),
-    paid: acc.paid + (curr.paidAmt || 0),
-    remaining: acc.remaining + Math.max(curr.remaining || 0, 0),
+    brut: acc.brut + (curr?.brut || 0),
+    comm: acc.comm + (curr?.commAmt || 0),
+    net: acc.net + (curr?.net || 0),
+    paid: acc.paid + (curr?.paidAmt || 0),
+    remaining: acc.remaining + Math.max(curr?.remaining || 0, 0),
     reservations: acc.reservations + 1,
-    nights: acc.nights + (curr.nights || 0)
+    nights: acc.nights + (curr?.nights || 0)
   }), { brut: 0, comm: 0, net: 0, paid: 0, remaining: 0, reservations: 0, nights: 0 }), [filteredData]);
 
   return (
@@ -123,7 +137,7 @@ export default function Home() {
         <ReservationForm
           onSave={() => { loadData(); setEditingItem(null); }}
           config={{ commission }}
-          reservations={data}
+          reservations={safeData}
           editingItem={editingItem}
           onCancelEdit={() => setEditingItem(null)}
           defaultVilla={activeFilter === 'All' ? 'Safira' : activeFilter}
