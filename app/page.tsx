@@ -9,7 +9,7 @@ import Calculator from "@/components/Calculator";
 import Settings from "@/components/Settings";
 import FilterBar from "@/components/FilterBar";
 import { GoogleService, VillaReservation } from "@/services/api";
-import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon, Bell } from "lucide-react";
+import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon, Bell, Home as HomeIcon } from "lucide-react";
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
@@ -82,7 +82,7 @@ export default function Home() {
 
   const safeData = Array.isArray(data) ? data : [];
 
-  // KOMİSYON VE NET TUTAR DÜZELTMESİ: Eksik komisyonları güncel orana göre dinamik hesapla
+  // Komisyon ve net tutar dinamik hesaplama
   const processedData = useMemo(() => {
     return safeData.map(item => {
       if (!item) return item;
@@ -125,7 +125,7 @@ export default function Home() {
     activeReservations.filter(item => item && (item.cout === todayStr || item.cout === tomorrowStr)), 
   [activeReservations, todayStr, tomorrowStr]);
 
-  // Ekranda (Takvim ve Listede) gösterilecek nihai veri setini sekmeye göre belirliyoruz
+  // Ekranda gösterilecek nihai veri setini sekmeye göre belirliyoruz
   const filteredData = useMemo(() => 
     reservationTab === 'active' ? activeReservations : completedReservations,
   [reservationTab, activeReservations, completedReservations]);
@@ -137,6 +137,27 @@ export default function Home() {
     reservations: acc.reservations + 1,
     nights: acc.nights + (curr?.nights || 0)
   }), { brut: 0, comm: 0, net: 0, reservations: 0, nights: 0 }), [filteredData]);
+
+  // VİLLA BAZLI AYRIŞTIRMA (Safira ve Destan Karşılaştırmalı Özet)
+  const villaBreakdown = useMemo(() => {
+    const activeSet = reservationTab === 'active' ? activeReservations : completedReservations;
+    
+    const safira = activeSet.filter(i => i.apart === 'Safira').reduce((acc, curr) => ({
+      brut: acc.brut + (curr.brut || 0),
+      comm: acc.comm + (curr.commAmt || 0),
+      net: acc.net + (curr.net || 0),
+      count: acc.count + 1
+    }), { brut: 0, comm: 0, net: 0, count: 0 });
+
+    const destan = activeSet.filter(i => i.apart === 'Destan').reduce((acc, curr) => ({
+      brut: acc.brut + (curr.brut || 0),
+      comm: acc.comm + (curr.commAmt || 0),
+      net: acc.net + (curr.net || 0),
+      count: acc.count + 1
+    }), { brut: 0, comm: 0, net: 0, count: 0 });
+
+    return { safira, destan };
+  }, [activeReservations, completedReservations, reservationTab]);
 
   if (!mounted) {
     return (
@@ -206,6 +227,57 @@ export default function Home() {
       </div>
 
       <Dashboard stats={stats} />
+
+      {/* VİLLA BAZLI KARŞILAŞTIRMALI ÖZET KARTI */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        {/* Safira Özet */}
+        <div className="bg-gray-900/90 border border-purple-500/30 rounded-2xl p-5 shadow-xl">
+          <div className="flex justify-between items-center mb-3 border-b border-gray-800 pb-2">
+            <h3 className="font-extrabold text-purple-400 flex items-center gap-2">
+              <HomeIcon className="w-4 h-4" /> Safira Villası
+            </h3>
+            <span className="text-xs bg-purple-500/10 text-purple-300 px-2.5 py-1 rounded-full font-semibold">{villaBreakdown.safira.count} Rezervasyon</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
+              <p className="text-[10px] text-gray-400 uppercase font-bold">Brüt Gelir</p>
+              <p className="text-sm md:text-base font-black text-emerald-400 mt-1">₺{villaBreakdown.safira.brut.toLocaleString('tr-TR')}</p>
+            </div>
+            <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
+              <p className="text-[10px] text-gray-400 uppercase font-bold">Komisyon</p>
+              <p className="text-sm md:text-base font-black text-amber-400 mt-1">₺{villaBreakdown.safira.comm.toLocaleString('tr-TR')}</p>
+            </div>
+            <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
+              <p className="text-[10px] text-gray-400 uppercase font-bold">Net Kalan</p>
+              <p className="text-sm md:text-base font-black text-indigo-400 mt-1">₺{villaBreakdown.safira.net.toLocaleString('tr-TR')}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Destan Özet */}
+        <div className="bg-gray-900/90 border border-pink-500/30 rounded-2xl p-5 shadow-xl">
+          <div className="flex justify-between items-center mb-3 border-b border-gray-800 pb-2">
+            <h3 className="font-extrabold text-pink-400 flex items-center gap-2">
+              <HomeIcon className="w-4 h-4" /> Destan Villası
+            </h3>
+            <span className="text-xs bg-pink-500/10 text-pink-300 px-2.5 py-1 rounded-full font-semibold">{villaBreakdown.destan.count} Rezervasyon</span>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
+              <p className="text-[10px] text-gray-400 uppercase font-bold">Brüt Gelir</p>
+              <p className="text-sm md:text-base font-black text-emerald-400 mt-1">₺{villaBreakdown.destan.brut.toLocaleString('tr-TR')}</p>
+            </div>
+            <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
+              <p className="text-[10px] text-gray-400 uppercase font-bold">Komisyon</p>
+              <p className="text-sm md:text-base font-black text-amber-400 mt-1">₺{villaBreakdown.destan.comm.toLocaleString('tr-TR')}</p>
+            </div>
+            <div className="bg-gray-950/60 p-2.5 rounded-xl border border-gray-800">
+              <p className="text-[10px] text-gray-400 uppercase font-bold">Net Kalan</p>
+              <p className="text-sm md:text-base font-black text-indigo-400 mt-1">₺{villaBreakdown.destan.net.toLocaleString('tr-TR')}</p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="grid lg:grid-cols-[1.25fr_0.75fr] gap-6 items-start">
         <div>
