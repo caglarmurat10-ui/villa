@@ -18,19 +18,15 @@ const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwFecxccz6SP5
 
 export const GoogleService = {
   async loadData(): Promise<VillaReservation[] | null> {
-    // YENİ: 10 saniyelik zaman aşımı kontrolcüsü
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     try {
-      // YENİ: Vercel önbelleğini kırmak için dinamik zaman damgası (t) ve cache ayarları
-      const response = await fetch(`/api/proxy?t=${Date.now()}`, {
-        signal: controller.signal,
-        cache: 'no-store', // Next.js'e bu isteği asla önbelleğe almamasını söyler
-        headers: {
-          'Pragma': 'no-cache',
-          'Cache-Control': 'no-cache'
-        }
+      // MENTÖRLÜK DOKUNUŞU: Proxy'i devreden çıkardık, veriyi doğrudan Google'dan çekiyoruz.
+      const response = await fetch(`${GOOGLE_SCRIPT_URL}?t=${Date.now()}`, {
+        method: 'GET',
+        redirect: 'follow', // Yönlendirmelere izin ver
+        signal: controller.signal
       });
       
       clearTimeout(timeoutId);
@@ -176,11 +172,12 @@ export const GoogleService = {
 
   async saveData(reservation: VillaReservation) {
     try {
-      const response = await fetch(`/api/proxy?t=${Date.now()}`, {
+      // MENTÖRLÜK DOKUNUŞU: Proxy by-pass edildi. HTML dosyasındaki gibi Güvenli CORS taktiği (text/plain) uygulandı.
+      const response = await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
+        redirect: 'follow',
         headers: { 
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
+          'Content-Type': 'text/plain;charset=utf-8' 
         },
         body: JSON.stringify({
           ...reservation,
@@ -190,7 +187,7 @@ export const GoogleService = {
       });
 
       if (!response.ok) {
-        console.error("Save Failed:", await response.json());
+        console.error("Save Failed:", response.status);
         return false;
       }
 
@@ -204,11 +201,12 @@ export const GoogleService = {
 
   async deleteData(id: number) {
     try {
-      const response = await fetch(`/api/proxy?t=${Date.now()}`, {
+      // Proxy devreden çıkarıldı. Silme işlemi de doğrudan ve güvenli yapılıyor.
+      const response = await fetch(GOOGLE_SCRIPT_URL, {
         method: 'POST',
+        redirect: 'follow',
         headers: { 
-          'Content-Type': 'application/json',
-          'Cache-Control': 'no-cache'
+          'Content-Type': 'text/plain;charset=utf-8' 
         },
         body: JSON.stringify({
           type: 'villa',
