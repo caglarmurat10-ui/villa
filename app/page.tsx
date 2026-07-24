@@ -8,11 +8,14 @@ import ReservationForm from "@/components/ReservationForm";
 import TransactionList from "@/components/TransactionList";
 import Calculator from "@/components/Calculator";
 import Settings from "@/components/Settings";
-import FilterBar from "@/components/FilterBar"; // YENİ: Filtre bileşenimizi içe aktarıyoruz
+import FilterBar from "@/components/FilterBar";
 import { GoogleService, VillaReservation } from "@/services/api";
 import { Loader2, Cloud, Calculator as CalcIcon, Settings as SettingsIcon } from "lucide-react";
 
 export default function Home() {
+  // YENİ: Hydration hatasını çözen "Mounted" durumu
+  const [mounted, setMounted] = useState(false);
+  
   const [data, setData] = useState<VillaReservation[]>([]);
   const [loading, setLoading] = useState(true);
   const [synced, setSynced] = useState(false);
@@ -20,14 +23,11 @@ export default function Home() {
   const [showCalculator, setShowCalculator] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   
-  // YENİ: Hangi filtrenin aktif olduğunu tutan State (Varsayılan: Tümü)
   const [activeFilter, setActiveFilter] = useState<'All' | 'Safira' | 'Destan'>('All');
 
-  // Configuration (Could be dynamic later)
   const config = { commission: 10 };
 
   const loadData = async () => {
-    // 1. Fast Load from Backup (Optimistic)
     if (data.length === 0) setLoading(true);
 
     try {
@@ -43,7 +43,6 @@ export default function Home() {
       console.error("Backup load failed", e);
     }
 
-    // 2. Sync with Cloud (Authoritative)
     setSynced(false); 
     const cloudData = await GoogleService.loadData();
 
@@ -55,6 +54,8 @@ export default function Home() {
   };
 
   useEffect(() => {
+    // YENİ: Sistem tarayıcıya tamamen oturduğunda mounted true olur
+    setMounted(true);
     loadData();
   }, []);
 
@@ -68,12 +69,20 @@ export default function Home() {
     setEditingItem(null);
   };
 
-  // YENİ: Tüm veriyi seçili filtreye göre süzüyoruz
+  // YENİ: Eğer sistem tarayıcıya henüz oturmadıysa ekranı çizme (Error 418 çözüm noktası)
+  if (!mounted) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-[#0f172a] text-white">
+        <Loader2 className="w-8 h-8 animate-spin text-indigo-400 mb-4" />
+        <p className="text-sm font-bold uppercase tracking-widest text-gray-400">Sistem Başlatılıyor...</p>
+      </div>
+    );
+  }
+
   const filteredData = activeFilter === 'All' 
     ? data 
     : data.filter(item => item.apart === activeFilter);
 
-  // GÜNCELLENDİ: İstatistikleri artık süzülmüş (filteredData) veriler üzerinden hesaplıyoruz
   const stats = filteredData.reduce((acc, curr) => ({
     brut: acc.brut + (curr.brut || 0),
     comm: acc.comm + (curr.commAmt || 0),
@@ -115,12 +124,8 @@ export default function Home() {
         </div>
       </header>
 
-      {/* YENİ: Menü Filtresi */}
       <FilterBar activeFilter={activeFilter} setFilter={setActiveFilter} />
-
       <Dashboard stats={stats} />
-
-      {/* GÜNCELLENDİ: Sadece filtrelenmiş veriyi gönderiyoruz */}
       <Calendar reservations={filteredData} />
 
       <ReservationForm
@@ -130,7 +135,6 @@ export default function Home() {
         onCancelEdit={() => setEditingItem(null)}
       />
 
-      {/* GÜNCELLENDİ: Sadece filtrelenmiş veriyi gönderiyoruz */}
       <TransactionList
         reservations={filteredData}
         onRefresh={loadData}
