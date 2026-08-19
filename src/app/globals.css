@@ -233,7 +233,7 @@ input:focus, select:focus, textarea:focus { border-color: #8b5cf6; box-shadow: 0
 .contact-ready, .contact-missing { display: inline-flex; width: fit-content; margin-top: 8px; padding: 4px 7px; border-radius: 99px; font-size: 10px; }
 .contact-ready { color: #a7f3d0; background: #0b3328; }
 .contact-missing { color: #fecdd3; background: #4c1825; }
-.action-row { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
+.action-row { grid-column: 1 / -1; display: grid; grid-template-columns: repeat(2, 1fr); gap: 7px; }
 .action-row button { min-height: 40px; padding: 9px; border: 1px solid #28523d; border-radius: 10px; color: #a7f3d0; background: #0d3026; font-weight: 760; cursor: pointer; }
 .action-row button.location { border-color: #315b90; color: #bfdbfe; background: #10294a; }
 

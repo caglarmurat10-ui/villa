@@ -5,7 +5,7 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { PriceRange, Reservation, Villa, VillaLocations } from "@/lib/types";
 
 type View = "dashboard" | "calendar" | "messages" | "cleaning" | "reports" | "calculator" | "settings";
-type MessageType = "Giriş" | "Konum" | "Çıkış";
+type MessageType = "Giriş" | "Çıkış";
 type MovementReminder = { reservation: Reservation; type: "Giriş" | "Çıkış"; date: string; dayLabel: "BUGÜN" | "YARIN" };
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
 const istanbulDate = new Intl.DateTimeFormat("en", { timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit" });
@@ -46,13 +46,12 @@ function openReservationMessage(reservation: Reservation, type: MessageType, loc
     alert(`${reservation.guestName} için kayıtlı WhatsApp numarası yok. Ana Takip bölümünden rezervasyonu düzenleyip numarayı ekleyin.`);
     return;
   }
-  if (type === "Konum" && !locations[reservation.villa]) {
+  if (type === "Giriş" && !locations[reservation.villa]) {
     alert(`${reservation.villa} için konum bağlantısı tanımlı değil. Ayarlar bölümünden bağlantıyı bir kez kaydedin.`);
     return;
   }
   const texts: Record<MessageType, string> = {
-    Giriş: `Merhaba, ${reservation.villa} Villa rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız. Giriş saatimiz 16.00'dır. Varış saatinizi müsait olduğunuzda bizimle paylaşabilirsiniz. Şimdiden iyi yolculuklar dileriz.`,
-    Konum: `Merhaba, ${reservation.villa} Villa için konum bağlantımız aşağıdadır:\n\n${locations[reservation.villa]}\n\nYola çıkmadan önce bağlantıyı açarak rotanızı kontrol etmenizi rica ederiz. Güvenli ve keyifli bir yolculuk dileriz.`,
+    Giriş: `Merhaba, ${reservation.villa} Villa rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız. Giriş saatimiz 16.00'dır. Varış saatinizi müsait olduğunuzda bizimle paylaşabilirsiniz.\n\nKonum bağlantımız:\n${locations[reservation.villa]}\n\nYola çıkmadan önce bağlantıyı açarak rotanızı kontrol etmenizi rica ederiz. Güvenli ve keyifli bir yolculuk dileriz.`,
     Çıkış: `Merhaba, bizi tercih ettiğiniz için teşekkür ederiz. Çıkış saatimiz 10.00'dır. Güzel anılarla ayrılmanızı diler, sizi yeniden ağırlamaktan mutluluk duyarız.`,
   };
   window.open(whatsappUrl(reservation.phone, texts[type]), "_blank", "noopener,noreferrer");
@@ -167,7 +166,7 @@ function MovementAlerts({ reminders, locations, openMessages }: { reminders: Mov
     {reminders.length === 0 ? <div className="movement-clear"><span>✓</span><div><strong>Bugün ve yarın işlem yok</strong><p>Yeni bir giriş veya çıkış yaklaştığında burada otomatik görünecek.</p></div></div> : <div className="movement-grid">{reminders.map((item) => <article className={`movement-card ${item.type === "Giriş" ? "checkin" : "checkout"} ${item.dayLabel === "BUGÜN" ? "today" : "tomorrow"}`} key={`${item.reservation.id}-${item.type}`}>
       <div className="movement-card-head"><span className="movement-day">{item.dayLabel}</span><span className="movement-type">{item.type === "Giriş" ? "→ GİRİŞ" : "← ÇIKIŞ"}</span></div>
       <div className="movement-guest"><div className={`villa-dot ${item.reservation.villa.toLowerCase()}`}>{item.reservation.villa[0]}</div><div><strong>{item.reservation.guestName}</strong><p>{item.reservation.villa} · {longDate(item.date)}</p></div></div>
-      <div className="movement-actions"><button onClick={() => openReservationMessage(item.reservation, item.type, locations)}>{item.type} mesajı</button>{item.type === "Giriş" ? <button className="location" onClick={() => openReservationMessage(item.reservation, "Konum", locations)}>Konum gönder</button> : null}</div>
+      <div className="movement-actions"><button onClick={() => openReservationMessage(item.reservation, item.type, locations)}>{item.type === "Giriş" ? "Giriş & konum" : "Çıkış mesajı"}</button></div>
     </article>)}</div>}
   </section>;
 }
@@ -203,7 +202,7 @@ function CalendarView({ reservations }: { reservations: Reservation[] }) {
 }
 function MessagesView({ reservations, locations, openSettings }: { reservations: Reservation[]; locations: VillaLocations; openSettings: () => void }) {
   const missingLocation = !locations.Safira || !locations.Destan;
-  return <section className="panel messages-panel"><div className="messages-head"><div><span className="eyebrow">WHATSAPP MESAJ PANELİ</span><h2>Hazır müşteri mesajları</h2><p>Numarası kayıtlı müşteriye giriş, konum veya çıkış mesajını tek dokunuşla gönderin.</p></div>{missingLocation ? <button className="location-settings" onClick={openSettings}>Konumları ayarla</button> : null}</div><div className="card-grid">{reservations.length === 0 ? <div className="empty">Aktif rezervasyon yok.</div> : reservations.map((r) => <article className="action-card" key={r.id}><div className={`villa-dot ${r.villa.toLowerCase()}`}>{r.villa[0]}</div><div><strong>{r.guestName}</strong><p>{r.villa} · {formatDate(r.checkIn)} — {formatDate(r.checkOut)}</p><span className={r.phone ? "contact-ready" : "contact-missing"}>{r.phone ? `WhatsApp: ${r.phone}` : "WhatsApp numarası eksik"}</span></div><div className="action-row"><button onClick={() => openReservationMessage(r,"Giriş",locations)}>Giriş</button><button className="location" onClick={() => openReservationMessage(r,"Konum",locations)}>Konum</button><button onClick={() => openReservationMessage(r,"Çıkış",locations)}>Çıkış</button></div></article>)}</div></section>;
+  return <section className="panel messages-panel"><div className="messages-head"><div><span className="eyebrow">WHATSAPP MESAJ PANELİ</span><h2>Hazır müşteri mesajları</h2><p>Numarası kayıtlı müşteriye giriş ve konumu birlikte veya çıkış mesajını tek dokunuşla gönderin.</p></div>{missingLocation ? <button className="location-settings" onClick={openSettings}>Konumları ayarla</button> : null}</div><div className="card-grid">{reservations.length === 0 ? <div className="empty">Aktif rezervasyon yok.</div> : reservations.map((r) => <article className="action-card" key={r.id}><div className={`villa-dot ${r.villa.toLowerCase()}`}>{r.villa[0]}</div><div><strong>{r.guestName}</strong><p>{r.villa} · {formatDate(r.checkIn)} — {formatDate(r.checkOut)}</p><span className={r.phone ? "contact-ready" : "contact-missing"}>{r.phone ? `WhatsApp: ${r.phone}` : "WhatsApp numarası eksik"}</span></div><div className="action-row"><button className="location" onClick={() => openReservationMessage(r,"Giriş",locations)}>Giriş & konum</button><button onClick={() => openReservationMessage(r,"Çıkış",locations)}>Çıkış</button></div></article>)}</div></section>;
 }
 function CleaningView({ reservations }: { reservations: Reservation[] }) {
   const events = new Map<string, Set<Villa>>(); reservations.forEach((r) => { for (const date of [r.checkIn, r.checkOut]) { const set = events.get(date) ?? new Set<Villa>(); set.add(r.villa); events.set(date, set); } });
