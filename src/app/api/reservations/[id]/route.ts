@@ -1,4 +1,4 @@
-import { softDeleteReservation, updatePayment, updateReservation } from "@/lib/db";
+import { softDeleteReservation, updatePayment, updateReservation, updateReservationPhone } from "@/lib/db";
 import { reservationSchema } from "@/lib/schema";
 import { z } from "zod";
 
@@ -12,10 +12,19 @@ export async function PUT(request: Request, context: { params: Promise<{ id: str
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
-  const parsed = z.object({ paidAmount: z.coerce.number().nonnegative() }).safeParse(await request.json());
-  if (!parsed.success) return Response.json({ error: "Geçerli ödeme tutarı girin." }, { status: 400 });
-  try { return Response.json({ reservation: await updatePayment(id, parsed.data.paidAmount) }); }
-  catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Ödeme güncellenemedi" }, { status: 400 }); }
+  const body = await request.json();
+  const parsed = z.union([
+    z.object({ paidAmount: z.coerce.number().nonnegative() }),
+    z.object({ phone: z.string().trim().min(5, "Geçerli WhatsApp numarası girin.").max(30) }),
+  ]).safeParse(body);
+  if (!parsed.success) return Response.json({ error: parsed.error.issues[0]?.message ?? "Geçerli bilgi girin." }, { status: 400 });
+  try {
+    const reservation = "phone" in parsed.data
+      ? await updateReservationPhone(id, parsed.data.phone)
+      : await updatePayment(id, parsed.data.paidAmount);
+    return Response.json({ reservation });
+  }
+  catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Güncellenemedi" }, { status: 400 }); }
 }
 
 export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
