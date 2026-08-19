@@ -1,6 +1,9 @@
 export type Villa = "Safira" | "Destan";
 export type Channel = "Doğrudan" | "Booking" | "Airbnb" | "Diğer";
 export type VillaLocations = Record<Villa, string>;
+export type SocialPlatform = "Instagram" | "Facebook" | "TikTok" | "WhatsApp Durum";
+export type SocialContentType = "Gönderi" | "Hikâye" | "Reels" | "Durum";
+export type SocialPostStatus = "Planlandı" | "Yayınlandı";
 
 export interface Reservation {
   id: string;
@@ -24,4 +27,17 @@ export interface PriceRange {
   startDate: string;
   endDate: string;
   nightlyRate: number;
+}
+
+export interface SocialPost {
+  id: string;
+  villa: Villa;
+  platform: SocialPlatform;
+  contentType: SocialContentType;
+  scheduledDate: string;
+  caption: string;
+  status: SocialPostStatus;
+  publishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
