@@ -133,9 +133,9 @@ export default function Dashboard({ initialReservations, initialCommission, init
     </div> : null}
 
     {view === "dashboard" && <>
+      <MovementAlerts reminders={movementReminders} locations={locations} openMessages={() => setView("messages")} />
       <Stats count={active.length} revenue={totals.revenue} paid={totals.paid} commission={commission} />
       <Operations reservations={visible} />
-      <MovementAlerts reminders={movementReminders} locations={locations} openMessages={() => setView("messages")} />
       <div className="record-tabs"><button className={recordFilter === "active" ? "active" : ""} onClick={() => setRecordFilter("active")}>Aktif ({visible.filter((r)=>r.checkOut>=today).length})</button><button className={recordFilter === "completed" ? "active" : ""} onClick={() => setRecordFilter("completed")}>Tamamlanan ({visible.filter((r)=>r.checkOut<today).length})</button></div>
       {message ? <p className="message dashboard-message">{message}</p> : null}
       <div className="layout"><ReservationList reservations={visible.filter((r)=>recordFilter === "active" ? r.checkOut>=today : r.checkOut<today)} remove={remove} edit={setEditing} payment={updatePayment} />
