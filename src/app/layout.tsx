@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import "./social.css";
+import "./message.css";
 
 export const metadata: Metadata = {
   title: "Villa Yönetim",
@@ -25,5 +26,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="tr"><body>{children}<a className="social-shortcut" href="/sosyal">◎ Sosyal</a></body></html>;
+  return <html lang="tr"><body>{children}<a className="message-shortcut" href="/mesajlar">✉ Mesajlar</a><a className="social-shortcut" href="/sosyal">◎ Sosyal</a></body></html>;
 }
