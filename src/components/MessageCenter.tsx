@@ -13,9 +13,13 @@ function normalizeWhatsAppNumber(value: string) {
   return digits;
 }
 
+function villaName(reservation: Reservation) {
+  return `Villa ${reservation.villa}`;
+}
+
 function messageText(reservation: Reservation, type: MessageType, locations: VillaLocations) {
   if (type === "Giriş") {
-    return `Merhaba, ${reservation.villa} Villa rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız. Giriş saatimiz 16.00'dır. Varış saatinizi müsait olduğunuzda bizimle paylaşabilirsiniz.\n\nKonum bağlantımız:\n${locations[reservation.villa]}\n\nYola çıkmadan önce bağlantıyı açarak rotanızı kontrol etmenizi rica ederiz. Güvenli ve keyifli bir yolculuk dileriz.`;
+    return `Merhaba, ${villaName(reservation)} rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız. Giriş saatimiz 16.00'dır. Varış saatinizi müsait olduğunuzda bizimle paylaşabilirsiniz.\n\nKonum bağlantımız:\n${locations[reservation.villa]}\n\nYola çıkmadan önce bağlantıyı açarak rotanızı kontrol etmenizi rica ederiz. Güvenli ve keyifli bir yolculuk dileriz.`;
   }
   return "Merhaba, bizi tercih ettiğiniz için teşekkür ederiz. Çıkış saatimiz 10.00'dır. Güzel anılarla ayrılmanızı diler, sizi yeniden ağırlamaktan mutluluk duyarız.";
 }
@@ -64,7 +68,7 @@ export default function MessageCenter({ reservations, locations }: { reservation
   async function send(reservation: Reservation, type: MessageType) {
     const phone = (phones[reservation.id] ?? "").trim();
     if (type === "Giriş" && !locations[reservation.villa]) {
-      setNotice((n) => ({ ...n, [reservation.id]: `${reservation.villa} konum bağlantısı Ayarlar bölümünde tanımlı değil.` }));
+      setNotice((n) => ({ ...n, [reservation.id]: `${villaName(reservation)} konum bağlantısı Ayarlar bölümünde tanımlı değil.` }));
       return;
     }
     if (normalizeWhatsAppNumber(phone).length < 10) {
@@ -84,7 +88,7 @@ export default function MessageCenter({ reservations, locations }: { reservation
       <div className="message-hero"><div><span className="eyebrow">WHATSAPP MESAJLARI</span><h1>Numarayı burada gir, mesajı gönder</h1><p>Rezervasyon oluştururken telefon numarası girmen gerekmez. Burada bir kez kaydetmen yeterli.</p></div></div>
       <div className="message-list">{reservations.length === 0 ? <div className="message-empty">Aktif rezervasyon yok.</div> : reservations.map((r) => <article className="message-card" key={r.id}>
         <div className={`message-villa ${r.villa.toLowerCase()}`}>{r.villa[0]}</div>
-        <div className="message-info"><strong>{r.guestName}</strong><span>{r.villa} Villa · {formatDate(r.checkIn)} — {formatDate(r.checkOut)}</span><label>WhatsApp numarası<input type="tel" inputMode="tel" autoComplete="tel" placeholder="05xx xxx xx xx" value={phones[r.id] ?? ""} onChange={(e) => setPhones((p) => ({ ...p, [r.id]: e.target.value }))} /></label>{notice[r.id] ? <small>{notice[r.id]}</small> : null}</div>
+        <div className="message-info"><strong>{r.guestName}</strong><span>{villaName(r)} · {formatDate(r.checkIn)} — {formatDate(r.checkOut)}</span><label>WhatsApp numarası<input type="tel" inputMode="tel" autoComplete="tel" placeholder="05xx xxx xx xx" value={phones[r.id] ?? ""} onChange={(e) => setPhones((p) => ({ ...p, [r.id]: e.target.value }))} /></label>{notice[r.id] ? <small>{notice[r.id]}</small> : null}</div>
         <div className="message-actions"><button className="phone-save" disabled={saving === r.id} onClick={() => savePhone(r)}>{saving === r.id ? "Kaydediliyor…" : "Numarayı kaydet"}</button><button className="checkin" onClick={() => send(r, "Giriş")}>Giriş & konum</button><button className="checkout" onClick={() => send(r, "Çıkış")}>Çıkış</button></div>
       </article>)}</div>
     </section>
