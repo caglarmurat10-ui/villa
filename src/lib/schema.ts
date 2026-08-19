@@ -23,3 +23,23 @@ export const priceRangeSchema = z.object({
   endDate: z.iso.date(),
   nightlyRate: z.coerce.number().positive("Fiyat sıfırdan büyük olmalı"),
 }).refine((value) => value.endDate >= value.startDate, { message: "Bitiş tarihi başlangıçtan önce olamaz", path: ["endDate"] });
+
+export const socialPostSchema = z.object({
+  villa: z.enum(["Safira", "Destan"]),
+  platform: z.enum(["Instagram", "Facebook", "TikTok", "WhatsApp Durum"]),
+  contentType: z.enum(["Gönderi", "Hikâye", "Reels", "Durum"]),
+  scheduledDate: z.iso.date(),
+  caption: z.string().trim().min(1, "Paylaşım metni gerekli").max(2200, "Paylaşım metni en fazla 2200 karakter olabilir"),
+}).superRefine((value, context) => {
+  const allowed = value.platform === "WhatsApp Durum"
+    ? ["Durum"]
+    : value.platform === "TikTok"
+      ? ["Gönderi", "Reels"]
+      : ["Gönderi", "Hikâye", "Reels"];
+  if (!allowed.includes(value.contentType)) {
+    context.addIssue({ code: "custom", path: ["contentType"], message: "Seçilen platform için paylaşım türü geçerli değil." });
+  }
+});
+
+export const socialPostStatusSchema = z.object({ status: z.enum(["Planlandı", "Yayınlandı"]) });
+export type SocialPostInput = z.infer<typeof socialPostSchema>;
