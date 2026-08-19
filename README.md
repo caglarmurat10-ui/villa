@@ -1,22 +1,25 @@
-# Villa Rezervasyon ve Gelir Takibi
+# Villa Yönetim
 
-Safira ve Destan villaları için hazırlanmış Next.js tabanlı rezervasyon yönetim uygulaması.
+Safira ve Destan için bağımsız rezervasyon yönetim uygulaması.
 
-## Özellikler
-- Her villa için ayrı takvim sekmesi
-- Giriş/çıkış ve gece sayısı hesabı
-- Doğrudan veya acente rezervasyonu
-- Acente adı ve komisyon oranı
-- Brüt gelir, komisyon, net gelir, tahsilat ve kalan ödeme
-- Tarih çakışma kontrolü
-- Dönemsel gecelik fiyat tanımlama
-- Mobil uyumlu arayüz
+## Yerel çalıştırma
 
-## Çalıştırma
-```bash
-npm install
-npm run dev
-```
-Ardından tarayıcıdan `http://localhost:3000` adresini açın.
+1. Node.js 24 kurulu olmalı.
+2. `npm install`
+3. `npm run dev`
+4. Tarayıcıda `http://localhost:3000`
 
-Not: Projenin mevcut Google Apps Script / yedekleme bağlantıları korunmuştur.
+Veritabanı ilk açılışta `data/villa.db` olarak oluşur. JSON yedeği uygulamadaki **Yedeği indir** düğmesiyle alınabilir.
+
+## İlk sürüm özellikleri
+
+- İki villa için merkezî rezervasyon kaydı
+- Tarih çakışmasını sunucu tarafında engelleme
+- Gelir, tahsilat ve kalan bakiye özeti
+- Booking, Airbnb, doğrudan ve diğer kanal ayrımı
+- Silinen kayıtları veritabanında koruyan soft-delete
+- İşlem denetim kaydı
+- JSON yedek dışa aktarma
+- Docker/self-hosting için Next.js standalone çıktı
+
+Henüz kullanıcı girişi, düzenleme, ödeme hareketleri, otomatik yedek planı ve eski sistemden veri aktarımı eklenmedi. Bunlar ikinci aşamadır.

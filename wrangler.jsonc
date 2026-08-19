@@ -1,0 +1,12 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "villa-yonetim",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-08-19",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "d1_databases": [
+    { "binding": "DB", "database_name": "villa-yonetim", "database_id": "fa8fc6ec-9cc5-4c92-ba04-b23f2a9b8106" }
+  ],
+  "observability": { "enabled": true }
+}
