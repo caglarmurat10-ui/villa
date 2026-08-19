@@ -1,6 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
-import type { PriceRange, Reservation, Villa } from "./types";
+import type { PriceRange, Reservation, Villa, VillaLocations } from "./types";
 import type { ReservationInput } from "./schema";
 
 type ReservationRow = {
@@ -112,6 +112,28 @@ export async function setCommissionRate(rate: number): Promise<number> {
   await db.prepare("INSERT INTO settings (key, value) VALUES ('commission_rate', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
     .bind(String(rate)).run();
   return rate;
+}
+
+export async function getVillaLocations(): Promise<VillaLocations> {
+  const db = await database();
+  const result = await db.prepare("SELECT key, value FROM settings WHERE key IN ('location_safira', 'location_destan')")
+    .all<{ key: string; value: string }>();
+  const values = new Map(result.results.map((row) => [row.key, row.value]));
+  return {
+    Safira: values.get("location_safira") ?? "",
+    Destan: values.get("location_destan") ?? "",
+  };
+}
+
+export async function setVillaLocations(locations: VillaLocations): Promise<VillaLocations> {
+  const db = await database();
+  await db.batch([
+    db.prepare("INSERT INTO settings (key, value) VALUES ('location_safira', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .bind(locations.Safira),
+    db.prepare("INSERT INTO settings (key, value) VALUES ('location_destan', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .bind(locations.Destan),
+  ]);
+  return locations;
 }
 
 export async function listPriceRanges(): Promise<PriceRange[]> {

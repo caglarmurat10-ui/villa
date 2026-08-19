@@ -1,7 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import type { PriceRange, Reservation, Villa } from "@/lib/types";
+import type { PriceRange, Reservation, Villa, VillaLocations } from "@/lib/types";
 
 type View = "dashboard" | "calendar" | "messages" | "cleaning" | "reports" | "calculator" | "settings";
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
@@ -12,7 +13,27 @@ const menu: { id: View; label: string; icon: string }[] = [
   { id: "reports", label: "Raporlar", icon: "▥" }, { id: "calculator", label: "Hesaplama", icon: "₺" }, { id: "settings", label: "Ayarlar", icon: "⚙" },
 ];
 
-export default function Dashboard({ initialReservations, initialCommission, initialPrices }: { initialReservations: Reservation[]; initialCommission: number; initialPrices: PriceRange[] }) {
+function normalizeWhatsAppNumber(value: string) {
+  const digits = value.replace(/\D/g, "");
+  if (digits.startsWith("00")) return digits.slice(2);
+  if (digits.length === 10) return `90${digits}`;
+  if (digits.length === 11 && digits.startsWith("0")) return `90${digits.slice(1)}`;
+  return digits;
+}
+
+function whatsappUrl(phone: string, text: string) {
+  const number = normalizeWhatsAppNumber(phone);
+  return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
+}
+
+type DashboardProps = {
+  initialReservations: Reservation[];
+  initialCommission: number;
+  initialPrices: PriceRange[];
+  initialLocations: VillaLocations;
+};
+
+export default function Dashboard({ initialReservations, initialCommission, initialPrices, initialLocations }: DashboardProps) {
   const [reservations, setReservations] = useState(initialReservations);
   const [villaFilter, setVillaFilter] = useState<"Tümü" | Villa>("Tümü");
   const [recordFilter, setRecordFilter] = useState<"active" | "completed">("active");
@@ -22,6 +43,7 @@ export default function Dashboard({ initialReservations, initialCommission, init
   const [editing, setEditing] = useState<Reservation | null>(null);
   const [commission, setCommission] = useState(initialCommission);
   const [prices, setPrices] = useState(initialPrices);
+  const [locations, setLocations] = useState(initialLocations);
 
   const visible = useMemo(() => reservations.filter((r) => (villaFilter === "Tümü" || r.villa === villaFilter) && (!search || r.guestName.toLocaleLowerCase("tr-TR").includes(search.toLocaleLowerCase("tr-TR"))) && (channelFilter === "Tümü" || r.channel === channelFilter) && (paymentFilter === "Tümü" || (paymentFilter === "Ödendi" ? r.paidAmount >= r.totalAmount : r.paidAmount < r.totalAmount))), [reservations, villaFilter, search, channelFilter, paymentFilter]);
   const active = visible.filter((r) => r.checkOut >= today);
@@ -42,19 +64,30 @@ export default function Dashboard({ initialReservations, initialCommission, init
     const response = await fetch(`/api/reservations/${reservation.id}`, { method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({paidAmount:Number(value)}) });
     const data = await response.json(); if(response.ok) await refresh(); else setMessage(data.error ?? "Ödeme güncellenemedi.");
   }
+  function showNewReservation() {
+    setView("dashboard");
+    setRecordFilter("active");
+    setEditing(null);
+    window.setTimeout(() => document.getElementById("reservation-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  }
 
   return <main>
     <header className="topbar">
-      <div><span className="eyebrow">BAĞIMSIZ YÖNETİM PANELİ</span><h1>Villa Yönetim</h1><p>Safira ve Destan tek, güvenli takvimde.</p></div>
-      <a className="backup" href="/api/backup">Yedeği indir</a>
+      <div className="brand-block">
+        <Image className="brand-icon" src="/app-icon.svg" width={68} height={68} alt="Villa Yönetim simgesi" priority />
+        <div><span className="eyebrow">BAĞIMSIZ YÖNETİM PANELİ</span><h1>Villa Yönetim</h1><p>Safira ve Destan, tek ve güvenli bir takvimde.</p><div className="cloud-status"><span /> Bulut bağlantısı açık</div></div>
+      </div>
+      <div className="top-actions"><button className="primary-action" onClick={showNewReservation}>＋ Yeni rezervasyon</button><a className="backup" href="/api/backup">Yedeği indir</a></div>
     </header>
     <nav className="main-menu" aria-label="Ana menü">
-      {menu.map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => setView(item.id)}><i>{item.icon}</i>{item.label}{item.id === "messages" && <small>{active.length}</small>}</button>)}
+      {menu.map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => setView(item.id)}><i aria-hidden="true">{item.icon}</i><span>{item.label}</span>{item.id === "messages" && <small>{active.length}</small>}</button>)}
     </nav>
-    <section className="filters" aria-label="Villa filtresi">
-      {(["Tümü", "Safira", "Destan"] as const).map((villa) => <button key={villa} className={villaFilter === villa ? "active" : ""} onClick={() => setVillaFilter(villa)}>{villa}</button>)}
-    </section>
-    <section className="advanced-filters"><input aria-label="Müşteri ara" placeholder="Müşteri ara…" value={search} onChange={(e)=>setSearch(e.target.value)} /><select aria-label="Kanal filtresi" value={channelFilter} onChange={(e)=>setChannelFilter(e.target.value)}><option>Tümü</option><option>Doğrudan</option><option>Booking</option><option>Airbnb</option><option>Diğer</option></select><select aria-label="Ödeme filtresi" value={paymentFilter} onChange={(e)=>setPaymentFilter(e.target.value)}><option>Tümü</option><option>Ödendi</option><option>Ödenmedi</option></select>{(search||channelFilter!=="Tümü"||paymentFilter!=="Tümü")?<button onClick={()=>{setSearch("");setChannelFilter("Tümü");setPaymentFilter("Tümü");}}>Temizle</button>:null}</section>
+    {["dashboard", "calendar", "messages", "reports"].includes(view) ? <div className="filter-bar">
+      <section className="filters" aria-label="Villa filtresi">
+        {(["Tümü", "Safira", "Destan"] as const).map((villa) => <button key={villa} className={villaFilter === villa ? "active" : ""} onClick={() => setVillaFilter(villa)}>{villa}</button>)}
+      </section>
+      <section className="advanced-filters"><input aria-label="Müşteri ara" placeholder="Müşteri ara…" value={search} onChange={(e)=>setSearch(e.target.value)} /><select aria-label="Kanal filtresi" value={channelFilter} onChange={(e)=>setChannelFilter(e.target.value)}><option>Tümü</option><option>Doğrudan</option><option>Booking</option><option>Airbnb</option><option>Diğer</option></select><select aria-label="Ödeme filtresi" value={paymentFilter} onChange={(e)=>setPaymentFilter(e.target.value)}><option>Tümü</option><option>Ödendi</option><option>Ödenmedi</option></select>{(search||channelFilter!=="Tümü"||paymentFilter!=="Tümü")?<button onClick={()=>{setSearch("");setChannelFilter("Tümü");setPaymentFilter("Tümü");}}>Temizle</button>:null}</section>
+    </div> : null}
 
     {view === "dashboard" && <>
       <Stats count={active.length} revenue={totals.revenue} paid={totals.paid} commission={commission} />
@@ -66,11 +99,11 @@ export default function Dashboard({ initialReservations, initialCommission, init
       </div>
     </>}
     {view === "calendar" && <CalendarView reservations={visible} />}
-    {view === "messages" && <MessagesView reservations={active} />}
+    {view === "messages" && <MessagesView reservations={active} locations={locations} openSettings={() => setView("settings")} />}
     {view === "cleaning" && <CleaningView reservations={reservations} />}
     {view === "reports" && <ReportsView reservations={visible} commission={commission} />}
     {view === "calculator" && <CalculatorView />}
-    {view === "settings" && <SettingsView count={reservations.length} commission={commission} setCommission={setCommission} prices={prices} setPrices={setPrices} />}
+    {view === "settings" && <SettingsView count={reservations.length} commission={commission} setCommission={setCommission} prices={prices} setPrices={setPrices} locations={locations} setLocations={setLocations} />}
   </main>;
 }
 
@@ -86,7 +119,7 @@ function Operations({ reservations }: { reservations: Reservation[] }) {
 }
 function ReservationList({ reservations, remove, edit, payment }: { reservations: Reservation[]; remove: (id: string) => void; edit: (item: Reservation) => void; payment: (item: Reservation) => void }) {
   return <section className="panel list-panel"><div className="panel-title"><div><span className="eyebrow">REZERVASYONLAR</span><h2>Konaklama listesi</h2></div><b>{reservations.length} kayıt</b></div><div className="reservation-list">
-    {reservations.length === 0 ? <div className="empty">Bu bölümde rezervasyon yok.</div> : reservations.map((r) => <article className="reservation" key={r.id}><div className={`villa-dot ${r.villa.toLowerCase()}`}>{r.villa[0]}</div><div className="guest"><strong>{r.guestName}</strong><span>{r.villa} · {r.channel}</span></div><div className="dates"><strong>{formatDate(r.checkIn)} → {formatDate(r.checkOut)}</strong><span>{nights(r.checkIn, r.checkOut)} gece</span></div><div className="amount"><strong>{money.format(r.totalAmount)}</strong><span className={r.totalAmount-r.paidAmount>0?"due":"paid"}>{r.totalAmount-r.paidAmount>0?`Kalan ${money.format(r.totalAmount-r.paidAmount)}`:"Ödendi ✓"}</span></div><div className="row-actions"><button onClick={()=>edit(r)}>Düzenle</button><button onClick={()=>payment(r)}>Ödeme</button><button className="delete" onClick={() => remove(r.id)}>Sil</button></div></article>)}
+    {reservations.length === 0 ? <div className="empty">Bu bölümde rezervasyon yok.</div> : reservations.map((r) => <article className="reservation" key={r.id}><div className={`villa-dot ${r.villa.toLowerCase()}`}>{r.villa[0]}</div><div className="guest"><strong>{r.guestName}</strong><span>{r.villa} · {r.channel}</span>{r.phone ? <span className="phone-line">☎ {r.phone}</span> : null}</div><div className="dates"><strong>{formatDate(r.checkIn)} → {formatDate(r.checkOut)}</strong><span>{nights(r.checkIn, r.checkOut)} gece</span></div><div className="amount"><strong>{money.format(r.totalAmount)}</strong><span className={r.totalAmount-r.paidAmount>0?"due":"paid"}>{r.totalAmount-r.paidAmount>0?`Kalan ${money.format(r.totalAmount-r.paidAmount)}`:"Ödendi ✓"}</span></div><div className="row-actions">{r.phone ? <a className="whatsapp-shortcut" href={whatsappUrl(r.phone, `Merhaba ${r.guestName}, ${r.villa} rezervasyonunuzla ilgili size ulaşıyoruz.`)} target="_blank" rel="noreferrer">WhatsApp</a> : null}<button onClick={()=>edit(r)}>Düzenle</button><button onClick={()=>payment(r)}>Ödeme</button><button className="delete" onClick={() => remove(r.id)}>Sil</button></div></article>)}
   </div></section>;
 }
 function ReservationForm({ editing, onCancel, onSaved }: { editing: Reservation | null; onCancel: () => void; onSaved: () => Promise<void> }) {
@@ -94,9 +127,10 @@ function ReservationForm({ editing, onCancel, onSaved }: { editing: Reservation 
   const [quote,setQuote]=useState<{total:number;nights:number}|null>(null),[quoteError,setQuoteError]=useState(""),[saving,setSaving]=useState(false),[notice,setNotice]=useState("");
   useEffect(()=>{if(!checkIn||!checkOut||checkOut<=checkIn)return;const controller=new AbortController();const timer=setTimeout(async()=>{try{const response=await fetch("/api/quote",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({villa,checkIn,checkOut}),signal:controller.signal});const data=await response.json();if(response.ok){setQuote(data);setQuoteError("");}else{setQuote(null);setQuoteError(data.error);}}catch{}},250);return()=>{clearTimeout(timer);controller.abort();};},[villa,checkIn,checkOut]);
   async function submit(event:FormEvent<HTMLFormElement>){event.preventDefault();const element=event.currentTarget;setSaving(true);setNotice("");const payload=Object.fromEntries(new FormData(element).entries());const response=await fetch(editing?`/api/reservations/${editing.id}`:"/api/reservations",{method:editing?"PUT":"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});const data=await response.json();if(response.ok){setNotice(editing?"Rezervasyon güncellendi.":"Rezervasyon kaydedildi.");if(!editing){element.reset();setVilla("Safira");setCheckIn("");setCheckOut("");}await onSaved();}else setNotice(data.error??"İşlem yapılamadı");setSaving(false);}
-  return <section className="panel form-panel"><span className="eyebrow">{editing?"KAYDI DÜZENLE":"YENİ KAYIT"}</span><h2>{editing?editing.guestName:"Rezervasyon ekle"}</h2><form key={editing?.id??"new"} onSubmit={submit}>
+  return <section className="panel form-panel" id="reservation-form"><span className="eyebrow">{editing?"KAYDI DÜZENLE":"YENİ KAYIT"}</span><h2>{editing?editing.guestName:"Rezervasyon ekle"}</h2><form key={editing?.id??"new"} onSubmit={submit}>
     <label>Villa<select name="villa" required value={villa} onChange={(e)=>{setVilla(e.target.value as Villa);setQuote(null);setQuoteError("");}}><option>Safira</option><option>Destan</option></select></label>
-    <label>Müşteri<input name="guestName" required minLength={2} placeholder="Müşteri" defaultValue={editing?.guestName??""} /></label><input name="phone" type="hidden" defaultValue="" />
+    <label>Müşteri<input name="guestName" required minLength={2} placeholder="Müşteri adı" autoComplete="name" defaultValue={editing?.guestName??""} /></label>
+    <label>WhatsApp numarası <span className="label-hint">Mesajlarda tekrar kullanmak için saklanır</span><input name="phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="05xx xxx xx xx" defaultValue={editing?.phone??""} /></label>
     <div className="two"><label>Giriş<input name="checkIn" type="date" required value={checkIn} onChange={(e)=>{setCheckIn(e.target.value);setQuote(null);setQuoteError("");}} /></label><label>Çıkış<input name="checkOut" type="date" required value={checkOut} onChange={(e)=>{setCheckOut(e.target.value);setQuote(null);setQuoteError("");}} /></label></div>
     <label>Kanal<select name="channel" defaultValue={editing?.channel??"Doğrudan"}><option>Doğrudan</option><option>Booking</option><option>Airbnb</option><option>Diğer</option></select></label>
     <div className={`auto-price ${quoteError?"error":""}`}>{quote?`${quote.nights} gece · Otomatik toplam ${money.format(quote.total)}`:quoteError||"Villa ve tarihleri seçince fiyat burada hesaplanır."}</div>
@@ -113,9 +147,25 @@ function CalendarView({ reservations }: { reservations: Reservation[] }) {
     {Array.from({ length: days }, (_, i) => i + 1).map((day) => { const date = `${year}-${String(month + 1).padStart(2,"0")}-${String(day).padStart(2,"0")}`; const stays = reservations.filter((r) => date >= r.checkIn && date < r.checkOut); return <div className={`day ${date === today ? "today" : ""}`} key={day}><strong>{day}</strong>{stays.map((r) => <span className={r.villa.toLowerCase()} key={r.id}>{r.villa}: {r.guestName}</span>)}</div>; })}
   </div></section>;
 }
-function MessagesView({ reservations }: { reservations: Reservation[] }) {
-  function openMessage(r: Reservation, type: "Giriş" | "Çıkış") { const text = type === "Giriş" ? `Merhaba ${r.guestName}, ${r.villa} villası girişiniz için sizi bekliyoruz. Giriş saati 16:00'dır. İyi yolculuklar.` : `Merhaba ${r.guestName}, konaklamanız için teşekkür ederiz. Çıkış saati 10:00'dır. Sizi tekrar ağırlamaktan mutluluk duyarız.`; window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer"); }
-  return <section className="panel"><span className="eyebrow">WHATSAPP MESAJ PANELİ</span><h2>Hazır müşteri mesajları</h2><div className="card-grid">{reservations.length === 0 ? <div className="empty">Aktif rezervasyon yok.</div> : reservations.map((r) => <article className="action-card" key={r.id}><div className={`villa-dot ${r.villa.toLowerCase()}`}>{r.villa[0]}</div><div><strong>{r.guestName}</strong><p>{r.villa} · {formatDate(r.checkIn)} — {formatDate(r.checkOut)}</p></div><div className="action-row"><button onClick={() => openMessage(r,"Giriş")}>Giriş mesajı</button><button onClick={() => openMessage(r,"Çıkış")}>Çıkış mesajı</button></div></article>)}</div></section>;
+function MessagesView({ reservations, locations, openSettings }: { reservations: Reservation[]; locations: VillaLocations; openSettings: () => void }) {
+  function openMessage(r: Reservation, type: "Giriş" | "Konum" | "Çıkış") {
+    if (!normalizeWhatsAppNumber(r.phone)) {
+      alert(`${r.guestName} için kayıtlı WhatsApp numarası yok. Ana Takip bölümünden rezervasyonu düzenleyip numarayı ekleyin.`);
+      return;
+    }
+    if (type === "Konum" && !locations[r.villa]) {
+      alert(`${r.villa} için konum bağlantısı tanımlı değil. Ayarlar bölümünden bağlantıyı bir kez kaydedin.`);
+      return;
+    }
+    const texts = {
+      Giriş: `Merhaba ${r.guestName}, ${r.villa} Villası rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız. Giriş saatimiz 16.00'dır. Varış saatinizi müsait olduğunuzda bizimle paylaşabilirsiniz. Şimdiden iyi yolculuklar dileriz.`,
+      Konum: `Merhaba ${r.guestName}, ${r.villa} Villası için konum bağlantımız aşağıdadır:\n\n${locations[r.villa]}\n\nYola çıkmadan önce bağlantıyı açarak rotanızı kontrol etmenizi rica ederiz. Güvenli ve keyifli bir yolculuk dileriz.`,
+      Çıkış: `Merhaba ${r.guestName}, bizi tercih ettiğiniz için teşekkür ederiz. Çıkış saatimiz 10.00'dır. Güzel anılarla ayrılmanızı diler, sizi yeniden ağırlamaktan mutluluk duyarız.`,
+    };
+    window.open(whatsappUrl(r.phone, texts[type]), "_blank", "noopener,noreferrer");
+  }
+  const missingLocation = !locations.Safira || !locations.Destan;
+  return <section className="panel messages-panel"><div className="messages-head"><div><span className="eyebrow">WHATSAPP MESAJ PANELİ</span><h2>Hazır müşteri mesajları</h2><p>Numarası kayıtlı müşteriye giriş, konum veya çıkış mesajını tek dokunuşla gönderin.</p></div>{missingLocation ? <button className="location-settings" onClick={openSettings}>Konumları ayarla</button> : null}</div><div className="card-grid">{reservations.length === 0 ? <div className="empty">Aktif rezervasyon yok.</div> : reservations.map((r) => <article className="action-card" key={r.id}><div className={`villa-dot ${r.villa.toLowerCase()}`}>{r.villa[0]}</div><div><strong>{r.guestName}</strong><p>{r.villa} · {formatDate(r.checkIn)} — {formatDate(r.checkOut)}</p><span className={r.phone ? "contact-ready" : "contact-missing"}>{r.phone ? `WhatsApp: ${r.phone}` : "WhatsApp numarası eksik"}</span></div><div className="action-row"><button onClick={() => openMessage(r,"Giriş")}>Giriş</button><button className="location" onClick={() => openMessage(r,"Konum")}>Konum</button><button onClick={() => openMessage(r,"Çıkış")}>Çıkış</button></div></article>)}</div></section>;
 }
 function CleaningView({ reservations }: { reservations: Reservation[] }) {
   const events = new Map<string, Set<Villa>>(); reservations.forEach((r) => { for (const date of [r.checkIn, r.checkOut]) { const set = events.get(date) ?? new Set<Villa>(); set.add(r.villa); events.set(date, set); } });
@@ -133,16 +183,18 @@ function ReportsView({reservations,commission}:{reservations:Reservation[];commi
   const yearRevenue=rows.reduce((sum,row)=>sum+row.perVilla.Safira.revenue+row.perVilla.Destan.revenue,0),yearNights=rows.reduce((sum,row)=>sum+row.perVilla.Safira.nights+row.perVilla.Destan.nights,0);
   return <section className="panel report-panel"><div className="report-head"><div><span className="eyebrow">İŞLETME RAPORU</span><h2>Aylık doluluk ve gelir</h2></div><div><select value={year} onChange={(e)=>setYear(Number(e.target.value))}>{years.map((y)=><option key={y}>{y}</option>)}</select><a className="backup" href="/api/export">CSV indir</a></div></div><section className="report-summary"><article><span>Yıllık gece</span><strong>{yearNights}</strong></article><article><span>Brüt gelir</span><strong>{money.format(yearRevenue)}</strong></article><article><span>Komisyon</span><strong>{money.format(yearRevenue*commission/100)}</strong></article><article><span>Net gelir</span><strong>{money.format(yearRevenue*(1-commission/100))}</strong></article></section><div className="table-wrap"><table className="report-table"><thead><tr><th>Ay</th><th>Safira gece</th><th>Safira gelir</th><th>Destan gece</th><th>Destan gelir</th><th>Toplam</th></tr></thead><tbody>{rows.map((row)=><tr key={row.month}><td>{new Intl.DateTimeFormat("tr-TR",{month:"long"}).format(new Date(year,row.month,1))}</td><td>{row.perVilla.Safira.nights}</td><td>{money.format(row.perVilla.Safira.revenue)}</td><td>{row.perVilla.Destan.nights}</td><td>{money.format(row.perVilla.Destan.revenue)}</td><td>{money.format(row.perVilla.Safira.revenue+row.perVilla.Destan.revenue)}</td></tr>)}</tbody></table></div></section>;
 }
-function SettingsView({ count, commission, setCommission, prices, setPrices }: { count: number; commission: number; setCommission: (value: number) => void; prices: PriceRange[]; setPrices: (value: PriceRange[]) => void }) {
+function SettingsView({ count, commission, setCommission, prices, setPrices, locations, setLocations }: { count: number; commission: number; setCommission: (value: number) => void; prices: PriceRange[]; setPrices: (value: PriceRange[]) => void; locations: VillaLocations; setLocations: (value: VillaLocations) => void }) {
   const [notice, setNotice] = useState("");
   async function saveCommission(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget); const value = Number(form.get("commissionRate")); const response = await fetch("/api/settings", { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({commissionRate:value}) }); const data=await response.json(); if(response.ok){setCommission(data.commissionRate);setNotice("Komisyon oranı kaydedildi.");}else setNotice(data.error); }
+  async function saveLocations(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const form = new FormData(event.currentTarget); const nextLocations = { Safira: String(form.get("Safira") ?? "").trim(), Destan: String(form.get("Destan") ?? "").trim() }; const response = await fetch("/api/settings", { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify({locations:nextLocations}) }); const data=await response.json(); if(response.ok){setLocations(data.locations);setNotice("Villa konumları kaydedildi.");}else setNotice(data.error); }
   async function addPrice(event: FormEvent<HTMLFormElement>) { event.preventDefault(); const element=event.currentTarget; const response=await fetch("/api/prices",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(Object.fromEntries(new FormData(element).entries()))}); const data=await response.json(); if(response.ok){setPrices([...prices,data.price].sort((a,b)=>a.startDate.localeCompare(b.startDate)));element.reset();setNotice("Fiyat dönemi eklendi.");}else setNotice(data.error); }
   async function removePrice(id:string){if(!confirm("Bu fiyat dönemini silmek istiyor musunuz?"))return;const response=await fetch(`/api/prices/${id}`,{method:"DELETE"});if(response.ok){setPrices(prices.filter((p)=>p.id!==id));setNotice("Fiyat dönemi silindi.");}}
-  return <section className="panel settings-panel"><span className="eyebrow">AYARLAR VE FİYATLAR</span><h2>Komisyon ve dönemsel fiyatlar</h2>{notice ? <p className="message settings-message">{notice}</p> : null}<div className="settings-layout">
+  return <section className="panel settings-panel"><span className="eyebrow">AYARLAR VE FİYATLAR</span><h2>İletişim, komisyon ve dönemsel fiyatlar</h2>{notice ? <p className="message settings-message">{notice}</p> : null}<div className="settings-layout">
     <div><form className="setting-box" onSubmit={saveCommission}><h3>Komisyon oranı</h3><p>Tüm finans özetinde kullanılacak oran.</p><label>Komisyon %<input name="commissionRate" type="number" min="0" max="100" step="0.1" defaultValue={commission} required /></label><button className="save">Oranı kaydet</button></form>
+    <form className="setting-box" onSubmit={saveLocations}><h3>WhatsApp konumları</h3><p>Google Maps&apos;te “Paylaş → Bağlantıyı kopyala” ile aldığınız adresleri bir kez kaydedin.</p><label>Safira konum bağlantısı<input name="Safira" type="url" inputMode="url" placeholder="https://maps.app.goo.gl/..." defaultValue={locations.Safira} /></label><label>Destan konum bağlantısı<input name="Destan" type="url" inputMode="url" placeholder="https://maps.app.goo.gl/..." defaultValue={locations.Destan} /></label><button className="save">Konumları kaydet</button></form>
     <form className="setting-box" onSubmit={addPrice}><h3>Yeni fiyat dönemi</h3><label>Villa<select name="villa"><option>Safira</option><option>Destan</option></select></label><div className="two"><label>Başlangıç<input name="startDate" type="date" required /></label><label>Bitiş<input name="endDate" type="date" required /></label></div><label>Gecelik fiyat<input name="nightlyRate" type="number" min="1" required /></label><button className="save">Fiyat dönemini ekle</button></form></div>
     <div className="price-lists">{(["Safira","Destan"] as Villa[]).map((villa)=><div className="setting-box" key={villa}><h3>{villa} fiyatları</h3>{prices.filter((p)=>p.villa===villa).length===0?<p>Henüz fiyat tanımlanmadı.</p>:prices.filter((p)=>p.villa===villa).map((p)=><article className="price-row" key={p.id}><div><strong>{money.format(p.nightlyRate)}</strong><span>{formatDate(p.startDate)} — {formatDate(p.endDate)}</span></div><button onClick={()=>removePrice(p.id)}>Sil</button></article>)}</div>)}</div>
-  </div><div className="settings-footer"><span>{count} aktif rezervasyon</span><a className="backup" href="/api/backup">JSON yedeğini indir</a></div></section>;
+  </div><div className="settings-footer"><span>{count} toplam rezervasyon</span><a className="backup" href="/api/backup">JSON yedeğini indir</a></div></section>;
 }
 
 function nights(start: string, end: string) { return Math.round((Date.parse(end)-Date.parse(start))/86400000); }

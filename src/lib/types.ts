@@ -1,5 +1,6 @@
 export type Villa = "Safira" | "Destan";
 export type Channel = "Doğrudan" | "Booking" | "Airbnb" | "Diğer";
+export type VillaLocations = Record<Villa, string>;
 
 export interface Reservation {
   id: string;
