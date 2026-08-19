@@ -5,8 +5,23 @@ import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { PriceRange, Reservation, Villa, VillaLocations } from "@/lib/types";
 
 type View = "dashboard" | "calendar" | "messages" | "cleaning" | "reports" | "calculator" | "settings";
+type MessageType = "Giriş" | "Konum" | "Çıkış";
+type MovementReminder = { reservation: Reservation; type: "Giriş" | "Çıkış"; date: string; dayLabel: "BUGÜN" | "YARIN" };
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
-const today = new Date().toISOString().slice(0, 10);
+const istanbulDate = new Intl.DateTimeFormat("en", { timeZone: "Europe/Istanbul", year: "numeric", month: "2-digit", day: "2-digit" });
+
+function dateKey(value = new Date()) {
+  const parts = Object.fromEntries(istanbulDate.formatToParts(value).map((part) => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function addDays(value: string, amount: number) {
+  const date = new Date(`${value}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + amount);
+  return date.toISOString().slice(0, 10);
+}
+
+const today = dateKey();
 const menu: { id: View; label: string; icon: string }[] = [
   { id: "dashboard", label: "Ana Takip", icon: "⌂" }, { id: "calendar", label: "Takvim", icon: "▦" },
   { id: "messages", label: "Mesajlar", icon: "✉" }, { id: "cleaning", label: "Temizlik", icon: "✦" },
@@ -24,6 +39,33 @@ function normalizeWhatsAppNumber(value: string) {
 function whatsappUrl(phone: string, text: string) {
   const number = normalizeWhatsAppNumber(phone);
   return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
+}
+
+function openReservationMessage(reservation: Reservation, type: MessageType, locations: VillaLocations) {
+  if (!normalizeWhatsAppNumber(reservation.phone)) {
+    alert(`${reservation.guestName} için kayıtlı WhatsApp numarası yok. Ana Takip bölümünden rezervasyonu düzenleyip numarayı ekleyin.`);
+    return;
+  }
+  if (type === "Konum" && !locations[reservation.villa]) {
+    alert(`${reservation.villa} için konum bağlantısı tanımlı değil. Ayarlar bölümünden bağlantıyı bir kez kaydedin.`);
+    return;
+  }
+  const texts: Record<MessageType, string> = {
+    Giriş: `Merhaba ${reservation.guestName}, ${reservation.villa} Villası rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız. Giriş saatimiz 16.00'dır. Varış saatinizi müsait olduğunuzda bizimle paylaşabilirsiniz. Şimdiden iyi yolculuklar dileriz.`,
+    Konum: `Merhaba ${reservation.guestName}, ${reservation.villa} Villası için konum bağlantımız aşağıdadır:\n\n${locations[reservation.villa]}\n\nYola çıkmadan önce bağlantıyı açarak rotanızı kontrol etmenizi rica ederiz. Güvenli ve keyifli bir yolculuk dileriz.`,
+    Çıkış: `Merhaba ${reservation.guestName}, bizi tercih ettiğiniz için teşekkür ederiz. Çıkış saatimiz 10.00'dır. Güzel anılarla ayrılmanızı diler, sizi yeniden ağırlamaktan mutluluk duyarız.`,
+  };
+  window.open(whatsappUrl(reservation.phone, texts[type]), "_blank", "noopener,noreferrer");
+}
+
+function getMovementReminders(reservations: Reservation[]) {
+  const tomorrow = addDays(today, 1);
+  return reservations.flatMap<MovementReminder>((reservation) => {
+    const reminders: MovementReminder[] = [];
+    if (reservation.checkIn === today || reservation.checkIn === tomorrow) reminders.push({ reservation, type: "Giriş", date: reservation.checkIn, dayLabel: reservation.checkIn === today ? "BUGÜN" : "YARIN" });
+    if (reservation.checkOut === today || reservation.checkOut === tomorrow) reminders.push({ reservation, type: "Çıkış", date: reservation.checkOut, dayLabel: reservation.checkOut === today ? "BUGÜN" : "YARIN" });
+    return reminders;
+  }).sort((a, b) => a.date.localeCompare(b.date) || a.type.localeCompare(b.type, "tr-TR") || a.reservation.villa.localeCompare(b.reservation.villa));
 }
 
 type DashboardProps = {
@@ -47,6 +89,7 @@ export default function Dashboard({ initialReservations, initialCommission, init
 
   const visible = useMemo(() => reservations.filter((r) => (villaFilter === "Tümü" || r.villa === villaFilter) && (!search || r.guestName.toLocaleLowerCase("tr-TR").includes(search.toLocaleLowerCase("tr-TR"))) && (channelFilter === "Tümü" || r.channel === channelFilter) && (paymentFilter === "Tümü" || (paymentFilter === "Ödendi" ? r.paidAmount >= r.totalAmount : r.paidAmount < r.totalAmount))), [reservations, villaFilter, search, channelFilter, paymentFilter]);
   const active = visible.filter((r) => r.checkOut >= today);
+  const movementReminders = useMemo(() => getMovementReminders(visible), [visible]);
   const totals = visible.reduce((acc, r) => ({ revenue: acc.revenue + r.totalAmount, paid: acc.paid + r.paidAmount }), { revenue: 0, paid: 0 });
 
   async function refresh() {
@@ -80,7 +123,7 @@ export default function Dashboard({ initialReservations, initialCommission, init
       <div className="top-actions"><button className="primary-action" onClick={showNewReservation}>＋ Yeni rezervasyon</button><a className="backup" href="/api/backup">Yedeği indir</a></div>
     </header>
     <nav className="main-menu" aria-label="Ana menü">
-      {menu.map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => setView(item.id)}><i aria-hidden="true">{item.icon}</i><span>{item.label}</span>{item.id === "messages" && <small>{active.length}</small>}</button>)}
+      {menu.map((item) => <button key={item.id} className={view === item.id ? "active" : ""} onClick={() => setView(item.id)}><i aria-hidden="true">{item.icon}</i><span>{item.label}</span>{item.id === "dashboard" && movementReminders.length > 0 ? <small>{movementReminders.length}</small> : item.id === "messages" ? <small>{active.length}</small> : null}</button>)}
     </nav>
     {["dashboard", "calendar", "messages", "reports"].includes(view) ? <div className="filter-bar">
       <section className="filters" aria-label="Villa filtresi">
@@ -92,6 +135,7 @@ export default function Dashboard({ initialReservations, initialCommission, init
     {view === "dashboard" && <>
       <Stats count={active.length} revenue={totals.revenue} paid={totals.paid} commission={commission} />
       <Operations reservations={visible} />
+      <MovementAlerts reminders={movementReminders} locations={locations} openMessages={() => setView("messages")} />
       <div className="record-tabs"><button className={recordFilter === "active" ? "active" : ""} onClick={() => setRecordFilter("active")}>Aktif ({visible.filter((r)=>r.checkOut>=today).length})</button><button className={recordFilter === "completed" ? "active" : ""} onClick={() => setRecordFilter("completed")}>Tamamlanan ({visible.filter((r)=>r.checkOut<today).length})</button></div>
       {message ? <p className="message dashboard-message">{message}</p> : null}
       <div className="layout"><ReservationList reservations={visible.filter((r)=>recordFilter === "active" ? r.checkOut>=today : r.checkOut<today)} remove={remove} edit={setEditing} payment={updatePayment} />
@@ -112,10 +156,20 @@ function Stats({ count, revenue, paid, commission }: { count: number; revenue: n
   return <section className="stats"><article><span>Aktif rezervasyon</span><strong>{count}</strong></article><article><span>Brüt gelir</span><strong>{money.format(revenue)}</strong></article><article><span>Net gelir</span><strong>{money.format(revenue-commissionAmount)}</strong></article><article><span>Kalan ödeme</span><strong>{money.format(revenue-paid)}</strong></article></section>;
 }
 function Operations({ reservations }: { reservations: Reservation[] }) {
-  const nextWeek = new Date(); nextWeek.setDate(nextWeek.getDate()+7); const nextWeekStr=nextWeek.toISOString().slice(0,10);
+  const nextWeekStr=addDays(today, 7);
   const arrivals=reservations.filter((r)=>r.checkIn===today), departures=reservations.filter((r)=>r.checkOut===today), upcoming=reservations.filter((r)=>r.checkIn>today&&r.checkIn<=nextWeekStr);
   const channels=(["Doğrudan","Booking","Airbnb","Diğer"] as const).map((channel)=>({channel,count:reservations.filter((r)=>r.channel===channel).length})).filter((x)=>x.count>0);
   return <section className="operations"><article><span>Bugün giriş</span><strong>{arrivals.length}</strong><small>{arrivals.map((r)=>`${r.guestName} · ${r.villa}`).join(", ")||"Giriş yok"}</small></article><article><span>Bugün çıkış</span><strong>{departures.length}</strong><small>{departures.map((r)=>`${r.guestName} · ${r.villa}`).join(", ")||"Çıkış yok"}</small></article><article><span>7 günlük giriş</span><strong>{upcoming.length}</strong><small>{upcoming.length?"Yaklaşan misafirler var":"Plan sakin"}</small></article><article><span>Kanal dağılımı</span><div className="channel-badges">{channels.map((x)=><b key={x.channel}>{x.channel} {x.count}</b>)}</div></article></section>;
+}
+function MovementAlerts({ reminders, locations, openMessages }: { reminders: MovementReminder[]; locations: VillaLocations; openMessages: () => void }) {
+  return <section className={`movement-alerts ${reminders.length > 0 ? "has-reminders" : "is-clear"}`} aria-live="polite">
+    <div className="movement-head"><div className="movement-title"><span className="movement-bell" aria-hidden="true">●</span><div><strong>Giriş–çıkış bildirimleri</strong><p>Bugün ve yarın yapılacak işlemler</p></div></div><button onClick={openMessages}>Mesaj paneli</button></div>
+    {reminders.length === 0 ? <div className="movement-clear"><span>✓</span><div><strong>Bugün ve yarın işlem yok</strong><p>Yeni bir giriş veya çıkış yaklaştığında burada otomatik görünecek.</p></div></div> : <div className="movement-grid">{reminders.map((item) => <article className={`movement-card ${item.type === "Giriş" ? "checkin" : "checkout"} ${item.dayLabel === "BUGÜN" ? "today" : "tomorrow"}`} key={`${item.reservation.id}-${item.type}`}>
+      <div className="movement-card-head"><span className="movement-day">{item.dayLabel}</span><span className="movement-type">{item.type === "Giriş" ? "→ GİRİŞ" : "← ÇIKIŞ"}</span></div>
+      <div className="movement-guest"><div className={`villa-dot ${item.reservation.villa.toLowerCase()}`}>{item.reservation.villa[0]}</div><div><strong>{item.reservation.guestName}</strong><p>{item.reservation.villa} · {longDate(item.date)}</p></div></div>
+      <div className="movement-actions"><button onClick={() => openReservationMessage(item.reservation, item.type, locations)}>{item.type} mesajı</button>{item.type === "Giriş" ? <button className="location" onClick={() => openReservationMessage(item.reservation, "Konum", locations)}>Konum gönder</button> : null}</div>
+    </article>)}</div>}
+  </section>;
 }
 function ReservationList({ reservations, remove, edit, payment }: { reservations: Reservation[]; remove: (id: string) => void; edit: (item: Reservation) => void; payment: (item: Reservation) => void }) {
   return <section className="panel list-panel"><div className="panel-title"><div><span className="eyebrow">REZERVASYONLAR</span><h2>Konaklama listesi</h2></div><b>{reservations.length} kayıt</b></div><div className="reservation-list">
@@ -148,24 +202,8 @@ function CalendarView({ reservations }: { reservations: Reservation[] }) {
   </div></section>;
 }
 function MessagesView({ reservations, locations, openSettings }: { reservations: Reservation[]; locations: VillaLocations; openSettings: () => void }) {
-  function openMessage(r: Reservation, type: "Giriş" | "Konum" | "Çıkış") {
-    if (!normalizeWhatsAppNumber(r.phone)) {
-      alert(`${r.guestName} için kayıtlı WhatsApp numarası yok. Ana Takip bölümünden rezervasyonu düzenleyip numarayı ekleyin.`);
-      return;
-    }
-    if (type === "Konum" && !locations[r.villa]) {
-      alert(`${r.villa} için konum bağlantısı tanımlı değil. Ayarlar bölümünden bağlantıyı bir kez kaydedin.`);
-      return;
-    }
-    const texts = {
-      Giriş: `Merhaba ${r.guestName}, ${r.villa} Villası rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız. Giriş saatimiz 16.00'dır. Varış saatinizi müsait olduğunuzda bizimle paylaşabilirsiniz. Şimdiden iyi yolculuklar dileriz.`,
-      Konum: `Merhaba ${r.guestName}, ${r.villa} Villası için konum bağlantımız aşağıdadır:\n\n${locations[r.villa]}\n\nYola çıkmadan önce bağlantıyı açarak rotanızı kontrol etmenizi rica ederiz. Güvenli ve keyifli bir yolculuk dileriz.`,
-      Çıkış: `Merhaba ${r.guestName}, bizi tercih ettiğiniz için teşekkür ederiz. Çıkış saatimiz 10.00'dır. Güzel anılarla ayrılmanızı diler, sizi yeniden ağırlamaktan mutluluk duyarız.`,
-    };
-    window.open(whatsappUrl(r.phone, texts[type]), "_blank", "noopener,noreferrer");
-  }
   const missingLocation = !locations.Safira || !locations.Destan;
-  return <section className="panel messages-panel"><div className="messages-head"><div><span className="eyebrow">WHATSAPP MESAJ PANELİ</span><h2>Hazır müşteri mesajları</h2><p>Numarası kayıtlı müşteriye giriş, konum veya çıkış mesajını tek dokunuşla gönderin.</p></div>{missingLocation ? <button className="location-settings" onClick={openSettings}>Konumları ayarla</button> : null}</div><div className="card-grid">{reservations.length === 0 ? <div className="empty">Aktif rezervasyon yok.</div> : reservations.map((r) => <article className="action-card" key={r.id}><div className={`villa-dot ${r.villa.toLowerCase()}`}>{r.villa[0]}</div><div><strong>{r.guestName}</strong><p>{r.villa} · {formatDate(r.checkIn)} — {formatDate(r.checkOut)}</p><span className={r.phone ? "contact-ready" : "contact-missing"}>{r.phone ? `WhatsApp: ${r.phone}` : "WhatsApp numarası eksik"}</span></div><div className="action-row"><button onClick={() => openMessage(r,"Giriş")}>Giriş</button><button className="location" onClick={() => openMessage(r,"Konum")}>Konum</button><button onClick={() => openMessage(r,"Çıkış")}>Çıkış</button></div></article>)}</div></section>;
+  return <section className="panel messages-panel"><div className="messages-head"><div><span className="eyebrow">WHATSAPP MESAJ PANELİ</span><h2>Hazır müşteri mesajları</h2><p>Numarası kayıtlı müşteriye giriş, konum veya çıkış mesajını tek dokunuşla gönderin.</p></div>{missingLocation ? <button className="location-settings" onClick={openSettings}>Konumları ayarla</button> : null}</div><div className="card-grid">{reservations.length === 0 ? <div className="empty">Aktif rezervasyon yok.</div> : reservations.map((r) => <article className="action-card" key={r.id}><div className={`villa-dot ${r.villa.toLowerCase()}`}>{r.villa[0]}</div><div><strong>{r.guestName}</strong><p>{r.villa} · {formatDate(r.checkIn)} — {formatDate(r.checkOut)}</p><span className={r.phone ? "contact-ready" : "contact-missing"}>{r.phone ? `WhatsApp: ${r.phone}` : "WhatsApp numarası eksik"}</span></div><div className="action-row"><button onClick={() => openReservationMessage(r,"Giriş",locations)}>Giriş</button><button className="location" onClick={() => openReservationMessage(r,"Konum",locations)}>Konum</button><button onClick={() => openReservationMessage(r,"Çıkış",locations)}>Çıkış</button></div></article>)}</div></section>;
 }
 function CleaningView({ reservations }: { reservations: Reservation[] }) {
   const events = new Map<string, Set<Villa>>(); reservations.forEach((r) => { for (const date of [r.checkIn, r.checkOut]) { const set = events.get(date) ?? new Set<Villa>(); set.add(r.villa); events.set(date, set); } });
