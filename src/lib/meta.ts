@@ -6,6 +6,14 @@ const INSTAGRAM_TOKEN = "https://api.instagram.com/oauth/access_token";
 const INSTAGRAM_GRAPH = "https://graph.instagram.com";
 const INSTAGRAM_CALLBACK_URI =
   "https://villa-yonetim.caglarmurat10.workers.dev/api/meta/instagram/callback";
+const UNSUPPORTED_LONG_TOKEN_POST =
+  "Unsupported request - method type: post";
+
+type LongTokenResponse = {
+  access_token?: string;
+  token_type?: string;
+  expires_in?: number;
+};
 
 export async function metaConfig() {
   const { env } = await getCloudflareContext({ async: true });
@@ -160,17 +168,28 @@ export async function exchangeInstagramCode(
 
   if (
     !response.ok ||
-    !data.access_token
+    !data.access_token ||
+    data.user_id === undefined ||
+    data.user_id === null ||
+    String(data.user_id).length === 0
   ) {
     throw new Error(
-      `Instagram kısa ömürlü erişim anahtarı alınamadı (HTTP ${response.status}).`
+      `Instagram kısa ömürlü erişim anahtarı veya user_id alınamadı (HTTP ${response.status}).`
     );
   }
 
   return {
     accessToken: data.access_token,
-    userId: String(data.user_id ?? ""),
+    userId: String(data.user_id),
   };
+}
+
+function parseLongTokenResponse(body: string): LongTokenResponse {
+  try {
+    return JSON.parse(body) as LongTokenResponse;
+  } catch {
+    return {};
+  }
 }
 
 export async function exchangeInstagramLongLivedToken(
@@ -183,15 +202,36 @@ export async function exchangeInstagramLongLivedToken(
     access_token: accessToken,
   });
 
-  const response = await fetch(
-    `${INSTAGRAM_GRAPH}/access_token?${params.toString()}`
+  let response = await fetch(
+    `${INSTAGRAM_GRAPH}/access_token`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type":
+          "application/x-www-form-urlencoded",
+      },
+      body: params,
+    }
   );
 
-  const data = (await response.json()) as {
-    access_token?: string;
-    token_type?: string;
-    expires_in?: number;
-  };
+  let responseBody = await response.text();
+
+  if (
+    !response.ok &&
+    responseBody
+      .toLowerCase()
+      .includes(UNSUPPORTED_LONG_TOKEN_POST.toLowerCase())
+  ) {
+    response = await fetch(
+      `${INSTAGRAM_GRAPH}/access_token?${params.toString()}`,
+      {
+        method: "GET",
+      }
+    );
+    responseBody = await response.text();
+  }
+
+  const data = parseLongTokenResponse(responseBody);
 
   if (!response.ok || !data.access_token) {
     throw new Error(
@@ -207,15 +247,20 @@ export async function exchangeInstagramLongLivedToken(
 }
 
 export async function getInstagramProfile(
+  userId: string,
   accessToken: string
 ) {
   const params = new URLSearchParams({
     fields: "id,username,account_type",
-    access_token: accessToken,
   });
 
   const response = await fetch(
-    `${INSTAGRAM_GRAPH}/me?${params.toString()}`
+    `${INSTAGRAM_GRAPH}/${encodeURIComponent(userId)}?${params.toString()}`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
   );
 
   const data = (await response.json()) as {

@@ -10,6 +10,7 @@ type OAuthStage =
   | "state"
   | "nonce-cookie"
   | "code-exchange"
+  | "long-token-exchange"
   | "profile-fetch"
   | "database-save";
 
@@ -26,7 +27,10 @@ function safeErrorMessage(error: unknown, fallback: string) {
   if (!(error instanceof Error) || !error.message) return fallback;
 
   return error.message
-    .replace(/(access_token|client_secret|authorization_code|code)=([^&\s]+)/gi, "$1=[REDACTED]")
+    .replace(
+      /(access_token|client_secret|authorization_code|code)=([^&\s]+)/gi,
+      "$1=[REDACTED]"
+    )
     .replace(/[A-Za-z0-9._~-]{80,}/g, "[REDACTED]")
     .slice(0, 240);
 }
@@ -40,7 +44,8 @@ function errorRedirect(url: URL, stage: OAuthStage, message: string) {
     status: 302,
     headers: {
       Location: target.toString(),
-      "Set-Cookie": "ig_oauth_nonce=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
+      "Set-Cookie":
+        "ig_oauth_nonce=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
     },
   });
 }
@@ -66,7 +71,7 @@ export async function GET(request: Request) {
     return stageFailure(
       url,
       "state",
-      new Error(providerError),
+      new Error("Meta OAuth isteği reddedildi."),
       "Meta OAuth isteği reddedildi."
     );
   }
@@ -81,17 +86,23 @@ export async function GET(request: Request) {
     );
   }
 
-  let parsed;
+  let parsed: Awaited<ReturnType<typeof verifyInstagramState>>;
   try {
     parsed = await verifyInstagramState(state);
-    if (!parsed) {
-      throw new Error("OAuth state imzası geçersiz.");
-    }
   } catch (error) {
     return stageFailure(
       url,
       "state",
       error,
+      "OAuth state doğrulaması başarısız."
+    );
+  }
+
+  if (!parsed) {
+    return stageFailure(
+      url,
+      "state",
+      new Error("OAuth state imzası geçersiz."),
       "OAuth state doğrulaması başarısız."
     );
   }
@@ -119,25 +130,42 @@ export async function GET(request: Request) {
     );
   }
 
-  let longLivedAccessToken: string;
+  let shortLivedAccessToken: string;
+  let instagramUserId: string;
   try {
     const shortLived = await exchangeInstagramCode(code);
-    const longLived = await exchangeInstagramLongLivedToken(
-      shortLived.accessToken
-    );
-    longLivedAccessToken = longLived.accessToken;
+    shortLivedAccessToken = shortLived.accessToken;
+    instagramUserId = shortLived.userId;
   } catch (error) {
     return stageFailure(
       url,
       "code-exchange",
       error,
-      "Instagram token değişimi başarısız."
+      "Instagram code exchange başarısız."
     );
   }
 
-  let profile;
+  let longLivedAccessToken: string;
   try {
-    profile = await getInstagramProfile(longLivedAccessToken);
+    const longLived = await exchangeInstagramLongLivedToken(
+      shortLivedAccessToken
+    );
+    longLivedAccessToken = longLived.accessToken;
+  } catch (error) {
+    return stageFailure(
+      url,
+      "long-token-exchange",
+      error,
+      "Instagram uzun ömürlü token değişimi başarısız."
+    );
+  }
+
+  let profile: Awaited<ReturnType<typeof getInstagramProfile>>;
+  try {
+    profile = await getInstagramProfile(
+      instagramUserId,
+      longLivedAccessToken
+    );
   } catch (error) {
     return stageFailure(
       url,
@@ -163,11 +191,15 @@ export async function GET(request: Request) {
     );
   }
 
+  const target = new URL("/sosyal", url.origin);
+  target.searchParams.set("meta_connected", parsed.villa);
+
   return new Response(null, {
     status: 302,
     headers: {
-      Location: `/sosyal?meta_connected=${encodeURIComponent(parsed.villa)}`,
-      "Set-Cookie": "ig_oauth_nonce=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
+      Location: target.toString(),
+      "Set-Cookie":
+        "ig_oauth_nonce=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0",
     },
   });
 }
