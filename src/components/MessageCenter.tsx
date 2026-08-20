@@ -5,6 +5,11 @@ import type { Reservation, VillaLocations } from "@/lib/types";
 
 type MessageType = "Giriş" | "Çıkış";
 
+const MAP_LINKS = {
+  Destan: "https://maps.app.goo.gl/8zCrgoegzri52ro79",
+  Safira: "https://maps.app.goo.gl/fKBpCQhn5Qneuo5H6",
+} as const;
+
 function normalizeWhatsAppNumber(value: string) {
   const digits = value.replace(/\D/g, "");
   if (digits.startsWith("00")) return digits.slice(2);
@@ -17,9 +22,14 @@ function villaName(reservation: Reservation) {
   return `Villa ${reservation.villa}`;
 }
 
+function locationLink(reservation: Reservation, locations: VillaLocations) {
+  return MAP_LINKS[reservation.villa] || locations[reservation.villa];
+}
+
 function messageText(reservation: Reservation, type: MessageType, locations: VillaLocations) {
   if (type === "Giriş") {
-    return `Merhaba, ${villaName(reservation)} rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız. Giriş saatimiz 16.00'dır. Varış saatinizi müsait olduğunuzda bizimle paylaşabilirsiniz.\n\nKonum bağlantımız:\n${locations[reservation.villa]}\n\nYola çıkmadan önce bağlantıyı açarak rotanızı kontrol etmenizi rica ederiz. Güvenli ve keyifli bir yolculuk dileriz.`;
+    const mapLink = locationLink(reservation, locations);
+    return `Merhaba, ${villaName(reservation)} rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız. Giriş saatimiz 16.00'dır. Varış saatinizi müsait olduğunuzda bizimle paylaşabilirsiniz.\n\nKonum bağlantımız:\n${mapLink}\n\nYola çıkmadan önce bağlantıyı açarak rotanızı kontrol etmenizi rica ederiz. Güvenli ve keyifli bir yolculuk dileriz.`;
   }
   return "Merhaba, bizi tercih ettiğiniz için teşekkür ederiz. Çıkış saatimiz 10.00'dır. Güzel anılarla ayrılmanızı diler, sizi yeniden ağırlamaktan mutluluk duyarız.";
 }
@@ -67,8 +77,8 @@ export default function MessageCenter({ reservations, locations }: { reservation
 
   async function send(reservation: Reservation, type: MessageType) {
     const phone = (phones[reservation.id] ?? "").trim();
-    if (type === "Giriş" && !locations[reservation.villa]) {
-      setNotice((n) => ({ ...n, [reservation.id]: `${villaName(reservation)} konum bağlantısı Ayarlar bölümünde tanımlı değil.` }));
+    if (type === "Giriş" && !locationLink(reservation, locations)) {
+      setNotice((n) => ({ ...n, [reservation.id]: `${villaName(reservation)} konum bağlantısı tanımlı değil.` }));
       return;
     }
     if (normalizeWhatsAppNumber(phone).length < 10) {
