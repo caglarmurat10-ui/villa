@@ -27,7 +27,7 @@ export async function metaConfig() {
     !baseUrl ? "APP_BASE_URL" : null,
   ].filter(Boolean);
 
-  if (missing.length > 0) {
+  if (!appId || !appSecret || !baseUrl) {
     throw new Error(`Eksik ortam değişkenleri: ${missing.join(", ")}`);
   }
 
