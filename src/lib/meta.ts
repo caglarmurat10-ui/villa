@@ -4,7 +4,8 @@ import type { Villa } from "./types";
 const INSTAGRAM_AUTH = "https://www.instagram.com/oauth/authorize";
 const INSTAGRAM_TOKEN = "https://api.instagram.com/oauth/access_token";
 const INSTAGRAM_GRAPH = "https://graph.instagram.com";
-const INSTAGRAM_CALLBACK_PATH = "/api/meta/instagram/callback";
+const INSTAGRAM_CALLBACK_URI =
+  "https://villa-yonetim.caglarmurat10.workers.dev/api/meta/instagram/callback";
 
 export async function metaConfig() {
   const { env } = await getCloudflareContext({ async: true });
@@ -31,17 +32,11 @@ export async function metaConfig() {
     throw new Error(`Eksik ortam değişkenleri: ${missing.join(", ")}`);
   }
 
-  const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
-  const instagramRedirectUri = new URL(
-    INSTAGRAM_CALLBACK_PATH,
-    `${normalizedBaseUrl}/`
-  ).toString();
-
   return {
     appId,
     appSecret,
-    baseUrl: normalizedBaseUrl,
-    instagramRedirectUri,
+    baseUrl: baseUrl.trim().replace(/\/+$/, ""),
+    instagramRedirectUri: INSTAGRAM_CALLBACK_URI,
   };
 }
 
@@ -161,7 +156,6 @@ export async function exchangeInstagramCode(
   const data = (await response.json()) as {
     access_token?: string;
     user_id?: number | string;
-    error_message?: string;
   };
 
   if (
@@ -169,8 +163,7 @@ export async function exchangeInstagramCode(
     !data.access_token
   ) {
     throw new Error(
-      data.error_message ??
-        "Instagram erişim anahtarı alınamadı."
+      `Instagram kısa ömürlü erişim anahtarı alınamadı (HTTP ${response.status}).`
     );
   }
 
@@ -180,11 +173,44 @@ export async function exchangeInstagramCode(
   };
 }
 
+export async function exchangeInstagramLongLivedToken(
+  accessToken: string
+) {
+  const { appSecret } = await metaConfig();
+  const params = new URLSearchParams({
+    grant_type: "ig_exchange_token",
+    client_secret: appSecret,
+    access_token: accessToken,
+  });
+
+  const response = await fetch(
+    `${INSTAGRAM_GRAPH}/access_token?${params.toString()}`
+  );
+
+  const data = (await response.json()) as {
+    access_token?: string;
+    token_type?: string;
+    expires_in?: number;
+  };
+
+  if (!response.ok || !data.access_token) {
+    throw new Error(
+      `Instagram uzun ömürlü erişim anahtarı alınamadı (HTTP ${response.status}).`
+    );
+  }
+
+  return {
+    accessToken: data.access_token,
+    tokenType: data.token_type ?? "bearer",
+    expiresIn: data.expires_in ?? null,
+  };
+}
+
 export async function getInstagramProfile(
   accessToken: string
 ) {
   const params = new URLSearchParams({
-    fields: "id,username",
+    fields: "id,username,account_type",
     access_token: accessToken,
   });
 
@@ -195,9 +221,7 @@ export async function getInstagramProfile(
   const data = (await response.json()) as {
     id?: string;
     username?: string;
-    error?: {
-      message?: string;
-    };
+    account_type?: string;
   };
 
   if (
@@ -205,8 +229,7 @@ export async function getInstagramProfile(
     !data.id
   ) {
     throw new Error(
-      data.error?.message ??
-        "Instagram profili alınamadı."
+      `Instagram profili alınamadı (HTTP ${response.status}).`
     );
   }
 
@@ -214,6 +237,7 @@ export async function getInstagramProfile(
     id: data.id,
     username:
       data.username ?? "instagram",
+    accountType: data.account_type ?? "unknown",
   };
 }
 
