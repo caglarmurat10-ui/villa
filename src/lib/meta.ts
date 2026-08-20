@@ -4,6 +4,7 @@ import type { Villa } from "./types";
 const INSTAGRAM_AUTH = "https://www.instagram.com/oauth/authorize";
 const INSTAGRAM_TOKEN = "https://api.instagram.com/oauth/access_token";
 const INSTAGRAM_GRAPH = "https://graph.instagram.com";
+const INSTAGRAM_CALLBACK_PATH = "/api/meta/instagram/callback";
 
 export async function metaConfig() {
   const { env } = await getCloudflareContext({ async: true });
@@ -30,10 +31,17 @@ export async function metaConfig() {
     throw new Error(`Eksik ortam değişkenleri: ${missing.join(", ")}`);
   }
 
+  const normalizedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+  const instagramRedirectUri = new URL(
+    INSTAGRAM_CALLBACK_PATH,
+    `${normalizedBaseUrl}/`
+  ).toString();
+
   return {
     appId,
     appSecret,
-    baseUrl: baseUrl.replace(/\/$/, ""),
+    baseUrl: normalizedBaseUrl,
+    instagramRedirectUri,
   };
 }
 
@@ -101,7 +109,7 @@ export async function instagramAuthorizeUrl(
   villa: Villa,
   nonce: string
 ) {
-  const { appId, baseUrl } = await metaConfig();
+  const { appId, instagramRedirectUri } = await metaConfig();
 
   const state = await makeInstagramState(
     villa,
@@ -110,7 +118,7 @@ export async function instagramAuthorizeUrl(
 
   const params = new URLSearchParams({
     client_id: appId,
-    redirect_uri: `${baseUrl}/api/meta/instagram/callback`,
+    redirect_uri: instagramRedirectUri,
     response_type: "code",
     scope:
       "instagram_business_basic,instagram_business_content_publish",
@@ -127,14 +135,14 @@ export async function exchangeInstagramCode(
   const {
     appId,
     appSecret,
-    baseUrl,
+    instagramRedirectUri,
   } = await metaConfig();
 
   const body = new URLSearchParams({
     client_id: appId,
     client_secret: appSecret,
     grant_type: "authorization_code",
-    redirect_uri: `${baseUrl}/api/meta/instagram/callback`,
+    redirect_uri: instagramRedirectUri,
     code,
   });
 
