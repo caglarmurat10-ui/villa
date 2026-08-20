@@ -251,43 +251,72 @@ export async function exchangeInstagramLongLivedToken(
   };
 }
 
-export async function getInstagramProfile(
-  userId: string,
+function safeProfileErrorValue(value: unknown, accessToken: string) {
+  const safe = safeMetaErrorValue(value);
+  if (!safe) return "";
+
+  const encodedToken = encodeURIComponent(accessToken);
+  return safe
+    .split(accessToken)
+    .join("[REDACTED]")
+    .split(encodedToken)
+    .join("[REDACTED]");
+}
+
+function profileErrorMessage(
+  status: number,
+  error: MetaApiError | undefined,
   accessToken: string
 ) {
-  const params = new URLSearchParams({
-    fields: "id,username,account_type",
+  const parts: string[] = [];
+  const message = safeProfileErrorValue(error?.message, accessToken);
+  const type = safeProfileErrorValue(error?.type, accessToken);
+  const code = safeProfileErrorValue(error?.code, accessToken);
+  const subcode = safeProfileErrorValue(error?.error_subcode, accessToken);
+
+  if (message) parts.push(`message=${message}`);
+  if (type) parts.push(`type=${type}`);
+  if (code) parts.push(`code=${code}`);
+  if (subcode) parts.push(`error_subcode=${subcode}`);
+
+  return parts.length
+    ? `Meta profil hatası (HTTP ${status}): ${parts.join(" | ")}`
+    : `Meta profil hatası (HTTP ${status}).`;
+}
+
+export async function getInstagramProfile(
+  _userId: string,
+  accessToken: string
+) {
+  const profileUrl =
+    `${INSTAGRAM_GRAPH}/me?fields=id,username&access_token=${encodeURIComponent(accessToken)}`;
+
+  const response = await fetch(profileUrl, {
+    method: "GET",
   });
 
-  const response = await fetch(
-    `${INSTAGRAM_GRAPH}/${encodeURIComponent(userId)}?${params.toString()}`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
-  );
-
-  const data = (await response.json()) as {
+  const data = (await response.json().catch(() => ({}))) as {
     id?: string;
     username?: string;
-    account_type?: string;
+    error?: MetaApiError;
   };
 
-  if (
-    !response.ok ||
-    !data.id
-  ) {
+  if (!response.ok) {
     throw new Error(
-      `Instagram profili alınamadı (HTTP ${response.status}).`
+      profileErrorMessage(response.status, data.error, accessToken)
+    );
+  }
+
+  if (!data.id || !data.username) {
+    throw new Error(
+      `Instagram profil yanıtı id ve username içermiyor (HTTP ${response.status}).`
     );
   }
 
   return {
     id: data.id,
-    username:
-      data.username ?? "instagram",
-    accountType: data.account_type ?? "unknown",
+    username: data.username,
+    accountType: "unknown",
   };
 }
 
