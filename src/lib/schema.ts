@@ -30,6 +30,7 @@ export const socialPostSchema = z.object({
   contentType: z.enum(["Gönderi", "Hikâye", "Reels", "Durum"]),
   scheduledDate: z.iso.date(),
   caption: z.string().trim().min(1, "Paylaşım metni gerekli").max(2200, "Paylaşım metni en fazla 2200 karakter olabilir"),
+  mediaUrl: z.union([z.literal(""), z.string().url("Geçerli bir görsel bağlantısı girin")]).default(""),
 }).superRefine((value, context) => {
   const allowed = value.platform === "WhatsApp Durum"
     ? ["Durum"]
