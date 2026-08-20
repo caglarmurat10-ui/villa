@@ -10,6 +10,7 @@ type SocialPostRow = {
   content_type: SocialPost["contentType"];
   scheduled_date: string;
   caption: string;
+  media_url?: string | null;
   status: SocialPostStatus;
   published_at: string | null;
   created_at: string;
@@ -29,6 +30,7 @@ function mapRow(row: SocialPostRow): SocialPost {
     contentType: row.content_type,
     scheduledDate: row.scheduled_date,
     caption: row.caption,
+    mediaUrl: row.media_url ?? "",
     status: row.status,
     publishedAt: row.published_at,
     createdAt: row.created_at,
@@ -45,6 +47,7 @@ async function ensureTable(db: D1Database) {
       content_type TEXT NOT NULL CHECK (content_type IN ('Gönderi', 'Hikâye', 'Reels', 'Durum')),
       scheduled_date TEXT NOT NULL,
       caption TEXT NOT NULL CHECK (length(caption) BETWEEN 1 AND 2200),
+      media_url TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'Planlandı' CHECK (status IN ('Planlandı', 'Yayınlandı')),
       published_at TEXT,
       created_at TEXT NOT NULL,
@@ -52,6 +55,7 @@ async function ensureTable(db: D1Database) {
     )`),
     db.prepare("CREATE INDEX IF NOT EXISTS social_posts_schedule_idx ON social_posts (status, scheduled_date)"),
   ]);
+  try { await db.prepare("ALTER TABLE social_posts ADD COLUMN media_url TEXT NOT NULL DEFAULT ''").run(); } catch {}
 }
 
 export async function listSocialPosts(): Promise<SocialPost[]> {
@@ -75,9 +79,9 @@ export async function createSocialPost(input: SocialPostInput): Promise<SocialPo
     updatedAt: now,
   };
   await db.prepare(`INSERT INTO social_posts
-    (id, villa, platform, content_type, scheduled_date, caption, status, published_at, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
-      post.id, post.villa, post.platform, post.contentType, post.scheduledDate, post.caption,
+    (id, villa, platform, content_type, scheduled_date, caption, media_url, status, published_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+      post.id, post.villa, post.platform, post.contentType, post.scheduledDate, post.caption, post.mediaUrl,
       post.status, post.publishedAt, post.createdAt, post.updatedAt,
     ).run();
   return post;
