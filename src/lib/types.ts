@@ -36,6 +36,7 @@ export interface SocialPost {
   contentType: SocialContentType;
   scheduledDate: string;
   caption: string;
+  mediaUrl: string;
   status: SocialPostStatus;
   publishedAt: string | null;
   createdAt: string;
