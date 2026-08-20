@@ -36,6 +36,7 @@ export interface SocialPost {
   contentType: SocialContentType;
   scheduledDate: string;
   caption: string;
+  // Legacy social rows may not have an attached media URL yet.
   mediaUrl?: string;
   status: SocialPostStatus;
   publishedAt: string | null;
