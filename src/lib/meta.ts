@@ -6,13 +6,19 @@ const INSTAGRAM_TOKEN = "https://api.instagram.com/oauth/access_token";
 const INSTAGRAM_GRAPH = "https://graph.instagram.com";
 const INSTAGRAM_CALLBACK_URI =
   "https://villa-yonetim.caglarmurat10.workers.dev/api/meta/instagram/callback";
-const UNSUPPORTED_LONG_TOKEN_POST =
-  "Unsupported request - method type: post";
+
+type MetaApiError = {
+  message?: unknown;
+  type?: unknown;
+  code?: unknown;
+  error_subcode?: unknown;
+};
 
 type LongTokenResponse = {
   access_token?: string;
   token_type?: string;
   expires_in?: number;
+  error?: MetaApiError;
 };
 
 export async function metaConfig() {
@@ -184,58 +190,57 @@ export async function exchangeInstagramCode(
   };
 }
 
-function parseLongTokenResponse(body: string): LongTokenResponse {
-  try {
-    return JSON.parse(body) as LongTokenResponse;
-  } catch {
-    return {};
-  }
+function safeMetaErrorValue(value: unknown) {
+  if (typeof value === "number") return String(value);
+  if (typeof value !== "string") return "";
+
+  return value
+    .replace(
+      /(access_token|client_secret|authorization_code|short_lived_token|long_lived_token)=([^&\s]+)/gi,
+      "$1=[REDACTED]"
+    )
+    .replace(/[A-Za-z0-9._~-]{80,}/g, "[REDACTED]")
+    .slice(0, 220);
+}
+
+function longTokenErrorMessage(
+  status: number,
+  error: MetaApiError | undefined
+) {
+  const parts: string[] = [];
+  const message = safeMetaErrorValue(error?.message);
+  const type = safeMetaErrorValue(error?.type);
+  const code = safeMetaErrorValue(error?.code);
+  const subcode = safeMetaErrorValue(error?.error_subcode);
+
+  if (message) parts.push(`message=${message}`);
+  if (type) parts.push(`type=${type}`);
+  if (code) parts.push(`code=${code}`);
+  if (subcode) parts.push(`error_subcode=${subcode}`);
+
+  return parts.length
+    ? `Meta uzun token hatası (HTTP ${status}): ${parts.join(" | ")}`
+    : `Meta uzun token hatası (HTTP ${status}).`;
 }
 
 export async function exchangeInstagramLongLivedToken(
   accessToken: string
 ) {
   const { appSecret } = await metaConfig();
-  const params = new URLSearchParams({
-    grant_type: "ig_exchange_token",
-    client_secret: appSecret,
-    access_token: accessToken,
+  const tokenUrl = new URL(`${INSTAGRAM_GRAPH}/access_token`);
+  tokenUrl.searchParams.set("grant_type", "ig_exchange_token");
+  tokenUrl.searchParams.set("client_secret", appSecret);
+  tokenUrl.searchParams.set("access_token", accessToken);
+
+  const response = await fetch(tokenUrl, {
+    method: "GET",
   });
 
-  let response = await fetch(
-    `${INSTAGRAM_GRAPH}/access_token`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type":
-          "application/x-www-form-urlencoded",
-      },
-      body: params,
-    }
-  );
-
-  let responseBody = await response.text();
-
-  if (
-    !response.ok &&
-    responseBody
-      .toLowerCase()
-      .includes(UNSUPPORTED_LONG_TOKEN_POST.toLowerCase())
-  ) {
-    response = await fetch(
-      `${INSTAGRAM_GRAPH}/access_token?${params.toString()}`,
-      {
-        method: "GET",
-      }
-    );
-    responseBody = await response.text();
-  }
-
-  const data = parseLongTokenResponse(responseBody);
+  const data = (await response.json().catch(() => ({}))) as LongTokenResponse;
 
   if (!response.ok || !data.access_token) {
     throw new Error(
-      `Instagram uzun ömürlü erişim anahtarı alınamadı (HTTP ${response.status}).`
+      longTokenErrorMessage(response.status, data.error)
     );
   }
 

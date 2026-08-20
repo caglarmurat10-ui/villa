@@ -28,11 +28,11 @@ function safeErrorMessage(error: unknown, fallback: string) {
 
   return error.message
     .replace(
-      /(access_token|client_secret|authorization_code|code)=([^&\s]+)/gi,
+      /(access_token|client_secret|authorization_code|short_lived_token|long_lived_token)=([^&\s]+)/gi,
       "$1=[REDACTED]"
     )
     .replace(/[A-Za-z0-9._~-]{80,}/g, "[REDACTED]")
-    .slice(0, 240);
+    .slice(0, 480);
 }
 
 function errorRedirect(url: URL, stage: OAuthStage, message: string) {
