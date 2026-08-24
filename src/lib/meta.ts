@@ -1,4 +1,3 @@
-import { storeInstagramTokenCandidate } from "@/lib/instagramTokenStore";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { Villa } from "./types";
 
@@ -245,8 +244,7 @@ export async function exchangeInstagramLongLivedToken(
     );
   }
 
-    await storeInstagramTokenCandidate(String(data.access_token));
-return {
+  return {
     accessToken: data.access_token,
     tokenType: data.token_type ?? "bearer",
     expiresIn: data.expires_in ?? null,

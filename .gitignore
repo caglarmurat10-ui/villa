@@ -1,6 +1,7 @@
 node_modules/
 .npm-cache/
 .next/
+.open-next/
 data/*.db
 data/*.db-*
 backups/

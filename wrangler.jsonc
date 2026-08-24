@@ -16,5 +16,8 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "villa-yonetim", "database_id": "fa8fc6ec-9cc5-4c92-ba04-b23f2a9b8106" }
   ],
+  "kv_namespaces": [
+    { "binding": "SOCIAL_MEDIA_KV", "id": "aee4775e7d0c4d9b9b488297bb4736be" }
+  ],
   "observability": { "enabled": true }
 }

@@ -1,22 +1,10 @@
-import { getInstagramTokenCandidates } from "@/lib/instagramTokenStore";
+import { getInstagramAccessToken } from "@/lib/instagramTokenStore";
+import { getInstagramAccount } from "@/lib/meta-store";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import type { D1Database } from "@cloudflare/workers-types";
+import type { Villa } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
-
-type D1Statement = {
-  bind: (...values: unknown[]) => D1Statement;
-  first: <T = Record<string, unknown>>() => Promise<T | null>;
-  all: <T = Record<string, unknown>>() => Promise<{ results: T[] }>;
-  run: () => Promise<unknown>;
-};
-
-type D1DatabaseLike = {
-  prepare: (query: string) => D1Statement;
-};
-
-type DbEnv = {
-  DB?: D1DatabaseLike;
-};
 
 type Connection = {
   accessToken: string;
@@ -26,10 +14,10 @@ type Connection = {
 
 type MetaError = {
   error?: {
-    message?: string;
-    type?: string;
-    code?: number;
-    error_subcode?: number;
+    message?: unknown;
+    type?: unknown;
+    code?: unknown;
+    error_subcode?: unknown;
   };
 };
 
@@ -44,140 +32,6 @@ type MetaProfileResponse = MetaError & {
   username?: string;
 };
 
-const TOKEN_COLUMNS = [
-  "access_token",
-  "instagram_access_token",
-  "long_lived_access_token",
-  "long_lived_token",
-  "long_token",
-  "accessToken",
-  "token",
-];
-
-const ID_COLUMNS = [
-  "instagram_user_id",
-  "instagram_account_id",
-  "ig_user_id",
-  "instagram_id",
-  "account_id",
-  "user_id",
-  "instagramUserId",
-];
-
-const VILLA_COLUMNS = ["villa", "villa_name", "property", "property_name"];
-const USERNAME_COLUMNS = ["username", "instagram_username", "ig_username"];
-const ORDER_COLUMNS = ["updated_at", "connected_at", "created_at", "id"];
-
-const CONNECTION_TABLES = [
-  "instagram_connections",
-  "instagram_connection",
-  "meta_connections",
-  "meta_connection",
-  "instagram_accounts",
-  "instagram_account",
-  "meta_instagram_connections",
-  "meta_instagram_accounts",
-  "social_connections",
-  "social_accounts",
-  "social_media_connections",
-  "social_media_accounts",
-  "connected_instagram_accounts",
-  "connected_accounts",
-  "oauth_connections",
-  "oauth_accounts",
-  "meta_accounts",
-  "social_integrations",
-  "integrations",
-  "integration_accounts",
-  "instagram_tokens",
-  "meta_tokens",
-  "settings",
-  "app_settings",
-  "social_settings",
-  "accounts",
-  "connections",
-] as const;
-
-
-function safeIdentifier(value: string) {
-  return /^[A-Za-z_][A-Za-z0-9_]*$/.test(value);
-}
-
-function q(value: string) {
-  if (!safeIdentifier(value)) throw new Error("Geçersiz veritabanı alanı.");
-  return `"${value}"`;
-}
-
-function firstColumn(columns: string[], candidates: string[]) {
-  const lower = new Map(columns.map((column) => [column.toLowerCase(), column]));
-  for (const candidate of candidates) {
-    const found = lower.get(candidate.toLowerCase());
-    if (found) return found;
-  }
-  return null;
-}
-
-function tableScore(name: string) {
-  const value = name.toLowerCase();
-  let score = 0;
-  if (value.includes("instagram")) score += 30;
-  if (value.includes("meta")) score += 20;
-  if (value.includes("connection")) score += 15;
-  if (value.includes("account")) score += 10;
-  if (value.includes("social")) score += 5;
-  return score;
-}
-
-function normalizeStoredToken(value: unknown) {
-  if (value == null) return "";
-  let token = String(value).trim();
-  if (!token) return "";
-
-  if (token.startsWith("{")) {
-    try {
-      const parsed = JSON.parse(token) as Record<string, unknown>;
-      const nested =
-        parsed.access_token ??
-        parsed.accessToken ??
-        parsed.long_lived_access_token ??
-        parsed.long_lived_token ??
-        parsed.token;
-      if (nested != null) token = String(nested).trim();
-    } catch {
-      // JSON değilse ham değer sonraki normalizasyonlardan geçer.
-    }
-  }
-
-  token = token.replace(/^Bearer\s+/i, "").trim();
-
-  if (
-    (token.startsWith('"') && token.endsWith('"')) ||
-    (token.startsWith("'") && token.endsWith("'"))
-  ) {
-    token = token.slice(1, -1).trim();
-  }
-
-  if (/^access_token=/i.test(token)) {
-    try {
-      token = new URLSearchParams(token).get("access_token")?.trim() ?? token;
-    } catch {}
-  }
-
-  if (/%[0-9A-Fa-f]{2}/.test(token)) {
-    try {
-      token = decodeURIComponent(token);
-    } catch {}
-  }
-
-  return token.trim();
-}
-
-function requestedUsernameHint(villa: string) {
-  if (villa === "Destan") return "villadestanpatara";
-  if (villa === "Safira") return "villasafira";
-  return "";
-}
-
 async function readJson<T>(response: Response): Promise<T> {
   const text = await response.text();
   try {
@@ -187,20 +41,41 @@ async function readJson<T>(response: Response): Promise<T> {
   }
 }
 
-function safeMetaMessage(data: MetaError, status: number, fallback: string) {
-  const error = data?.error;
-  const message =
-    typeof error?.message === "string" && error.message.trim()
-      ? error.message.trim()
-      : `${fallback} (HTTP ${status}).`;
+function safeMetaValue(value: unknown) {
+  if (typeof value === "number") return String(value);
+  if (typeof value !== "string") return "";
 
-  const code = typeof error?.code === "number" ? ` [kod ${error.code}]` : "";
-  const subcode =
-    typeof error?.error_subcode === "number"
-      ? ` [alt kod ${error.error_subcode}]`
-      : "";
-  const type = typeof error?.type === "string" ? ` [${error.type}]` : "";
-  return `${message}${type}${code}${subcode}`;
+  return value
+    .replace(
+      /(access_token|client_secret|authorization_code|short_lived_token|long_lived_token)=([^&\s]+)/gi,
+      "$1=[REDACTED]",
+    )
+    .replace(/[A-Za-z0-9._~-]{80,}/g, "[REDACTED]")
+    .slice(0, 220);
+}
+
+function safeMetaMessage(data: MetaError, status: number, fallback: string) {
+  const parts: string[] = [];
+  const message = safeMetaValue(data.error?.message);
+  const type = safeMetaValue(data.error?.type);
+  const code = safeMetaValue(data.error?.code);
+  const subcode = safeMetaValue(data.error?.error_subcode);
+
+  if (message) parts.push(`message=${message}`);
+  if (type) parts.push(`type=${type}`);
+  if (code) parts.push(`code=${code}`);
+  if (subcode) parts.push(`error_subcode=${subcode}`);
+
+  return parts.length
+    ? `${fallback}: ${parts.join(" | ")}`
+    : `${fallback} (HTTP ${status}).`;
+}
+
+function safeUnexpectedMessage(error: unknown) {
+  if (!(error instanceof Error) || !error.message) {
+    return "Instagram yayını tamamlanamadı.";
+  }
+  return safeMetaValue(error.message) || "Instagram yayını tamamlanamadı.";
 }
 
 async function validateInstagramToken(accessToken: string) {
@@ -221,212 +96,51 @@ async function validateInstagramToken(accessToken: string) {
   };
 }
 
-type Candidate = {
-  token: string;
-  storedUsername: string | null;
-  storedVilla: string | null;
-  tableScore: number;
-};
+const INVALID_TOKEN_MESSAGE =
+  "Instagram bağlantısının erişim anahtarı geçersiz. Hesabı kaldırıp yeniden bağlayın.";
 
-function lowerKeyMap(row: Record<string, unknown>) {
-  const map = new Map<string, string>();
-  for (const key of Object.keys(row)) map.set(key.toLowerCase(), key);
-  return map;
+function isVilla(value: string): value is Villa {
+  return value === "Destan" || value === "Safira";
 }
 
-function valueByNames(row: Record<string, unknown>, names: string[]) {
-  const map = lowerKeyMap(row);
-  for (const name of names) {
-    const actual = map.get(name.toLowerCase());
-    if (actual) return row[actual];
-  }
-  return undefined;
-}
-
-function tokenCandidatesFromRow(row: Record<string, unknown>) {
-  const tokens: string[] = [];
-  const seen = new Set<string>();
-
-  const push = (value: unknown) => {
-    const token = normalizeStoredToken(value);
-    if (!token || token.length < 20 || seen.has(token)) return;
-    seen.add(token);
-    tokens.push(token);
-  };
-
-  // Önce alan adı açıkça token/access belirten sütunlar.
-  for (const [key, value] of Object.entries(row)) {
-    const lower = key.toLowerCase();
-    if (lower.includes("token") || lower.includes("access")) push(value);
-  }
-
-  // Bazı sürümlerde bağlantı verisi JSON olarak tek kolonda tutulabilir.
-  for (const value of Object.values(row)) {
-    if (typeof value !== "string") continue;
-    const trimmed = value.trim();
-    if (!trimmed.startsWith("{")) continue;
-
-    try {
-      const parsed = JSON.parse(trimmed) as Record<string, unknown>;
-      for (const [key, nested] of Object.entries(parsed)) {
-        const lower = key.toLowerCase();
-        if (lower.includes("token") || lower.includes("access")) push(nested);
-      }
-    } catch {}
-  }
-
-  return tokens;
-}
-
-async function resolveConnection(
-  db: D1DatabaseLike,
-  villa: string,
-): Promise<Connection> {
-  // KV_CANDIDATE_RESOLUTION_V2
-  // OAuth long-lived exchange sırasında kaydedilen ham tokenları Meta ile doğrula.
-  const kvTokenCandidates = await getInstagramTokenCandidates();
-  if (kvTokenCandidates.length) {
-    const hint = requestedUsernameHint(villa).toLowerCase();
-
-    for (const kvToken of kvTokenCandidates) {
-      const kvProfile = await validateInstagramToken(kvToken);
-      if (!kvProfile) continue;
-
-      const candidateUsername = kvProfile.username.toLowerCase();
-      const exact = hint && candidateUsername === hint;
-      const villaMatch =
-        (villa === "Destan" && candidateUsername.includes("destan")) ||
-        (villa === "Safira" && candidateUsername.includes("safira"));
-
-      if (exact || villaMatch) {
-        return {
-          accessToken: kvToken,
-          igUserId: kvProfile.id,
-          username: kvProfile.username,
-        };
-      }
-    }
-  }
-
-  const hint = requestedUsernameHint(villa).toLowerCase();
-
-  type RuntimeCandidate = Candidate & {
-    table: string;
-  };
-
-  const candidates: RuntimeCandidate[] = [];
-  const readableTables: string[] = [];
-
-  for (const table of CONNECTION_TABLES) {
-    let rows: Record<string, unknown>[] = [];
-
-    try {
-      const result = await db
-        .prepare(`SELECT * FROM "${table}" LIMIT 100`)
-        .all<Record<string, unknown>>();
-
-      rows = result.results;
-      readableTables.push(table);
-    } catch {
-      // Tablo yoksa veya bu isim kullanılmıyorsa sıradaki olası tabloya geç.
-      continue;
-    }
-
-    for (const row of rows) {
-      const storedUsernameValue = valueByNames(row, USERNAME_COLUMNS);
-      const storedVillaValue = valueByNames(row, VILLA_COLUMNS);
-
-      const storedUsername =
-        storedUsernameValue == null ? null : String(storedUsernameValue).trim();
-      const storedVilla =
-        storedVillaValue == null ? null : String(storedVillaValue).trim();
-
-      for (const token of tokenCandidatesFromRow(row)) {
-        candidates.push({
-          token,
-          storedUsername,
-          storedVilla,
-          tableScore: tableScore(table),
-          table,
-        });
-      }
-    }
-  }
-
-  candidates.sort((a, b) => {
-    function score(candidate: RuntimeCandidate) {
-      let value = candidate.tableScore;
-
-      if (
-        candidate.storedVilla &&
-        candidate.storedVilla.toLowerCase() === villa.toLowerCase()
-      ) {
-        value += 100;
-      }
-
-      if (
-        hint &&
-        candidate.storedUsername &&
-        candidate.storedUsername.toLowerCase() === hint
-      ) {
-        value += 200;
-      }
-
-      if (candidate.table.includes("instagram")) value += 30;
-      if (candidate.table.includes("meta")) value += 10;
-
-      return value;
-    }
-
-    return score(b) - score(a);
-  });
-
-  const seen = new Set<string>();
-  let tested = 0;
-
-  for (const candidate of candidates) {
-    if (seen.has(candidate.token)) continue;
-    seen.add(candidate.token);
-
-    // Bir istekte sınırsız dış doğrulama yapılmasını engelle.
-    if (tested >= 25) break;
-    tested += 1;
-
-    const profile = await validateInstagramToken(candidate.token);
-    if (!profile) continue;
-
-    const username = profile.username.toLowerCase();
-
-    if (hint && username !== hint) {
-      if (villa === "Destan" && !username.includes("destan")) continue;
-      if (villa === "Safira" && !username.includes("safira")) continue;
-    }
-
-    return {
-      accessToken: candidate.token,
-      igUserId: profile.id,
-      username: profile.username,
-    };
-  }
-
-  if (readableTables.length === 0) {
+async function resolveConnection(villa: Villa): Promise<Connection> {
+  const account = await getInstagramAccount(villa);
+  if (!account) {
     throw new Error(
-      "Instagram bağlantı tablosu bulunamadı. OAuth bağlantı kaydının tablo adı mevcut yayın sürümüyle eşleşmiyor.",
+      "Bu villa için bağlı Instagram hesabı bulunamadı. Önce hesabı bağlayın.",
     );
   }
 
-  if (candidates.length === 0) {
-    throw new Error(
-      `Instagram bağlantı kaydı bulundu ancak erişim anahtarı alanı bulunamadı. Okunan bağlantı tablosu sayısı: ${readableTables.length}.`,
-    );
+  let accessToken: string | null = null;
+  try {
+    accessToken = await getInstagramAccessToken(villa, account.accountId);
+  } catch {
+    throw new Error(INVALID_TOKEN_MESSAGE);
   }
 
-  throw new Error(
-    `${villa} için ${Math.min(seen.size, 25)} erişim anahtarı adayı kontrol edildi ancak Meta geçerli bir Instagram tokenı kabul etmedi. Bağlantı kaydının token formatı düzeltilmeli.`,
-  );
+  if (!accessToken) {
+    throw new Error(INVALID_TOKEN_MESSAGE);
+  }
+
+  let profile: Awaited<ReturnType<typeof validateInstagramToken>> = null;
+  try {
+    profile = await validateInstagramToken(accessToken);
+  } catch {
+    throw new Error(INVALID_TOKEN_MESSAGE);
+  }
+
+  if (!profile || profile.id !== account.accountId) {
+    throw new Error(INVALID_TOKEN_MESSAGE);
+  }
+
+  return {
+    accessToken,
+    igUserId: profile.id,
+    username: profile.username,
+  };
 }
 
-async function ensureLogTable(db: D1DatabaseLike) {
+async function ensureLogTable(db: D1Database) {
   await db
     .prepare(`
       CREATE TABLE IF NOT EXISTS instagram_publish_log (
@@ -453,9 +167,9 @@ async function ensureLogTable(db: D1DatabaseLike) {
 }
 
 async function writeLog(
-  db: D1DatabaseLike,
+  db: D1Database,
   input: {
-    villa: string;
+    villa: Villa;
     username: string | null;
     imageUrl: string;
     caption: string;
@@ -491,14 +205,7 @@ async function writeLog(
 
 export async function GET() {
   const { env } = await getCloudflareContext({ async: true });
-  const db = (env as unknown as DbEnv).DB;
-
-  if (!db) {
-    return Response.json(
-      { error: "D1 veritabanı bağlantısı bulunamadı." },
-      { status: 500 },
-    );
-  }
+  const db = env.DB;
 
   await ensureLogTable(db);
 
@@ -518,8 +225,8 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  let db: D1DatabaseLike | undefined;
-  let villa = "";
+  let db: D1Database | undefined;
+  let villa: Villa | undefined;
   let imageUrl = "";
   let caption = "";
   let username: string | null = null;
@@ -531,13 +238,14 @@ export async function POST(request: Request) {
       caption?: unknown;
     };
 
-    villa = String(body.villa ?? "");
+    const requestedVilla = String(body.villa ?? "");
     imageUrl = String(body.imageUrl ?? "").trim();
     caption = String(body.caption ?? "").trim();
 
-    if (!["Destan", "Safira"].includes(villa)) {
+    if (!isVilla(requestedVilla)) {
       return Response.json({ error: "Geçerli villa seçin." }, { status: 400 });
     }
+    villa = requestedVilla;
 
     if (!imageUrl.startsWith("https://")) {
       return Response.json(
@@ -554,18 +262,9 @@ export async function POST(request: Request) {
     }
 
     const { env } = await getCloudflareContext({ async: true });
-    db = (env as unknown as DbEnv).DB;
+    db = env.DB;
 
-    if (!db) {
-      return Response.json(
-        { error: "D1 veritabanı bağlantısı bulunamadı." },
-        { status: 500 },
-      );
-    }
-
-    // Kritik düzeltme:
-    // D1'den tokenı körlemesine seçmek yerine Meta /me ile doğrula.
-    const connection = await resolveConnection(db, villa);
+    const connection = await resolveConnection(villa);
     username = connection.username;
 
     const createBody = new URLSearchParams({
@@ -578,6 +277,9 @@ export async function POST(request: Request) {
       `https://graph.instagram.com/${encodeURIComponent(connection.igUserId)}/media`,
       {
         method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
         body: createBody,
       },
     );
@@ -617,7 +319,7 @@ export async function POST(request: Request) {
         );
       }
 
-      if (!statusData.status_code || statusData.status_code === "FINISHED") {
+      if (statusData.status_code === "FINISHED") {
         finished = true;
         break;
       }
@@ -627,7 +329,7 @@ export async function POST(request: Request) {
         statusData.status_code === "EXPIRED"
       ) {
         throw new Error(
-          statusData.status ||
+          safeMetaValue(statusData.status) ||
             `Instagram medya hazırlama durumu: ${statusData.status_code}`,
         );
       }
@@ -650,6 +352,9 @@ export async function POST(request: Request) {
       `https://graph.instagram.com/${encodeURIComponent(connection.igUserId)}/media_publish`,
       {
         method: "POST",
+        headers: {
+          "Content-Type": "application/x-www-form-urlencoded",
+        },
         body: publishBody,
       },
     );
@@ -682,10 +387,7 @@ export async function POST(request: Request) {
       message: "Instagram gönderisi başarıyla yayınlandı.",
     });
   } catch (error) {
-    const message =
-      error instanceof Error
-        ? error.message
-        : "Instagram yayını tamamlanamadı.";
+    const message = safeUnexpectedMessage(error);
 
     if (db && villa && imageUrl && caption) {
       try {
@@ -702,8 +404,13 @@ export async function POST(request: Request) {
       }
     }
 
-    // Token, secret veya auth code loglanmaz.
-    console.error("[instagram-publish]", message);
+    console.error(
+      JSON.stringify({
+        message: "instagram publish failed",
+        villa: villa ?? null,
+        error: message,
+      }),
+    );
 
     return Response.json({ error: message }, { status: 400 });
   }

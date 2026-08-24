@@ -1,25 +1,7 @@
+import { INSTAGRAM_MEDIA_PREFIX } from "@/lib/instagramTokenStore";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export const dynamic = "force-dynamic";
-
-type MediaBucket = {
-  put: (
-    key: string,
-    value: ArrayBuffer,
-    options?: {
-      httpMetadata?: {
-        contentType?: string;
-        cacheControl?: string;
-      };
-      customMetadata?: Record<string, string>;
-    },
-  ) => Promise<unknown>;
-};
-
-type MediaEnv = {
-  SOCIAL_MEDIA?: MediaBucket;
-  APP_BASE_URL?: string;
-};
 
 function getExtension(file: File) {
   if (file.type === "image/jpeg") return "jpg";
@@ -54,30 +36,27 @@ export async function POST(request: Request) {
     }
 
     const { env } = await getCloudflareContext({ async: true });
-    const mediaEnv = env as unknown as MediaEnv;
 
-    if (!mediaEnv.SOCIAL_MEDIA) {
+    if (!env.SOCIAL_MEDIA_KV) {
       return Response.json(
-        { error: "Cloudflare R2 medya bağlantısı yapılandırılmamış." },
+        { error: "Cloudflare Workers KV medya bağlantısı yapılandırılmamış." },
         { status: 500 },
       );
     }
 
     const villaSlug = villa.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9]+/g, "-");
-    const key = `${villaSlug}/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${extension}`;
+    const key = `${INSTAGRAM_MEDIA_PREFIX}${villaSlug}/${new Date().toISOString().slice(0, 10)}/${crypto.randomUUID()}.${extension}`;
 
-    await mediaEnv.SOCIAL_MEDIA.put(key, await file.arrayBuffer(), {
-      httpMetadata: {
+    await env.SOCIAL_MEDIA_KV.put(key, await file.arrayBuffer(), {
+      metadata: {
         contentType: "image/jpeg",
-        cacheControl: "public, max-age=604800",
-      },
-      customMetadata: {
+        cacheControl: "public, max-age=604800, immutable",
         villa,
         originalName: file.name.slice(0, 180),
       },
     });
 
-    const baseUrl = (mediaEnv.APP_BASE_URL || new URL(request.url).origin).replace(/\/$/, "");
+    const baseUrl = (env.APP_BASE_URL || new URL(request.url).origin).replace(/\/$/, "");
     const encodedKey = key.split("/").map(encodeURIComponent).join("/");
     const publicUrl = `${baseUrl}/api/meta/instagram/media/${encodedKey}`;
 
