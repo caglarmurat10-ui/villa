@@ -1,10 +1,18 @@
 import { INSTAGRAM_MEDIA_PREFIX } from "@/lib/instagramTokenStore";
+import {
+  IMAGE_MAX_BYTES,
+  REELS_MAX_BYTES,
+  type InstagramMediaMetadata,
+} from "@/lib/instagramMedia";
+import {
+  INSTAGRAM_TIMEZONE,
+  scheduledMediaExpirationTtl,
+  validateScheduledDate,
+} from "@/lib/instagramTime";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export const dynamic = "force-dynamic";
 
-const IMAGE_MAX_BYTES = 8 * 1024 * 1024;
-const REELS_MAX_BYTES = 24 * 1024 * 1024;
 const MEDIA_EXPIRATION_SECONDS = 24 * 60 * 60;
 
 type AcceptedMedia = {
@@ -53,6 +61,8 @@ export async function POST(request: Request) {
     const form = await request.formData();
     const file = form.get("file");
     const villa = String(form.get("villa") ?? "");
+    const scheduledAtInput = String(form.get("scheduledAt") ?? "").trim();
+    const timezone = String(form.get("timezone") ?? "").trim();
 
     if (!(file instanceof File)) {
       return Response.json(
@@ -82,6 +92,32 @@ export async function POST(request: Request) {
     }
 
     const { env } = await getCloudflareContext({ async: true });
+    const now = new Date();
+    let scheduledAt: Date | null = null;
+    if (scheduledAtInput) {
+      try {
+        scheduledAt = validateScheduledDate(scheduledAtInput, timezone, now);
+      } catch (error) {
+        return Response.json(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : "Planlama tarihi veya saati geçersiz.",
+          },
+          { status: 400 },
+        );
+      }
+    }
+    if (!scheduledAt && timezone && timezone !== INSTAGRAM_TIMEZONE) {
+      return Response.json(
+        { error: "Planlama saat dilimi Europe/Istanbul olmalı." },
+        { status: 400 },
+      );
+    }
+    const expirationTtl = scheduledAt
+      ? scheduledMediaExpirationTtl(scheduledAt, now)
+      : MEDIA_EXPIRATION_SECONDS;
 
     const villaSlug = villa.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9]+/g, "-");
     const key = `${INSTAGRAM_MEDIA_PREFIX}${villaSlug}/${new Date()
@@ -89,14 +125,19 @@ export async function POST(request: Request) {
       .slice(0, 10)}/${crypto.randomUUID()}.${media.extension}`;
 
     await env.SOCIAL_MEDIA_KV.put(key, await file.arrayBuffer(), {
-      expirationTtl: MEDIA_EXPIRATION_SECONDS,
+      expirationTtl,
       metadata: {
         contentType: media.contentType,
         cacheControl: "public, max-age=86400, immutable",
         villa,
         originalName: file.name.slice(0, 180),
         size: file.size,
-      },
+        expiresAt: new Date(
+          now.getTime() + expirationTtl * 1000,
+        ).toISOString(),
+        scheduledAt: scheduledAt?.toISOString(),
+        purpose: scheduledAt ? "scheduled" : "manual",
+      } satisfies InstagramMediaMetadata,
     });
 
     const baseUrl = (env.APP_BASE_URL || new URL(request.url).origin).replace(/\/$/, "");
@@ -109,7 +150,7 @@ export async function POST(request: Request) {
       publicUrl,
       size: file.size,
       mimeType: media.contentType,
-      expiresIn: MEDIA_EXPIRATION_SECONDS,
+      expiresIn: expirationTtl,
     });
   } catch {
     return Response.json(

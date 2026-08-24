@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "villa-yonetim",
-  "main": ".open-next/worker.js",
+  "main": "./worker.ts",
   "keep_vars": true,
   "compatibility_date": "2026-08-19",
   "compatibility_flags": ["nodejs_compat"],
@@ -14,10 +14,11 @@
     "required": ["META_APP_SECRET"]
   },
   "d1_databases": [
-    { "binding": "DB", "database_name": "villa-yonetim", "database_id": "fa8fc6ec-9cc5-4c92-ba04-b23f2a9b8106" }
+    { "binding": "DB", "database_name": "villa-yonetim", "database_id": "fa8fc6ec-9cc5-4c92-ba04-b23f2a9b8106", "migrations_dir": "migrations" }
   ],
   "kv_namespaces": [
     { "binding": "SOCIAL_MEDIA_KV", "id": "aee4775e7d0c4d9b9b488297bb4736be" }
   ],
+  "triggers": { "crons": ["* * * * *"] },
   "observability": { "enabled": true }
 }

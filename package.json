@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "test": "vitest run",
     "start": "next start",
     "lint": "eslint",
     "preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
@@ -26,6 +27,7 @@
     "eslint": "^9",
     "eslint-config-next": "^16.2.11",
     "typescript": "^5",
+    "vitest": "^4.1.11",
     "wrangler": "^4.124.0"
   }
 }

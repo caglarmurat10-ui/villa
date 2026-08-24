@@ -78,6 +78,13 @@ export async function listMetaAccounts(): Promise<MetaSocialAccount[]> {
 
 export async function getInstagramAccount(villa: Villa) {
   const { env } = await context();
+  return getInstagramAccountFromEnv(env, villa);
+}
+
+export async function getInstagramAccountFromEnv(
+  env: CloudflareEnv,
+  villa: Villa,
+) {
   const db = env.DB;
   await ensureTable(db);
   const row = await db.prepare("SELECT * FROM social_accounts WHERE villa=? AND platform='Instagram'").bind(villa).first<Row>();

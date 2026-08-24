@@ -89,15 +89,19 @@ async function decryptToken(value: string, secret: string) {
   return new TextDecoder().decode(decrypted);
 }
 
-async function tokenStorage() {
-  const { env } = await getCloudflareContext({ async: true });
+async function tokenStorageFromEnv(env: CloudflareEnv) {
   if (!env.META_APP_SECRET) {
     throw new Error("META_APP_SECRET tanımlı değil.");
   }
   return {
-    store: await getSocialMediaKv(),
+    store: env.SOCIAL_MEDIA_KV,
     secret: env.META_APP_SECRET,
   };
+}
+
+async function tokenStorage() {
+  const { env } = await getCloudflareContext({ async: true });
+  return tokenStorageFromEnv(env);
 }
 
 export async function storeInstagramAccessToken(
@@ -118,6 +122,15 @@ export async function storeInstagramAccessToken(
 
 export async function getInstagramAccessToken(villa: Villa, accountId: string) {
   const { store, secret } = await tokenStorage();
+  return readInstagramAccessToken(store, secret, villa, accountId);
+}
+
+async function readInstagramAccessToken(
+  store: KVNamespace,
+  secret: string,
+  villa: Villa,
+  accountId: string,
+) {
   const value = await store.get(accountTokenKey(villa, accountId));
   if (!value) return null;
 
@@ -128,6 +141,15 @@ export async function getInstagramAccessToken(villa: Villa, accountId: string) {
     return null;
   }
   return token.length >= 20 ? token : null;
+}
+
+export async function getInstagramAccessTokenFromEnv(
+  env: CloudflareEnv,
+  villa: Villa,
+  accountId: string,
+) {
+  const { store, secret } = await tokenStorageFromEnv(env);
+  return readInstagramAccessToken(store, secret, villa, accountId);
 }
 
 export async function deleteInstagramAccessToken(

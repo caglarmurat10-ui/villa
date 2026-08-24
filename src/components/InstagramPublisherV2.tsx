@@ -10,9 +10,11 @@ import {
   useState,
 } from "react";
 import styles from "./InstagramPublisherV2.module.css";
+import InstagramScheduledPostsPanel from "./InstagramScheduledPostsPanel";
 
 type Villa = "Destan" | "Safira";
 type PublishType = "IMAGE" | "CAROUSEL" | "REELS";
+type PublishMode = "now" | "scheduled";
 type SelectedMedia = { id: string; file: File; previewUrl: string };
 
 type HistoryItem = {
@@ -27,6 +29,7 @@ type HistoryItem = {
   status: string;
   errorMessage?: string | null;
   createdAt: string;
+  source?: "manual" | "scheduled";
 };
 
 const IMAGE_MAX_BYTES = 8 * 1024 * 1024;
@@ -66,9 +69,32 @@ function formattedDate(value: string) {
   }
 }
 
+function defaultScheduleParts() {
+  const future = new Date(Date.now() + 10 * 60 * 1000);
+  const parts = new Map(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Europe/Istanbul",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    })
+      .formatToParts(future)
+      .filter((part) => part.type !== "literal")
+      .map((part) => [part.type, part.value]),
+  );
+  return {
+    date: `${parts.get("year")}-${parts.get("month")}-${parts.get("day")}`,
+    time: `${parts.get("hour")}:${parts.get("minute")}`,
+  };
+}
+
 export default function InstagramPublisher() {
   const [villa, setVilla] = useState<Villa>("Destan");
   const [publishType, setPublishType] = useState<PublishType>("IMAGE");
+  const [publishMode, setPublishMode] = useState<PublishMode>("now");
   const [media, setMedia] = useState<SelectedMedia[]>([]);
   const [caption, setCaption] = useState("");
   const [shareToFeed, setShareToFeed] = useState(true);
@@ -76,6 +102,13 @@ export default function InstagramPublisher() {
   const [notice, setNotice] = useState("");
   const [error, setError] = useState("");
   const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [scheduledDate, setScheduledDate] = useState(
+    () => defaultScheduleParts().date,
+  );
+  const [scheduledTime, setScheduledTime] = useState(
+    () => defaultScheduleParts().time,
+  );
+  const [scheduleRefreshKey, setScheduleRefreshKey] = useState(0);
   const previewUrls = useRef(new Set<string>());
 
   const canPublish = useMemo(() => {
@@ -83,8 +116,19 @@ export default function InstagramPublisher() {
       (publishType === "IMAGE" && media.length === 1) ||
       (publishType === "CAROUSEL" && media.length >= 2 && media.length <= 10) ||
       (publishType === "REELS" && media.length === 1);
-    return ready && Boolean(caption.trim()) && !busy;
-  }, [busy, caption, media.length, publishType]);
+    const captionReady = publishMode === "scheduled" || Boolean(caption.trim());
+    const timeReady =
+      publishMode === "now" || Boolean(scheduledDate && scheduledTime);
+    return ready && captionReady && timeReady && !busy;
+  }, [
+    busy,
+    caption,
+    media.length,
+    publishMode,
+    publishType,
+    scheduledDate,
+    scheduledTime,
+  ]);
 
   useEffect(() => {
     void refreshHistory();
@@ -186,6 +230,10 @@ export default function InstagramPublisher() {
     const body = new FormData();
     body.set("villa", villa);
     body.set("file", item.file);
+    if (publishMode === "scheduled") {
+      body.set("scheduledAt", `${scheduledDate}T${scheduledTime}`);
+      body.set("timezone", "Europe/Istanbul");
+    }
     const response = await fetch("/api/meta/instagram/media", {
       method: "POST",
       body,
@@ -213,7 +261,11 @@ export default function InstagramPublisher() {
       for (let index = 0; index < media.length; index += 1) {
         mediaUrls.push(await upload(media[index], index));
       }
-      const response = await fetch("/api/meta/instagram/publish", {
+      const response = await fetch(
+        publishMode === "scheduled"
+          ? "/api/meta/instagram/schedule"
+          : "/api/meta/instagram/publish",
+        {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -222,24 +274,40 @@ export default function InstagramPublisher() {
           mediaUrls,
           caption: caption.trim(),
           ...(publishType === "REELS" ? { shareToFeed } : {}),
+          ...(publishMode === "scheduled"
+            ? {
+                scheduledAt: `${scheduledDate}T${scheduledTime}`,
+                timezone: "Europe/Istanbul",
+              }
+            : {}),
         }),
-      });
+        },
+      );
       const data = await responseData(response);
       if (!response.ok) {
         throw new Error(dataString(data, "error") || "Instagram gönderisi yayınlanamadı.");
       }
-      const username = dataString(data, "username");
-      setNotice(
-        username
-          ? `@${username} hesabında ${typeLabel(publishType)} yayınlandı.`
-          : dataString(data, "message") || "Instagram gönderisi yayınlandı.",
-      );
+      if (publishMode === "scheduled") {
+        const item = isRecord(data.item) ? data.item : {};
+        const scheduledAt = dataString(item, "scheduledAt");
+        setNotice(
+          `Villa ${villa} gönderisi ${formattedDate(scheduledAt)} için planlandı.`,
+        );
+        setScheduleRefreshKey((value) => value + 1);
+      } else {
+        const username = dataString(data, "username");
+        setNotice(
+          username
+            ? `@${username} hesabında ${typeLabel(publishType)} yayınlandı.`
+            : dataString(data, "message") || "Instagram gönderisi yayınlandı.",
+        );
+      }
       setCaption("");
       clearMedia();
-      await refreshHistory();
+      if (publishMode === "now") await refreshHistory();
     } catch (publishError) {
       setError(publishError instanceof Error ? publishError.message : "Instagram yayını tamamlanamadı.");
-      await refreshHistory();
+      if (publishMode === "now") await refreshHistory();
     } finally {
       setBusy(false);
     }
@@ -260,6 +328,25 @@ export default function InstagramPublisher() {
         </div>
         <a className={styles.back} href="/sosyal">← Sosyal merkeze dön</a>
       </section>
+
+      <nav className={styles.modeTabs} aria-label="Yayın zamanı">
+        <button
+          type="button"
+          className={publishMode === "now" ? styles.activeMode : ""}
+          onClick={() => setPublishMode("now")}
+          disabled={busy}
+        >
+          Şimdi Yayınla
+        </button>
+        <button
+          type="button"
+          className={publishMode === "scheduled" ? styles.activeMode : ""}
+          onClick={() => setPublishMode("scheduled")}
+          disabled={busy}
+        >
+          Planla
+        </button>
+      </nav>
 
       <nav className={styles.typeTabs} aria-label="Yayın türü">
         {publishTypes.map((item) => (
@@ -362,12 +449,45 @@ export default function InstagramPublisher() {
             Paylaşım metni
             <textarea rows={8} maxLength={2200} value={caption} onChange={(event) => setCaption(event.target.value)} placeholder={`Villa ${villa} için paylaşım açıklamasını yazın…`} disabled={busy} />
           </label>
+
+          {publishMode === "scheduled" ? (
+            <div className={styles.scheduleFields}>
+              <label>
+                Tarih
+                <input
+                  type="date"
+                  value={scheduledDate}
+                  onChange={(event) => setScheduledDate(event.target.value)}
+                  disabled={busy}
+                />
+              </label>
+              <label>
+                Saat
+                <input
+                  type="time"
+                  value={scheduledTime}
+                  onChange={(event) => setScheduledTime(event.target.value)}
+                  disabled={busy}
+                />
+              </label>
+              <small>Türkiye saati (Europe/Istanbul)</small>
+            </div>
+          ) : null}
+
           <button type="button" className={styles.publish} disabled={!canPublish} onClick={() => void publish()}>
             {busy
-              ? publishType === "REELS" ? "Video hazırlanıyor ve yayınlanıyor…" : "Medya hazırlanıyor ve yayınlanıyor…"
-              : `${currentType?.label ?? "İçerik"} Instagram'da yayınla`}
+              ? publishMode === "scheduled"
+                ? "Medya yükleniyor ve plan kaydediliyor…"
+                : publishType === "REELS" ? "Video hazırlanıyor ve yayınlanıyor…" : "Medya hazırlanıyor ve yayınlanıyor…"
+              : publishMode === "scheduled"
+                ? "Yayını planla"
+                : `${currentType?.label ?? "İçerik"} Instagram'da yayınla`}
           </button>
-          <p className={styles.note}>İçerik yalnızca bu düğmeye bastığınızda bağlı Instagram hesabına gönderilir.</p>
+          <p className={styles.note}>
+            {publishMode === "scheduled"
+              ? "Kayıt bu düğmeye bastığınızda oluşturulur; seçtiğiniz zamanda otomatik yayınlanır."
+              : "İçerik yalnızca bu düğmeye bastığınızda bağlı Instagram hesabına gönderilir."}
+          </p>
         </section>
 
         <section className={styles.card}>
@@ -394,6 +514,7 @@ export default function InstagramPublisher() {
                   <p>{item.caption}</p>
                   <div className={styles.historyMeta}>
                     {item.username ? <small>@{item.username}</small> : null}
+                    <small>{item.source === "scheduled" ? "Planlı" : "Manuel"}</small>
                     <small>{formattedDate(item.createdAt)}</small>
                     {item.instagramMediaId ? <small>Medya ID: {item.instagramMediaId}</small> : null}
                   </div>
@@ -404,6 +525,7 @@ export default function InstagramPublisher() {
           </div>
         </section>
       </div>
+      <InstagramScheduledPostsPanel refreshKey={scheduleRefreshKey} />
     </main>
   );
 }
