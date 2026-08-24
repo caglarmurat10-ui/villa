@@ -1,3 +1,4 @@
+import { getInstagramTokenCandidates } from "@/lib/instagramTokenStore";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export const dynamic = "force-dynamic";
@@ -281,6 +282,32 @@ async function resolveConnection(
   db: D1DatabaseLike,
   villa: string,
 ): Promise<Connection> {
+  // KV_CANDIDATE_RESOLUTION_V2
+  // OAuth long-lived exchange sırasında kaydedilen ham tokenları Meta ile doğrula.
+  const kvTokenCandidates = await getInstagramTokenCandidates();
+  if (kvTokenCandidates.length) {
+    const hint = requestedUsernameHint(villa).toLowerCase();
+
+    for (const kvToken of kvTokenCandidates) {
+      const kvProfile = await validateInstagramToken(kvToken);
+      if (!kvProfile) continue;
+
+      const candidateUsername = kvProfile.username.toLowerCase();
+      const exact = hint && candidateUsername === hint;
+      const villaMatch =
+        (villa === "Destan" && candidateUsername.includes("destan")) ||
+        (villa === "Safira" && candidateUsername.includes("safira"));
+
+      if (exact || villaMatch) {
+        return {
+          accessToken: kvToken,
+          igUserId: kvProfile.id,
+          username: kvProfile.username,
+        };
+      }
+    }
+  }
+
   const hint = requestedUsernameHint(villa).toLowerCase();
 
   type RuntimeCandidate = Candidate & {
