@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useState } from "react";
@@ -137,7 +137,13 @@ export default function Dashboard({ initialReservations, initialCommission, init
       <Operations reservations={visible} />
       <div className="record-tabs"><button className={recordFilter === "active" ? "active" : ""} onClick={() => setRecordFilter("active")}>Aktif ({visible.filter((r)=>r.checkOut>=today).length})</button><button className={recordFilter === "completed" ? "active" : ""} onClick={() => setRecordFilter("completed")}>Tamamlanan ({visible.filter((r)=>r.checkOut<today).length})</button></div>
       {message ? <p className="message dashboard-message">{message}</p> : null}
-      <div className="layout"><ReservationList reservations={visible.filter((r)=>recordFilter === "active" ? r.checkOut>=today : r.checkOut<today)} remove={remove} edit={setEditing} payment={updatePayment} />
+      <div className="layout"><ReservationList reservations={visible.filter((r)=>recordFilter === "active" ? r.checkOut>=today : r.checkOut<today)} remove={remove} edit={(reservation) => {
+          setView("dashboard");
+          setRecordFilter(reservation.checkOut >= today ? "active" : "completed");
+          setMessage("");
+          setEditing(reservation);
+          window.setTimeout(() => document.getElementById("reservation-form")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+        }} payment={updatePayment} />
         <ReservationForm key={editing?.id??"new"} editing={editing} onCancel={() => setEditing(null)} onSaved={async () => { setEditing(null); await refresh(); }} />
       </div>
     </>}
