@@ -1,4 +1,4 @@
-﻿import InstagramPublisher from "@/components/InstagramPublisher";
+﻿import InstagramPublisher from "@/components/InstagramPublisherV2";
 
 export const dynamic = "force-dynamic";
 

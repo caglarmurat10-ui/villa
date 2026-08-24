@@ -1,143 +1,294 @@
-import { getInstagramAccessToken } from "@/lib/instagramTokenStore";
-import { getInstagramAccount } from "@/lib/meta-store";
+import {
+  createInstagramContainer,
+  publishInstagramContainer,
+  resolveInstagramConnection,
+  safeInstagramError,
+  waitForInstagramContainer,
+  type InstagramConnection,
+} from "@/lib/instagramPublish";
+import { INSTAGRAM_MEDIA_PREFIX } from "@/lib/instagramTokenStore";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
 import type { Villa } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
-type Connection = {
-  accessToken: string;
-  igUserId: string;
-  username: string | null;
-};
-
-type MetaError = {
-  error?: {
-    message?: unknown;
-    type?: unknown;
-    code?: unknown;
-    error_subcode?: unknown;
-  };
-};
-
-type MetaIdResponse = MetaError & { id?: string };
-type MetaStatusResponse = MetaError & {
-  id?: string;
-  status_code?: string;
-  status?: string;
-};
-type MetaProfileResponse = MetaError & {
-  id?: string;
-  username?: string;
-};
-
-async function readJson<T>(response: Response): Promise<T> {
-  const text = await response.text();
-  try {
-    return JSON.parse(text) as T;
-  } catch {
-    return {} as T;
-  }
-}
-
-function safeMetaValue(value: unknown) {
-  if (typeof value === "number") return String(value);
-  if (typeof value !== "string") return "";
-
-  return value
-    .replace(
-      /(access_token|client_secret|authorization_code|short_lived_token|long_lived_token)=([^&\s]+)/gi,
-      "$1=[REDACTED]",
-    )
-    .replace(/[A-Za-z0-9._~-]{80,}/g, "[REDACTED]")
-    .slice(0, 220);
-}
-
-function safeMetaMessage(data: MetaError, status: number, fallback: string) {
-  const parts: string[] = [];
-  const message = safeMetaValue(data.error?.message);
-  const type = safeMetaValue(data.error?.type);
-  const code = safeMetaValue(data.error?.code);
-  const subcode = safeMetaValue(data.error?.error_subcode);
-
-  if (message) parts.push(`message=${message}`);
-  if (type) parts.push(`type=${type}`);
-  if (code) parts.push(`code=${code}`);
-  if (subcode) parts.push(`error_subcode=${subcode}`);
-
-  return parts.length
-    ? `${fallback}: ${parts.join(" | ")}`
-    : `${fallback} (HTTP ${status}).`;
-}
-
-function safeUnexpectedMessage(error: unknown) {
-  if (!(error instanceof Error) || !error.message) {
-    return "Instagram yayını tamamlanamadı.";
-  }
-  return safeMetaValue(error.message) || "Instagram yayını tamamlanamadı.";
-}
-
-async function validateInstagramToken(accessToken: string) {
-  if (accessToken.length < 20) return null;
-
-  const profileUrl = new URL("https://graph.instagram.com/me");
-  profileUrl.searchParams.set("fields", "id,username");
-  profileUrl.searchParams.set("access_token", accessToken);
-
-  const response = await fetch(profileUrl, { method: "GET" });
-  const data = await readJson<MetaProfileResponse>(response);
-
-  if (!response.ok || !data.id || !data.username) return null;
-
-  return {
-    id: String(data.id),
-    username: String(data.username),
-  };
-}
-
-const INVALID_TOKEN_MESSAGE =
-  "Instagram bağlantısının erişim anahtarı geçersiz. Hesabı kaldırıp yeniden bağlayın.";
-
 function isVilla(value: string): value is Villa {
   return value === "Destan" || value === "Safira";
 }
 
-async function resolveConnection(villa: Villa): Promise<Connection> {
-  const account = await getInstagramAccount(villa);
-  if (!account) {
-    throw new Error(
-      "Bu villa için bağlı Instagram hesabı bulunamadı. Önce hesabı bağlayın.",
+type PublishType = "IMAGE" | "CAROUSEL" | "REELS";
+
+type PublishRequest = {
+  villa: Villa;
+  type: PublishType;
+  mediaUrls: string[];
+  caption: string;
+  shareToFeed: boolean;
+  legacyImageRequest: boolean;
+};
+
+type MediaMetadata = {
+  contentType?: unknown;
+  size?: unknown;
+};
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isPublishType(value: unknown): value is PublishType {
+  return value === "IMAGE" || value === "CAROUSEL" || value === "REELS";
+}
+
+function httpsUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return (
+      url.protocol === "https:" &&
+      !url.username &&
+      !url.password &&
+      value.length <= 2048
     );
-  }
-
-  let accessToken: string | null = null;
-  try {
-    accessToken = await getInstagramAccessToken(villa, account.accountId);
   } catch {
-    throw new Error(INVALID_TOKEN_MESSAGE);
+    return false;
+  }
+}
+
+function parsePublishRequest(value: unknown): PublishRequest {
+  if (!isRecord(value)) throw new Error("Yayın isteği geçersiz.");
+
+  const requestedVilla =
+    typeof value.villa === "string" ? value.villa.trim() : "";
+  if (!isVilla(requestedVilla)) throw new Error("Geçerli villa seçin.");
+
+  const caption = typeof value.caption === "string" ? value.caption.trim() : "";
+  if (!caption || caption.length > 2200) {
+    throw new Error("Paylaşım metni 1-2200 karakter arasında olmalı.");
   }
 
-  if (!accessToken) {
-    throw new Error(INVALID_TOKEN_MESSAGE);
+  let type: PublishType;
+  let mediaUrls: string[];
+  let legacyImageRequest = false;
+
+  if (isPublishType(value.type)) {
+    type = value.type;
+    if (
+      !Array.isArray(value.mediaUrls) ||
+      !value.mediaUrls.every((item): item is string => typeof item === "string")
+    ) {
+      throw new Error("Medya adresleri geçersiz.");
+    }
+    mediaUrls = value.mediaUrls.map((item) => item.trim());
+  } else if (typeof value.imageUrl === "string") {
+    type = "IMAGE";
+    mediaUrls = [value.imageUrl.trim()];
+    legacyImageRequest = true;
+  } else {
+    throw new Error("Yayın türü veya medya adresi eksik.");
   }
 
-  let profile: Awaited<ReturnType<typeof validateInstagramToken>> = null;
-  try {
-    profile = await validateInstagramToken(accessToken);
-  } catch {
-    throw new Error(INVALID_TOKEN_MESSAGE);
+  if (type === "IMAGE" && mediaUrls.length !== 1) {
+    throw new Error("Tek fotoğraf yayını için tam 1 JPEG gerekli.");
+  }
+  if (type === "CAROUSEL" && (mediaUrls.length < 2 || mediaUrls.length > 10)) {
+    throw new Error("Carousel yayını 2-10 JPEG içermeli.");
+  }
+  if (type === "REELS" && mediaUrls.length !== 1) {
+    throw new Error("Reels yayını için tam 1 MP4 gerekli.");
+  }
+  if (!mediaUrls.every(httpsUrl)) {
+    throw new Error("Instagram için geçerli HTTPS medya adresleri gerekli.");
   }
 
-  if (!profile || profile.id !== account.accountId) {
-    throw new Error(INVALID_TOKEN_MESSAGE);
+  if (value.shareToFeed !== undefined && typeof value.shareToFeed !== "boolean") {
+    throw new Error("Akışta göster seçimi geçersiz.");
   }
 
   return {
-    accessToken,
-    igUserId: profile.id,
-    username: profile.username,
+    villa: requestedVilla,
+    type,
+    mediaUrls,
+    caption,
+    shareToFeed: value.shareToFeed !== false,
+    legacyImageRequest,
   };
+}
+
+function managedMediaKey(mediaUrl: string, appBaseUrl: string) {
+  const url = new URL(mediaUrl);
+  const appUrl = new URL(appBaseUrl);
+  const routePrefix = "/api/meta/instagram/media/";
+
+  if (url.origin !== appUrl.origin || !url.pathname.startsWith(routePrefix)) {
+    return null;
+  }
+
+  try {
+    const key = url.pathname
+      .slice(routePrefix.length)
+      .split("/")
+      .map(decodeURIComponent)
+      .join("/");
+    if (!key.startsWith(INSTAGRAM_MEDIA_PREFIX) || key.includes("..")) {
+      return null;
+    }
+    return key;
+  } catch {
+    return null;
+  }
+}
+
+async function validateManagedMedia(
+  env: CloudflareEnv,
+  request: PublishRequest,
+) {
+  const expectedContentType =
+    request.type === "REELS" ? "video/mp4" : "image/jpeg";
+  const maxBytes =
+    request.type === "REELS" ? 24 * 1024 * 1024 : 8 * 1024 * 1024;
+
+  for (const mediaUrl of request.mediaUrls) {
+    const key = managedMediaKey(mediaUrl, env.APP_BASE_URL);
+    if (!key) {
+      throw new Error("Medya önce güvenli yayın yükleme alanına yüklenmeli.");
+    }
+
+    const object = await env.SOCIAL_MEDIA_KV.getWithMetadata<MediaMetadata>(
+      key,
+      "stream",
+    );
+    if (!object.value) throw new Error("Yüklenen medya bulunamadı veya süresi doldu.");
+    await object.value.cancel();
+
+    const contentType = object.metadata?.contentType;
+    const size = object.metadata?.size;
+    if (contentType !== expectedContentType) {
+      throw new Error(
+        request.type === "REELS"
+          ? "Reels yayını için MP4 video gerekli."
+          : "Fotoğraf yayınları için JPEG/JPG gerekli.",
+      );
+    }
+    if (typeof size !== "number" || size <= 0 || size > maxBytes) {
+      throw new Error(
+        request.type === "REELS"
+          ? "Reels dosyası 24 MiB veya daha küçük olmalı."
+          : "JPEG dosyası 8 MiB veya daha küçük olmalı.",
+      );
+    }
+  }
+}
+
+async function publishImage(
+  connection: InstagramConnection,
+  mediaUrl: string,
+  caption: string,
+) {
+  const containerId = await createInstagramContainer(
+    connection,
+    { image_url: mediaUrl, caption },
+    "Instagram medya kapsayıcısı oluşturulamadı",
+  );
+  await waitForInstagramContainer(
+    connection,
+    containerId,
+    "IMAGE",
+    "Instagram fotoğrafı",
+  );
+  return publishInstagramContainer(connection, containerId);
+}
+
+async function publishCarousel(
+  connection: InstagramConnection,
+  mediaUrls: string[],
+  caption: string,
+) {
+  const childIds: string[] = [];
+
+  for (let index = 0; index < mediaUrls.length; index += 1) {
+    try {
+      const childId = await createInstagramContainer(
+        connection,
+        { image_url: mediaUrls[index], is_carousel_item: "true" },
+        `Carousel ${index + 1}. öğe kapsayıcısı oluşturulamadı`,
+      );
+      await waitForInstagramContainer(
+        connection,
+        childId,
+        "IMAGE",
+        `Carousel ${index + 1}. öğesi`,
+      );
+      childIds.push(childId);
+    } catch (error) {
+      throw new Error(
+        `Carousel ${index + 1}. öğesi hazırlanamadı: ${safeInstagramError(
+          error,
+          "Instagram medya hazırlığı başarısız.",
+        )}`,
+      );
+    }
+  }
+
+  const parentId = await createInstagramContainer(
+    connection,
+    {
+      media_type: "CAROUSEL",
+      children: childIds.join(","),
+      caption,
+    },
+    "Instagram Carousel kapsayıcısı oluşturulamadı",
+  );
+  await waitForInstagramContainer(
+    connection,
+    parentId,
+    "IMAGE",
+    "Instagram Carousel",
+  );
+  return publishInstagramContainer(connection, parentId);
+}
+
+async function publishReels(
+  connection: InstagramConnection,
+  mediaUrl: string,
+  caption: string,
+  shareToFeed: boolean,
+) {
+  const containerId = await createInstagramContainer(
+    connection,
+    {
+      media_type: "REELS",
+      video_url: mediaUrl,
+      caption,
+      share_to_feed: String(shareToFeed),
+    },
+    "Instagram Reels kapsayıcısı oluşturulamadı",
+  );
+  await waitForInstagramContainer(
+    connection,
+    containerId,
+    "REELS",
+    "Instagram Reels videosu",
+  );
+  return publishInstagramContainer(connection, containerId);
+}
+
+async function publishByType(
+  connection: InstagramConnection,
+  request: PublishRequest,
+) {
+  if (request.type === "CAROUSEL") {
+    return publishCarousel(connection, request.mediaUrls, request.caption);
+  }
+  if (request.type === "REELS") {
+    return publishReels(
+      connection,
+      request.mediaUrls[0],
+      request.caption,
+      request.shareToFeed,
+    );
+  }
+  return publishImage(connection, request.mediaUrls[0], request.caption);
 }
 
 async function ensureLogTable(db: D1Database) {
@@ -160,6 +311,18 @@ async function ensureLogTable(db: D1Database) {
 
   await db
     .prepare(`
+      CREATE TABLE IF NOT EXISTS instagram_publish_log_details (
+        log_id TEXT PRIMARY KEY,
+        publish_type TEXT NOT NULL
+          CHECK (publish_type IN ('IMAGE', 'CAROUSEL', 'REELS')),
+        item_count INTEGER NOT NULL CHECK (item_count BETWEEN 1 AND 10),
+        FOREIGN KEY (log_id) REFERENCES instagram_publish_log(id) ON DELETE CASCADE
+      )
+    `)
+    .run();
+
+  await db
+    .prepare(`
       CREATE INDEX IF NOT EXISTS instagram_publish_log_created_idx
       ON instagram_publish_log (created_at DESC)
     `)
@@ -171,7 +334,8 @@ async function writeLog(
   input: {
     villa: Villa;
     username: string | null;
-    imageUrl: string;
+    mediaUrls: string[];
+    publishType: PublishType;
     caption: string;
     mediaId?: string | null;
     status: "Yayınlandı" | "Hata";
@@ -179,28 +343,34 @@ async function writeLog(
   },
 ) {
   const now = new Date().toISOString();
+  const logId = crypto.randomUUID();
   await ensureLogTable(db);
 
-  await db
-    .prepare(`
+  await db.batch([
+    db.prepare(`
       INSERT INTO instagram_publish_log
         (id, villa, username, image_url, caption, instagram_media_id,
          status, error_message, created_at, published_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `)
     .bind(
-      crypto.randomUUID(),
+      logId,
       input.villa,
       input.username,
-      input.imageUrl,
+      input.mediaUrls[0],
       input.caption,
       input.mediaId ?? null,
       input.status,
       input.error ?? null,
       now,
       input.status === "Yayınlandı" ? now : null,
-    )
-    .run();
+    ),
+    db.prepare(`
+      INSERT INTO instagram_publish_log_details
+        (log_id, publish_type, item_count)
+      VALUES (?, ?, ?)
+    `).bind(logId, input.publishType, input.mediaUrls.length),
+  ]);
 }
 
 export async function GET() {
@@ -211,12 +381,16 @@ export async function GET() {
 
   const result = await db
     .prepare(`
-      SELECT id, villa, username, image_url AS imageUrl, caption,
-             instagram_media_id AS instagramMediaId, status,
-             error_message AS errorMessage, created_at AS createdAt,
-             published_at AS publishedAt
-      FROM instagram_publish_log
-      ORDER BY created_at DESC
+      SELECT log.id, log.villa, log.username, log.image_url AS imageUrl,
+             log.caption, log.instagram_media_id AS instagramMediaId,
+             log.status, log.error_message AS errorMessage,
+             log.created_at AS createdAt, log.published_at AS publishedAt,
+             COALESCE(details.publish_type, 'IMAGE') AS publishType,
+             COALESCE(details.item_count, 1) AS itemCount
+      FROM instagram_publish_log AS log
+      LEFT JOIN instagram_publish_log_details AS details
+        ON details.log_id = log.id
+      ORDER BY log.created_at DESC
       LIMIT 30
     `)
     .all();
@@ -226,176 +400,62 @@ export async function GET() {
 
 export async function POST(request: Request) {
   let db: D1Database | undefined;
-  let villa: Villa | undefined;
-  let imageUrl = "";
-  let caption = "";
+  let publishRequest: PublishRequest | undefined;
   let username: string | null = null;
 
   try {
-    const body = (await request.json()) as {
-      villa?: unknown;
-      imageUrl?: unknown;
-      caption?: unknown;
-    };
-
-    const requestedVilla = String(body.villa ?? "");
-    imageUrl = String(body.imageUrl ?? "").trim();
-    caption = String(body.caption ?? "").trim();
-
-    if (!isVilla(requestedVilla)) {
-      return Response.json({ error: "Geçerli villa seçin." }, { status: 400 });
-    }
-    villa = requestedVilla;
-
-    if (!imageUrl.startsWith("https://")) {
-      return Response.json(
-        { error: "Instagram için HTTPS medya adresi gerekli." },
-        { status: 400 },
-      );
-    }
-
-    if (!caption || caption.length > 2200) {
-      return Response.json(
-        { error: "Paylaşım metni 1-2200 karakter arasında olmalı." },
-        { status: 400 },
-      );
-    }
+    const body: unknown = await request.json();
+    publishRequest = parsePublishRequest(body);
 
     const { env } = await getCloudflareContext({ async: true });
     db = env.DB;
 
-    const connection = await resolveConnection(villa);
+    // Eski imageUrl istemcileri geçici olarak çalışmaya devam eder.
+    // Yeni yayın merkezi yalnızca metadata ile doğrulanan KV medya URL'lerini kullanır.
+    if (!publishRequest.legacyImageRequest) {
+      await validateManagedMedia(env, publishRequest);
+    }
+
+    const connection = await resolveInstagramConnection(publishRequest.villa);
     username = connection.username;
 
-    const createBody = new URLSearchParams({
-      image_url: imageUrl,
-      caption,
-      access_token: connection.accessToken,
-    });
-
-    const createResponse = await fetch(
-      `https://graph.instagram.com/${encodeURIComponent(connection.igUserId)}/media`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: createBody,
-      },
-    );
-
-    const createData = await readJson<MetaIdResponse>(createResponse);
-
-    if (!createResponse.ok || !createData.id) {
-      throw new Error(
-        safeMetaMessage(
-          createData,
-          createResponse.status,
-          "Instagram medya kapsayıcısı oluşturulamadı",
-        ),
-      );
-    }
-
-    const containerId = createData.id;
-    let finished = false;
-
-    for (let attempt = 0; attempt < 10; attempt += 1) {
-      const statusUrl = new URL(
-        `https://graph.instagram.com/${encodeURIComponent(containerId)}`,
-      );
-      statusUrl.searchParams.set("fields", "status_code,status");
-      statusUrl.searchParams.set("access_token", connection.accessToken);
-
-      const statusResponse = await fetch(statusUrl);
-      const statusData = await readJson<MetaStatusResponse>(statusResponse);
-
-      if (!statusResponse.ok) {
-        throw new Error(
-          safeMetaMessage(
-            statusData,
-            statusResponse.status,
-            "Instagram medya durumu alınamadı",
-          ),
-        );
-      }
-
-      if (statusData.status_code === "FINISHED") {
-        finished = true;
-        break;
-      }
-
-      if (
-        statusData.status_code === "ERROR" ||
-        statusData.status_code === "EXPIRED"
-      ) {
-        throw new Error(
-          safeMetaValue(statusData.status) ||
-            `Instagram medya hazırlama durumu: ${statusData.status_code}`,
-        );
-      }
-
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-    }
-
-    if (!finished) {
-      throw new Error(
-        "Instagram medyayı zamanında hazırlayamadı. Birkaç saniye sonra yeniden deneyin.",
-      );
-    }
-
-    const publishBody = new URLSearchParams({
-      creation_id: containerId,
-      access_token: connection.accessToken,
-    });
-
-    const publishResponse = await fetch(
-      `https://graph.instagram.com/${encodeURIComponent(connection.igUserId)}/media_publish`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-        },
-        body: publishBody,
-      },
-    );
-
-    const publishData = await readJson<MetaIdResponse>(publishResponse);
-
-    if (!publishResponse.ok || !publishData.id) {
-      throw new Error(
-        safeMetaMessage(
-          publishData,
-          publishResponse.status,
-          "Instagram gönderisi yayınlanamadı",
-        ),
-      );
-    }
-
+    const mediaId = await publishByType(connection, publishRequest);
     await writeLog(db, {
-      villa,
+      villa: publishRequest.villa,
       username,
-      imageUrl,
-      caption,
-      mediaId: publishData.id,
+      mediaUrls: publishRequest.mediaUrls,
+      publishType: publishRequest.type,
+      caption: publishRequest.caption,
+      mediaId,
       status: "Yayınlandı",
     });
 
+    const typeLabel =
+      publishRequest.type === "CAROUSEL"
+        ? "Carousel"
+        : publishRequest.type === "REELS"
+          ? "Reels"
+          : "Fotoğraf";
+
     return Response.json({
       ok: true,
-      instagramMediaId: publishData.id,
+      type: publishRequest.type,
+      itemCount: publishRequest.mediaUrls.length,
+      instagramMediaId: mediaId,
       username,
-      message: "Instagram gönderisi başarıyla yayınlandı.",
+      message: "Instagram " + typeLabel + " gönderisi başarıyla yayınlandı.",
     });
   } catch (error) {
-    const message = safeUnexpectedMessage(error);
+    const message = safeInstagramError(error);
 
-    if (db && villa && imageUrl && caption) {
+    if (db && publishRequest) {
       try {
         await writeLog(db, {
-          villa,
+          villa: publishRequest.villa,
           username,
-          imageUrl,
-          caption,
+          mediaUrls: publishRequest.mediaUrls,
+          publishType: publishRequest.type,
+          caption: publishRequest.caption,
           status: "Hata",
           error: message,
         });
@@ -407,7 +467,8 @@ export async function POST(request: Request) {
     console.error(
       JSON.stringify({
         message: "instagram publish failed",
-        villa: villa ?? null,
+        villa: publishRequest?.villa ?? null,
+        publishType: publishRequest?.type ?? null,
         error: message,
       }),
     );
