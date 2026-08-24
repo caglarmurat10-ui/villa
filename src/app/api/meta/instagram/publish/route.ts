@@ -67,6 +67,37 @@ const VILLA_COLUMNS = ["villa", "villa_name", "property", "property_name"];
 const USERNAME_COLUMNS = ["username", "instagram_username", "ig_username"];
 const ORDER_COLUMNS = ["updated_at", "connected_at", "created_at", "id"];
 
+const CONNECTION_TABLES = [
+  "instagram_connections",
+  "instagram_connection",
+  "meta_connections",
+  "meta_connection",
+  "instagram_accounts",
+  "instagram_account",
+  "meta_instagram_connections",
+  "meta_instagram_accounts",
+  "social_connections",
+  "social_accounts",
+  "social_media_connections",
+  "social_media_accounts",
+  "connected_instagram_accounts",
+  "connected_accounts",
+  "oauth_connections",
+  "oauth_accounts",
+  "meta_accounts",
+  "social_integrations",
+  "integrations",
+  "integration_accounts",
+  "instagram_tokens",
+  "meta_tokens",
+  "settings",
+  "app_settings",
+  "social_settings",
+  "accounts",
+  "connections",
+] as const;
+
+
 function safeIdentifier(value: string) {
   return /^[A-Za-z_][A-Za-z0-9_]*$/.test(value);
 }
@@ -196,97 +227,116 @@ type Candidate = {
   tableScore: number;
 };
 
+function lowerKeyMap(row: Record<string, unknown>) {
+  const map = new Map<string, string>();
+  for (const key of Object.keys(row)) map.set(key.toLowerCase(), key);
+  return map;
+}
+
+function valueByNames(row: Record<string, unknown>, names: string[]) {
+  const map = lowerKeyMap(row);
+  for (const name of names) {
+    const actual = map.get(name.toLowerCase());
+    if (actual) return row[actual];
+  }
+  return undefined;
+}
+
+function tokenCandidatesFromRow(row: Record<string, unknown>) {
+  const tokens: string[] = [];
+  const seen = new Set<string>();
+
+  const push = (value: unknown) => {
+    const token = normalizeStoredToken(value);
+    if (!token || token.length < 20 || seen.has(token)) return;
+    seen.add(token);
+    tokens.push(token);
+  };
+
+  // Önce alan adı açıkça token/access belirten sütunlar.
+  for (const [key, value] of Object.entries(row)) {
+    const lower = key.toLowerCase();
+    if (lower.includes("token") || lower.includes("access")) push(value);
+  }
+
+  // Bazı sürümlerde bağlantı verisi JSON olarak tek kolonda tutulabilir.
+  for (const value of Object.values(row)) {
+    if (typeof value !== "string") continue;
+    const trimmed = value.trim();
+    if (!trimmed.startsWith("{")) continue;
+
+    try {
+      const parsed = JSON.parse(trimmed) as Record<string, unknown>;
+      for (const [key, nested] of Object.entries(parsed)) {
+        const lower = key.toLowerCase();
+        if (lower.includes("token") || lower.includes("access")) push(nested);
+      }
+    } catch {}
+  }
+
+  return tokens;
+}
+
 async function resolveConnection(
   db: D1DatabaseLike,
   villa: string,
 ): Promise<Connection> {
-  const tableResult = await db
-    .prepare(
-      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'",
-    )
-    .all<{ name: string }>();
+  const hint = requestedUsernameHint(villa).toLowerCase();
 
-  const tables = [...tableResult.results]
-    .filter((row) => safeIdentifier(row.name))
-    .sort((a, b) => tableScore(b.name) - tableScore(a.name));
+  type RuntimeCandidate = Candidate & {
+    table: string;
+  };
 
-  const candidates: Candidate[] = [];
+  const candidates: RuntimeCandidate[] = [];
+  const readableTables: string[] = [];
 
-  for (const table of tables) {
-    const info = await db
-      .prepare(`PRAGMA table_info(${q(table.name)})`)
-      .all<{ name: string }>();
-
-    const columns = info.results.map((row) => row.name);
-    const tokenColumn = firstColumn(columns, TOKEN_COLUMNS);
-    if (!tokenColumn) continue;
-
-    const usernameColumn = firstColumn(columns, USERNAME_COLUMNS);
-    const villaColumn = firstColumn(columns, VILLA_COLUMNS);
-    const orderColumn = firstColumn(columns, ORDER_COLUMNS);
-
-    const usernameSelect = usernameColumn
-      ? `${q(usernameColumn)} AS username`
-      : "NULL AS username";
-    const villaSelect = villaColumn
-      ? `${q(villaColumn)} AS villa`
-      : "NULL AS villa";
-    const orderClause = orderColumn
-      ? ` ORDER BY ${q(orderColumn)} DESC`
-      : "";
-
-    let rows: Array<{
-      access_token?: unknown;
-      username?: unknown;
-      villa?: unknown;
-    }> = [];
+  for (const table of CONNECTION_TABLES) {
+    let rows: Record<string, unknown>[] = [];
 
     try {
       const result = await db
-        .prepare(
-          `SELECT ${q(tokenColumn)} AS access_token,
-                  ${usernameSelect},
-                  ${villaSelect}
-           FROM ${q(table.name)}
-           ${orderClause}
-           LIMIT 50`,
-        )
-        .all<{
-          access_token?: unknown;
-          username?: unknown;
-          villa?: unknown;
-        }>();
+        .prepare(`SELECT * FROM "${table}" LIMIT 100`)
+        .all<Record<string, unknown>>();
 
       rows = result.results;
+      readableTables.push(table);
     } catch {
+      // Tablo yoksa veya bu isim kullanılmıyorsa sıradaki olası tabloya geç.
       continue;
     }
 
     for (const row of rows) {
-      const token = normalizeStoredToken(row.access_token);
-      if (!token) continue;
+      const storedUsernameValue = valueByNames(row, USERNAME_COLUMNS);
+      const storedVillaValue = valueByNames(row, VILLA_COLUMNS);
 
-      candidates.push({
-        token,
-        storedUsername:
-          row.username == null ? null : String(row.username).trim(),
-        storedVilla: row.villa == null ? null : String(row.villa).trim(),
-        tableScore: tableScore(table.name),
-      });
+      const storedUsername =
+        storedUsernameValue == null ? null : String(storedUsernameValue).trim();
+      const storedVilla =
+        storedVillaValue == null ? null : String(storedVillaValue).trim();
+
+      for (const token of tokenCandidatesFromRow(row)) {
+        candidates.push({
+          token,
+          storedUsername,
+          storedVilla,
+          tableScore: tableScore(table),
+          table,
+        });
+      }
     }
   }
 
-  const hint = requestedUsernameHint(villa).toLowerCase();
-
   candidates.sort((a, b) => {
-    function score(candidate: Candidate) {
+    function score(candidate: RuntimeCandidate) {
       let value = candidate.tableScore;
+
       if (
         candidate.storedVilla &&
         candidate.storedVilla.toLowerCase() === villa.toLowerCase()
       ) {
         value += 100;
       }
+
       if (
         hint &&
         candidate.storedUsername &&
@@ -294,8 +344,13 @@ async function resolveConnection(
       ) {
         value += 200;
       }
+
+      if (candidate.table.includes("instagram")) value += 30;
+      if (candidate.table.includes("meta")) value += 10;
+
       return value;
     }
+
     return score(b) - score(a);
   });
 
@@ -306,29 +361,18 @@ async function resolveConnection(
     if (seen.has(candidate.token)) continue;
     seen.add(candidate.token);
 
-    // Kontrolsüz çok sayıda dış istek oluşmasını engelle.
-    if (tested >= 20) break;
+    // Bir istekte sınırsız dış doğrulama yapılmasını engelle.
+    if (tested >= 25) break;
     tested += 1;
 
     const profile = await validateInstagramToken(candidate.token);
     if (!profile) continue;
 
-    const profileUsername = profile.username.toLowerCase();
+    const username = profile.username.toLowerCase();
 
-    if (hint && profileUsername !== hint) {
-      // Villa adıyla uyumlu başka bir hesap yanlışlıkla seçilmesin.
-      if (
-        villa === "Destan" &&
-        !profileUsername.includes("destan")
-      ) {
-        continue;
-      }
-      if (
-        villa === "Safira" &&
-        !profileUsername.includes("safira")
-      ) {
-        continue;
-      }
+    if (hint && username !== hint) {
+      if (villa === "Destan" && !username.includes("destan")) continue;
+      if (villa === "Safira" && !username.includes("safira")) continue;
     }
 
     return {
@@ -338,12 +382,20 @@ async function resolveConnection(
     };
   }
 
+  if (readableTables.length === 0) {
+    throw new Error(
+      "Instagram bağlantı tablosu bulunamadı. OAuth bağlantı kaydının tablo adı mevcut yayın sürümüyle eşleşmiyor.",
+    );
+  }
+
   if (candidates.length === 0) {
-    throw new Error(`${villa} için D1 içinde Instagram erişim anahtarı bulunamadı.`);
+    throw new Error(
+      `Instagram bağlantı kaydı bulundu ancak erişim anahtarı alanı bulunamadı. Okunan bağlantı tablosu sayısı: ${readableTables.length}.`,
+    );
   }
 
   throw new Error(
-    `${villa} için ${Math.min(seen.size, 20)} Instagram erişim anahtarı adayı kontrol edildi ancak Meta tarafından geçerli kabul edilen bir token bulunamadı. Hesabı Sosyal merkezden kaldırıp yeniden bağlayın.`,
+    `${villa} için ${Math.min(seen.size, 25)} erişim anahtarı adayı kontrol edildi ancak Meta geçerli bir Instagram tokenı kabul etmedi. Bağlantı kaydının token formatı düzeltilmeli.`,
   );
 }
 

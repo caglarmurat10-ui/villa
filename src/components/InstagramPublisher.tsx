@@ -121,7 +121,7 @@ export default function InstagramPublisher() {
           <span className={styles.eyebrow}>INSTAGRAM YAYIN MERKEZİ</span>
           <h1>Fotoğrafı seç, metni yaz, yayınla</h1>
           <p>
-            Fotoğraf Cloudflare R2&apos;ye yüklenir ve bağlı profesyonel Instagram
+            Fotoğraf Cloudflare Workers KV&apos;ye yüklenir ve bağlı profesyonel Instagram
             hesabına Meta API üzerinden yayınlanır.
           </p>
         </div>
