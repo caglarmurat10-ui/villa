@@ -28,5 +28,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="tr"><body><NavigationBridge />{children}<a className="social-shortcut" href="/sosyal">◎ Sosyal</a></body></html>;
+  return <html lang="tr"><body><NavigationBridge />{children}</body></html>;
 }

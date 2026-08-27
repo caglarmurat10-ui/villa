@@ -1,7 +1,8 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
-import type { PriceRange, Reservation, SocialPost, SocialPostStatus, Villa, VillaLocations } from "./types";
+import type { FinancialReservation, PriceRange, Reservation, SocialPost, SocialPostStatus, Villa, VillaLocations } from "./types";
 import type { ReservationInput, SocialPostInput } from "./schema";
+import { calculateReservationFinancials } from "./reservationFinancials";
 import { revalidateAvailabilityCampaigns } from "./socialOperationsDb";
 
 type ReservationRow = {
@@ -46,7 +47,17 @@ async function database(): Promise<D1Database> {
   return env.DB;
 }
 
-function mapRow(row: ReservationRow): Reservation {
+async function getCommissionRateFromDatabase(db: D1Database): Promise<number> {
+  const row = await db.prepare("SELECT value FROM settings WHERE key = 'commission_rate'").first<{ value: string }>();
+  const rate = Number(row?.value);
+  if (!row || !Number.isFinite(rate) || rate < 0 || rate > 100) {
+    throw new Error("Komisyon ayarı geçerli değil.");
+  }
+  return rate;
+}
+
+function mapRow(row: ReservationRow, commissionRate: number): FinancialReservation {
+  const financials = calculateReservationFinancials(row.total_amount, commissionRate);
   return {
     id: row.id,
     villa: row.villa,
@@ -56,7 +67,8 @@ function mapRow(row: ReservationRow): Reservation {
     checkOut: row.check_out,
     channel: row.channel,
     nightlyRate: row.nightly_rate,
-    totalAmount: row.total_amount,
+    totalAmount: financials.grossAmount,
+    ...financials,
     paidAmount: row.paid_amount,
     notes: row.notes,
     createdAt: row.created_at,
@@ -97,10 +109,11 @@ async function ensureSocialPostsTable(db: D1Database) {
   ]);
 }
 
-async function findReservation(id: string): Promise<Reservation | null> {
-  const db = await database();
+async function findReservation(id: string, existingDb?: D1Database, knownCommissionRate?: number): Promise<FinancialReservation | null> {
+  const db = existingDb ?? await database();
+  const commissionRate = knownCommissionRate ?? await getCommissionRateFromDatabase(db);
   const row = await db.prepare("SELECT * FROM reservations WHERE id = ? AND deleted_at IS NULL").bind(id).first<ReservationRow>();
-  return row ? mapRow(row) : null;
+  return row ? mapRow(row, commissionRate) : null;
 }
 
 export async function checkDatabase(): Promise<void> {
@@ -108,13 +121,14 @@ export async function checkDatabase(): Promise<void> {
   await db.prepare("SELECT 1").first();
 }
 
-export async function listReservations(): Promise<Reservation[]> {
+export async function listReservations(): Promise<FinancialReservation[]> {
   const db = await database();
+  const commissionRate = await getCommissionRateFromDatabase(db);
   const result = await db.prepare("SELECT * FROM reservations WHERE deleted_at IS NULL ORDER BY check_in ASC").all<ReservationRow>();
-  return result.results.map(mapRow);
+  return result.results.map((row) => mapRow(row, commissionRate));
 }
 
-export async function createReservation(input: ReservationInput): Promise<Reservation> {
+export async function createReservation(input: ReservationInput): Promise<FinancialReservation> {
   const db = await database();
   const overlap = await db.prepare(`
     SELECT id FROM reservations
@@ -122,13 +136,18 @@ export async function createReservation(input: ReservationInput): Promise<Reserv
   `).bind(input.villa, input.checkOut, input.checkIn).first();
   if (overlap) throw new Error("Bu tarihlerde villa için başka bir rezervasyon var.");
 
-  const quote = await calculatePrice(input.villa, input.checkIn, input.checkOut);
+  const quote = await calculateReservationQuoteFromDatabase(db, input.villa, input.checkIn, input.checkOut);
+  if (input.paidAmount > quote.grossAmount) throw new Error("Alınan ödeme toplam tutardan büyük olamaz.");
   const now = new Date().toISOString();
-  const reservation: Reservation = {
+  const reservation: FinancialReservation = {
     id: crypto.randomUUID(),
     ...input,
     nightlyRate: quote.averageRate,
-    totalAmount: quote.total,
+    totalAmount: quote.grossAmount,
+    grossAmount: quote.grossAmount,
+    commissionRate: quote.commissionRate,
+    commissionAmount: quote.commissionAmount,
+    netAmount: quote.netAmount,
     createdAt: now,
     updatedAt: now,
   };
@@ -154,8 +173,7 @@ export async function createReservation(input: ReservationInput): Promise<Reserv
 
 export async function getCommissionRate(): Promise<number> {
   const db = await database();
-  const row = await db.prepare("SELECT value FROM settings WHERE key = 'commission_rate'").first<{ value: string }>();
-  return Number(row?.value ?? 10);
+  return getCommissionRateFromDatabase(db);
 }
 
 export async function setCommissionRate(rate: number): Promise<number> {
@@ -190,6 +208,10 @@ export async function setVillaLocations(locations: VillaLocations): Promise<Vill
 
 export async function listPriceRanges(): Promise<PriceRange[]> {
   const db = await database();
+  return listPriceRangesFromDatabase(db);
+}
+
+async function listPriceRangesFromDatabase(db: D1Database): Promise<PriceRange[]> {
   const result = await db.prepare("SELECT id, villa, start_date, end_date, nightly_rate FROM price_ranges ORDER BY villa, start_date").all<PriceRangeRow>();
   return result.results.map((row) => ({
     id: row.id,
@@ -218,7 +240,12 @@ export async function deletePriceRange(id: string): Promise<boolean> {
 }
 
 export async function calculatePrice(villa: Villa, checkIn: string, checkOut: string) {
-  const ranges = (await listPriceRanges()).filter((range) => range.villa === villa);
+  const db = await database();
+  return calculatePriceFromDatabase(db, villa, checkIn, checkOut);
+}
+
+async function calculatePriceFromDatabase(db: D1Database, villa: Villa, checkIn: string, checkOut: string) {
+  const ranges = (await listPriceRangesFromDatabase(db)).filter((range) => range.villa === villa);
   let total = 0;
   let nights = 0;
   for (let cursor = new Date(`${checkIn}T00:00:00Z`); cursor < new Date(`${checkOut}T00:00:00Z`); cursor.setUTCDate(cursor.getUTCDate() + 1)) {
@@ -230,6 +257,19 @@ export async function calculatePrice(villa: Villa, checkIn: string, checkOut: st
   }
   if (!nights) throw new Error("Geçerli bir konaklama tarihi seçin.");
   return { total, nights, averageRate: total / nights };
+}
+
+async function calculateReservationQuoteFromDatabase(db: D1Database, villa: Villa, checkIn: string, checkOut: string) {
+  const [price, commissionRate] = await Promise.all([
+    calculatePriceFromDatabase(db, villa, checkIn, checkOut),
+    getCommissionRateFromDatabase(db),
+  ]);
+  return { ...price, ...calculateReservationFinancials(price.total, commissionRate) };
+}
+
+export async function calculateReservationQuote(villa: Villa, checkIn: string, checkOut: string) {
+  const db = await database();
+  return calculateReservationQuoteFromDatabase(db, villa, checkIn, checkOut);
 }
 
 export async function softDeleteReservation(id: string): Promise<boolean> {
@@ -244,24 +284,27 @@ export async function softDeleteReservation(id: string): Promise<boolean> {
   return true;
 }
 
-export async function updateReservation(id: string, input: ReservationInput): Promise<Reservation> {
+export async function updateReservation(id: string, input: ReservationInput): Promise<FinancialReservation> {
   const db = await database();
-  const current = await findReservation(id);
+  const commissionRate = await getCommissionRateFromDatabase(db);
+  const current = await findReservation(id, db, commissionRate);
   if (!current) throw new Error("Rezervasyon bulunamadı.");
   const overlap = await db.prepare(`
     SELECT id FROM reservations
     WHERE villa = ? AND id != ? AND deleted_at IS NULL AND check_in < ? AND check_out > ? LIMIT 1
   `).bind(input.villa, id, input.checkOut, input.checkIn).first();
   if (overlap) throw new Error("Bu tarihlerde villa için başka bir rezervasyon var.");
-  const quote = await calculatePrice(input.villa, input.checkIn, input.checkOut);
-  if (input.paidAmount > quote.total) throw new Error("Alınan ödeme toplam tutardan büyük olamaz.");
+  const price = await calculatePriceFromDatabase(db, input.villa, input.checkIn, input.checkOut);
+  const quote = { ...price, ...calculateReservationFinancials(price.total, commissionRate) };
+  if (input.paidAmount > quote.grossAmount) throw new Error("Alınan ödeme toplam tutardan büyük olamaz.");
   const now = new Date().toISOString();
   await db.batch([
     db.prepare(`UPDATE reservations SET villa=?, guest_name=?, phone=?, check_in=?, check_out=?, channel=?, nightly_rate=?, total_amount=?, paid_amount=?, notes=?, updated_at=? WHERE id=?`)
       .bind(input.villa, input.guestName, input.phone, input.checkIn, input.checkOut,
-        input.channel, quote.averageRate, quote.total, input.paidAmount, input.notes, now, id),
+        input.channel, quote.averageRate, quote.grossAmount, input.paidAmount, input.notes, now, id),
     db.prepare("INSERT INTO audit_log (entity_id, action, payload, created_at) VALUES (?, 'UPDATE', ?, ?)")
-      .bind(id, JSON.stringify(input), now),
+      .bind(id, JSON.stringify({ ...input, nightlyRate: quote.averageRate, totalAmount: quote.grossAmount,
+        commissionRate: quote.commissionRate, commissionAmount: quote.commissionAmount, netAmount: quote.netAmount }), now),
   ]);
   for (const villa of new Set([current.villa, input.villa])) {
     try {
@@ -270,10 +313,10 @@ export async function updateReservation(id: string, input: ReservationInput): Pr
       console.error(JSON.stringify({ message: "social availability revalidation failed", action: "update", villa }));
     }
   }
-  return (await findReservation(id))!;
+  return (await findReservation(id, db, commissionRate))!;
 }
 
-export async function updateReservationPhone(id: string, phone: string): Promise<Reservation> {
+export async function updateReservationPhone(id: string, phone: string): Promise<FinancialReservation> {
   const db = await database();
   const current = await findReservation(id);
   if (!current) throw new Error("Rezervasyon bulunamadı.");
@@ -288,7 +331,7 @@ export async function updateReservationPhone(id: string, phone: string): Promise
   return (await findReservation(id))!;
 }
 
-export async function updatePayment(id: string, paidAmount: number): Promise<Reservation> {
+export async function updatePayment(id: string, paidAmount: number): Promise<FinancialReservation> {
   const db = await database();
   const row = await db.prepare("SELECT total_amount FROM reservations WHERE id = ? AND deleted_at IS NULL")
     .bind(id).first<{ total_amount: number }>();

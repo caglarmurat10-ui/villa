@@ -1,3 +1,5 @@
+import type { ReservationFinancials } from "./reservationFinancials";
+
 export type Villa = "Safira" | "Destan";
 export type Channel = "Doğrudan" | "Booking" | "Airbnb" | "Diğer";
 export type VillaLocations = Record<Villa, string>;
@@ -20,6 +22,8 @@ export interface Reservation {
   createdAt: string;
   updatedAt: string;
 }
+
+export type FinancialReservation = Reservation & ReservationFinancials;
 
 export interface PriceRange {
   id: string;

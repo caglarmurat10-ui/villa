@@ -1,2 +1,3 @@
 .form-panel label:has(input[name="phone"]){display:none!important}
 .message-shortcut{display:none!important}
+.main-menu button:nth-child(3){display:flex!important}
