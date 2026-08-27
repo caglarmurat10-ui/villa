@@ -13,7 +13,7 @@ import aiStyles from "./AiContentStudio.module.css";
 const styles = { ...baseStyles, ...aiStyles };
 
 type SettingItem = { settings: AiSocialSettings; profile: VillaAiProfile; systemFlags: { image: boolean; video: boolean } };
-type TodayItem = { villa: Villa; category: string; suggestion: string; reason: string; enabled: boolean; autopilotLevel: string };
+type TodayItem = { villa: Villa; category: string; suggestion: string; reason: string; enabled: boolean; autopilotLevel: string; historyAvailable?: boolean };
 type Usage = { service?: string; operation?: string; model?: string; villa?: Villa; calls?: number; estimated_units?: number };
 type ResearchIdea = { id?: string; topic?: string; summary?: string; content_angle?: string; sourceUrls?: string[]; sourceTitles?: string[]; expires_at?: string };
 
@@ -55,16 +55,30 @@ export default function AiContentStudio() {
   const [pexelsResults, setPexelsResults] = useState<PexelsResult[]>([]);
   const [imagePrompt, setImagePrompt] = useState("Patara temalı zarif yaz tatili duyurusu");
   const [notice, setNotice] = useState("");
+  const [loadWarnings, setLoadWarnings] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
-    const responses = await Promise.all([fetch("/api/social/ai/settings"), fetch("/api/social/ai/today"), fetch("/api/social/ai/research")]);
-    if (responses.some((response) => response.status === 401)) { setAuthenticated(false); return; }
-    const [settings, suggestions, research] = await Promise.all(responses.map(data));
-    if (settings.configuration) setConfiguration(settings.configuration as AiConfigurationStatus);
-    setSettingItems((settings.items as SettingItem[]) ?? []); setUsage((settings.usage as Usage[]) ?? []);
-    setToday((suggestions.items as TodayItem[]) ?? []); setResearchIdeas((research.items as ResearchIdea[]) ?? []);
-    setAuthenticated(true);
+    const endpoints = ["/api/social/ai/settings", "/api/social/ai/today", "/api/social/ai/research"] as const;
+    const results = await Promise.allSettled(endpoints.map(async (endpoint) => {
+      const response = await fetch(endpoint); return { response, body: await data(response) };
+    }));
+    if (results.some((result) => result.status === "fulfilled" && result.value.response.status === 401)) {
+      setAuthenticated(false); return;
+    }
+    const section = (index: number) => {
+      const result = results[index]; return result?.status === "fulfilled" && result.value.response.ok ? result.value.body : null;
+    };
+    const settings = section(0), suggestions = section(1), research = section(2);
+    const warnings = [
+      ...(settings ? (settings.warnings as string[] | undefined) ?? [] : ["AI ayarları şu anda yüklenemedi. Lütfen yeniden deneyin."]),
+      ...(suggestions ? (suggestions.warnings as string[] | undefined) ?? [] : ["İçerik geçmişi şu anda yüklenemedi. İçerik üretmeye devam edebilirsiniz."]),
+      ...(research ? (research.warnings as string[] | undefined) ?? [] : ["Bölgesel fikirler şu anda yüklenemedi. İçerik üretmeye devam edebilirsiniz."]),
+    ];
+    if (settings?.configuration) setConfiguration(settings.configuration as AiConfigurationStatus);
+    setSettingItems((settings?.items as SettingItem[]) ?? []); setUsage((settings?.usage as Usage[]) ?? []);
+    setToday((suggestions?.items as TodayItem[]) ?? []); setResearchIdeas((research?.items as ResearchIdea[]) ?? []);
+    setLoadWarnings([...new Set(warnings)]); setAuthenticated(true);
   }, []);
 
   useEffect(() => { void fetch("/api/social/ai/session").then(data).then((result) => {
@@ -142,6 +156,7 @@ export default function AiContentStudio() {
   return <main className={styles.page}><div className={styles.shell}><SocialNav/>
     <section className={styles.hero}><div><span className={styles.eyebrow}>AI İÇERİK STÜDYOSU</span><h1>Fikirden kontrollü taslağa</h1><p>Doğrulanmış villa bilgisi, gerçek içerik geçmişi ve kaynaklı bölge araştırması kullanılır. AI kendi kendine yayın yapmaz.</p></div><div className={styles.statusStack}><span>Metin: kullanıcı isteğiyle</span><span>Görsel: varsayılan kapalı</span><span>Video: mimari hazır, çağrı kapalı</span></div></section>
     {configuration ? <AiStatus configuration={configuration}/> : null}
+    {loadWarnings.map((warning)=><p className={styles.notice} key={warning}>{warning}</p>)}
     {notice ? <p className={styles.message}>{notice}</p> : null}
     <section className={styles.panel}><div className={styles.panelHead}><div><span className={styles.eyebrow}>BUGÜN NE PAYLAŞALIM?</span><h2>İçerik geçmişine dayalı öneriler</h2></div></div><div className={styles.grid}>{today.map((item)=><article className={styles.ideaCard} key={item.villa}><strong>Villa {item.villa}</strong><p>{item.suggestion}</p><small>Neden: {item.reason}</small><span>AI autopilot: {item.autopilotLevel === "off" ? "Kapalı" : item.autopilotLevel}</span></article>)}</div></section>
     <section className={styles.panel}><div className={styles.panelHead}><div><span className={styles.eyebrow}>İÇERİK ÜRET</span><h2>Caption, Carousel, Reels ve haftalık plan</h2></div></div><div className={styles.fields}>

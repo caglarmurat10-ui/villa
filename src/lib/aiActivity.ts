@@ -1,6 +1,6 @@
 import { generateAiContent, todaySuggestion } from "./aiContentStudio";
 import { hasOpenAiConfiguration } from "./aiConfiguration";
-import { ensureAiTables, getAiSettings, type AiSocialSettings } from "./aiDb";
+import { getAiSettings, type AiSocialSettings } from "./aiDb";
 import { availabilityPriceText, createCampaign, getSocialSettings, listAvailability, suggestLibraryMedia } from "./socialOperationsDb";
 import type { AiPurpose } from "./aiTypes";
 import type { Villa } from "./types";
@@ -37,7 +37,6 @@ export async function runAiContentActivity(env: CloudflareEnv, now = new Date())
   if (!hasOpenAiConfiguration(env)) {
     return (["Destan", "Safira"] as const).map((villa) => ({ villa, status: "unconfigured" }));
   }
-  await ensureAiTables(env.DB);
   for (const villa of ["Destan", "Safira"] as const) {
     try {
       const settings = await getAiSettings(env.DB, villa);

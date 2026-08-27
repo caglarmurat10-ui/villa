@@ -1,5 +1,6 @@
 import { requireAiAdmin } from "@/lib/aiAdminSession";
 import { hasAiAdminConfiguration, hasOpenAiConfiguration, integrationUnavailableResponse } from "@/lib/aiConfiguration";
+import { publicAiError } from "@/lib/aiD1";
 import { generateAiContent } from "@/lib/aiContentStudio";
 import { AI_MODES, AI_PURPOSES, type AiMode, type AiPurpose } from "@/lib/aiTypes";
 import { availabilityPriceText, getSocialSettings, listAvailability, socialOperationsDb } from "@/lib/socialOperationsDb";
@@ -34,6 +35,6 @@ export async function POST(request: Request) {
       weekly: body.weekly === true });
     return Response.json(result, { status: 201 });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "AI içerik üretilemedi." }, { status: 400 });
+    return Response.json({ error: publicAiError(error, "AI içerik üretilemedi. Lütfen yeniden deneyin.") }, { status: 400 });
   }
 }

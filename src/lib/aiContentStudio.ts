@@ -4,6 +4,7 @@ import {
   getAiSettings,
   getVillaAiProfile,
   recentAiContext,
+  recentAiTopics,
   saveAiHistory,
   saveRegionalIdea,
   saveWeeklyPlan,
@@ -65,8 +66,11 @@ export function chooseTodayCategory(
 }
 
 export async function todaySuggestion(db: D1Database, villa: Villa) {
-  const [settings, context] = await Promise.all([getAiSettings(db, villa), recentAiContext(db, villa)]);
-  const recentCategories = context.history.map((item) => String(item.topic ?? ""));
+  const settings = await getAiSettings(db, villa);
+  let recentCategories: string[] = [];
+  let historyAvailable = true;
+  try { recentCategories = await recentAiTopics(db, villa); }
+  catch { historyAvailable = false; }
   const category = chooseTodayCategory(settings.contentMix, recentCategories);
   const labels: Record<string, string> = {
     villa: "Villanın doğrulanmış özelliklerinden birini anlatın",
@@ -79,7 +83,13 @@ export async function todaySuggestion(db: D1Database, villa: Villa) {
     ? `${category} kategorisi son içeriklerde hedef dağılımının altında kaldı.`
     : "Henüz AI içerik geçmişi yok; dengeli bir başlangıç önerisi hazırlandı.";
   return { villa, category, suggestion: labels[category], reason, aiCallMade: false,
-    enabled: settings.aiEnabled, autopilotLevel: settings.autopilotLevel };
+    enabled: settings.aiEnabled, autopilotLevel: settings.autopilotLevel, historyAvailable };
+}
+
+export function fallbackTodaySuggestion(villa: Villa) {
+  return { villa, category: "villa", suggestion: "Villanın doğrulanmış özelliklerinden birini anlatın",
+    reason: "Öneri verisi şu anda yüklenemedi; güvenli başlangıç fikri gösteriliyor.", aiCallMade: false,
+    enabled: false, autopilotLevel: "off", historyAvailable: false } as const;
 }
 
 export async function generateAiContent(input: {

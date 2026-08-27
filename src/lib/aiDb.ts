@@ -1,5 +1,6 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import type { AiContentOutput, RegionalResearchOutput, VillaAiProfile } from "./aiTypes";
+import { readAiD1 } from "./aiD1";
 import { hashCaption } from "./social-rules";
 import type { Villa } from "./types";
 
@@ -38,33 +39,12 @@ function objectJson<T>(value: string, fallback: T): T {
   catch { return fallback; }
 }
 
-export async function ensureAiTables(db: D1Database) {
-  await db.batch([
-    db.prepare(`CREATE TABLE IF NOT EXISTS villa_ai_profiles (villa TEXT PRIMARY KEY,facts_json TEXT NOT NULL DEFAULT '[]',
-      prohibited_claims_json TEXT NOT NULL DEFAULT '[]',tone TEXT NOT NULL DEFAULT 'warm',updated_at TEXT NOT NULL)`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS ai_social_settings (villa TEXT PRIMARY KEY,ai_enabled INTEGER NOT NULL DEFAULT 0,
-      daily_text_limit INTEGER NOT NULL DEFAULT 5,daily_research_limit INTEGER NOT NULL DEFAULT 2,image_enabled INTEGER NOT NULL DEFAULT 0,
-      video_enabled INTEGER NOT NULL DEFAULT 0,autopilot_level TEXT NOT NULL DEFAULT 'off',content_mix_json TEXT NOT NULL,updated_at TEXT NOT NULL)`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS regional_content_ideas (id TEXT PRIMARY KEY,region TEXT NOT NULL,topic TEXT NOT NULL,
-      title TEXT NOT NULL,summary TEXT NOT NULL,content_angle TEXT NOT NULL,source_urls_json TEXT NOT NULL DEFAULT '[]',
-      source_titles_json TEXT NOT NULL DEFAULT '[]',content_ideas_json TEXT NOT NULL DEFAULT '[]',event_date TEXT,status TEXT NOT NULL DEFAULT 'new',
-      relevance_score INTEGER NOT NULL DEFAULT 0,freshness_score INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL,expires_at TEXT NOT NULL,used_at TEXT)`),
-    db.prepare(`CREATE INDEX IF NOT EXISTS regional_content_topic_idx ON regional_content_ideas(region,topic,status,expires_at DESC)`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS ai_content_history (id TEXT PRIMARY KEY,villa TEXT NOT NULL,content_type TEXT NOT NULL,
-      topic TEXT NOT NULL,template_style TEXT NOT NULL,caption_hash TEXT NOT NULL,media_category TEXT,output_json TEXT NOT NULL,
-      source_urls_json TEXT NOT NULL DEFAULT '[]',status TEXT NOT NULL DEFAULT 'draft',created_at TEXT NOT NULL,published_at TEXT,performance_summary TEXT)`),
-    db.prepare(`CREATE INDEX IF NOT EXISTS ai_content_history_recent_idx ON ai_content_history(villa,created_at DESC)`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS ai_weekly_plans (id TEXT PRIMARY KEY,villa TEXT NOT NULL,week_start TEXT NOT NULL,
-      plan_json TEXT NOT NULL,status TEXT NOT NULL DEFAULT 'draft',created_at TEXT NOT NULL,updated_at TEXT NOT NULL,UNIQUE(villa,week_start))`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS ai_usage_log (id TEXT PRIMARY KEY,service TEXT NOT NULL,operation TEXT NOT NULL,
-      model TEXT NOT NULL,villa TEXT,daily_key TEXT NOT NULL,estimated_units INTEGER NOT NULL DEFAULT 0,success INTEGER NOT NULL DEFAULT 0,created_at TEXT NOT NULL)`),
-    db.prepare(`CREATE INDEX IF NOT EXISTS ai_usage_daily_idx ON ai_usage_log(daily_key,service,operation,villa)`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS ai_service_state (service TEXT PRIMARY KEY,failure_count INTEGER NOT NULL DEFAULT 0,
-      open_until TEXT,last_failure_at TEXT,updated_at TEXT NOT NULL)`),
-    db.prepare(`CREATE TABLE IF NOT EXISTS social_media_provenance (media_id TEXT PRIMARY KEY,source TEXT NOT NULL,
-      photographer TEXT,photographer_url TEXT,source_url TEXT,source_id TEXT,search_query TEXT,license_source TEXT,
-      ai_generated INTEGER NOT NULL DEFAULT 0,geographic_claim TEXT,created_at TEXT NOT NULL)`),
-  ]);
+export function defaultAiSettings(villa: Villa): AiSocialSettings {
+  return { villa, ...DEFAULT_AI_SETTINGS, contentMix: { ...DEFAULT_AI_SETTINGS.contentMix } };
+}
+
+export function defaultVillaAiProfile(villa: Villa): VillaAiProfile {
+  return { villa, facts: ["Patara / Kaş bölgesinde konaklama"], prohibitedClaims: [], tone: "warm" };
 }
 
 export function dailyKey(now = new Date()) {
@@ -72,9 +52,10 @@ export function dailyKey(now = new Date()) {
 }
 
 export async function getAiSettings(db: D1Database, villa: Villa): Promise<AiSocialSettings> {
-  await ensureAiTables(db);
-  const row = await db.prepare("SELECT * FROM ai_social_settings WHERE villa=?").bind(villa).first<SettingsRow>();
-  if (!row) return { villa, ...DEFAULT_AI_SETTINGS };
+  const row = await readAiD1("ai-settings", () => db.prepare(`SELECT villa,ai_enabled,daily_text_limit,daily_research_limit,
+    image_enabled,video_enabled,autopilot_level,content_mix_json FROM ai_social_settings WHERE villa=?`)
+    .bind(villa).first<SettingsRow>());
+  if (!row) return defaultAiSettings(villa);
   return { villa, aiEnabled: row.ai_enabled === 1, dailyTextLimit: row.daily_text_limit,
     dailyResearchLimit: row.daily_research_limit, imageEnabled: row.image_enabled === 1,
     videoEnabled: row.video_enabled === 1, autopilotLevel: row.autopilot_level,
@@ -87,7 +68,6 @@ export async function saveAiSettings(db: D1Database, input: AiSocialSettings) {
   if (input.dailyTextLimit < 0 || input.dailyTextLimit > 100 || input.dailyResearchLimit < 0 || input.dailyResearchLimit > 50) {
     throw new Error("AI günlük limitleri geçersiz.");
   }
-  await ensureAiTables(db);
   await db.prepare(`INSERT INTO ai_social_settings
     (villa,ai_enabled,daily_text_limit,daily_research_limit,image_enabled,video_enabled,autopilot_level,content_mix_json,updated_at)
     VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(villa) DO UPDATE SET ai_enabled=excluded.ai_enabled,
@@ -99,14 +79,14 @@ export async function saveAiSettings(db: D1Database, input: AiSocialSettings) {
 }
 
 export async function getVillaAiProfile(db: D1Database, villa: Villa): Promise<VillaAiProfile> {
-  await ensureAiTables(db);
-  const row = await db.prepare("SELECT * FROM villa_ai_profiles WHERE villa=?").bind(villa).first<ProfileRow>();
+  const row = await readAiD1("ai-settings", () => db.prepare(
+    "SELECT villa,facts_json,prohibited_claims_json,tone FROM villa_ai_profiles WHERE villa=?",
+  ).bind(villa).first<ProfileRow>());
   return row ? { villa, facts: stringArray(row.facts_json), prohibitedClaims: stringArray(row.prohibited_claims_json), tone: row.tone }
-    : { villa, facts: ["Patara / Kaş bölgesinde konaklama"], prohibitedClaims: [], tone: "warm" };
+    : defaultVillaAiProfile(villa);
 }
 
 export async function saveVillaAiProfile(db: D1Database, input: VillaAiProfile) {
-  await ensureAiTables(db);
   const facts = [...new Set(input.facts.map((item) => item.trim()).filter(Boolean))].slice(0, 50);
   const prohibited = [...new Set(input.prohibitedClaims.map((item) => item.trim()).filter(Boolean))].slice(0, 50);
   await db.prepare(`INSERT INTO villa_ai_profiles(villa,facts_json,prohibited_claims_json,tone,updated_at)
@@ -120,35 +100,35 @@ export async function assertAiBudget(db: D1Database, villa: Villa, operation: "t
   const settings = await getAiSettings(db, villa);
   if (!settings.aiEnabled) throw new Error("AI bu villa için kapalı.");
   const service = operation === "research" ? "openai-web" : operation === "image" ? "openai-image" : "openai-text";
-  const row = await db.prepare("SELECT COUNT(*) AS count FROM ai_usage_log WHERE daily_key=? AND villa=? AND service=?")
-    .bind(dailyKey(now), villa, service).first<{ count: number }>();
+  const row = await readAiD1("usage", () => db.prepare(
+    "SELECT COUNT(*) AS count FROM ai_usage_log WHERE daily_key=? AND villa=? AND service=?",
+  ).bind(dailyKey(now), villa, service).first<{ count: number }>());
   const limit = operation === "research" ? settings.dailyResearchLimit : settings.dailyTextLimit;
   if ((row?.count ?? 0) >= limit) throw new Error("Günlük AI kullanım limiti doldu.");
   return { settings, used: row?.count ?? 0, limit };
 }
 
 export async function logAiUsage(db: D1Database, input: { service: string; operation: string; model: string; villa: Villa | null; estimatedUnits: number; success: boolean }, now = new Date()) {
-  await ensureAiTables(db);
   await db.prepare(`INSERT INTO ai_usage_log(id,service,operation,model,villa,daily_key,estimated_units,success,created_at)
     VALUES (?,?,?,?,?,?,?,?,?)`).bind(crypto.randomUUID(), input.service, input.operation, input.model, input.villa,
       dailyKey(now), Math.max(0, Math.round(input.estimatedUnits)), Number(input.success), now.toISOString()).run();
 }
 
 export async function aiCircuitOpen(db: D1Database, service: string, now = new Date()) {
-  await ensureAiTables(db);
-  const row = await db.prepare("SELECT open_until FROM ai_service_state WHERE service=?").bind(service).first<{ open_until: string | null }>();
+  const row = await readAiD1("usage", () => db.prepare("SELECT open_until FROM ai_service_state WHERE service=?")
+    .bind(service).first<{ open_until: string | null }>());
   return Boolean(row?.open_until && Date.parse(row.open_until) > now.getTime());
 }
 
 export async function recordAiServiceResult(db: D1Database, service: string, success: boolean, now = new Date()) {
-  await ensureAiTables(db);
   if (success) {
     await db.prepare(`INSERT INTO ai_service_state(service,failure_count,open_until,last_failure_at,updated_at)
       VALUES (?,0,NULL,NULL,?) ON CONFLICT(service) DO UPDATE SET failure_count=0,open_until=NULL,updated_at=excluded.updated_at`)
       .bind(service, now.toISOString()).run();
     return;
   }
-  const current = await db.prepare("SELECT failure_count FROM ai_service_state WHERE service=?").bind(service).first<{ failure_count: number }>();
+  const current = await readAiD1("usage", () => db.prepare("SELECT failure_count FROM ai_service_state WHERE service=?")
+    .bind(service).first<{ failure_count: number }>());
   const failures = (current?.failure_count ?? 0) + 1;
   const openUntil = failures >= 3 ? new Date(now.getTime() + 15 * 60 * 1000).toISOString() : null;
   await db.prepare(`INSERT INTO ai_service_state(service,failure_count,open_until,last_failure_at,updated_at)
@@ -158,7 +138,6 @@ export async function recordAiServiceResult(db: D1Database, service: string, suc
 }
 
 export async function saveAiHistory(db: D1Database, input: { villa: Villa; purpose: string; mode: string; mediaCategory: string | null; output: AiContentOutput; sourceUrls?: string[] }) {
-  await ensureAiTables(db);
   const id = crypto.randomUUID();
   await db.prepare(`INSERT INTO ai_content_history
     (id,villa,content_type,topic,template_style,caption_hash,media_category,output_json,source_urls_json,status,created_at)
@@ -169,20 +148,30 @@ export async function saveAiHistory(db: D1Database, input: { villa: Villa; purpo
 }
 
 export async function recentAiContext(db: D1Database, villa: Villa) {
-  await ensureAiTables(db);
-  const history = await db.prepare(`SELECT content_type,topic,template_style,caption_hash,media_category,output_json,
-    performance_summary,created_at FROM ai_content_history WHERE villa=? ORDER BY created_at DESC LIMIT 20`)
-    .bind(villa).all<Record<string, unknown>>();
-  const performance = await db.prepare(`SELECT media_type,metrics_json FROM instagram_media_insights WHERE villa=?
-    AND published_at>=? ORDER BY published_at DESC LIMIT 30`).bind(villa, new Date(Date.now() - 30 * 86_400_000).toISOString())
-    .all<Record<string, unknown>>();
+  const [history, performance] = await Promise.all([
+    readAiD1("ai-history", () => db.prepare(`SELECT content_type,topic,template_style,caption_hash,media_category,
+      performance_summary,created_at FROM ai_content_history WHERE villa=? ORDER BY created_at DESC LIMIT ?`)
+      .bind(villa, 20).all<Record<string, unknown>>()).catch(() => ({ results: [] })),
+    readAiD1("ai-history", () => db.prepare(`SELECT media_type,metrics_json FROM instagram_media_insights WHERE villa=?
+      AND published_at>=? ORDER BY published_at DESC LIMIT ?`).bind(villa,
+      new Date(Date.now() - 30 * 86_400_000).toISOString(), 20).all<Record<string, unknown>>()).catch(() => ({ results: [] })),
+  ]);
   return { history: history.results, aggregatePerformance: performance.results };
 }
 
+export async function recentAiTopics(db: D1Database, villa: Villa, limit = 20) {
+  const boundedLimit = Math.min(20, Math.max(1, Math.floor(limit)));
+  const result = await readAiD1("ai-history", () => db.prepare(
+    "SELECT topic FROM ai_content_history WHERE villa=? ORDER BY created_at DESC LIMIT ?",
+  ).bind(villa, boundedLimit).all<{ topic: string }>());
+  return result.results.slice(0, boundedLimit).map((row) => row.topic);
+}
+
 export async function cachedRegionalIdea(db: D1Database, region: string, topic: string, now = new Date()) {
-  await ensureAiTables(db);
-  return db.prepare(`SELECT * FROM regional_content_ideas WHERE region=? AND topic=? AND status NOT IN ('ignored','expired')
-    AND expires_at>? ORDER BY created_at DESC LIMIT 1`).bind(region, topic, now.toISOString()).first<Record<string, unknown>>();
+  return readAiD1("regional-ideas", () => db.prepare(`SELECT topic,summary,content_angle,source_urls_json,source_titles_json,
+    content_ideas_json,event_date,expires_at,relevance_score,freshness_score FROM regional_content_ideas
+    WHERE region=? AND topic=? AND status NOT IN ('ignored','expired') AND expires_at>?
+    ORDER BY expires_at DESC,created_at DESC LIMIT 1`).bind(region, topic, now.toISOString()).first<Record<string, unknown>>());
 }
 
 export async function saveRegionalIdea(db: D1Database, result: RegionalResearchOutput, region: string) {
@@ -197,8 +186,9 @@ export async function saveRegionalIdea(db: D1Database, result: RegionalResearchO
 }
 
 export async function listRegionalIdeas(db: D1Database) {
-  await ensureAiTables(db);
-  const result = await db.prepare("SELECT * FROM regional_content_ideas ORDER BY created_at DESC LIMIT 100").all<Record<string, unknown>>();
+  const result = await readAiD1("regional-ideas", () => db.prepare(`SELECT id,topic,summary,content_angle,source_urls_json,
+    source_titles_json,content_ideas_json,expires_at,created_at FROM regional_content_ideas ORDER BY created_at DESC LIMIT ?`)
+    .bind(50).all<Record<string, unknown>>());
   return result.results.map((row) => ({ ...row,
     sourceUrls: typeof row.source_urls_json === "string" ? stringArray(row.source_urls_json) : [],
     sourceTitles: typeof row.source_titles_json === "string" ? stringArray(row.source_titles_json) : [],
@@ -207,23 +197,26 @@ export async function listRegionalIdeas(db: D1Database) {
 }
 
 export async function saveWeeklyPlan(db: D1Database, villa: Villa, weekStart: string, output: AiContentOutput) {
-  await ensureAiTables(db); const now = new Date().toISOString(); const id = crypto.randomUUID();
+  const now = new Date().toISOString(); const id = crypto.randomUUID();
   await db.prepare(`INSERT INTO ai_weekly_plans(id,villa,week_start,plan_json,status,created_at,updated_at)
     VALUES (?,?,?,?,'draft',?,?) ON CONFLICT(villa,week_start) DO UPDATE SET plan_json=excluded.plan_json,
       status='draft',updated_at=excluded.updated_at`).bind(id, villa, weekStart, JSON.stringify(output.weeklyPlan), now, now).run();
 }
 
 export async function aiUsageSummary(db: D1Database, now = new Date()) {
-  await ensureAiTables(db); const month = dailyKey(now).slice(0, 7);
-  const result = await db.prepare(`SELECT service,operation,model,villa,COUNT(*) AS calls,SUM(estimated_units) AS estimated_units
-    FROM ai_usage_log WHERE daily_key LIKE ? GROUP BY service,operation,model,villa ORDER BY calls DESC`).bind(`${month}%`).all();
+  const month = dailyKey(now).slice(0, 7);
+  const start = `${month}-01`;
+  const nextMonth = new Date(`${start}T00:00:00Z`); nextMonth.setUTCMonth(nextMonth.getUTCMonth() + 1);
+  const result = await readAiD1("usage", () => db.prepare(`SELECT service,operation,model,villa,COUNT(*) AS calls,
+    SUM(estimated_units) AS estimated_units FROM ai_usage_log WHERE daily_key>=? AND daily_key<?
+    GROUP BY service,operation,model,villa ORDER BY calls DESC LIMIT ?`)
+    .bind(start, nextMonth.toISOString().slice(0, 10), 50).all());
   return result.results;
 }
 
 export async function saveMediaProvenance(db: D1Database, input: { mediaId: string; source: "owner" | "Pexels" | "OpenAI";
   photographer?: string | null; photographerUrl?: string | null; sourceUrl?: string | null; sourceId?: string | null;
   searchQuery?: string | null; licenseSource?: string | null; aiGenerated?: boolean; geographicClaim?: string | null }) {
-  await ensureAiTables(db);
   await db.prepare(`INSERT INTO social_media_provenance
     (media_id,source,photographer,photographer_url,source_url,source_id,search_query,license_source,ai_generated,geographic_claim,created_at)
     VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(media_id) DO UPDATE SET source=excluded.source,photographer=excluded.photographer,

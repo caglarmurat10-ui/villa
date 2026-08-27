@@ -1,5 +1,6 @@
 import { requireAiAdmin } from "@/lib/aiAdminSession";
 import { hasAiAdminConfiguration, hasOpenAiConfiguration, integrationUnavailableResponse } from "@/lib/aiConfiguration";
+import { publicAiError } from "@/lib/aiD1";
 import { researchRegionalTopic } from "@/lib/aiContentStudio";
 import { listRegionalIdeas } from "@/lib/aiDb";
 import { socialOperationsDb } from "@/lib/socialOperationsDb";
@@ -12,7 +13,12 @@ export async function GET(request: Request) {
     const { db, env } = await socialOperationsDb();
     if (!hasAiAdminConfiguration(env)) return integrationUnavailableResponse("admin");
     if (!(await requireAiAdmin(request, env))) return Response.json({ error: "Yetkili oturum gerekli." }, { status: 401 });
-    return Response.json({ configured: hasOpenAiConfiguration(env), items: await listRegionalIdeas(db) });
+    try {
+      return Response.json({ configured: hasOpenAiConfiguration(env), items: await listRegionalIdeas(db), available: true, warnings: [] });
+    } catch {
+      return Response.json({ configured: hasOpenAiConfiguration(env), items: [], available: false,
+        warnings: ["Bölgesel fikirler şu anda yüklenemedi. İçerik üretmeye devam edebilirsiniz."] });
+    }
   } catch { return Response.json({ error: "Bölgesel içerik kuyruğu yüklenemedi." }, { status: 500 }); }
 }
 export async function POST(request: Request) {
@@ -27,6 +33,6 @@ export async function POST(request: Request) {
       region: typeof body.region === "string" ? body.region : undefined, forceRefresh: body.forceRefresh === true });
     return Response.json(result, { status: result.cached ? 200 : 201 });
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "Bölgesel araştırma tamamlanamadı." }, { status: 400 });
+    return Response.json({ error: publicAiError(error, "Bölgesel araştırma tamamlanamadı.") }, { status: 400 });
   }
 }

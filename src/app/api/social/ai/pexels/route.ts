@@ -1,5 +1,6 @@
 import { requireAiAdmin } from "@/lib/aiAdminSession";
 import { hasAiAdminConfiguration, hasPexelsConfiguration, integrationUnavailableResponse } from "@/lib/aiConfiguration";
+import { publicAiError } from "@/lib/aiD1";
 import { importPexelsMedia, searchPexels } from "@/lib/pexels";
 import { socialOperationsDb } from "@/lib/socialOperationsDb";
 import type { Villa } from "@/lib/types";
@@ -16,7 +17,7 @@ export async function GET(request: Request) {
     if (!isKind(kind)) throw new Error("Pexels medya türü geçersiz.");
     if (!(await requireAiAdmin(request, env))) return Response.json({ error: "Yetkili oturum gerekli." }, { status: 401 });
     return Response.json({ items: await searchPexels(env, { query, kind }) });
-  } catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Pexels araması tamamlanamadı." }, { status: 400 }); }
+  } catch (error) { return Response.json({ error: publicAiError(error, "Pexels araması tamamlanamadı.") }, { status: 400 }); }
 }
 export async function POST(request: Request) {
   try {
@@ -27,5 +28,5 @@ export async function POST(request: Request) {
     if (!isVilla(body.villa) || !isKind(body.kind) || typeof body.id !== "string" || typeof body.query !== "string") throw new Error("Pexels içe aktarma bilgileri geçersiz.");
     if (!(await requireAiAdmin(request, env, true))) return Response.json({ error: "Yetkili oturum gerekli." }, { status: 401 });
     return Response.json(await importPexelsMedia({ db, env, villa: body.villa, kind: body.kind, id: body.id, query: body.query }), { status: 201 });
-  } catch (error) { return Response.json({ error: error instanceof Error ? error.message : "Pexels medyası eklenemedi." }, { status: 400 }); }
+  } catch (error) { return Response.json({ error: publicAiError(error, "Pexels medyası eklenemedi.") }, { status: 400 }); }
 }
