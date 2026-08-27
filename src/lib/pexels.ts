@@ -2,6 +2,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import { acceptedInstagramMedia, IMAGE_MAX_BYTES, REELS_MAX_BYTES, type InstagramMediaMetadata } from "./instagramMedia";
 import { INSTAGRAM_LIBRARY_PREFIX } from "./instagramTokenStore";
 import { saveMediaProvenance } from "./aiDb";
+import { requirePexelsApiKey } from "./aiConfiguration";
 import { addMediaLibraryItem, deactivateMediaLibraryItem } from "./socialOperationsDb";
 import type { Villa } from "./types";
 
@@ -70,14 +71,8 @@ export function parsePexelsVideos(items: PexelsVideo[]): PexelsResult[] {
   });
 }
 
-function pexelsKey(env: CloudflareEnv) {
-  const key = env.PEXELS_API_KEY?.trim();
-  if (!key) throw new Error("Pexels bağlantısı henüz yapılandırılmadı.");
-  return key;
-}
-
 async function pexelsJson<T>(env: CloudflareEnv, path: string, fetcher: typeof fetch = fetch) {
-  const response = await fetcher(`${PEXELS_API}${path}`, { headers: { Authorization: pexelsKey(env) } });
+  const response = await fetcher(`${PEXELS_API}${path}`, { headers: { Authorization: requirePexelsApiKey(env) } });
   if (!response.ok) throw new Error("Pexels servisine şu anda ulaşılamıyor.");
   return response.json() as Promise<T>;
 }

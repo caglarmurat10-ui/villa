@@ -7,6 +7,7 @@ import {
   recordAiServiceResult,
   saveMediaProvenance,
 } from "./aiDb";
+import { hasOpenAiConfiguration, requireOpenAiApiKey } from "./aiConfiguration";
 import { acceptedInstagramMedia, IMAGE_MAX_BYTES, type InstagramMediaMetadata } from "./instagramMedia";
 import { INSTAGRAM_LIBRARY_PREFIX } from "./instagramTokenStore";
 import { addMediaLibraryItem, deactivateMediaLibraryItem } from "./socialOperationsDb";
@@ -19,12 +20,6 @@ function decodeBase64(value: string) {
   const bytes = new Uint8Array(binary.length);
   for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
   return bytes;
-}
-
-function secret(env: CloudflareEnv) {
-  const value = env.OPENAI_API_KEY?.trim();
-  if (!value) throw new Error("OpenAI bağlantısı henüz yapılandırılmadı.");
-  return value;
 }
 
 export function safeIllustrationPrompt(villa: Villa, prompt: string) {
@@ -40,6 +35,7 @@ export async function generateAiIllustration(input: {
   prompt: string;
   fetcher?: typeof fetch;
 }) {
+  const apiKey = requireOpenAiApiKey(input.env);
   const settings = await getAiSettings(input.db, input.villa);
   if (String(input.env.AI_IMAGE_ENABLED) !== "true" || !settings.imageEnabled) {
     throw new Error("AI görsel üretimi hem sistem hem villa ayarlarında kapalı.");
@@ -51,7 +47,7 @@ export async function generateAiIllustration(input: {
   try {
     const response = await (input.fetcher ?? fetch)(IMAGE_GENERATION_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${secret(input.env)}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ model, prompt: safeIllustrationPrompt(input.villa, input.prompt), size: "1024x1024",
         quality: "medium", output_format: "jpeg", n: 1 }),
     });
@@ -99,7 +95,7 @@ export async function generateAiIllustration(input: {
 export async function videoGenerationStatus(db: D1Database, env: CloudflareEnv, villa: Villa) {
   const settings = await getAiSettings(db, villa);
   return {
-    enabled: String(env.AI_VIDEO_ENABLED) === "true" && settings.videoEnabled,
+    enabled: hasOpenAiConfiguration(env) && String(env.AI_VIDEO_ENABLED) === "true" && settings.videoEnabled,
     available: false,
     requiresSeparatePaidConfirmation: true,
     message: "Storyboard üretimi hazır. Ücretli video üretimi, sağlayıcı desteği yeniden doğrulanıp ayrıca onaylanmadan çağrılmaz.",

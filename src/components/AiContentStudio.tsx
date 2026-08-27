@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState, type FormEvent } from "react";
+import type { AiConfigurationStatus } from "@/lib/aiConfiguration";
 import type { AiSocialSettings } from "@/lib/aiDb";
 import type { AiContentOutput, AiMode, AiPurpose, VillaAiProfile } from "@/lib/aiTypes";
 import type { PexelsResult } from "@/lib/pexels";
@@ -16,6 +17,16 @@ type TodayItem = { villa: Villa; category: string; suggestion: string; reason: s
 type Usage = { service?: string; operation?: string; model?: string; villa?: Villa; calls?: number; estimated_units?: number };
 type ResearchIdea = { id?: string; topic?: string; summary?: string; content_angle?: string; sourceUrls?: string[]; sourceTitles?: string[]; expires_at?: string };
 
+function AiStatus({ configuration }: { configuration: AiConfigurationStatus }) {
+  return <section className={styles.panel}><div className={styles.panelHead}><div><span className={styles.eyebrow}>AI DURUMU</span><h2>Opsiyonel servisler</h2></div></div>
+    <div className={styles.statusGrid}>
+      <span>OpenAI: <strong>{configuration.openAiConfigured ? "Yapılandırıldı" : "Yapılandırılmadı"}</strong></span>
+      <span>Pexels: <strong>{configuration.pexelsConfigured ? "Yapılandırıldı" : "Yapılandırılmadı"}</strong></span>
+      <span>AI Autopilot: <strong>{configuration.autopilotEnabled ? "Açık" : "Kapalı"}</strong></span>
+    </div>
+  </section>;
+}
+
 const regionalTopics = ["Patara Antik Kenti", "Patara Plajı", "Kaş", "Kalkan", "Kaputaş", "Saklıkent", "Xanthos",
   "Letoon", "Likya Yolu", "Kekova", "Kaleköy", "Yerel gastronomi", "Doğa", "Gün batımı", "Mevsimsel gezi önerileri"];
 const purposes: Array<[AiPurpose, string]> = [["villa","Villa Tanıtımı"],["availability","Müsaitlik"],["last-minute","Son Dakika"],
@@ -26,6 +37,7 @@ async function data(response: Response) { return response.json().catch(() => ({}
 
 export default function AiContentStudio() {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [configuration, setConfiguration] = useState<AiConfigurationStatus | null>(null);
   const [accessKey, setAccessKey] = useState("");
   const [settingItems, setSettingItems] = useState<SettingItem[]>([]);
   const [today, setToday] = useState<TodayItem[]>([]);
@@ -49,12 +61,14 @@ export default function AiContentStudio() {
     const responses = await Promise.all([fetch("/api/social/ai/settings"), fetch("/api/social/ai/today"), fetch("/api/social/ai/research")]);
     if (responses.some((response) => response.status === 401)) { setAuthenticated(false); return; }
     const [settings, suggestions, research] = await Promise.all(responses.map(data));
+    if (settings.configuration) setConfiguration(settings.configuration as AiConfigurationStatus);
     setSettingItems((settings.items as SettingItem[]) ?? []); setUsage((settings.usage as Usage[]) ?? []);
     setToday((suggestions.items as TodayItem[]) ?? []); setResearchIdeas((research.items as ResearchIdea[]) ?? []);
     setAuthenticated(true);
   }, []);
 
   useEffect(() => { void fetch("/api/social/ai/session").then(data).then((result) => {
+    if (result.configuration) setConfiguration(result.configuration as AiConfigurationStatus);
     const active = result.authenticated === true; setAuthenticated(active); if (active) void load();
   }); }, [load]);
 
@@ -115,11 +129,19 @@ export default function AiContentStudio() {
 
   const activeSettings = settingItems.find((item) => item.settings.villa === villa);
   if (authenticated === null) return <main className={styles.page}><div className={styles.shell}><SocialNav/><section className={styles.panel}>AI merkezi yükleniyor...</section></div></main>;
-  if (!authenticated) return <main className={styles.page}><div className={styles.shell}><SocialNav/><section className={styles.authCard}><span className={styles.eyebrow}>KORUMALI ALAN</span><h1>AI İçerik Stüdyosu</h1><p className={styles.muted}>Ücretli AI çağrıları ve medya aktarımları yönetici oturumuyla korunur.</p>
-    {notice ? <p className={styles.notice}>{notice}</p> : null}<form className={styles.form} onSubmit={login}><label>AI yönetici erişim anahtarı<input type="password" autoComplete="current-password" value={accessKey} onChange={(event)=>setAccessKey(event.target.value)} required/></label><button className={styles.primary} disabled={busy}>Güvenli giriş</button></form></section></div></main>;
+  if (!authenticated) return <main className={styles.page}><div className={styles.shell}><SocialNav/>
+    {configuration ? <AiStatus configuration={configuration}/> : null}
+    <section className={styles.authCard}><span className={styles.eyebrow}>KORUMALI ALAN</span><h1>AI İçerik Stüdyosu</h1>
+      {!configuration?.adminConfigured ? <><p className={styles.notice}>AI yönetici erişimi yapılandırılmadı. Mevcut uygulama, Instagram yayınları ve hazır içerik şablonları çalışmaya devam eder.</p>
+        {!configuration?.openAiConfigured ? <p className={styles.muted}>OpenAI yapılandırılmadı.</p> : null}
+        {!configuration?.pexelsConfigured ? <p className={styles.muted}>Pexels yapılandırılmadı; kendi villa medyalarınızı kullanabilirsiniz.</p> : null}</>
+        : <><p className={styles.muted}>Ücretli AI çağrıları ve medya aktarımları yönetici oturumuyla korunur.</p>
+          {notice ? <p className={styles.notice}>{notice}</p> : null}<form className={styles.form} onSubmit={login}><label>AI yönetici erişim anahtarı<input type="password" autoComplete="current-password" value={accessKey} onChange={(event)=>setAccessKey(event.target.value)} required/></label><button className={styles.primary} disabled={busy}>Güvenli giriş</button></form></>}
+    </section></div></main>;
 
   return <main className={styles.page}><div className={styles.shell}><SocialNav/>
     <section className={styles.hero}><div><span className={styles.eyebrow}>AI İÇERİK STÜDYOSU</span><h1>Fikirden kontrollü taslağa</h1><p>Doğrulanmış villa bilgisi, gerçek içerik geçmişi ve kaynaklı bölge araştırması kullanılır. AI kendi kendine yayın yapmaz.</p></div><div className={styles.statusStack}><span>Metin: kullanıcı isteğiyle</span><span>Görsel: varsayılan kapalı</span><span>Video: mimari hazır, çağrı kapalı</span></div></section>
+    {configuration ? <AiStatus configuration={configuration}/> : null}
     {notice ? <p className={styles.message}>{notice}</p> : null}
     <section className={styles.panel}><div className={styles.panelHead}><div><span className={styles.eyebrow}>BUGÜN NE PAYLAŞALIM?</span><h2>İçerik geçmişine dayalı öneriler</h2></div></div><div className={styles.grid}>{today.map((item)=><article className={styles.ideaCard} key={item.villa}><strong>Villa {item.villa}</strong><p>{item.suggestion}</p><small>Neden: {item.reason}</small><span>AI autopilot: {item.autopilotLevel === "off" ? "Kapalı" : item.autopilotLevel}</span></article>)}</div></section>
     <section className={styles.panel}><div className={styles.panelHead}><div><span className={styles.eyebrow}>İÇERİK ÜRET</span><h2>Caption, Carousel, Reels ve haftalık plan</h2></div></div><div className={styles.fields}>
@@ -128,19 +150,21 @@ export default function AiContentStudio() {
       <label>İçerik amacı<select value={purpose} onChange={(event)=>setPurpose(event.target.value as AiPurpose)}>{purposes.map(([value,label])=><option value={value} key={value}>{label}</option>)}</select></label>
       <label className={styles.switch}><input type="checkbox" checked={weekly} onChange={(event)=>setWeekly(event.target.checked)}/> 7 günlük plan taslağı</label>
       <label className={styles.wide}>Ek istek<textarea rows={4} maxLength={1000} value={brief} onChange={(event)=>setBrief(event.target.value)} placeholder="Örn. sakin, samimi ve kısa bir carousel..."/></label></div>
-      <button className={styles.primary} disabled={busy || !activeSettings?.settings.aiEnabled} onClick={createContent}>{weekly ? "Haftalık plan taslağı üret" : "AI içerik taslağı üret"}</button>
-      {!activeSettings?.settings.aiEnabled ? <p className={styles.muted}>Önce aşağıdaki Villa {villa} AI ayarını açın.</p> : null}
+      <button className={styles.primary} disabled={busy || !configuration?.openAiConfigured || !activeSettings?.settings.aiEnabled} onClick={createContent}>{weekly ? "Haftalık plan taslağı üret" : "AI içerik taslağı üret"}</button>
+      {!configuration?.openAiConfigured ? <p className={styles.muted}>OpenAI yapılandırılmadı; hazır caption ve kampanya şablonları çalışmaya devam eder.</p>
+        : !activeSettings?.settings.aiEnabled ? <p className={styles.muted}>Önce aşağıdaki Villa {villa} AI ayarını açın.</p> : null}
       {output ? <div className={styles.aiOutput}><h3>{output.title}</h3><strong>{output.hook}</strong><p>{output.caption}</p><div className={styles.tags}>{output.hashtags.map((tag)=><span className={styles.tag} key={tag}>{tag}</span>)}</div>{output.carouselSlides.length?<ol>{output.carouselSlides.map((slide)=><li key={slide}>{slide}</li>)}</ol>:null}{output.reelsStoryboard.length?<div>{output.reelsStoryboard.map((scene)=><p key={`${scene.startSecond}-${scene.endSecond}`}><b>{scene.startSecond}–{scene.endSecond} sn:</b> {scene.scene} · {scene.overlayText}</p>)}</div>:null}{output.weeklyPlan.length?<div>{output.weeklyPlan.map((item)=><p key={`${item.day}-${item.villa}`}><b>{item.day} · {item.villa}:</b> {item.topic} ({item.contentType})</p>)}</div>:null}</div>:null}
     </section>
-    <section className={styles.panel}><div className={styles.panelHead}><div><span className={styles.eyebrow}>BÖLGE ARAŞTIRMA MOTORU</span><h2>Patara, Kaş ve Kalkan için kaynaklı fikirler</h2></div></div><div className={styles.toolbar}><select value={topic} onChange={(event)=>setTopic(event.target.value)}>{regionalTopics.map((item)=><option key={item}>{item}</option>)}</select><button className={styles.primary} disabled={busy || !activeSettings?.settings.aiEnabled} onClick={research}>Kaynaklarla araştır</button></div>
+    <section className={styles.panel}><div className={styles.panelHead}><div><span className={styles.eyebrow}>BÖLGE ARAŞTIRMA MOTORU</span><h2>Patara, Kaş ve Kalkan için kaynaklı fikirler</h2></div></div><div className={styles.toolbar}><select value={topic} onChange={(event)=>setTopic(event.target.value)}>{regionalTopics.map((item)=><option key={item}>{item}</option>)}</select><button className={styles.primary} disabled={busy || !configuration?.openAiConfigured || !activeSettings?.settings.aiEnabled} onClick={research}>Kaynaklarla araştır</button></div>
       <div className={styles.ideaList}>{researchIdeas.slice(0,8).map((idea)=><article className={styles.ideaCard} key={idea.id}><strong>{idea.topic}</strong><p>{idea.summary}</p><small>{idea.content_angle}</small><div><b>Kaynaklar</b>{(idea.sourceUrls??[]).map((url,index)=><a href={url} target="_blank" rel="noreferrer" key={url}>{idea.sourceTitles?.[index]??new URL(url).hostname}</a>)}</div></article>)}</div></section>
-    <section className={styles.panel}><div className={styles.panelHead}><div><span className={styles.eyebrow}>PEXELS MEDYA</span><h2>Lisans ve kaynak bilgisi korunan fotoğraf/video</h2></div></div><div className={styles.toolbar}><input value={pexelsQuery} onChange={(event)=>setPexelsQuery(event.target.value)} maxLength={100}/><select value={pexelsKind} onChange={(event)=>setPexelsKind(event.target.value as "photo"|"video")}><option value="photo">Fotoğraf</option><option value="video">Video</option></select><button className={styles.primary} disabled={busy} onClick={searchMedia}>Pexels ara</button></div>
+    <section className={styles.panel}><div className={styles.panelHead}><div><span className={styles.eyebrow}>PEXELS MEDYA</span><h2>Lisans ve kaynak bilgisi korunan fotoğraf/video</h2></div></div><div className={styles.toolbar}><input value={pexelsQuery} onChange={(event)=>setPexelsQuery(event.target.value)} maxLength={100}/><select value={pexelsKind} onChange={(event)=>setPexelsKind(event.target.value as "photo"|"video")}><option value="photo">Fotoğraf</option><option value="video">Video</option></select><button className={styles.primary} disabled={busy || !configuration?.pexelsConfigured} onClick={searchMedia}>Pexels ara</button></div>
+      {!configuration?.pexelsConfigured ? <p className={styles.muted}>Pexels yapılandırılmadı; kendi villa medya kütüphaneniz ve yayın sistemi kullanılabilir.</p> : null}
       <div className={styles.stockGrid}>{pexelsResults.map((item)=><article className={styles.mediaCard} key={`${item.kind}-${item.id}`}><div className={styles.stockPreview} style={{backgroundImage:`url(${item.previewUrl})`}}/><div className={styles.mediaBody}><strong>{item.photographer}</strong><p className={styles.muted}>{item.geographicClaim}</p><a href={item.sourceUrl} target="_blank" rel="noreferrer">Pexels kaynağı</a><button className={styles.success} disabled={busy} onClick={()=>importMedia(item)}>Villa {villa} kütüphanesine ekle</button></div></article>)}</div></section>
     <section className={styles.grid}><article className={styles.panel}><span className={styles.eyebrow}>AI GÖRSEL STÜDYOSU</span><h2>İllüstrasyon üretimi</h2><p className={styles.muted}>Gerçek villa görünümü uydurulmaz; çıktı “AI üretimi” olarak işaretlenir.</p><div className={styles.form}><label>Açıklama<textarea rows={4} value={imagePrompt} onChange={(event)=>setImagePrompt(event.target.value)}/></label><button className={styles.primary} disabled={busy || !activeSettings?.systemFlags.image || !activeSettings.settings.imageEnabled} onClick={createImage}>AI görsel oluştur</button></div></article>
       <article className={styles.panel}><span className={styles.eyebrow}>AI VIDEO / REELS</span><h2>Storyboard öncelikli</h2><p className={styles.muted}>15/30 saniyelik sahne, overlay, voice-over ve CTA metni içerik üreticisinden hazırlanır. Ücretli video API çağrısı ayrıca onaylanmadan çalışmaz.</p><span className={styles.tag}>AI_VIDEO_ENABLED=false varsayılan</span></article></section>
     <section className={styles.panel}><div className={styles.panelHead}><div><span className={styles.eyebrow}>AI AYARLARI VE MALİYET</span><h2>Villa bazlı sınırlar</h2></div><span className={styles.muted}>Aylık çağrılar: {usage.reduce((sum,item)=>sum+Number(item.calls??0),0)}</span></div><div className={styles.settingsGrid}>{settingItems.map((item)=><article className={styles.settingsBox} key={item.settings.villa}><h3>Villa {item.settings.villa}</h3><div className={styles.fields}>
-      <label className={styles.switch}><input type="checkbox" checked={item.settings.aiEnabled} onChange={(event)=>updateSetting(item.settings.villa,(current)=>({...current,settings:{...current.settings,aiEnabled:event.target.checked}}))}/> AI açık</label>
-      <label>Autopilot<select value={item.settings.autopilotLevel} onChange={(event)=>updateSetting(item.settings.villa,(current)=>({...current,settings:{...current.settings,autopilotLevel:event.target.value as AiSocialSettings["autopilotLevel"]}}))}><option value="off">Kapalı</option><option value="suggestion">Öneri</option><option value="draft">Taslak</option><option value="auto_schedule">Otomatik plan isteği (taslakta bekler)</option></select></label>
+      <label className={styles.switch}><input type="checkbox" checked={item.settings.aiEnabled} disabled={!configuration?.openAiConfigured} onChange={(event)=>updateSetting(item.settings.villa,(current)=>({...current,settings:{...current.settings,aiEnabled:event.target.checked}}))}/> AI açık</label>
+      <label>Autopilot<select value={item.settings.autopilotLevel} disabled={!configuration?.openAiConfigured} onChange={(event)=>updateSetting(item.settings.villa,(current)=>({...current,settings:{...current.settings,autopilotLevel:event.target.value as AiSocialSettings["autopilotLevel"]}}))}><option value="off">Kapalı</option><option value="suggestion">Öneri</option><option value="draft">Taslak</option><option value="auto_schedule">Otomatik plan isteği (taslakta bekler)</option></select></label>
       <label>Günlük metin çağrısı<input type="number" min="0" max="100" value={item.settings.dailyTextLimit} onChange={(event)=>updateSetting(item.settings.villa,(current)=>({...current,settings:{...current.settings,dailyTextLimit:Number(event.target.value)}}))}/></label>
       <label>Günlük web araştırması<input type="number" min="0" max="50" value={item.settings.dailyResearchLimit} onChange={(event)=>updateSetting(item.settings.villa,(current)=>({...current,settings:{...current.settings,dailyResearchLimit:Number(event.target.value)}}))}/></label>
       <label className={styles.switch}><input type="checkbox" checked={item.settings.imageEnabled} disabled={!item.systemFlags.image} onChange={(event)=>updateSetting(item.settings.villa,(current)=>({...current,settings:{...current.settings,imageEnabled:event.target.checked}}))}/> AI görsel</label>

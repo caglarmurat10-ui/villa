@@ -1,7 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import type { D1Database } from "@cloudflare/workers-types";
 import { createAiAdminCookie, hasAiAdminSession } from "@/lib/aiAdminSession";
-import { aiAutopilotDecision } from "@/lib/aiActivity";
+import { aiAutopilotDecision, runAiContentActivity } from "@/lib/aiActivity";
+import { aiConfigurationStatus, integrationUnavailableResponse } from "@/lib/aiConfiguration";
 import { assertAiBudget } from "@/lib/aiDb";
 import { cachedResearch, chooseTodayCategory, regionalTopicIsSafe } from "@/lib/aiContentStudio";
 import { AI_CONTENT_JSON_SCHEMA, aiContentOutputSchema, validateAiVillaFacts, type AiContentOutput } from "@/lib/aiTypes";
@@ -47,6 +48,29 @@ const validOutput: AiContentOutput = {
 };
 
 describe("AI structured output ve güvenlik", () => {
+  it("AI ve Pexels secretları yokken güvenli biçimde yapılandırılmamış olur", async () => {
+    const missing = { AI_IMAGE_ENABLED: "true", AI_VIDEO_ENABLED: "true" } as unknown as CloudflareEnv;
+    expect(aiConfigurationStatus(missing, true)).toEqual({
+      openAiConfigured: false, pexelsConfigured: false, adminConfigured: false,
+      aiEnabled: false, imageEnabled: false, videoEnabled: false, autopilotEnabled: false,
+    });
+    const response = integrationUnavailableResponse("openai");
+    expect(response.status).toBe(503);
+    expect(await response.json()).toMatchObject({ configured: false, service: "openai" });
+    expect(await runAiContentActivity(missing)).toEqual([
+      { villa: "Destan", status: "unconfigured" }, { villa: "Safira", status: "unconfigured" },
+    ]);
+  });
+
+  it("mock secret varlığını yalnız güvenli boolean metadata olarak bildirir", () => {
+    const configured = { ...env, PEXELS_API_KEY: "mock-pexels", AI_IMAGE_ENABLED: "false", AI_VIDEO_ENABLED: "false" } as unknown as CloudflareEnv;
+    expect(aiConfigurationStatus(configured, true)).toEqual({
+      openAiConfigured: true, pexelsConfigured: true, adminConfigured: true,
+      aiEnabled: true, imageEnabled: false, videoEnabled: false, autopilotEnabled: true,
+    });
+    expect(JSON.stringify(aiConfigurationStatus(configured))).not.toContain("mock-pexels");
+  });
+
   it("Responses API yapılandırılmış JSON çıktısını şemayla doğrular", async () => {
     const fetcher = vi.fn(async () => new Response(JSON.stringify({ output: [{ type: "message", content: [{ type: "output_text", text: JSON.stringify(validOutput) }] }], usage: { total_tokens: 42 } }), { status: 200 }));
     const result = await callStructuredResponse({ db: fakeDb(), env, villa: "Destan", operation: "text",
@@ -66,6 +90,14 @@ describe("AI structured output ve güvenlik", () => {
     await expect(callStructuredResponse({ db: fakeDb(), env, villa: "Destan", operation: "text",
       schemaName: "test_content", jsonSchema: AI_CONTENT_JSON_SCHEMA, validator: aiContentOutputSchema,
       system: "test", prompt: "test", fetcher })).rejects.toThrow("Hazır şablonlarla");
+  });
+
+  it("OpenAI secretı yokken network çağrısı yapmadan controlled fallback verir", async () => {
+    const fetcher = vi.fn();
+    await expect(callStructuredResponse({ db: fakeDb(), env: { ...env, OPENAI_API_KEY: undefined } as unknown as CloudflareEnv,
+      villa: "Destan", operation: "text", schemaName: "test_content", jsonSchema: AI_CONTENT_JSON_SCHEMA,
+      validator: aiContentOutputSchema, system: "test", prompt: "test", fetcher })).rejects.toThrow("OpenAI yapılandırılmadı");
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it("günlük AI limitini çağrıdan önce uygular", async () => {
@@ -126,6 +158,12 @@ describe("Pexels ve AI medya güvenliği", () => {
     const fetcher = vi.fn(async () => new Response("unavailable", { status: 503 }));
     await expect(searchPexels({ ...env, PEXELS_API_KEY: "test" } as CloudflareEnv,
       { query: "Patara", kind: "photo" }, fetcher)).rejects.toThrow("ulaşılamıyor");
+  });
+
+  it("Pexels secretı yokken network çağrısı yapmadan controlled fallback verir", async () => {
+    const fetcher = vi.fn();
+    await expect(searchPexels(env, { query: "Patara", kind: "photo" }, fetcher)).rejects.toThrow("Pexels yapılandırılmadı");
+    expect(fetcher).not.toHaveBeenCalled();
   });
 
   it("AI görsel promptuna gerçek villa görünümü uydurmama kuralını ekler", () => {

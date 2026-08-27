@@ -1,4 +1,5 @@
 import { requireAiAdmin } from "@/lib/aiAdminSession";
+import { hasAiAdminConfiguration, hasOpenAiConfiguration, integrationUnavailableResponse } from "@/lib/aiConfiguration";
 import { generateAiContent } from "@/lib/aiContentStudio";
 import { AI_MODES, AI_PURPOSES, type AiMode, type AiPurpose } from "@/lib/aiTypes";
 import { availabilityPriceText, getSocialSettings, listAvailability, socialOperationsDb } from "@/lib/socialOperationsDb";
@@ -11,9 +12,11 @@ const isPurpose = (value: unknown): value is AiPurpose => typeof value === "stri
 
 export async function POST(request: Request) {
   try {
+    const { db, env } = await socialOperationsDb();
+    if (!hasOpenAiConfiguration(env)) return integrationUnavailableResponse("openai");
+    if (!hasAiAdminConfiguration(env)) return integrationUnavailableResponse("admin");
     const body = await request.json() as Record<string, unknown>;
     if (!isVilla(body.villa) || !isMode(body.mode) || !isPurpose(body.purpose)) throw new Error("AI içerik seçimi geçersiz.");
-    const { db, env } = await socialOperationsDb();
     if (!(await requireAiAdmin(request, env, true))) return Response.json({ error: "Yetkili oturum gerekli." }, { status: 401 });
     let availability: { startDate: string; endDate: string; nights: number; priceText?: string | null } | null = null;
     const startDate = typeof body.startDate === "string" ? body.startDate : "";

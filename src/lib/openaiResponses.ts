@@ -6,6 +6,7 @@ import {
   logAiUsage,
   recordAiServiceResult,
 } from "./aiDb";
+import { requireOpenAiApiKey } from "./aiConfiguration";
 import type { Villa } from "./types";
 
 const RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -26,12 +27,6 @@ export type StructuredResponseResult<T> = {
   sources: ResponseSource[];
   model: string;
 };
-
-function apiKey(env: CloudflareEnv) {
-  const key = env.OPENAI_API_KEY?.trim();
-  if (!key) throw new Error("OpenAI bağlantısı henüz yapılandırılmadı.");
-  return key;
-}
 
 function outputText(response: OpenAiResponse) {
   if (typeof response.output_text === "string" && response.output_text.trim()) return response.output_text;
@@ -84,6 +79,7 @@ export async function callStructuredResponse<T>(input: {
 }): Promise<StructuredResponseResult<T>> {
   const service = input.operation === "research" ? "openai-web" : "openai-text";
   const model = input.env.OPENAI_TEXT_MODEL || "gpt-5.6-terra";
+  const key = requireOpenAiApiKey(input.env);
   await assertAiBudget(input.db, input.villa, input.operation);
   if (await aiCircuitOpen(input.db, service)) {
     throw new Error("AI servisi geçici olarak dinlenmede. Mevcut şablonlar kullanılabilir.");
@@ -94,7 +90,7 @@ export async function callStructuredResponse<T>(input: {
   try {
     const response = await (input.fetcher ?? fetch)(RESPONSES_URL, {
       method: "POST",
-      headers: { Authorization: `Bearer ${apiKey(input.env)}`, "Content-Type": "application/json" },
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model,
         store: false,

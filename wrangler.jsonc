@@ -15,7 +15,7 @@
     "AI_VIDEO_ENABLED": "false"
   },
   "secrets": {
-    "required": ["META_APP_SECRET", "OPENAI_API_KEY", "PEXELS_API_KEY", "SOCIAL_AI_ADMIN_KEY"]
+    "required": ["META_APP_SECRET"]
   },
   "d1_databases": [
     { "binding": "DB", "database_name": "villa-yonetim", "database_id": "fa8fc6ec-9cc5-4c92-ba04-b23f2a9b8106", "migrations_dir": "migrations" }

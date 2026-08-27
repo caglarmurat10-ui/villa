@@ -1,3 +1,5 @@
+import { requireAiAdminKey } from "./aiConfiguration";
+
 const COOKIE_NAME = "social_ai_admin";
 const SESSION_SECONDS = 8 * 60 * 60;
 
@@ -31,12 +33,6 @@ function constantTimeEqual(left: string, right: string) {
   return mismatch === 0;
 }
 
-function configuredSecret(env: CloudflareEnv) {
-  const value = env.SOCIAL_AI_ADMIN_KEY?.trim();
-  if (!value || value.length < 16) throw new Error("AI yönetici erişim anahtarı yapılandırılmadı.");
-  return value;
-}
-
 export function sameOrigin(request: Request) {
   const origin = request.headers.get("origin");
   return Boolean(origin && origin === new URL(request.url).origin);
@@ -44,12 +40,12 @@ export function sameOrigin(request: Request) {
 
 export async function createAiAdminCookie(env: CloudflareEnv) {
   const expires = String(Math.floor(Date.now() / 1000) + SESSION_SECONDS);
-  const token = `${expires}.${await signature(expires, configuredSecret(env))}`;
+  const token = `${expires}.${await signature(expires, requireAiAdminKey(env))}`;
   return `${COOKIE_NAME}=${token}; Path=/; HttpOnly; Secure; SameSite=Strict; Max-Age=${SESSION_SECONDS}`;
 }
 
 export async function verifyAiAdminKey(candidate: string, env: CloudflareEnv) {
-  return constantTimeEqual(candidate, configuredSecret(env));
+  return constantTimeEqual(candidate, requireAiAdminKey(env));
 }
 
 export async function hasAiAdminSession(request: Request, env: CloudflareEnv) {
@@ -57,7 +53,7 @@ export async function hasAiAdminSession(request: Request, env: CloudflareEnv) {
   if (!token) return false;
   const [expires, provided, extra] = token.split(".");
   if (!expires || !provided || extra || !/^\d{10}$/.test(expires) || Number(expires) <= Math.floor(Date.now() / 1000)) return false;
-  return constantTimeEqual(provided, await signature(expires, configuredSecret(env)));
+  return constantTimeEqual(provided, await signature(expires, requireAiAdminKey(env)));
 }
 
 export async function requireAiAdmin(request: Request, env: CloudflareEnv, write = false) {
