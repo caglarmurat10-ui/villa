@@ -22,6 +22,10 @@ import {
 } from "@/lib/instagramTypes";
 import type { Villa } from "@/lib/types";
 import type { D1Database } from "@cloudflare/workers-types";
+import {
+  ensureSocialOperationsTables,
+  validateScheduledCampaignAvailability,
+} from "@/lib/socialOperationsDb";
 
 export const MAX_SCHEDULE_ATTEMPTS = 3;
 export const SCHEDULER_BATCH_SIZE = 3;
@@ -502,6 +506,11 @@ async function finalizeScheduledSuccess(
   if ((results[0].meta.changes ?? 0) !== 1) {
     throw new Error("Planlı yayın sonucu kaydedilemedi.");
   }
+  await db
+    .prepare(`UPDATE social_campaign_drafts SET status='published',updated_at=?
+      WHERE scheduled_post_id=? AND status='scheduled'`)
+    .bind(timestamp, post.id)
+    .run();
 }
 
 export type StaleProcessingAction =
@@ -606,6 +615,7 @@ async function processClaimedPost(
 ) {
   let finalPublishStarted = false;
   try {
+    if (!(await validateScheduledCampaignAvailability(env.DB, post.id))) return;
     const input: InstagramPublishInput = {
       villa: post.villa,
       type: post.type,
@@ -684,6 +694,7 @@ export async function runInstagramScheduler(
   now = new Date(),
 ) {
   await ensureInstagramScheduledPostsTable(env.DB);
+  await ensureSocialOperationsTables(env.DB);
   return processScheduledQueue(
     {
       recover: (current) => recoverStaleProcessing(env.DB, current),

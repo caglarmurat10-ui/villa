@@ -1,4 +1,7 @@
-import { INSTAGRAM_MEDIA_PREFIX } from "@/lib/instagramTokenStore";
+import {
+  INSTAGRAM_LIBRARY_PREFIX,
+  INSTAGRAM_MEDIA_PREFIX,
+} from "@/lib/instagramTokenStore";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export const dynamic = "force-dynamic";
@@ -57,7 +60,8 @@ async function serveMedia(
   const objectKey = key.join("/");
 
   if (
-    !objectKey.startsWith(INSTAGRAM_MEDIA_PREFIX) ||
+    (!objectKey.startsWith(INSTAGRAM_MEDIA_PREFIX) &&
+      !objectKey.startsWith(INSTAGRAM_LIBRARY_PREFIX)) ||
     objectKey.includes("..")
   ) {
     return new Response("Not found", { status: 404 });

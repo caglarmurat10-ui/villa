@@ -8,10 +8,14 @@
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "vars": {
     "META_APP_ID": "2566616200453545",
-    "APP_BASE_URL": "https://villa-yonetim.caglarmurat10.workers.dev"
+    "APP_BASE_URL": "https://villa-yonetim.caglarmurat10.workers.dev",
+    "OPENAI_TEXT_MODEL": "gpt-5.6-terra",
+    "OPENAI_IMAGE_MODEL": "gpt-image-2",
+    "AI_IMAGE_ENABLED": "false",
+    "AI_VIDEO_ENABLED": "false"
   },
   "secrets": {
-    "required": ["META_APP_SECRET"]
+    "required": ["META_APP_SECRET", "OPENAI_API_KEY", "PEXELS_API_KEY", "SOCIAL_AI_ADMIN_KEY"]
   },
   "d1_databases": [
     { "binding": "DB", "database_name": "villa-yonetim", "database_id": "fa8fc6ec-9cc5-4c92-ba04-b23f2a9b8106", "migrations_dir": "migrations" }

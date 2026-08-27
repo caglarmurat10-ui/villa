@@ -1,7 +1,6 @@
 import { INSTAGRAM_MEDIA_PREFIX } from "@/lib/instagramTokenStore";
 import {
-  IMAGE_MAX_BYTES,
-  REELS_MAX_BYTES,
+  acceptedInstagramMedia,
   type InstagramMediaMetadata,
 } from "@/lib/instagramMedia";
 import {
@@ -14,47 +13,6 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 export const dynamic = "force-dynamic";
 
 const MEDIA_EXPIRATION_SECONDS = 24 * 60 * 60;
-
-type AcceptedMedia = {
-  contentType: "image/jpeg" | "video/mp4";
-  extension: "jpg" | "mp4";
-  maxBytes: number;
-};
-
-async function acceptedMedia(file: File): Promise<AcceptedMedia | null> {
-  const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
-
-  if (
-    file.type === "image/jpeg" &&
-    header.length >= 3 &&
-    header[0] === 0xff &&
-    header[1] === 0xd8 &&
-    header[2] === 0xff
-  ) {
-    return {
-      contentType: "image/jpeg",
-      extension: "jpg",
-      maxBytes: IMAGE_MAX_BYTES,
-    };
-  }
-
-  const hasFtypBox =
-    header.length >= 12 &&
-    header[4] === 0x66 &&
-    header[5] === 0x74 &&
-    header[6] === 0x79 &&
-    header[7] === 0x70;
-
-  if (file.type === "video/mp4" && hasFtypBox) {
-    return {
-      contentType: "video/mp4",
-      extension: "mp4",
-      maxBytes: REELS_MAX_BYTES,
-    };
-  }
-
-  return null;
-}
 
 export async function POST(request: Request) {
   try {
@@ -75,7 +33,7 @@ export async function POST(request: Request) {
       return Response.json({ error: "Geçerli villa seçin." }, { status: 400 });
     }
 
-    const media = await acceptedMedia(file);
+    const media = await acceptedInstagramMedia(file);
     if (!media) {
       return Response.json(
         { error: "Yalnızca gerçek JPG/JPEG fotoğraf veya MP4 video yükleyin." },

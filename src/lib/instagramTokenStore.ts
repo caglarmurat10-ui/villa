@@ -3,6 +3,7 @@ import type { Villa } from "@/lib/types";
 
 const TOKEN_PREFIX = "instagram-token:";
 export const INSTAGRAM_MEDIA_PREFIX = "instagram-media/";
+export const INSTAGRAM_LIBRARY_PREFIX = "instagram-library/";
 const TOKEN_EXPIRATION_SECONDS = 60 * 60 * 24 * 70;
 
 type EncryptedToken = {

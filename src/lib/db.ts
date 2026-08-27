@@ -2,6 +2,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
 import type { PriceRange, Reservation, SocialPost, SocialPostStatus, Villa, VillaLocations } from "./types";
 import type { ReservationInput, SocialPostInput } from "./schema";
+import { revalidateAvailabilityCampaigns } from "./socialOperationsDb";
 
 type ReservationRow = {
   id: string;
@@ -143,6 +144,11 @@ export async function createReservation(input: ReservationInput): Promise<Reserv
     db.prepare("INSERT INTO audit_log (entity_id, action, payload, created_at) VALUES (?, 'CREATE', ?, ?)")
       .bind(reservation.id, JSON.stringify(reservation), now),
   ]);
+  try {
+    await revalidateAvailabilityCampaigns(db, reservation.villa);
+  } catch {
+    console.error(JSON.stringify({ message: "social availability revalidation failed", action: "create", villa: reservation.villa }));
+  }
   return reservation;
 }
 
@@ -257,6 +263,13 @@ export async function updateReservation(id: string, input: ReservationInput): Pr
     db.prepare("INSERT INTO audit_log (entity_id, action, payload, created_at) VALUES (?, 'UPDATE', ?, ?)")
       .bind(id, JSON.stringify(input), now),
   ]);
+  for (const villa of new Set([current.villa, input.villa])) {
+    try {
+      await revalidateAvailabilityCampaigns(db, villa);
+    } catch {
+      console.error(JSON.stringify({ message: "social availability revalidation failed", action: "update", villa }));
+    }
+  }
   return (await findReservation(id))!;
 }
 

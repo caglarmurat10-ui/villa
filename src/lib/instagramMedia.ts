@@ -1,4 +1,7 @@
-import { INSTAGRAM_MEDIA_PREFIX } from "@/lib/instagramTokenStore";
+import {
+  INSTAGRAM_LIBRARY_PREFIX,
+  INSTAGRAM_MEDIA_PREFIX,
+} from "@/lib/instagramTokenStore";
 import type {
   InstagramPublishInput,
   InstagramPublishType,
@@ -11,6 +14,26 @@ import {
 export const IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 export const REELS_MAX_BYTES = 24 * 1024 * 1024;
 
+export type AcceptedMedia = {
+  contentType: "image/jpeg" | "video/mp4";
+  extension: "jpg" | "mp4";
+  maxBytes: number;
+};
+
+export async function acceptedInstagramMedia(file: File): Promise<AcceptedMedia | null> {
+  const header = new Uint8Array(await file.slice(0, 16).arrayBuffer());
+  if (file.type === "image/jpeg" && header.length >= 3 &&
+    header[0] === 0xff && header[1] === 0xd8 && header[2] === 0xff) {
+    return { contentType: "image/jpeg", extension: "jpg", maxBytes: IMAGE_MAX_BYTES };
+  }
+  const hasFtypBox = header.length >= 12 && header[4] === 0x66 && header[5] === 0x74 &&
+    header[6] === 0x79 && header[7] === 0x70;
+  if (file.type === "video/mp4" && hasFtypBox) {
+    return { contentType: "video/mp4", extension: "mp4", maxBytes: REELS_MAX_BYTES };
+  }
+  return null;
+}
+
 export type InstagramMediaMetadata = {
   contentType?: string;
   cacheControl?: string;
@@ -19,7 +42,7 @@ export type InstagramMediaMetadata = {
   size?: number;
   expiresAt?: string;
   scheduledAt?: string;
-  purpose?: "manual" | "scheduled";
+  purpose?: "manual" | "scheduled" | "library";
 };
 
 function expectedMedia(type: InstagramPublishType) {
@@ -64,7 +87,8 @@ export function managedInstagramMediaKey(
       .map(decodeURIComponent)
       .join("/");
     if (
-      !key.startsWith(INSTAGRAM_MEDIA_PREFIX) ||
+      (!key.startsWith(INSTAGRAM_MEDIA_PREFIX) &&
+        !key.startsWith(INSTAGRAM_LIBRARY_PREFIX)) ||
       key.includes("..") ||
       key.includes("\\") ||
       key.includes("\0")
@@ -119,7 +143,7 @@ export async function validateManagedInstagramMedia(
       );
     }
 
-    if (requiredExpiration !== null) {
+    if (requiredExpiration !== null && object.metadata?.purpose !== "library") {
       const expiresAt = Date.parse(object.metadata?.expiresAt ?? "");
       if (!Number.isFinite(expiresAt) || expiresAt < requiredExpiration) {
         throw new Error(

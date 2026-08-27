@@ -130,7 +130,7 @@ export async function instagramAuthorizeUrl(
     redirect_uri: instagramRedirectUri,
     response_type: "code",
     scope:
-      "instagram_business_basic,instagram_business_content_publish",
+      "instagram_business_basic,instagram_business_content_publish,instagram_business_manage_insights",
     state,
     force_reauth: "true",
   });
