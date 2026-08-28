@@ -8,6 +8,7 @@ export type MetaDiagnostic = {
     appSecret: boolean;
     baseUrl: boolean;
     database: boolean;
+    privateKv: boolean;
   };
   baseUrl: string;
   callbacks: {
@@ -38,6 +39,7 @@ export async function getMetaDiagnostic(accounts: MetaSocialAccount[]): Promise<
   const appSecret = String(env.META_APP_SECRET ?? process.env.META_APP_SECRET ?? "").trim();
   const baseUrl = String(env.APP_BASE_URL ?? process.env.APP_BASE_URL ?? "").trim().replace(/\/+$/, "");
   const hasDatabase = Boolean(env.DB);
+  const hasPrivateKv = Boolean(env.META_PRIVATE);
 
   const expected = [
     "Safira Instagram",
@@ -54,6 +56,7 @@ export async function getMetaDiagnostic(accounts: MetaSocialAccount[]): Promise<
       appSecret: Boolean(appSecret),
       baseUrl: Boolean(baseUrl),
       database: hasDatabase,
+      privateKv: hasPrivateKv,
     },
     baseUrl,
     callbacks: {
