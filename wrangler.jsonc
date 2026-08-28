@@ -4,9 +4,13 @@
   "main": ".open-next/worker.js",
   "compatibility_date": "2026-08-19",
   "compatibility_flags": ["nodejs_compat"],
+  "keep_vars": true,
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "vars": {
     "APP_BASE_URL": "https://villa-yonetim.caglarmurat10.workers.dev"
+  },
+  "secrets": {
+    "required": ["META_APP_SECRET"]
   },
   "d1_databases": [
     { "binding": "DB", "database_name": "villa-yonetim", "database_id": "fa8fc6ec-9cc5-4c92-ba04-b23f2a9b8106" }
