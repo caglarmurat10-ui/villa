@@ -1,5 +1,10 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
+import {
+  deleteFacebookPageToken,
+  getFacebookPageToken,
+  saveFacebookPageToken,
+} from "./facebook-private-store";
 import type { Villa } from "./types";
 
 export type MetaSocialAccount = {
@@ -25,8 +30,8 @@ type FacebookRow = {
   account_id: string;
   username: string;
   profile_url: string | null;
-  access_token: string;
   connected_at: string;
+  updated_at: string;
 };
 
 async function context() {
@@ -47,12 +52,14 @@ async function ensureInstagramTable(db: D1Database) {
 }
 
 async function ensureFacebookTable(db: D1Database) {
-  await db.prepare(`CREATE TABLE IF NOT EXISTS facebook_accounts (
+  // Security migration: the legacy table contained Facebook Page tokens in D1.
+  // Drop it rather than carrying any secret value forward.
+  await db.prepare("DROP TABLE IF EXISTS facebook_accounts").run();
+  await db.prepare(`CREATE TABLE IF NOT EXISTS facebook_account_metadata (
     villa TEXT PRIMARY KEY CHECK (villa IN ('Safira','Destan')),
-    account_id TEXT NOT NULL,
+    account_id TEXT NOT NULL UNIQUE,
     username TEXT NOT NULL,
     profile_url TEXT,
-    access_token TEXT NOT NULL,
     connected_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
   )`).run();
@@ -71,7 +78,7 @@ async function keyFromSecret(secret: string) {
 
 function toBase64(bytes: Uint8Array) {
   let binary = "";
-  bytes.forEach((b) => binary += String.fromCharCode(b));
+  bytes.forEach((b) => (binary += String.fromCharCode(b)));
   return btoa(binary);
 }
 
@@ -133,17 +140,53 @@ export async function saveFacebookAccount(
   accessToken: string,
 ) {
   const { env } = await context();
-  if (!env.META_APP_SECRET) throw new Error("META_APP_SECRET tanımlı değil.");
   const db = env.DB;
   await ensureTables(db);
+
+  const conflict = await db
+    .prepare("SELECT villa FROM facebook_account_metadata WHERE account_id=? AND villa<>?")
+    .bind(accountId, villa)
+    .first<{ villa: Villa }>();
+  if (conflict) {
+    throw new Error(`Bu Facebook Sayfası zaten Villa ${conflict.villa} ile eşleştirilmiş.`);
+  }
+
+  const previous = await db
+    .prepare("SELECT * FROM facebook_account_metadata WHERE villa=?")
+    .bind(villa)
+    .first<FacebookRow>();
+  const previousToken = previous
+    ? await getFacebookPageToken(villa, previous.account_id).catch(() => null)
+    : null;
+
   const now = new Date().toISOString();
-  const token = await encrypt(accessToken, env.META_APP_SECRET);
-  await db.prepare(`INSERT INTO facebook_accounts (villa, account_id, username, profile_url, access_token, connected_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
+  await db.prepare(`INSERT INTO facebook_account_metadata (villa, account_id, username, profile_url, connected_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
     ON CONFLICT(villa) DO UPDATE SET account_id=excluded.account_id, username=excluded.username,
-      profile_url=excluded.profile_url, access_token=excluded.access_token,
-      connected_at=excluded.connected_at, updated_at=excluded.updated_at`)
-    .bind(villa, accountId, username, profileUrl, token, now, now).run();
+      profile_url=excluded.profile_url, connected_at=excluded.connected_at, updated_at=excluded.updated_at`)
+    .bind(villa, accountId, username, profileUrl, now, now).run();
+
+  try {
+    await saveFacebookPageToken(villa, accountId, accessToken);
+  } catch (error) {
+    if (previous) {
+      await db.prepare(`INSERT INTO facebook_account_metadata (villa, account_id, username, profile_url, connected_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(villa) DO UPDATE SET account_id=excluded.account_id, username=excluded.username,
+          profile_url=excluded.profile_url, connected_at=excluded.connected_at, updated_at=excluded.updated_at`)
+        .bind(previous.villa, previous.account_id, previous.username, previous.profile_url, previous.connected_at, previous.updated_at)
+        .run()
+        .catch(() => undefined);
+      if (previousToken) {
+        await saveFacebookPageToken(villa, previous.account_id, previousToken).catch(() => undefined);
+      }
+    } else {
+      await db.prepare("DELETE FROM facebook_account_metadata WHERE villa=?").bind(villa).run().catch(() => undefined);
+      await deleteFacebookPageToken(villa).catch(() => undefined);
+    }
+    throw error;
+  }
+
   return { villa, platform: "Facebook" as const, accountId, username, profileUrl, connectedAt: now };
 }
 
@@ -153,7 +196,7 @@ export async function listMetaAccounts(): Promise<MetaSocialAccount[]> {
   await ensureTables(db);
   const [instagram, facebook] = await Promise.all([
     db.prepare("SELECT * FROM social_accounts ORDER BY villa, platform").all<InstagramRow>(),
-    db.prepare("SELECT * FROM facebook_accounts ORDER BY villa").all<FacebookRow>(),
+    db.prepare("SELECT * FROM facebook_account_metadata ORDER BY villa").all<FacebookRow>(),
   ]);
   return [
     ...instagram.results.map(publicInstagramAccount),
@@ -173,12 +216,13 @@ export async function getInstagramCredentials(villa: Villa) {
 
 export async function getFacebookCredentials(villa: Villa) {
   const { env } = await context();
-  if (!env.META_APP_SECRET) throw new Error("META_APP_SECRET tanımlı değil.");
   const db = env.DB;
   await ensureTables(db);
-  const row = await db.prepare("SELECT * FROM facebook_accounts WHERE villa=?").bind(villa).first<FacebookRow>();
+  const row = await db.prepare("SELECT * FROM facebook_account_metadata WHERE villa=?").bind(villa).first<FacebookRow>();
   if (!row) return null;
-  return { ...publicFacebookAccount(row), accessToken: await decrypt(row.access_token, env.META_APP_SECRET) };
+  const accessToken = await getFacebookPageToken(villa, row.account_id);
+  if (!accessToken) throw new Error("Facebook Page tokenı private KV içinde bulunamadı; yeniden bağlayın.");
+  return { ...publicFacebookAccount(row), accessToken };
 }
 
 export async function removeMetaAccount(villa: Villa, platform: "Instagram" | "Facebook") {
@@ -186,7 +230,8 @@ export async function removeMetaAccount(villa: Villa, platform: "Instagram" | "F
   const db = env.DB;
   await ensureTables(db);
   if (platform === "Facebook") {
-    await db.prepare("DELETE FROM facebook_accounts WHERE villa=?").bind(villa).run();
+    await deleteFacebookPageToken(villa);
+    await db.prepare("DELETE FROM facebook_account_metadata WHERE villa=?").bind(villa).run();
   } else {
     await db.prepare("DELETE FROM social_accounts WHERE villa=? AND platform='Instagram'").bind(villa).run();
   }

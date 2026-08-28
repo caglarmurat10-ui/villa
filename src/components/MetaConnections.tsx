@@ -12,8 +12,11 @@ const stageLabels: Record<string, string> = {
   state: "state doğrulama",
   "nonce-cookie": "güvenlik çerezi",
   "code-exchange": "erişim anahtarı",
-  "page-fetch": "Facebook Sayfa eşleştirme",
+  "page-fetch": "Facebook Sayfalarını alma",
+  "selection-save": "güvenli seçim oturumu",
+  "selection-validate": "Sayfa seçimi doğrulama",
   "profile-fetch": "profil bilgisi",
+  "account-save": "güvenli hesap kaydı",
   "database-save": "veritabanı kaydı",
 };
 
@@ -58,7 +61,7 @@ export default function MetaConnections({ initialAccounts }: { initialAccounts: 
   }
 
   return <section className="meta-connect-box">
-    <div className="meta-connect-head"><div><span className="eyebrow">META BAĞLANTILARI</span><h2>Instagram ve Facebook hesaplarını Villa Yönetim'e bağla</h2><p>Safira ve Destan hesapları ayrı tutulur. Tokenlar şifreli saklanır; yayın işlemleri yalnızca insan onayından geçmiş içeriklerde çalışır.</p></div></div>
+    <div className="meta-connect-head"><div><span className="eyebrow">META BAĞLANTILARI</span><h2>Instagram ve Facebook hesaplarını Villa Yönetim'e bağla</h2><p>Safira ve Destan hesapları ayrı tutulur. Facebook'ta otomatik isim eşleştirmesi yapılmaz; OAuth sonrasında doğru Sayfayı siz açıkça seçersiniz. Facebook Page tokenları D1'e yazılmaz, şifreli private KV'de saklanır.</p></div></div>
     {notice ? <p className="message">{notice}</p> : null}
     <div className="meta-account-grid">{villas.flatMap((villa) => platforms.map((platform) => {
       const account = accounts.find((item) => item.villa === villa && item.platform === platform);
@@ -71,7 +74,7 @@ export default function MetaConnections({ initialAccounts }: { initialAccounts: 
           <p>{platform === "Instagram" ? `@${account.username}` : account.username}</p>
           <div className="meta-actions"><span className="meta-ok">✓ Bağlı</span><button onClick={() => disconnect(villa, platform)}>Bağlantıyı kaldır</button></div>
         </> : <>
-          <p>Henüz bağlanmadı</p>
+          <p>{platform === "Facebook" ? "Bağlantıdan sonra Sayfa seçimi yapılacak" : "Henüz bağlanmadı"}</p>
           <a className="meta-connect-button" href={connectHref}>{platform}'u bağla</a>
         </>}
       </article>;
