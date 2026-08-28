@@ -37,11 +37,11 @@ export default function MetaConnections({ initialAccounts }: { initialAccounts: 
       setNotice(`${platform} bağlantısı tamamlanamadı · ${stageText}: ${error}`);
     } else if (connected) {
       if (platform === "Facebook" && brand === "applied") {
-        setNotice(`Villa ${connected} Facebook Sayfası bağlandı; profil logosu ve kapak görseli otomatik uygulandı.`);
+        setNotice(`Villa ${connected} Facebook Sayfası bağlandı; Hakkında metni, profil logosu ve kapak görseli otomatik uygulandı.`);
       } else if (platform === "Facebook" && brand === "partial") {
-        setNotice(`Villa ${connected} Facebook Sayfası bağlandı; marka görsellerinden biri uygulandı. Marka Merkezi'nden tekrar deneyebilirsiniz.`);
+        setNotice(`Villa ${connected} Facebook Sayfası bağlandı; marka ayarlarının bir bölümü uygulandı. Marka Merkezi'nden güvenle tekrar deneyebilirsiniz.`);
       } else if (platform === "Facebook" && brand === "failed") {
-        setNotice(`Villa ${connected} Facebook Sayfası bağlandı. Profil/kapak otomatik uygulanamadı; bağlantı korunuyor ve Marka Merkezi'nden tekrar denenebilir.`);
+        setNotice(`Villa ${connected} Facebook Sayfası bağlandı. Marka ayarları otomatik uygulanamadı; bağlantı korunuyor ve Marka Merkezi'nden tekrar denenebilir.`);
       } else {
         setNotice(`Villa ${connected} ${platform} hesabı başarıyla bağlandı.`);
       }
@@ -71,7 +71,7 @@ export default function MetaConnections({ initialAccounts }: { initialAccounts: 
   }
 
   return <section className="meta-connect-box">
-    <div className="meta-connect-head"><div><span className="eyebrow">META BAĞLANTILARI</span><h2>Instagram ve Facebook hesaplarını Villa Yönetim'e bağla</h2><p>Safira ve Destan hesapları ayrı tutulur. Facebook'ta otomatik isim eşleştirmesi yapılmaz; OAuth sonrasında doğru Sayfayı siz açıkça seçersiniz. Facebook Page tokenları D1'e yazılmaz, şifreli private KV'de saklanır. Facebook bağlantısında profil ve kapak marka görselleri de otomatik uygulanmayı dener.</p></div></div>
+    <div className="meta-connect-head"><div><span className="eyebrow">META BAĞLANTILARI</span><h2>Instagram ve Facebook hesaplarını Villa Yönetim'e bağla</h2><p>Safira ve Destan hesapları ayrı tutulur. Facebook'ta otomatik isim eşleştirmesi yapılmaz; OAuth sonrasında doğru Sayfayı siz açıkça seçersiniz. Facebook Page tokenları D1'e yazılmaz, şifreli private KV'de saklanır. Facebook bağlantısında güvenli Hakkında metni, profil logosu ve gerçek villa fotoğraflı kapak otomatik uygulanmayı dener.</p></div></div>
     {notice ? <p className="message">{notice}</p> : null}
     <div className="meta-account-grid">{villas.flatMap((villa) => platforms.map((platform) => {
       const account = accounts.find((item) => item.villa === villa && item.platform === platform);
@@ -84,7 +84,7 @@ export default function MetaConnections({ initialAccounts }: { initialAccounts: 
           <p>{platform === "Instagram" ? `@${account.username}` : account.username}</p>
           <div className="meta-actions"><span className="meta-ok">✓ Bağlı</span><button onClick={() => disconnect(villa, platform)}>Bağlantıyı kaldır</button></div>
         </> : <>
-          <p>{platform === "Facebook" ? "Bağlantıdan sonra Sayfa seçimi ve marka uygulaması yapılacak" : "Henüz bağlanmadı"}</p>
+          <p>{platform === "Facebook" ? "Bağlantıdan sonra Sayfa seçimi ve güvenli marka senkronu yapılacak" : "Henüz bağlanmadı"}</p>
           <a className="meta-connect-button" href={connectHref}>{platform}'u bağla</a>
         </>}
       </article>;

@@ -1,5 +1,6 @@
 import type { Villa } from "./types";
 import type { FacebookPageCandidate } from "./facebook-private-store";
+import { brandProfiles } from "./brand-profiles";
 import { makeInstagramState, metaConfig, verifyInstagramState } from "./meta";
 
 const META_GRAPH_VERSION = "v26.0";
@@ -113,7 +114,7 @@ export async function getFacebookPages(userAccessToken: string): Promise<Faceboo
 
 export async function getFacebookPageProfile(pageId: string, pageAccessToken: string) {
   const url = new URL(`${META_GRAPH}/${encodeURIComponent(pageId)}`);
-  url.searchParams.set("fields", "id,name,username,link");
+  url.searchParams.set("fields", "id,name,username,link,bio,description,cover,picture.type(large)");
   url.searchParams.set("access_token", pageAccessToken);
 
   const response = await fetch(url, { method: "GET" });
@@ -122,6 +123,10 @@ export async function getFacebookPageProfile(pageId: string, pageAccessToken: st
     name?: string;
     username?: string;
     link?: string;
+    bio?: string;
+    description?: string;
+    cover?: { source?: string };
+    picture?: { data?: { url?: string } };
     error?: { code?: number };
   };
 
@@ -134,6 +139,10 @@ export async function getFacebookPageProfile(pageId: string, pageAccessToken: st
     name: data.name ?? "Facebook Sayfası",
     username: data.username ?? data.name ?? "facebook",
     link: data.link ?? "",
+    bio: data.bio ?? "",
+    description: data.description ?? "",
+    coverUrl: data.cover?.source ?? "",
+    pictureUrl: data.picture?.data?.url ?? "",
   };
 }
 
@@ -152,6 +161,7 @@ async function graphPost(path: string, body: URLSearchParams) {
 }
 
 export type FacebookBrandApplyResult = {
+  details: { applied: boolean; error?: string };
   profile: { applied: boolean; error?: string };
   cover: { applied: boolean; error?: string };
 };
@@ -166,12 +176,32 @@ export async function applyFacebookBrandAssets(
   pageAccessToken: string,
 ): Promise<FacebookBrandApplyResult> {
   const { baseUrl } = await metaConfig();
+  const brand = brandProfiles[villa].facebook;
   const profileUrl = `${baseUrl}/api/social-assets/${villa}/profile`;
   const coverUrl = `${baseUrl}/api/social-assets/${villa}/cover`;
   const result: FacebookBrandApplyResult = {
+    details: { applied: false },
     profile: { applied: false },
     cover: { applied: false },
   };
+
+  // Only sync safe, source-controlled text fields. Page name, username, category,
+  // phone and website are intentionally not changed automatically.
+  try {
+    const detailBody = new URLSearchParams({
+      access_token: pageAccessToken,
+      bio: brand.intro,
+      description: brand.about,
+    });
+    const updated = await graphPost(encodeURIComponent(pageId), detailBody);
+    if (updated.response.ok && (updated.data.success === true || Boolean(updated.data.id))) {
+      result.details.applied = true;
+    } else {
+      result.details.error = publicGraphError("Facebook Hakkında alanları uygulanamadı", updated.response, updated.data);
+    }
+  } catch {
+    result.details.error = "Facebook Hakkında alanları uygulanamadı.";
+  }
 
   try {
     const body = new URLSearchParams({
