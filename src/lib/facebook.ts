@@ -1,21 +1,57 @@
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { Villa } from "./types";
 import type { FacebookPageCandidate } from "./facebook-private-store";
 import { brandProfiles } from "./brand-profiles";
-import { makeInstagramState, metaConfig, verifyInstagramState } from "./meta";
 
 const META_GRAPH_VERSION = "v26.0";
 const META_GRAPH = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
 const FACEBOOK_AUTH = `https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth`;
 
-export { verifyInstagramState as verifyFacebookState };
+async function facebookConfig() {
+  const { env } = await getCloudflareContext({ async: true });
+  const appId = env.FACEBOOK_APP_ID ?? process.env.FACEBOOK_APP_ID;
+  const appSecret = env.FACEBOOK_APP_SECRET ?? process.env.FACEBOOK_APP_SECRET;
+  const baseUrl = env.APP_BASE_URL ?? process.env.APP_BASE_URL;
+
+  if (!appId) throw new Error("Eksik ortam değişkeni: FACEBOOK_APP_ID. Instagram App ID Facebook Login için kullanılamaz.");
+  if (!appSecret) throw new Error("Eksik ortam değişkeni: FACEBOOK_APP_SECRET.");
+  if (!baseUrl) throw new Error("Eksik ortam değişkeni: APP_BASE_URL.");
+
+  return { appId, appSecret, baseUrl: baseUrl.replace(/\/$/, "") };
+}
 
 function facebookRedirectUri(baseUrl: string) {
   return `${baseUrl}/api/meta/facebook/callback`;
 }
 
+async function signFacebookState(villa: Villa, nonce: string) {
+  const { appSecret } = await facebookConfig();
+  const payload = `${villa}.${nonce}`;
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(appSecret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = new Uint8Array(await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(payload)));
+  return `${payload}.${Array.from(signature).map((byte) => byte.toString(16).padStart(2, "0")).join("")}`;
+}
+
+export async function verifyFacebookState(state: string) {
+  const parts = state.split(".");
+  if (parts.length !== 3) return null;
+  const [villa, nonce, signature] = parts;
+  if (villa !== "Safira" && villa !== "Destan") return null;
+  if (!/^[a-f0-9]{64}$/.test(signature)) return null;
+  const expected = await signFacebookState(villa, nonce);
+  if (expected !== state) return null;
+  return { villa: villa as Villa, nonce };
+}
+
 export async function facebookAuthorizeUrl(villa: Villa, nonce: string) {
-  const { appId, baseUrl } = await metaConfig();
-  const state = await makeInstagramState(villa, nonce);
+  const { appId, baseUrl } = await facebookConfig();
+  const state = await signFacebookState(villa, nonce);
   const params = new URLSearchParams({
     client_id: appId,
     redirect_uri: facebookRedirectUri(baseUrl),
@@ -28,7 +64,7 @@ export async function facebookAuthorizeUrl(villa: Villa, nonce: string) {
 }
 
 export async function exchangeFacebookCode(code: string) {
-  const { appId, appSecret, baseUrl } = await metaConfig();
+  const { appId, appSecret, baseUrl } = await facebookConfig();
   const url = new URL(`${META_GRAPH}/oauth/access_token`);
   url.searchParams.set("client_id", appId);
   url.searchParams.set("client_secret", appSecret);
@@ -51,7 +87,7 @@ export async function exchangeFacebookCode(code: string) {
 }
 
 export async function exchangeFacebookLongLivedToken(shortLivedAccessToken: string) {
-  const { appId, appSecret } = await metaConfig();
+  const { appId, appSecret } = await facebookConfig();
   const url = new URL(`${META_GRAPH}/oauth/access_token`);
   url.searchParams.set("grant_type", "fb_exchange_token");
   url.searchParams.set("client_id", appId);
@@ -175,7 +211,7 @@ export async function applyFacebookBrandAssets(
   pageId: string,
   pageAccessToken: string,
 ): Promise<FacebookBrandApplyResult> {
-  const { baseUrl } = await metaConfig();
+  const { baseUrl } = await facebookConfig();
   const brand = brandProfiles[villa].facebook;
   const profileUrl = `${baseUrl}/api/social-assets/${villa}/profile`;
   const coverUrl = `${baseUrl}/api/social-assets/${villa}/cover`;
@@ -185,63 +221,34 @@ export async function applyFacebookBrandAssets(
     cover: { applied: false },
   };
 
-  // Only sync safe, source-controlled text fields. Page name, username, category,
-  // phone and website are intentionally not changed automatically.
   try {
-    const detailBody = new URLSearchParams({
-      access_token: pageAccessToken,
-      bio: brand.intro,
-      description: brand.about,
-    });
+    const detailBody = new URLSearchParams({ access_token: pageAccessToken, bio: brand.intro, description: brand.about });
     const updated = await graphPost(encodeURIComponent(pageId), detailBody);
-    if (updated.response.ok && (updated.data.success === true || Boolean(updated.data.id))) {
-      result.details.applied = true;
-    } else {
-      result.details.error = publicGraphError("Facebook Hakkında alanları uygulanamadı", updated.response, updated.data);
-    }
+    if (updated.response.ok && (updated.data.success === true || Boolean(updated.data.id))) result.details.applied = true;
+    else result.details.error = publicGraphError("Facebook Hakkında alanları uygulanamadı", updated.response, updated.data);
   } catch {
     result.details.error = "Facebook Hakkında alanları uygulanamadı.";
   }
 
   try {
-    const body = new URLSearchParams({
-      access_token: pageAccessToken,
-      url: profileUrl,
-      no_feed_story: "true",
-    });
+    const body = new URLSearchParams({ access_token: pageAccessToken, url: profileUrl, no_feed_story: "true" });
     const { response, data } = await graphPost(`${encodeURIComponent(pageId)}/picture`, body);
-    if (response.ok && (data.success === true || Boolean(data.id))) {
-      result.profile.applied = true;
-    } else {
-      result.profile.error = publicGraphError("Facebook profil fotoğrafı uygulanamadı", response, data);
-    }
+    if (response.ok && (data.success === true || Boolean(data.id))) result.profile.applied = true;
+    else result.profile.error = publicGraphError("Facebook profil fotoğrafı uygulanamadı", response, data);
   } catch {
     result.profile.error = "Facebook profil fotoğrafı uygulanamadı.";
   }
 
   try {
-    const uploadBody = new URLSearchParams({
-      access_token: pageAccessToken,
-      url: coverUrl,
-      published: "false",
-      no_story: "true",
-    });
+    const uploadBody = new URLSearchParams({ access_token: pageAccessToken, url: coverUrl, published: "false", no_story: "true" });
     const upload = await graphPost(`${encodeURIComponent(pageId)}/photos`, uploadBody);
     if (!upload.response.ok || !upload.data.id) {
       result.cover.error = publicGraphError("Facebook kapak görseli yüklenemedi", upload.response, upload.data);
     } else {
-      const applyBody = new URLSearchParams({
-        access_token: pageAccessToken,
-        cover: upload.data.id,
-        offset_y: "50",
-        no_feed_story: "true",
-      });
+      const applyBody = new URLSearchParams({ access_token: pageAccessToken, cover: upload.data.id, offset_y: "50", no_feed_story: "true" });
       const applied = await graphPost(encodeURIComponent(pageId), applyBody);
-      if (applied.response.ok && (applied.data.success === true || Boolean(applied.data.id))) {
-        result.cover.applied = true;
-      } else {
-        result.cover.error = publicGraphError("Facebook kapak görseli uygulanamadı", applied.response, applied.data);
-      }
+      if (applied.response.ok && (applied.data.success === true || Boolean(applied.data.id))) result.cover.applied = true;
+      else result.cover.error = publicGraphError("Facebook kapak görseli uygulanamadı", applied.response, applied.data);
     }
   } catch {
     result.cover.error = "Facebook kapak görseli uygulanamadı.";
@@ -250,12 +257,7 @@ export async function applyFacebookBrandAssets(
   return result;
 }
 
-export async function publishFacebookPost(
-  pageId: string,
-  pageAccessToken: string,
-  message: string,
-  imageUrl?: string,
-) {
+export async function publishFacebookPost(pageId: string, pageAccessToken: string, message: string, imageUrl?: string) {
   const endpoint = imageUrl ? `${META_GRAPH}/${pageId}/photos` : `${META_GRAPH}/${pageId}/feed`;
   const body = new URLSearchParams({ access_token: pageAccessToken });
   if (imageUrl) {
@@ -272,12 +274,7 @@ export async function publishFacebookPost(
     body,
   });
 
-  const data = (await response.json().catch(() => ({}))) as {
-    id?: string;
-    post_id?: string;
-    error?: { code?: number };
-  };
-
+  const data = (await response.json().catch(() => ({}))) as { id?: string; post_id?: string; error?: { code?: number } };
   if (!response.ok || (!data.id && !data.post_id)) {
     throw new Error(`Facebook yayını başarısız (HTTP ${response.status}${data.error?.code ? ` / ${data.error.code}` : ""}).`);
   }
