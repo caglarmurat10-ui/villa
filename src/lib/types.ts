@@ -4,6 +4,7 @@ export type VillaLocations = Record<Villa, string>;
 export type SocialPlatform = "Instagram" | "Facebook" | "TikTok" | "WhatsApp Durum";
 export type SocialContentType = "Gönderi" | "Hikâye" | "Reels" | "Durum";
 export type SocialPostStatus = "Planlandı" | "Yayınlandı";
+export type SocialPostApproval = "İnsan onayı" | "Onaylandı";
 
 export interface Reservation {
   id: string;
@@ -39,6 +40,8 @@ export interface SocialPost {
   // Legacy social rows may not have an attached media URL yet.
   mediaUrl?: string;
   status: SocialPostStatus;
+  approvalStatus: SocialPostApproval;
+  approvedAt: string | null;
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
