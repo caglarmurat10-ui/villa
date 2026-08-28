@@ -8,7 +8,7 @@
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "vars": {
     "META_APP_ID": "2566616200453545",
-    "FACEBOOK_APP_ID": "23359436506793",
+    "FACEBOOK_APP_ID": "2335943650679330",
     "APP_BASE_URL": "https://villa-yonetim.caglarmurat10.workers.dev"
   },
   "secrets": {
