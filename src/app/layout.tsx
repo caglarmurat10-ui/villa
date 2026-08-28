@@ -6,6 +6,7 @@ import "./social-approval.css";
 import "./social-content-library.css";
 import "./meta-diagnostics.css";
 import "./brand-profile.css";
+import "./brand-assets.css";
 import "./message.css";
 import "./navigation.css";
 
