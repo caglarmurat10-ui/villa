@@ -21,10 +21,11 @@ export default function MetaDiagnostics({ diagnostic }: { diagnostic: MetaDiagno
         <Status ok={diagnostic.configuration.instagramAppSecret} label="Instagram META_APP_SECRET" />
         <Status ok={diagnostic.configuration.facebookAppId} label="FACEBOOK_APP_ID" />
         <Status ok={diagnostic.configuration.facebookAppSecret} label="FACEBOOK_APP_SECRET" />
+        <Status ok={diagnostic.configuration.facebookConfigId} label="FACEBOOK_CONFIG_ID" />
         <Status ok={diagnostic.configuration.baseUrl} label="APP_BASE_URL" />
         <Status ok={diagnostic.configuration.database} label="D1 / DB" />
         <Status ok={diagnostic.configuration.privateKv} label="META_PRIVATE KV" />
-      </div><p>Graph API: <strong>{diagnostic.graphApiVersion}</strong></p>{!diagnostic.configuration.facebookAppId || !diagnostic.configuration.facebookAppSecret ? <p className="diag-warning">Facebook Login için Meta Developer uygulamasındaki Facebook App ID ve App Secret ayrı olarak Cloudflare'a eklenmelidir.</p> : null}</article>
+      </div><p>Graph API: <strong>{diagnostic.graphApiVersion}</strong></p>{!diagnostic.configuration.facebookAppId || !diagnostic.configuration.facebookAppSecret || !diagnostic.configuration.facebookConfigId ? <p className="diag-warning">Facebook Login for Business için App ID, App Secret ve Business Login Configuration ID ayrı olarak Cloudflare'a eklenmelidir.</p> : null}</article>
 
       <article><h3>Hesap bağlantıları</h3><p><strong>{diagnostic.accounts.connected}/{diagnostic.accounts.expected}</strong> bağlantı hazır</p>{diagnostic.accounts.missing.length ? <ul>{diagnostic.accounts.missing.map((item) => <li key={item}>{item} bekleniyor</li>)}</ul> : <p className="diag-complete">Safira ve Destan Instagram/Facebook bağlantıları tamam.</p>}</article>
     </div>
@@ -37,7 +38,7 @@ export default function MetaDiagnostics({ diagnostic }: { diagnostic: MetaDiagno
 
     <div className="diag-scopes">
       <div><strong>Instagram izinleri</strong><p>{diagnostic.requiredScopes.instagram.join(" · ")}</p></div>
-      <div><strong>Facebook izinleri</strong><p>{diagnostic.requiredScopes.facebook.join(" · ")}</p></div>
+      <div><strong>Facebook Business Login yapılandırmasında bulunması gereken izinler</strong><p>{diagnostic.requiredScopes.facebook.join(" · ")}</p></div>
     </div>
 
     <MetaHealthCheck />
