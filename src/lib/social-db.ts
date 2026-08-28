@@ -21,6 +21,8 @@ type SocialPostRow = {
 
 type SocialPostIdentityRow = Pick<SocialPostRow, "id" | "villa" | "platform" | "content_type" | "scheduled_date" | "caption" | "media_url" | "status">;
 
+let tableReady: Promise<void> | null = null;
+
 async function database(): Promise<D1Database> {
   const { env } = await getCloudflareContext({ async: true });
   return env.DB;
@@ -48,7 +50,7 @@ function identity(input: Pick<SocialPostInput, "villa" | "platform" | "contentTy
   return `${input.villa}\u001f${input.platform}\u001f${input.contentType}\u001f${input.scheduledDate}\u001f${input.caption}`;
 }
 
-async function ensureTable(db: D1Database) {
+async function prepareTable(db: D1Database) {
   await db.batch([
     db.prepare(`CREATE TABLE IF NOT EXISTS social_posts (
       id TEXT PRIMARY KEY,
@@ -67,16 +69,32 @@ async function ensureTable(db: D1Database) {
     )`),
     db.prepare("CREATE INDEX IF NOT EXISTS social_posts_schedule_idx ON social_posts (status, scheduled_date)"),
   ]);
+
+  // Legacy deployments may predate these columns. Run compatibility ALTERs once per isolate,
+  // not on every request.
   try { await db.prepare("ALTER TABLE social_posts ADD COLUMN media_url TEXT NOT NULL DEFAULT ''").run(); } catch {}
   try { await db.prepare("ALTER TABLE social_posts ADD COLUMN approval_status TEXT NOT NULL DEFAULT 'İnsan onayı' CHECK (approval_status IN ('İnsan onayı', 'Onaylandı'))").run(); } catch {}
   try { await db.prepare("ALTER TABLE social_posts ADD COLUMN approved_at TEXT").run(); } catch {}
 }
 
-export async function listSocialPosts(): Promise<SocialPost[]> {
+async function ensureTable(db: D1Database) {
+  if (!tableReady) {
+    tableReady = prepareTable(db).catch((error) => {
+      tableReady = null;
+      throw error;
+    });
+  }
+  await tableReady;
+}
+
+export async function listSocialPosts(limit?: number): Promise<SocialPost[]> {
   const db = await database();
   await ensureTable(db);
-  const result = await db.prepare(`SELECT * FROM social_posts
-    ORDER BY CASE status WHEN 'Planlandı' THEN 0 ELSE 1 END, scheduled_date ASC, created_at DESC`).all<SocialPostRow>();
+  const safeLimit = Number.isFinite(limit) ? Math.max(1, Math.min(100, Math.trunc(limit!))) : null;
+  const sql = `SELECT * FROM social_posts
+    ORDER BY CASE status WHEN 'Planlandı' THEN 0 ELSE 1 END, scheduled_date ASC, created_at DESC${safeLimit ? " LIMIT ?" : ""}`;
+  const statement = safeLimit ? db.prepare(sql).bind(safeLimit) : db.prepare(sql);
+  const result = await statement.all<SocialPostRow>();
   return result.results.map(mapRow);
 }
 
@@ -150,8 +168,8 @@ export async function seedSocialPosts(inputs: SocialPostInput[]) {
     .bind(item.mediaUrl, now, item.id));
   const statements = [...insertStatements, ...updateStatements];
 
-  for (let index = 0; index < statements.length; index += 50) {
-    await db.batch(statements.slice(index, index + 50));
+  for (let index = 0; index < statements.length; index += 25) {
+    await db.batch(statements.slice(index, index + 25));
   }
 
   return { created: pending.length, updated: updates.length, skipped, total: inputs.length };
