@@ -6,7 +6,8 @@ export type DriveMediaAsset = {
   fileId: string;
   viewUrl: string;
   previewUrl: string;
-  publishUrl: string;
+  sourceUrl: string;
+  proxyPath: string;
 };
 
 const source: Array<[Villa, string, string]> = [
@@ -38,7 +39,8 @@ function toAsset([villa, fileName, fileId]: [Villa, string, string]): DriveMedia
     fileId,
     viewUrl: `https://drive.google.com/file/d/${fileId}/view?usp=drivesdk`,
     previewUrl: `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`,
-    publishUrl: `https://drive.google.com/uc?export=download&id=${fileId}`,
+    sourceUrl: `https://drive.google.com/uc?export=download&id=${fileId}`,
+    proxyPath: `/api/media/drive/${fileId}`,
   };
 }
 
@@ -47,23 +49,40 @@ export const socialDriveMedia: DriveMediaAsset[] = source.map(toAsset);
 const byVillaAndName = new Map(
   socialDriveMedia.map((asset) => [`${asset.villa}:${asset.fileName}`, asset]),
 );
+const byId = new Map(socialDriveMedia.map((asset) => [asset.fileId, asset]));
 
 export function resolveDriveMedia(villa: Villa, fileName: string) {
   return byVillaAndName.get(`${villa}:${fileName}`) ?? null;
 }
 
-export function isApprovedDriveMediaUrl(villa: Villa, url: string) {
-  return socialDriveMedia.some((asset) =>
-    asset.villa === villa &&
-    (asset.publishUrl === url || asset.previewUrl === url || asset.viewUrl === url),
-  );
+export function resolveDriveMediaById(fileId: string) {
+  return byId.get(fileId) ?? null;
 }
 
-export function isGoogleDriveMediaUrl(url: string) {
+function proxyFileId(url: string) {
   try {
     const parsed = new URL(url);
-    return parsed.hostname === "drive.google.com" || parsed.hostname === "docs.google.com";
+    const match = parsed.pathname.match(/^\/api\/media\/drive\/([^/]+)$/);
+    return match?.[1] ?? "";
+  } catch {
+    return "";
+  }
+}
+
+export function isManagedMediaUrl(url: string) {
+  try {
+    const parsed = new URL(url);
+    return parsed.hostname === "drive.google.com" || parsed.hostname === "docs.google.com" || Boolean(proxyFileId(url));
   } catch {
     return false;
   }
+}
+
+export function isApprovedMediaUrl(villa: Villa, url: string) {
+  const fileId = proxyFileId(url);
+  if (fileId) return resolveDriveMediaById(fileId)?.villa === villa;
+  return socialDriveMedia.some((asset) =>
+    asset.villa === villa &&
+    (asset.sourceUrl === url || asset.previewUrl === url || asset.viewUrl === url),
+  );
 }
