@@ -122,25 +122,18 @@ export async function seedSocialPosts(inputs: SocialPostInput[]) {
     caption: row.caption,
   })));
 
-  let created = 0;
-  let skipped = 0;
-  for (const input of inputs) {
-    const key = identity(input);
-    if (existing.has(key)) {
-      skipped += 1;
-      continue;
-    }
-    const now = new Date().toISOString();
-    await db.prepare(`INSERT INTO social_posts
-      (id, villa, platform, content_type, scheduled_date, caption, media_url, status, approval_status, approved_at, published_at, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, 'Planlandı', 'İnsan onayı', NULL, NULL, ?, ?)`)
-      .bind(crypto.randomUUID(), input.villa, input.platform, input.contentType, input.scheduledDate, input.caption, input.mediaUrl, now, now)
-      .run();
-    existing.add(key);
-    created += 1;
+  const pending = inputs.filter((input) => !existing.has(identity(input)));
+  const now = new Date().toISOString();
+  const statements = pending.map((input) => db.prepare(`INSERT INTO social_posts
+    (id, villa, platform, content_type, scheduled_date, caption, media_url, status, approval_status, approved_at, published_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'Planlandı', 'İnsan onayı', NULL, NULL, ?, ?)`)
+    .bind(crypto.randomUUID(), input.villa, input.platform, input.contentType, input.scheduledDate, input.caption, input.mediaUrl, now, now));
+
+  for (let index = 0; index < statements.length; index += 50) {
+    await db.batch(statements.slice(index, index + 50));
   }
 
-  return { created, skipped, total: inputs.length };
+  return { created: pending.length, skipped: inputs.length - pending.length, total: inputs.length };
 }
 
 export async function updateSocialPostApproval(id: string, approvalStatus: SocialPostApproval): Promise<SocialPost | null> {
