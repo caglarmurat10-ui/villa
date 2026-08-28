@@ -2,9 +2,10 @@ import {
   deleteSocialPost,
   getSocialPost,
   updateSocialPostApproval,
+  updateSocialPostContent,
   updateSocialPostStatus,
 } from "@/lib/social-db";
-import { socialPostApprovalSchema, socialPostStatusSchema } from "@/lib/schema";
+import { socialPostApprovalSchema, socialPostEditSchema, socialPostStatusSchema } from "@/lib/schema";
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {
   const { id } = await context.params;
@@ -22,20 +23,30 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   }
 
   const status = socialPostStatusSchema.safeParse(body);
-  if (!status.success) {
-    return Response.json({ error: "Geçerli paylaşım veya onay durumu seçin." }, { status: 400 });
+  if (status.success) {
+    if (status.data.status === "Yayınlandı") {
+      const current = await getSocialPost(id);
+      if (!current) return Response.json({ error: "Paylaşım bulunamadı." }, { status: 404 });
+      if (current.approvalStatus !== "Onaylandı") {
+        return Response.json({ error: "Paylaşım yayınlanmadan önce insan onayı verilmelidir." }, { status: 409 });
+      }
+    }
+    const post = await updateSocialPostStatus(id, status.data.status);
+    return post ? Response.json({ post }) : Response.json({ error: "Paylaşım bulunamadı." }, { status: 404 });
   }
 
-  if (status.data.status === "Yayınlandı") {
+  const edit = socialPostEditSchema.safeParse(body);
+  if (edit.success) {
     const current = await getSocialPost(id);
     if (!current) return Response.json({ error: "Paylaşım bulunamadı." }, { status: 404 });
-    if (current.approvalStatus !== "Onaylandı") {
-      return Response.json({ error: "Paylaşım yayınlanmadan önce insan onayı verilmelidir." }, { status: 409 });
+    if (current.status === "Yayınlandı") {
+      return Response.json({ error: "Yayınlanmış paylaşım düzenlenemez; önce yeni bir plan oluşturun." }, { status: 409 });
     }
+    const post = await updateSocialPostContent(id, edit.data);
+    return post ? Response.json({ post }) : Response.json({ error: "Paylaşım güncellenemedi." }, { status: 409 });
   }
 
-  const post = await updateSocialPostStatus(id, status.data.status);
-  return post ? Response.json({ post }) : Response.json({ error: "Paylaşım bulunamadı." }, { status: 404 });
+  return Response.json({ error: "Geçerli paylaşım güncellemesi, durum veya onay bilgisi gönderin." }, { status: 400 });
 }
 
 export async function DELETE(_request: Request, context: { params: Promise<{ id: string }> }) {
