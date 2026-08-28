@@ -1,43 +1,62 @@
 import type { Villa } from "./types";
 
 export const profileAssets: Record<Villa, string> = {
-  Safira: "/brand/safira-profile.svg",
-  Destan: "/brand/destan-profile.svg",
+  Safira: "/api/social-assets/Safira/profile",
+  Destan: "/api/social-assets/Destan/profile",
 };
 
-// Facebook cover preview always uses a verified real image from the correct villa whitelist.
 export const facebookCoverAssets: Record<Villa, string> = {
-  Safira: "/api/media/drive/13ZC4v1qxGmUX0AXfNRWhpAkYprKpfkLB", // Villa Safira (50).jpg
-  Destan: "/api/media/drive/1IipTx5zZfOge9Y1rQJBpW8BK9zBU2tgj", // DJI_0332.jpg
+  Safira: "/api/social-assets/Safira/cover",
+  Destan: "/api/social-assets/Destan/cover",
 };
 
-export const highlightAssets = [
-  { label: "Villa", path: "/brand/highlight-villa.svg" },
-  { label: "Havuz", path: "/brand/highlight-havuz.svg" },
-  { label: "Odalar", path: "/brand/highlight-odalar.svg" },
-  { label: "Patara", path: "/brand/highlight-patara.svg" },
-  { label: "Kaş", path: "/brand/highlight-kas.svg" },
-  { label: "Müsaitlik", path: "/brand/highlight-musaitlik.svg" },
-  { label: "İletişim", path: "/brand/highlight-iletisim.svg" },
-];
+const highlightDefinitions = [
+  { key: "villa", label: "Villa" },
+  { key: "havuz", label: "Havuz" },
+  { key: "odalar", label: "Odalar" },
+  { key: "patara", label: "Patara" },
+  { key: "kas", label: "Kaş" },
+  { key: "musaitlik", label: "Müsaitlik" },
+  { key: "iletisim", label: "İletişim" },
+] as const;
+
+export function highlightAssetsForVilla(villa: Villa) {
+  return highlightDefinitions.map((item) => ({
+    label: item.label,
+    path: `/api/social-assets/${villa}/highlight/${item.key}`,
+  }));
+}
+
+export const socialAssetManifest: Record<Villa, { profile: string; facebookCover: string; instagramHighlights: Array<{ label: string; path: string }> }> = {
+  Safira: {
+    profile: profileAssets.Safira,
+    facebookCover: facebookCoverAssets.Safira,
+    instagramHighlights: highlightAssetsForVilla("Safira"),
+  },
+  Destan: {
+    profile: profileAssets.Destan,
+    facebookCover: facebookCoverAssets.Destan,
+    instagramHighlights: highlightAssetsForVilla("Destan"),
+  },
+};
 
 export const verifiedMediaNotes: Record<Villa, { status: string; notes: string[] }> = {
   Safira: {
     status: "12 gerçek Safira görseli Drive ile doğrulandı",
     notes: [
       "30 günlük içerik planında kullanılan Safira fotoğrafları gerçek `Safira Resim` Drive klasörüyle dosya ID'si seviyesinde eşleştirildi.",
-      "Facebook kapak önizlemesi gerçek `Villa Safira (50).jpg` dosyasını kullanır.",
+      "Facebook kapak PNG'si gerçek `Villa Safira (50).jpg` fotoğrafından otomatik üretilir.",
+      "Profil logosu yalnız VS monogramı + Villa Safira adı kullanır; yapay villa fotoğrafı içermez.",
       "Instagram / Facebook yayınında yalnız Safira whitelist'indeki medya ID'leri kabul edilir; Destan medyası teknik olarak reddedilir.",
-      "AI ile başka villa üretilmez ve Villa Safira diye yayınlanmaz.",
     ],
   },
   Destan: {
     status: "7 gerçek Destan görseli Drive ile doğrulandı",
     notes: [
       "30 günlük içerik planında kullanılan Destan fotoğrafları gerçek `destan resim` Drive klasörüyle dosya ID'si seviyesinde eşleştirildi.",
-      "Facebook kapak önizlemesi gerçek `DJI_0332.jpg` drone fotoğrafını kullanır.",
+      "Facebook kapak PNG'si gerçek `DJI_0332.jpg` drone fotoğrafından otomatik üretilir.",
+      "Profil logosu yalnız VD monogramı + Villa Destan adı kullanır; yapay villa fotoğrafı içermez.",
       "Instagram / Facebook yayınında yalnız Destan whitelist'indeki medya ID'leri kabul edilir; Safira medyası teknik olarak reddedilir.",
-      "Gerçek drone dosyası doğrulandığı için sahte drone görseli kullanılmaz.",
     ],
   },
 };
