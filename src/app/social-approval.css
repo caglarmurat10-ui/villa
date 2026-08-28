@@ -1,0 +1,10 @@
+.social-overview{grid-template-columns:repeat(3,100px)}
+.social-state-badges{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:5px}
+.approval-status{padding:4px 7px;border-radius:99px;font-size:9px;font-weight:800;white-space:nowrap}
+.approval-status.pending{color:#fde68a;background:#713f12}
+.approval-status.approved{color:#bbf7d0;background:#14532d}
+.social-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
+.social-actions .approval-action{border-color:#a16207;color:#fde68a;background:#422006}
+.social-actions .approval-action.approved{border-color:#15803d;color:#bbf7d0;background:#14532d}
+@media(max-width:850px){.social-overview{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:520px){.social-state-badges{justify-content:flex-start}.social-post-top{flex-direction:column}.social-overview{grid-template-columns:1fr 1fr}.social-actions{grid-template-columns:1fr}}
