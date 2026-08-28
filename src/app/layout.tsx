@@ -4,6 +4,7 @@ import "./globals.css";
 import "./social.css";
 import "./social-approval.css";
 import "./social-content-library.css";
+import "./meta-diagnostics.css";
 import "./message.css";
 import "./navigation.css";
 
