@@ -65,7 +65,7 @@ export async function getMetaDiagnostic(accounts: MetaSocialAccount[]): Promise<
     },
     requiredScopes: {
       instagram: ["instagram_business_basic", "instagram_business_content_publish"],
-      facebook: ["pages_show_list", "pages_read_engagement", "pages_manage_posts"],
+      facebook: ["pages_show_list", "pages_read_engagement", "pages_manage_posts", "pages_manage_metadata"],
     },
     accounts: {
       connected: connected.size,
