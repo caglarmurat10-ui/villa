@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import NavigationBridge from "@/components/NavigationBridge";
 import "./globals.css";
 import "./social.css";
+import "./social-approval.css";
 import "./message.css";
 import "./navigation.css";
 

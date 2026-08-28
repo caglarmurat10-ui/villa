@@ -1,6 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
-import type { SocialPost, SocialPostStatus } from "./types";
+import type { SocialPost, SocialPostApproval, SocialPostStatus } from "./types";
 import type { SocialPostInput } from "./schema";
 
 type SocialPostRow = {
@@ -12,6 +12,8 @@ type SocialPostRow = {
   caption: string;
   media_url?: string | null;
   status: SocialPostStatus;
+  approval_status?: SocialPostApproval | null;
+  approved_at?: string | null;
   published_at: string | null;
   created_at: string;
   updated_at: string;
@@ -32,6 +34,8 @@ function mapRow(row: SocialPostRow): SocialPost {
     caption: row.caption,
     mediaUrl: row.media_url ?? "",
     status: row.status,
+    approvalStatus: row.approval_status ?? "İnsan onayı",
+    approvedAt: row.approved_at ?? null,
     publishedAt: row.published_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
@@ -49,6 +53,8 @@ async function ensureTable(db: D1Database) {
       caption TEXT NOT NULL CHECK (length(caption) BETWEEN 1 AND 2200),
       media_url TEXT NOT NULL DEFAULT '',
       status TEXT NOT NULL DEFAULT 'Planlandı' CHECK (status IN ('Planlandı', 'Yayınlandı')),
+      approval_status TEXT NOT NULL DEFAULT 'İnsan onayı' CHECK (approval_status IN ('İnsan onayı', 'Onaylandı')),
+      approved_at TEXT,
       published_at TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
@@ -56,6 +62,8 @@ async function ensureTable(db: D1Database) {
     db.prepare("CREATE INDEX IF NOT EXISTS social_posts_schedule_idx ON social_posts (status, scheduled_date)"),
   ]);
   try { await db.prepare("ALTER TABLE social_posts ADD COLUMN media_url TEXT NOT NULL DEFAULT ''").run(); } catch {}
+  try { await db.prepare("ALTER TABLE social_posts ADD COLUMN approval_status TEXT NOT NULL DEFAULT 'İnsan onayı' CHECK (approval_status IN ('İnsan onayı', 'Onaylandı'))").run(); } catch {}
+  try { await db.prepare("ALTER TABLE social_posts ADD COLUMN approved_at TEXT").run(); } catch {}
 }
 
 export async function listSocialPosts(): Promise<SocialPost[]> {
@@ -66,6 +74,13 @@ export async function listSocialPosts(): Promise<SocialPost[]> {
   return result.results.map(mapRow);
 }
 
+export async function getSocialPost(id: string): Promise<SocialPost | null> {
+  const db = await database();
+  await ensureTable(db);
+  const row = await db.prepare("SELECT * FROM social_posts WHERE id = ?").bind(id).first<SocialPostRow>();
+  return row ? mapRow(row) : null;
+}
+
 export async function createSocialPost(input: SocialPostInput): Promise<SocialPost> {
   const db = await database();
   await ensureTable(db);
@@ -74,17 +89,30 @@ export async function createSocialPost(input: SocialPostInput): Promise<SocialPo
     id: crypto.randomUUID(),
     ...input,
     status: "Planlandı",
+    approvalStatus: "İnsan onayı",
+    approvedAt: null,
     publishedAt: null,
     createdAt: now,
     updatedAt: now,
   };
   await db.prepare(`INSERT INTO social_posts
-    (id, villa, platform, content_type, scheduled_date, caption, media_url, status, published_at, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+    (id, villa, platform, content_type, scheduled_date, caption, media_url, status, approval_status, approved_at, published_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
       post.id, post.villa, post.platform, post.contentType, post.scheduledDate, post.caption, post.mediaUrl,
-      post.status, post.publishedAt, post.createdAt, post.updatedAt,
+      post.status, post.approvalStatus, post.approvedAt, post.publishedAt, post.createdAt, post.updatedAt,
     ).run();
   return post;
+}
+
+export async function updateSocialPostApproval(id: string, approvalStatus: SocialPostApproval): Promise<SocialPost | null> {
+  const db = await database();
+  await ensureTable(db);
+  const now = new Date().toISOString();
+  const approvedAt = approvalStatus === "Onaylandı" ? now : null;
+  await db.prepare("UPDATE social_posts SET approval_status = ?, approved_at = ?, updated_at = ? WHERE id = ?")
+    .bind(approvalStatus, approvedAt, now, id).run();
+  const row = await db.prepare("SELECT * FROM social_posts WHERE id = ?").bind(id).first<SocialPostRow>();
+  return row ? mapRow(row) : null;
 }
 
 export async function updateSocialPostStatus(id: string, status: SocialPostStatus): Promise<SocialPost | null> {
