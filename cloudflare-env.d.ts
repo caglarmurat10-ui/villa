@@ -7,6 +7,8 @@ declare global {
     META_PRIVATE: KVNamespace;
     META_APP_ID?: string;
     META_APP_SECRET?: string;
+    FACEBOOK_APP_ID?: string;
+    FACEBOOK_APP_SECRET?: string;
     APP_BASE_URL?: string;
   }
 }
