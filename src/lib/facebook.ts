@@ -19,7 +19,7 @@ export async function facebookAuthorizeUrl(villa: Villa, nonce: string) {
     client_id: appId,
     redirect_uri: facebookRedirectUri(baseUrl),
     response_type: "code",
-    scope: "pages_show_list,pages_read_engagement,pages_manage_posts",
+    scope: "pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_metadata",
     state,
     auth_type: "rerequest",
   });
@@ -135,6 +135,89 @@ export async function getFacebookPageProfile(pageId: string, pageAccessToken: st
     username: data.username ?? data.name ?? "facebook",
     link: data.link ?? "",
   };
+}
+
+async function graphPost(path: string, body: URLSearchParams) {
+  const response = await fetch(`${META_GRAPH}/${path}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  const data = (await response.json().catch(() => ({}))) as {
+    id?: string;
+    success?: boolean;
+    error?: { code?: number; message?: string };
+  };
+  return { response, data };
+}
+
+export type FacebookBrandApplyResult = {
+  profile: { applied: boolean; error?: string };
+  cover: { applied: boolean; error?: string };
+};
+
+function publicGraphError(prefix: string, response: Response, data: { error?: { code?: number } }) {
+  return `${prefix} (HTTP ${response.status}${data.error?.code ? ` / ${data.error.code}` : ""})`;
+}
+
+export async function applyFacebookBrandAssets(
+  villa: Villa,
+  pageId: string,
+  pageAccessToken: string,
+): Promise<FacebookBrandApplyResult> {
+  const { baseUrl } = await metaConfig();
+  const profileUrl = `${baseUrl}/api/social-assets/${villa}/profile`;
+  const coverUrl = `${baseUrl}/api/social-assets/${villa}/cover`;
+  const result: FacebookBrandApplyResult = {
+    profile: { applied: false },
+    cover: { applied: false },
+  };
+
+  try {
+    const body = new URLSearchParams({
+      access_token: pageAccessToken,
+      url: profileUrl,
+      no_feed_story: "true",
+    });
+    const { response, data } = await graphPost(`${encodeURIComponent(pageId)}/picture`, body);
+    if (response.ok && (data.success === true || Boolean(data.id))) {
+      result.profile.applied = true;
+    } else {
+      result.profile.error = publicGraphError("Facebook profil fotoğrafı uygulanamadı", response, data);
+    }
+  } catch {
+    result.profile.error = "Facebook profil fotoğrafı uygulanamadı.";
+  }
+
+  try {
+    const uploadBody = new URLSearchParams({
+      access_token: pageAccessToken,
+      url: coverUrl,
+      published: "false",
+      no_story: "true",
+    });
+    const upload = await graphPost(`${encodeURIComponent(pageId)}/photos`, uploadBody);
+    if (!upload.response.ok || !upload.data.id) {
+      result.cover.error = publicGraphError("Facebook kapak görseli yüklenemedi", upload.response, upload.data);
+    } else {
+      const applyBody = new URLSearchParams({
+        access_token: pageAccessToken,
+        cover: upload.data.id,
+        offset_y: "50",
+        no_feed_story: "true",
+      });
+      const applied = await graphPost(encodeURIComponent(pageId), applyBody);
+      if (applied.response.ok && (applied.data.success === true || Boolean(applied.data.id))) {
+        result.cover.applied = true;
+      } else {
+        result.cover.error = publicGraphError("Facebook kapak görseli uygulanamadı", applied.response, applied.data);
+      }
+    }
+  } catch {
+    result.cover.error = "Facebook kapak görseli uygulanamadı.";
+  }
+
+  return result;
 }
 
 export async function publishFacebookPost(
