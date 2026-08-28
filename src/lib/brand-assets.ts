@@ -5,6 +5,11 @@ export const profileAssets: Record<Villa, string> = {
   Destan: "/brand/destan-profile.svg",
 };
 
+export const facebookCoverAssets: Record<Villa, string> = {
+  Safira: "/brand/safira-facebook-cover.svg",
+  Destan: "/brand/destan-facebook-cover.svg",
+};
+
 export const highlightAssets = [
   { label: "Villa", path: "/brand/highlight-villa.svg" },
   { label: "Havuz", path: "/brand/highlight-havuz.svg" },
