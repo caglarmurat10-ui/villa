@@ -1,4 +1,5 @@
 import MetaConnections from "@/components/MetaConnections";
+import SocialContentLibrary from "@/components/SocialContentLibrary";
 import SocialMediaView from "@/components/SocialMediaView";
 import { listMetaAccounts } from "@/lib/meta-store";
 import { listReservations } from "@/lib/db";
@@ -14,5 +15,5 @@ function istanbulToday() {
 export default async function SocialPage() {
   const [posts, accounts, reservations] = await Promise.all([listSocialPosts(), listMetaAccounts(), listReservations()]);
   const gaps = findAvailabilityGaps(reservations, istanbulToday());
-  return <><MetaConnections initialAccounts={accounts} /><SocialMediaView initialPosts={posts} availabilityGaps={gaps} /></>;
+  return <><MetaConnections initialAccounts={accounts} /><SocialContentLibrary /><SocialMediaView initialPosts={posts} availabilityGaps={gaps} /></>;
 }
