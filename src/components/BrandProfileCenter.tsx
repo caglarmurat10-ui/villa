@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { brandProfiles } from "@/lib/brand-profiles";
+import { highlightAssets, profileAssets, verifiedMediaNotes } from "@/lib/brand-assets";
+import { organicRevivalRules, socialAudiences } from "@/lib/social-audiences";
 import type { Villa } from "@/lib/types";
 
 async function copyText(value: string) {
@@ -12,6 +14,7 @@ export default function BrandProfileCenter() {
   const [villa, setVilla] = useState<Villa>("Safira");
   const [notice, setNotice] = useState("");
   const profile = brandProfiles[villa];
+  const media = verifiedMediaNotes[villa];
 
   async function copy(label: string, value: string) {
     try {
@@ -25,8 +28,13 @@ export default function BrandProfileCenter() {
   return <main className="brand-page">
     <div className="brand-top"><a href="/sosyal">← Sosyal medya merkezine dön</a><span>Villa Yönetim · Marka Ayarları</span></div>
     <section className="brand-shell">
-      <header className="brand-hero"><div><span className="eyebrow">MARKA / PROFİL KONTROL MERKEZİ</span><h1>Safira ve Destan sosyal medya standardı</h1><p>Bio, profil adı, öne çıkanlar, sabit içerikler, Facebook CTA ve görsel kurallar tek kaynaktan yönetilir.</p></div><div className="brand-switch">{(["Safira","Destan"] as Villa[]).map((item) => <button type="button" key={item} className={villa===item?"active":""} onClick={()=>{setVilla(item);setNotice("");}}>Villa {item}</button>)}</div></header>
+      <header className="brand-hero"><div><span className="eyebrow">MARKA / PROFİL / CANLANDIRMA MERKEZİ</span><h1>Safira ve Destan sosyal medya standardı</h1><p>Profil ayarları, logo, öne çıkan kapakları, Meta bağlantıları, hedef kitleler ve ilk 30 günlük canlandırma kuralları tek merkezde.</p></div><div className="brand-switch">{(["Safira","Destan"] as Villa[]).map((item) => <button type="button" key={item} className={villa===item?"active":""} onClick={()=>{setVilla(item);setNotice("");}}>Villa {item}</button>)}</div></header>
       {notice ? <p className="message brand-message">{notice}</p> : null}
+
+      <article className="brand-assets-card">
+        <div className="brand-assets-logo"><img src={profileAssets[villa]} alt={`Villa ${villa} profil logosu`} /><div><span className="eyebrow">HAZIR PROFİL VARLIĞI</span><h2>Villa {villa} profil logosu</h2><p>Lacivert-altın ortak marka ailesi. Instagram ve Facebook profil fotoğrafı için kare/daire güvenli alanla hazır.</p><a href={profileAssets[villa]} download>Logo SVG dosyasını aç →</a></div></div>
+        <div className="brand-connect-actions"><a href={`/api/meta/instagram/connect?villa=${villa}`}>Instagram bağlantısını başlat</a><a href={`/api/meta/facebook/connect?villa=${villa}`}>Facebook bağlantısını başlat</a><a href="/sosyal">Meta durumunu kontrol et</a></div>
+      </article>
 
       <div className="brand-grid">
         <article className="brand-card"><div className="brand-card-head"><div><span>INSTAGRAM</span><h2>Profil standardı</h2></div></div>
@@ -50,6 +58,10 @@ export default function BrandProfileCenter() {
         </article>
       </div>
 
+      <article className="brand-highlight-card"><div><span className="eyebrow">ÖNE ÇIKAN KAPAKLARI</span><h2>Tek tip Instagram Highlight sistemi</h2><p>Safira ve Destan aynı görsel dili kullanır; yalnız hesap adı ve gerçek medya ayrıdır.</p></div><div className="highlight-assets">{highlightAssets.map((asset)=><a key={asset.label} href={asset.path} download><img src={asset.path} alt={`${asset.label} öne çıkan kapağı`} /><span>{asset.label}</span></a>)}</div></article>
+
+      <article className="brand-media-status"><div><span className="eyebrow">GERÇEK MEDYA GÜVENLİĞİ</span><h2>{media.status}</h2></div><ul>{media.notes.map((note)=><li key={note}>{note}</li>)}</ul></article>
+
       <article className="brand-visual"><div><span className="eyebrow">GÖRSEL SİSTEM</span><h2>Yayınlanacak görsel standardı</h2></div><div className="brand-visual-grid">
         <div><strong>Kırpma</strong><p>{profile.visual.feedRatio}</p></div>
         <div><strong>Renk yönü</strong><p>{profile.visual.colorDirection}</p></div>
@@ -59,6 +71,10 @@ export default function BrandProfileCenter() {
       </div></article>
 
       <article className="brand-week"><div className="brand-week-head"><div><span className="eyebrow">7 GÜN CANLANDIRMA</span><h2>İlk hafta yayın akışı</h2></div><small>Her içerik yayın öncesi insan onayından geçer</small></div><div className="brand-week-list">{profile.launchWeek.map((item)=><div key={item.day}><b>Gün {item.day}</b><strong>{item.main}</strong><span>{item.format}</span><p>{item.story}</p><em>{item.goal}</em></div>)}</div></article>
+
+      <article className="audience-center"><div className="audience-head"><div><span className="eyebrow">HEDEF KİTLE MERKEZİ</span><h2>Meta kampanya kitleleri</h2><p>Kitleler hazırdır; reklam harcaması açık kullanıcı onayı olmadan başlatılmaz.</p></div><strong>{socialAudiences.length} kitle seti</strong></div><div className="audience-grid">{socialAudiences.map((item)=><section key={item.id}><div className="audience-title"><h3>{item.name}</h3><span>{item.activation}</span></div><dl><div><dt>Coğrafya</dt><dd>{item.geography}</dd></div><div><dt>Yaş</dt><dd>{item.age}</dd></div><div><dt>Hedefleme</dt><dd>{item.targeting}</dd></div><div><dt>Amaç</dt><dd>{item.objective}</dd></div><div><dt>Kreatif</dt><dd>{item.creative}</dd></div></dl><p>{item.rule}</p></section>)}</div></article>
+
+      <article className="revival-rules"><div><span className="eyebrow">30 GÜNLÜK OPERASYON KURALLARI</span><h2>Canlandırma guardrail'leri</h2></div><ol>{organicRevivalRules.map((rule)=><li key={rule}>{rule}</li>)}</ol></article>
     </section>
   </main>;
 }
