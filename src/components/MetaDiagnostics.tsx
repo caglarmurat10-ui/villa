@@ -1,3 +1,4 @@
+import MetaHealthCheck from "@/components/MetaHealthCheck";
 import type { MetaDiagnostic } from "@/lib/meta-diagnostics";
 
 function Status({ ok, label }: { ok: boolean; label: string }) {
@@ -35,5 +36,7 @@ export default function MetaDiagnostics({ diagnostic }: { diagnostic: MetaDiagno
       <div><strong>Instagram izinleri</strong><p>{diagnostic.requiredScopes.instagram.join(" · ")}</p></div>
       <div><strong>Facebook izinleri</strong><p>{diagnostic.requiredScopes.facebook.join(" · ")}</p></div>
     </div>
+
+    <MetaHealthCheck />
   </section>;
 }
