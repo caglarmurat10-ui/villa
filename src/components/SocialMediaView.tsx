@@ -1,8 +1,9 @@
 "use client";
 
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { SocialContentType, SocialPlatform, SocialPost, SocialPostStatus, Villa } from "@/lib/types";
 import type { AvailabilityGap } from "@/lib/social-availability";
+import type { SocialContentTemplate } from "@/lib/social-content-library";
 
 const platforms: SocialPlatform[] = ["Instagram", "Facebook", "TikTok", "WhatsApp Durum"];
 const types: Record<SocialPlatform, SocialContentType[]> = {
@@ -48,6 +49,22 @@ export default function SocialMediaView({ initialPosts, availabilityGaps }: { in
   const published=posts.filter(p=>p.status==="Yayınlandı").length;
   const approvalPending=posts.filter(p=>p.status==="Planlandı"&&p.approvalStatus!=="Onaylandı").length;
   const gaps=availabilityGaps.filter(g=>g.startDate>=today()).slice(0,10);
+
+  useEffect(() => {
+    function handleTemplate(event: Event) {
+      const template = (event as CustomEvent<SocialContentTemplate>).detail;
+      if (!template) return;
+      setVilla(template.villa);
+      setPlatform("Instagram");
+      setContentType(template.contentType);
+      setScheduledDate(template.scheduledDate >= today() ? template.scheduledDate : today());
+      setCaption(template.caption);
+      setMediaUrl("");
+      setNotice(`${template.id} forma yüklendi. Önerilen gerçek medya dosyası: ${template.mediaFile}. Görsel bağlantısını ekleyip paylaşımı kontrol edin.`);
+    }
+    window.addEventListener("social-template-use", handleTemplate);
+    return () => window.removeEventListener("social-template-use", handleTemplate);
+  }, []);
 
   function useGap(gap: AvailabilityGap) {
     setVilla(gap.villa);
