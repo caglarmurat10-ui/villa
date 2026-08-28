@@ -1,4 +1,5 @@
 import type { Villa } from "./types";
+import type { FacebookPageCandidate } from "./facebook-private-store";
 import { makeInstagramState, metaConfig, verifyInstagramState } from "./meta";
 
 const META_GRAPH_VERSION = "v26.0";
@@ -71,18 +72,14 @@ export async function exchangeFacebookLongLivedToken(shortLivedAccessToken: stri
   return { accessToken: data.access_token, expiresIn: data.expires_in ?? null };
 }
 
-type FacebookPage = {
+type FacebookPageApi = {
   id: string;
   name: string;
   access_token?: string;
   tasks?: string[];
 };
 
-function normalize(value: string) {
-  return value.toLocaleLowerCase("tr-TR").replace(/[^a-z0-9çğıöşü]+/gi, " ").trim();
-}
-
-export async function getFacebookPageForVilla(villa: Villa, userAccessToken: string) {
+export async function getFacebookPages(userAccessToken: string): Promise<FacebookPageCandidate[]> {
   const url = new URL(`${META_GRAPH}/me/accounts`);
   url.searchParams.set("fields", "id,name,access_token,tasks");
   url.searchParams.set("limit", "100");
@@ -90,7 +87,7 @@ export async function getFacebookPageForVilla(villa: Villa, userAccessToken: str
 
   const response = await fetch(url, { method: "GET" });
   const data = (await response.json().catch(() => ({}))) as {
-    data?: FacebookPage[];
+    data?: FacebookPageApi[];
     error?: { code?: number };
   };
 
@@ -98,26 +95,20 @@ export async function getFacebookPageForVilla(villa: Villa, userAccessToken: str
     throw new Error(`Facebook sayfaları alınamadı (HTTP ${response.status}${data.error?.code ? ` / ${data.error.code}` : ""}).`);
   }
 
-  const pages = (data.data ?? []).filter((page) => page.id && page.name && page.access_token);
+  const pages = (data.data ?? [])
+    .filter((page) => page.id && page.name && page.access_token)
+    .map((page) => ({
+      id: page.id,
+      name: page.name,
+      accessToken: page.access_token!,
+      tasks: page.tasks ?? [],
+    }));
+
   if (pages.length === 0) {
     throw new Error("Bu Meta hesabında yönetilebilir Facebook Sayfası bulunamadı.");
   }
 
-  const villaName = normalize(villa);
-  const matched = pages.filter((page) => normalize(page.name).includes(villaName));
-  const page = matched.length === 1 ? matched[0] : pages.length === 1 ? pages[0] : null;
-
-  if (!page?.access_token) {
-    const names = pages.map((item) => item.name).slice(0, 6).join(", ");
-    throw new Error(`Villa ${villa} için Facebook Sayfası otomatik eşleştirilemedi. Bulunan sayfalar: ${names}.`);
-  }
-
-  return {
-    id: page.id,
-    name: page.name,
-    accessToken: page.access_token,
-    tasks: page.tasks ?? [],
-  };
+  return pages;
 }
 
 export async function getFacebookPageProfile(pageId: string, pageAccessToken: string) {
