@@ -1,7 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
 import type { SocialPost, SocialPostApproval, SocialPostStatus } from "./types";
-import type { SocialPostInput } from "./schema";
+import type { SocialPostEditInput, SocialPostInput } from "./schema";
 
 type SocialPostRow = {
   id: string;
@@ -102,6 +102,23 @@ export async function createSocialPost(input: SocialPostInput): Promise<SocialPo
       post.status, post.approvalStatus, post.approvedAt, post.publishedAt, post.createdAt, post.updatedAt,
     ).run();
   return post;
+}
+
+export async function updateSocialPostContent(id: string, input: SocialPostEditInput): Promise<SocialPost | null> {
+  const db = await database();
+  await ensureTable(db);
+  const now = new Date().toISOString();
+  await db.prepare(`UPDATE social_posts SET
+    scheduled_date = COALESCE(?, scheduled_date),
+    caption = COALESCE(?, caption),
+    media_url = COALESCE(?, media_url),
+    approval_status = 'İnsan onayı',
+    approved_at = NULL,
+    updated_at = ?
+    WHERE id = ? AND status = 'Planlandı'`)
+    .bind(input.scheduledDate ?? null, input.caption ?? null, input.mediaUrl ?? null, now, id).run();
+  const row = await db.prepare("SELECT * FROM social_posts WHERE id = ?").bind(id).first<SocialPostRow>();
+  return row ? mapRow(row) : null;
 }
 
 export async function updateSocialPostApproval(id: string, approvalStatus: SocialPostApproval): Promise<SocialPost | null> {
