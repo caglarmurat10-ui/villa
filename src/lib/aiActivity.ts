@@ -1,5 +1,5 @@
 import { generateAiContent, todaySuggestion } from "./aiContentStudio";
-import { hasOpenAiConfiguration } from "./aiConfiguration";
+import { hasConfiguredTextProvider } from "./aiConfiguration";
 import { getAiSettings, type AiSocialSettings } from "./aiDb";
 import { availabilityPriceText, createCampaign, getSocialSettings, listAvailability, suggestLibraryMedia } from "./socialOperationsDb";
 import type { AiPurpose } from "./aiTypes";
@@ -34,7 +34,7 @@ const purposeByCategory: Record<string, AiPurpose> = {
 
 export async function runAiContentActivity(env: CloudflareEnv, now = new Date()) {
   const results: Array<{ villa: Villa; status: string }> = [];
-  if (!hasOpenAiConfiguration(env)) {
+  if (!hasConfiguredTextProvider(env)) {
     return (["Destan", "Safira"] as const).map((villa) => ({ villa, status: "unconfigured" }));
   }
   for (const villa of ["Destan", "Safira"] as const) {
@@ -70,7 +70,7 @@ export async function runAiContentActivity(env: CloudflareEnv, now = new Date())
       }
       const campaign = await createCampaign(env.DB, { villa, campaignType: purpose, availabilityStart: gap?.startDate ?? null,
         availabilityEnd: gap?.endDate ?? null, nights: gap?.nights ?? null, mediaIds: [media.id],
-        caption: generated.output.caption, templateId: `ai:${generated.id}`, source: "automation",
+        caption: generated.output.caption, templateId: generated.id ? `ai:${generated.id}` : "ai:unsaved", source: "automation",
         contentCategory: suggestion.category });
       results.push({ villa, status: campaign
         ? settings.autopilotLevel === "auto_schedule" ? "drafted-approval-required" : "drafted"

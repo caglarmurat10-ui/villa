@@ -25,7 +25,7 @@ describe("opsiyonel AI route davranışı", () => {
       method: "POST", headers: { origin: "https://villa.example", "content-type": "application/json" }, body: "{}",
     }));
     expect(content.status).toBe(503);
-    expect(await content.json()).toMatchObject({ configured: false, service: "openai" });
+    expect(await content.json()).toMatchObject({ configured: false, service: "admin" });
 
     const pexels = await searchPexels(new Request("https://villa.example/api/social/ai/pexels?kind=photo&query=Patara"));
     expect(pexels.status).toBe(503);
@@ -37,7 +37,8 @@ describe("opsiyonel AI route davranışı", () => {
     const body = await response.json() as Record<string, unknown>;
     expect(response.status).toBe(200);
     expect(body).toMatchObject({ configured: false, authenticated: false,
-      configuration: { openAiConfigured: false, pexelsConfigured: false, adminConfigured: false,
+      configuration: { workersAiConfigured: false, primaryProvider: "workers-ai", openAiConfigured: false,
+        paidFallbackEnabled: false, pexelsConfigured: false, adminConfigured: false, templateAvailable: true,
         aiEnabled: false, imageEnabled: false, videoEnabled: false, autopilotEnabled: false } });
     expect(JSON.stringify(body)).not.toMatch(/API_KEY|ADMIN_KEY|token|secret/i);
   });

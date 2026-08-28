@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createAiAdminCookie } from "@/lib/aiAdminSession";
 import { publicAiError, readAiD1 } from "@/lib/aiD1";
 import { aiUsageSummary, getAiSettings, getVillaAiProfile, listRegionalIdeas, recentAiContext, recentAiTopics } from "@/lib/aiDb";
-import { todaySuggestion } from "@/lib/aiContentStudio";
+import { generateAiContent, todaySuggestion } from "@/lib/aiContentStudio";
 
 type Query = { sql: string; args: unknown[] };
 type FakeOptions = { failOn?: string; topicRows?: number };
@@ -101,6 +101,17 @@ describe("AI D1 request hot path", () => {
     const suggestion = await todaySuggestion(fake.db, "Destan");
     expect(suggestion).toMatchObject({ villa: "Destan", historyAvailable: false });
     expect(suggestion.suggestion).toBeTruthy();
+  });
+
+  it("generation history timeout olduğunda doğrulanmış profil ve şablonla taslak döndürür", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    const fake = fakeDb({ failOn: "FROM ai_content_history" });
+    const result = await generateAiContent({ db: fake.db,
+      env: { AI_PROVIDER: "template", AI_IMAGE_ENABLED: "false", AI_VIDEO_ENABLED: "false" } as unknown as CloudflareEnv,
+      villa: "Destan", purpose: "villa", mode: "quick", userBrief: "Sade bir içerik" });
+    expect(result.provider).toBe("template");
+    expect(result.output.caption).toBeTruthy();
+    expect(JSON.stringify(result)).not.toContain("D1_ERROR");
   });
 
   it("safe read timeout için yalnız bir kısa retry yapar", async () => {

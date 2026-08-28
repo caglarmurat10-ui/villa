@@ -36,7 +36,8 @@ function fakeDb(used = 0) {
 
 const env = {
   OPENAI_API_KEY: "test-key-never-logged", OPENAI_TEXT_MODEL: "test-model", OPENAI_IMAGE_MODEL: "test-image",
-  AI_IMAGE_ENABLED: "false", AI_VIDEO_ENABLED: "false", SOCIAL_AI_ADMIN_KEY: "a-strong-test-admin-key",
+  AI_ALLOW_PAID_FALLBACK: "true", AI_IMAGE_ENABLED: "false", AI_VIDEO_ENABLED: "false",
+  SOCIAL_AI_ADMIN_KEY: "a-strong-test-admin-key",
 } as unknown as CloudflareEnv;
 
 const validOutput: AiContentOutput = {
@@ -51,8 +52,10 @@ describe("AI structured output ve güvenlik", () => {
   it("AI ve Pexels secretları yokken güvenli biçimde yapılandırılmamış olur", async () => {
     const missing = { AI_IMAGE_ENABLED: "true", AI_VIDEO_ENABLED: "true" } as unknown as CloudflareEnv;
     expect(aiConfigurationStatus(missing, true)).toEqual({
+      workersAiConfigured: false, workersAiModel: "@cf/meta/llama-3.1-8b-instruct-fast", primaryProvider: "workers-ai",
       openAiConfigured: false, pexelsConfigured: false, adminConfigured: false,
-      aiEnabled: false, imageEnabled: false, videoEnabled: false, autopilotEnabled: false,
+      paidFallbackEnabled: false, templateAvailable: true, aiEnabled: false,
+      imageEnabled: false, videoEnabled: false, autopilotEnabled: false,
     });
     const response = integrationUnavailableResponse("openai");
     expect(response.status).toBe(503);
@@ -65,8 +68,10 @@ describe("AI structured output ve güvenlik", () => {
   it("mock secret varlığını yalnız güvenli boolean metadata olarak bildirir", () => {
     const configured = { ...env, PEXELS_API_KEY: "mock-pexels", AI_IMAGE_ENABLED: "false", AI_VIDEO_ENABLED: "false" } as unknown as CloudflareEnv;
     expect(aiConfigurationStatus(configured, true)).toEqual({
+      workersAiConfigured: false, workersAiModel: "@cf/meta/llama-3.1-8b-instruct-fast", primaryProvider: "workers-ai",
       openAiConfigured: true, pexelsConfigured: true, adminConfigured: true,
-      aiEnabled: true, imageEnabled: false, videoEnabled: false, autopilotEnabled: true,
+      paidFallbackEnabled: true, templateAvailable: true, aiEnabled: true,
+      imageEnabled: false, videoEnabled: false, autopilotEnabled: true,
     });
     expect(JSON.stringify(aiConfigurationStatus(configured))).not.toContain("mock-pexels");
   });

@@ -1,5 +1,5 @@
 import { requireAiAdmin } from "@/lib/aiAdminSession";
-import { hasAiAdminConfiguration, hasOpenAiConfiguration, integrationUnavailableResponse } from "@/lib/aiConfiguration";
+import { hasAiAdminConfiguration, integrationUnavailableResponse } from "@/lib/aiConfiguration";
 import { publicAiError } from "@/lib/aiD1";
 import { generateAiContent } from "@/lib/aiContentStudio";
 import { AI_MODES, AI_PURPOSES, type AiMode, type AiPurpose } from "@/lib/aiTypes";
@@ -14,7 +14,6 @@ const isPurpose = (value: unknown): value is AiPurpose => typeof value === "stri
 export async function POST(request: Request) {
   try {
     const { db, env } = await socialOperationsDb();
-    if (!hasOpenAiConfiguration(env)) return integrationUnavailableResponse("openai");
     if (!hasAiAdminConfiguration(env)) return integrationUnavailableResponse("admin");
     const body = await request.json() as Record<string, unknown>;
     if (!isVilla(body.villa) || !isMode(body.mode) || !isPurpose(body.purpose)) throw new Error("AI içerik seçimi geçersiz.");
@@ -32,7 +31,7 @@ export async function POST(request: Request) {
     const result = await generateAiContent({ db, env, villa: body.villa, mode: body.mode, purpose: body.purpose,
       userBrief: typeof body.userBrief === "string" ? body.userBrief : "", availability,
       mediaCategory: typeof body.mediaCategory === "string" ? body.mediaCategory.slice(0, 80) : null,
-      weekly: body.weekly === true });
+      weekly: body.weekly === true, forceRefresh: body.forceRefresh === true });
     return Response.json(result, { status: 201 });
   } catch (error) {
     return Response.json({ error: publicAiError(error, "AI içerik üretilemedi. Lütfen yeniden deneyin.") }, { status: 400 });

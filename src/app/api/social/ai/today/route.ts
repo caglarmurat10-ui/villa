@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     const items = settled.map((result, index) => result.status === "fulfilled" ? result.value : fallbackTodaySuggestion(villas[index]));
     const configuration = aiConfigurationStatus(env, items.some((item) => item.enabled && item.autopilotLevel !== "off"));
     const available = settled.every((result) => result.status === "fulfilled") && items.every((item) => item.historyAvailable);
-    return Response.json({ configured: configuration.openAiConfigured, configuration, items, available,
+    return Response.json({ configured: configuration.aiEnabled, configuration, items, available,
       warnings: available ? [] : ["İçerik geçmişi şu anda yüklenemedi. İçerik üretmeye devam edebilirsiniz."] });
   } catch { return Response.json({ error: "Bugünün içerik önerileri hazırlanamadı." }, { status: 500 }); }
 }

@@ -1,5 +1,5 @@
 import { requireAiAdmin } from "@/lib/aiAdminSession";
-import { hasAiAdminConfiguration, hasOpenAiConfiguration, integrationUnavailableResponse } from "@/lib/aiConfiguration";
+import { hasAiAdminConfiguration, hasConfiguredTextProvider, integrationUnavailableResponse } from "@/lib/aiConfiguration";
 import { publicAiError } from "@/lib/aiD1";
 import { researchRegionalTopic } from "@/lib/aiContentStudio";
 import { listRegionalIdeas } from "@/lib/aiDb";
@@ -14,9 +14,9 @@ export async function GET(request: Request) {
     if (!hasAiAdminConfiguration(env)) return integrationUnavailableResponse("admin");
     if (!(await requireAiAdmin(request, env))) return Response.json({ error: "Yetkili oturum gerekli." }, { status: 401 });
     try {
-      return Response.json({ configured: hasOpenAiConfiguration(env), items: await listRegionalIdeas(db), available: true, warnings: [] });
+      return Response.json({ configured: hasConfiguredTextProvider(env), items: await listRegionalIdeas(db), available: true, warnings: [] });
     } catch {
-      return Response.json({ configured: hasOpenAiConfiguration(env), items: [], available: false,
+      return Response.json({ configured: hasConfiguredTextProvider(env), items: [], available: false,
         warnings: ["Bölgesel fikirler şu anda yüklenemedi. İçerik üretmeye devam edebilirsiniz."] });
     }
   } catch { return Response.json({ error: "Bölgesel içerik kuyruğu yüklenemedi." }, { status: 500 }); }
@@ -24,7 +24,6 @@ export async function GET(request: Request) {
 export async function POST(request: Request) {
   try {
     const { db, env } = await socialOperationsDb();
-    if (!hasOpenAiConfiguration(env)) return integrationUnavailableResponse("openai");
     if (!hasAiAdminConfiguration(env)) return integrationUnavailableResponse("admin");
     const body = await request.json() as Record<string, unknown>;
     if (!isVilla(body.villa) || typeof body.topic !== "string") throw new Error("Araştırma bilgileri geçersiz.");

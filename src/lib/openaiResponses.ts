@@ -6,7 +6,7 @@ import {
   logAiUsage,
   recordAiServiceResult,
 } from "./aiDb";
-import { requireOpenAiApiKey } from "./aiConfiguration";
+import { isPaidAiFallbackAllowed, requireOpenAiApiKey } from "./aiConfiguration";
 import type { Villa } from "./types";
 
 const RESPONSES_URL = "https://api.openai.com/v1/responses";
@@ -77,6 +77,7 @@ export async function callStructuredResponse<T>(input: {
   webSearch?: boolean;
   fetcher?: typeof fetch;
 }): Promise<StructuredResponseResult<T>> {
+  if (!isPaidAiFallbackAllowed(input.env)) throw new Error("OpenAI ücretli alternatifi kapalı.");
   const service = input.operation === "research" ? "openai-web" : "openai-text";
   const model = input.env.OPENAI_TEXT_MODEL || "gpt-5.6-terra";
   const key = requireOpenAiApiKey(input.env);

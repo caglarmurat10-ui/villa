@@ -1,6 +1,8 @@
 import type { D1Database } from "@cloudflare/workers-types";
 import {
   cachedRegionalIdea,
+  defaultAiSettings,
+  defaultVillaAiProfile,
   getAiSettings,
   getVillaAiProfile,
   recentAiContext,
@@ -11,16 +13,12 @@ import {
   type AiSocialSettings,
 } from "./aiDb";
 import {
-  AI_CONTENT_JSON_SCHEMA,
-  REGIONAL_JSON_SCHEMA,
-  aiContentOutputSchema,
   regionalResearchOutputSchema,
-  validateAiVillaFacts,
   type AiMode,
   type AiPurpose,
   type RegionalResearchOutput,
 } from "./aiTypes";
-import { callStructuredResponse } from "./openaiResponses";
+import { deterministicSocialContent, generateRegionalContent, generateSocialContent } from "./aiProviders";
 import type { Villa } from "./types";
 
 const REGIONAL_BLOCKLIST = [
@@ -103,16 +101,21 @@ export async function generateAiContent(input: {
   regionalIdea?: RegionalResearchOutput | null;
   mediaCategory?: string | null;
   weekly?: boolean;
+  forceRefresh?: boolean;
 }) {
-  const [profile, settings, context] = await Promise.all([
-    getVillaAiProfile(input.db, input.villa),
-    getAiSettings(input.db, input.villa),
-    recentAiContext(input.db, input.villa),
+  const [profileResult, settingsResult, contextResult] = await Promise.allSettled([
+    getVillaAiProfile(input.db, input.villa), getAiSettings(input.db, input.villa), recentAiContext(input.db, input.villa),
   ]);
-  const system = `Türkçe Instagram içerik editörüsün. Sadece verilen doğrulanmış villa özelliklerini kullan.
+  const profile = profileResult.status === "fulfilled" ? profileResult.value : defaultVillaAiProfile(input.villa);
+  const settings = settingsResult.status === "fulfilled" ? settingsResult.value : defaultAiSettings(input.villa);
+  const context = contextResult.status === "fulfilled" ? contextResult.value : { history: [], aggregatePerformance: [] };
+  const system = `Doğal Türkçe kullanan, turizm ve villa sosyal medya içerikleri hazırlayan dikkatli bir editörsün.
+Spam, aşırı emoji, abartılı garanti, sahte indirim veya yanıltıcı coğrafi iddia yazma.
+Sadece verilen doğrulanmış villa özelliklerini kullan.
 Villa özellikleri uydurma; emin olmadığın her bilgiyi warnings alanına yaz ve metne ekleme.
 villaClaims yalnızca doğrulanmış özellikler listesindeki cümlelerin birebir aynısını içerebilir.
 Kaynaklı bölgesel bilgiyi villa özelliği gibi sunma. Abartılı garanti, sahte indirim veya yanıltıcı coğrafi iddia yazma.
+Güncel fiyat, ziyaret saati, etkinlik tarihi, yol durumu, giriş ücreti veya işletme bilgisi yalnızca kullanıcı bağlamında açıkça verilmişse kullanılabilir.
 Çıktıyı istenen JSON şemasına eksiksiz uydur. Ton: ${profile.tone}. Mod: ${input.mode}.`;
   const prompt = `Villa: ${input.villa}
 Amaç: ${input.weekly ? "haftalık plan" : input.purpose}
@@ -125,19 +128,25 @@ Son içeriklerin tekrarından kaçın: ${promptJson(context.history.slice(0, 10)
 Son performans özeti, yalnız fikir önceliği için: ${promptJson(context.aggregatePerformance.slice(0, 20))}
 İçerik dağılım hedefi: ${promptJson(settings.contentMix)}
 ${input.weekly ? "7 günlük dengeli bir weeklyPlan üret; diğer metin alanlarını da kısa bir plan özetiyle doldur." : "Caption, kısa caption, hikâyeleştirilmiş caption ve uygun Carousel/Reels taslağını üret."}`;
-  const response = await callStructuredResponse({ db: input.db, env: input.env, villa: input.villa,
-    operation: "text", schemaName: "villa_social_content", jsonSchema: AI_CONTENT_JSON_SCHEMA,
-    validator: aiContentOutputSchema, system, prompt });
-  const output = validateAiVillaFacts(response.value, profile);
+  const template = deterministicSocialContent({ villa: input.villa, purpose: input.purpose,
+    weekly: input.weekly === true, profile, availability: input.availability,
+    regionalTopic: input.regionalIdea?.topic ?? null });
+  const response = await generateSocialContent({ db: input.db, env: input.env, villa: input.villa,
+    purpose: input.purpose, mode: input.mode, weekly: input.weekly === true, profile, system, prompt, template,
+    forceRefresh: input.forceRefresh });
+  const output = response.output;
+  const warnings = [...response.warnings];
   const id = await saveAiHistory(input.db, { villa: input.villa, purpose: input.purpose, mode: input.mode,
-    mediaCategory: input.mediaCategory ?? null, output,
-    sourceUrls: input.regionalIdea?.sourceUrls ?? [] });
+    mediaCategory: input.mediaCategory ?? null, output, sourceUrls: input.regionalIdea?.sourceUrls ?? [] })
+    .catch(() => { warnings.push("İçerik geçmişi kaydedilemedi; taslağı yine de kullanabilirsiniz."); return null; });
   if (input.weekly) {
     const date = new Date();
     const monday = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate() - ((date.getUTCDay() + 6) % 7)));
-    await saveWeeklyPlan(input.db, input.villa, monday.toISOString().slice(0, 10), output);
+    await saveWeeklyPlan(input.db, input.villa, monday.toISOString().slice(0, 10), output)
+      .catch(() => { warnings.push("Haftalık plan D1'e kaydedilemedi; üretilen taslak ekranda kullanılabilir."); });
   }
-  return { id, output, model: response.model };
+  return { id, output, model: response.model, provider: response.provider, cached: response.cached,
+    warnings: [...new Set(warnings)] };
 }
 
 export function cachedResearch(row: Record<string, unknown>): RegionalResearchOutput | null {
@@ -176,28 +185,25 @@ export async function researchRegionalTopic(input: {
   const topic = boundedText(input.topic, 160);
   if (!topic || !regionalTopicIsSafe(topic)) throw new Error("Bu konu bölgesel içerik güvenlik kurallarına uygun değil.");
   if (!input.forceRefresh) {
-    const cached = await cachedRegionalIdea(input.db, region, topic);
+    const cached = await cachedRegionalIdea(input.db, region, topic).catch(() => null);
     const value = cached ? cachedResearch(cached) : null;
-    if (value) return { output: value, cached: true, model: null };
+    if (value) return { output: value, cached: true, model: null, provider: "template" as const, warnings: [] };
   }
-  const system = `Patara ve Kaş için dikkatli bir turizm içerik araştırmacısısın.
-Sadece güncel ve güvenilir web kaynaklarıyla doğrulayabildiğin bilgileri yaz.
+  const system = `Patara, Kaş ve çevresi için dikkatli bir Türkçe turizm içerik editörüsün.
+Doğal, abartısız, spam olmayan ve genel geçerliliği yüksek gezi fikirleri üret.
 Siyaset, suç, kaza, ölüm, trajedi, magazin, özel hayat, sansasyon ve doğrulanamayan etkinlikleri dışla.
-Tarih veya etkinlik güncelse mutlaka kaynakla doğrula. Kaynaksız iddiayı çıktıdan çıkar.`;
-  const prompt = `Bölge: ${region}\nKonu: ${topic}\nTurizm, kültür, doğa, tarih, gastronomi veya güvenli seyahat açısından Instagram içerik fikirleri araştır. En fazla 12 kaynak kullan.`;
-  const response = await callStructuredResponse({ db: input.db, env: input.env, villa: input.villa,
-    operation: "research", schemaName: "regional_content_research", jsonSchema: REGIONAL_JSON_SCHEMA,
-    validator: regionalResearchOutputSchema, system, prompt, webSearch: true });
-  if (!response.sources.length) throw new Error("Bölgesel araştırma doğrulanmış kaynak döndürmedi.");
-  const now = Date.now();
-  const output = regionalResearchOutputSchema.parse({ ...response.value,
-    sourceUrls: response.sources.map((source) => source.url),
-    sourceTitles: response.sources.map((source) => source.title),
-    expiresAt: new Date(now + (response.value.eventDate ? 7 : 30) * 86_400_000).toISOString(),
-  });
+Güncel fiyat, saat, etkinlik tarihi, yol durumu, giriş ücreti veya işletme bilgisi uydurma.
+Web kaynağına gerçekten erişimin yoksa sourceUrls ve sourceTitles alanlarını boş, eventDate alanını null bırak.`;
+  const prompt = `Bölge: ${region}\nKonu: ${topic}\nTurizm, kültür, doğa, tarih, gastronomi veya güvenli seyahat açısından genel Instagram içerik fikirleri hazırla. Güncel ve doğrulanmamış ayrıntı kullanma.`;
+  const response = await generateRegionalContent({ db: input.db, env: input.env, villa: input.villa,
+    topic, region, system, prompt });
+  const output = response.output;
   if (!regionalTopicIsSafe(`${output.topic} ${output.summary} ${output.contentIdeas.join(" ")}`)) {
     throw new Error("Araştırma sonucu güvenli içerik filtresinden geçmedi.");
   }
-  await saveRegionalIdea(input.db, output, region);
-  return { output, cached: false, model: response.model };
+  const warnings = [...response.warnings];
+  await saveRegionalIdea(input.db, output, region)
+    .catch(() => { warnings.push("Bölgesel fikir D1'e kaydedilemedi; üretilen taslağı yine de kullanabilirsiniz."); });
+  return { output, cached: false, model: response.model, provider: response.provider,
+    warnings: [...new Set(warnings)] };
 }

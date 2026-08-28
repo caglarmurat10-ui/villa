@@ -7,7 +7,7 @@ import {
   recordAiServiceResult,
   saveMediaProvenance,
 } from "./aiDb";
-import { hasOpenAiConfiguration, requireOpenAiApiKey } from "./aiConfiguration";
+import { hasOpenAiConfiguration, isPaidAiFallbackAllowed, requireOpenAiApiKey } from "./aiConfiguration";
 import { acceptedInstagramMedia, IMAGE_MAX_BYTES, type InstagramMediaMetadata } from "./instagramMedia";
 import { INSTAGRAM_LIBRARY_PREFIX } from "./instagramTokenStore";
 import { addMediaLibraryItem, deactivateMediaLibraryItem } from "./socialOperationsDb";
@@ -35,6 +35,7 @@ export async function generateAiIllustration(input: {
   prompt: string;
   fetcher?: typeof fetch;
 }) {
+  if (!isPaidAiFallbackAllowed(input.env)) throw new Error("OpenAI ücretli alternatifi kapalı.");
   const apiKey = requireOpenAiApiKey(input.env);
   const settings = await getAiSettings(input.db, input.villa);
   if (String(input.env.AI_IMAGE_ENABLED) !== "true" || !settings.imageEnabled) {
@@ -95,7 +96,7 @@ export async function generateAiIllustration(input: {
 export async function videoGenerationStatus(db: D1Database, env: CloudflareEnv, villa: Villa) {
   const settings = await getAiSettings(db, villa);
   return {
-    enabled: hasOpenAiConfiguration(env) && String(env.AI_VIDEO_ENABLED) === "true" && settings.videoEnabled,
+    enabled: isPaidAiFallbackAllowed(env) && hasOpenAiConfiguration(env) && String(env.AI_VIDEO_ENABLED) === "true" && settings.videoEnabled,
     available: false,
     requiresSeparatePaidConfirmation: true,
     message: "Storyboard üretimi hazır. Ücretli video üretimi, sağlayıcı desteği yeniden doğrulanıp ayrıca onaylanmadan çağrılmaz.",

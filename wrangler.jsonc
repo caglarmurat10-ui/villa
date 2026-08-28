@@ -6,11 +6,15 @@
   "compatibility_date": "2026-08-19",
   "compatibility_flags": ["nodejs_compat"],
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
+  "ai": { "binding": "AI" },
   "vars": {
     "META_APP_ID": "2566616200453545",
     "APP_BASE_URL": "https://villa-yonetim.caglarmurat10.workers.dev",
     "OPENAI_TEXT_MODEL": "gpt-5.6-terra",
     "OPENAI_IMAGE_MODEL": "gpt-image-2",
+    "AI_PROVIDER": "workers-ai",
+    "AI_ALLOW_PAID_FALLBACK": "false",
+    "WORKERS_AI_TEXT_MODEL": "@cf/meta/llama-3.1-8b-instruct-fast",
     "AI_IMAGE_ENABLED": "false",
     "AI_VIDEO_ENABLED": "false"
   },

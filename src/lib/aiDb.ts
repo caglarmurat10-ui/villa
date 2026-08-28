@@ -99,10 +99,9 @@ export async function saveVillaAiProfile(db: D1Database, input: VillaAiProfile) 
 export async function assertAiBudget(db: D1Database, villa: Villa, operation: "text" | "research" | "image", now = new Date()) {
   const settings = await getAiSettings(db, villa);
   if (!settings.aiEnabled) throw new Error("AI bu villa için kapalı.");
-  const service = operation === "research" ? "openai-web" : operation === "image" ? "openai-image" : "openai-text";
   const row = await readAiD1("usage", () => db.prepare(
-    "SELECT COUNT(*) AS count FROM ai_usage_log WHERE daily_key=? AND villa=? AND service=?",
-  ).bind(dailyKey(now), villa, service).first<{ count: number }>());
+    "SELECT COUNT(*) AS count FROM ai_usage_log WHERE daily_key=? AND villa=? AND operation=?",
+  ).bind(dailyKey(now), villa, operation).first<{ count: number }>());
   const limit = operation === "research" ? settings.dailyResearchLimit : settings.dailyTextLimit;
   if ((row?.count ?? 0) >= limit) throw new Error("Günlük AI kullanım limiti doldu.");
   return { settings, used: row?.count ?? 0, limit };
