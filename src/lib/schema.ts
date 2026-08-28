@@ -42,6 +42,15 @@ export const socialPostSchema = z.object({
   }
 });
 
+export const socialPostEditSchema = z.object({
+  scheduledDate: z.iso.date().optional(),
+  caption: z.string().trim().min(1, "Paylaşım metni gerekli").max(2200, "Paylaşım metni en fazla 2200 karakter olabilir").optional(),
+  mediaUrl: z.union([z.literal(""), z.string().url("Geçerli bir görsel bağlantısı girin")]).optional(),
+}).refine((value) => Object.values(value).some((item) => item !== undefined), {
+  message: "Güncellenecek paylaşım alanı bulunamadı.",
+});
+
 export const socialPostStatusSchema = z.object({ status: z.enum(["Planlandı", "Yayınlandı"]) });
 export const socialPostApprovalSchema = z.object({ approvalStatus: z.enum(["İnsan onayı", "Onaylandı"]) });
 export type SocialPostInput = z.infer<typeof socialPostSchema>;
+export type SocialPostEditInput = z.infer<typeof socialPostEditSchema>;
