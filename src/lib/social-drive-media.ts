@@ -86,3 +86,14 @@ export function isApprovedMediaUrl(villa: Villa, url: string) {
     (asset.sourceUrl === url || asset.previewUrl === url || asset.viewUrl === url),
   );
 }
+
+export function isApprovedProxyMediaUrl(villa: Villa, url: string, allowedOrigins: string[]) {
+  try {
+    const parsed = new URL(url);
+    if (!allowedOrigins.includes(parsed.origin)) return false;
+    const fileId = proxyFileId(url);
+    return Boolean(fileId) && resolveDriveMediaById(fileId)?.villa === villa;
+  } catch {
+    return false;
+  }
+}
