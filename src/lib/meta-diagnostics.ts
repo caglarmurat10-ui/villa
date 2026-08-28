@@ -4,8 +4,10 @@ import type { MetaSocialAccount } from "./meta-store";
 export type MetaDiagnostic = {
   graphApiVersion: string;
   configuration: {
-    appId: boolean;
-    appSecret: boolean;
+    instagramAppId: boolean;
+    instagramAppSecret: boolean;
+    facebookAppId: boolean;
+    facebookAppSecret: boolean;
     baseUrl: boolean;
     database: boolean;
     privateKv: boolean;
@@ -35,8 +37,10 @@ export async function getMetaDiagnostic(accounts: MetaSocialAccount[]): Promise<
     env = {};
   }
 
-  const appId = String(env.META_APP_ID ?? process.env.META_APP_ID ?? "").trim();
-  const appSecret = String(env.META_APP_SECRET ?? process.env.META_APP_SECRET ?? "").trim();
+  const instagramAppId = String(env.META_APP_ID ?? process.env.META_APP_ID ?? "").trim();
+  const instagramAppSecret = String(env.META_APP_SECRET ?? process.env.META_APP_SECRET ?? "").trim();
+  const facebookAppId = String(env.FACEBOOK_APP_ID ?? process.env.FACEBOOK_APP_ID ?? "").trim();
+  const facebookAppSecret = String(env.FACEBOOK_APP_SECRET ?? process.env.FACEBOOK_APP_SECRET ?? "").trim();
   const baseUrl = String(env.APP_BASE_URL ?? process.env.APP_BASE_URL ?? "").trim().replace(/\/+$/, "");
   const hasDatabase = Boolean(env.DB);
   const hasPrivateKv = Boolean(env.META_PRIVATE);
@@ -52,8 +56,10 @@ export async function getMetaDiagnostic(accounts: MetaSocialAccount[]): Promise<
   return {
     graphApiVersion: "v26.0",
     configuration: {
-      appId: Boolean(appId),
-      appSecret: Boolean(appSecret),
+      instagramAppId: Boolean(instagramAppId),
+      instagramAppSecret: Boolean(instagramAppSecret),
+      facebookAppId: Boolean(facebookAppId),
+      facebookAppSecret: Boolean(facebookAppSecret),
       baseUrl: Boolean(baseUrl),
       database: hasDatabase,
       privateKv: hasPrivateKv,
