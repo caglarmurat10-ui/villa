@@ -1,0 +1,3 @@
+Cloudflare deploy trigger
+Target production commit: 19bd482a61a2d953887434d7ebb7c3a0b6a3fa17
+Reason: force a real branch push after synchronizing the legacy deploy branch to the current production tree.
