@@ -1,7 +1,6 @@
 import MetaConnections from "@/components/MetaConnections";
 import MetaDiagnostics from "@/components/MetaDiagnostics";
-import SocialContentLibrary from "@/components/SocialContentLibrary";
-import SocialMediaView from "@/components/SocialMediaView";
+import SocialDeferredContent from "@/components/SocialDeferredContent";
 import { listMetaAccounts } from "@/lib/meta-store";
 import { getMetaDiagnostic } from "@/lib/meta-diagnostics";
 import { listReservations } from "@/lib/db";
@@ -18,8 +17,6 @@ function istanbulToday() {
 const villas: Villa[] = ["Safira", "Destan"];
 
 export default async function SocialPage() {
-  // Keep the main social route lightweight. Bulk plan seeding is intentionally not
-  // executed during page rendering because Workers Free has a very small CPU budget.
   const [posts, accounts, reservations] = await Promise.all([
     listSocialPosts(30),
     listMetaAccounts(),
@@ -64,14 +61,13 @@ export default async function SocialPage() {
     <MetaConnections initialAccounts={accounts} />
     <div style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
       <div style={{marginBottom:10,padding:"10px 13px",border:"1px solid #22c55e55",borderRadius:12,background:"#071b16",color:"#bbf7d0",fontSize:11,fontWeight:700}}>
-        ✓ Drive medya otomasyonu aktif · İlk ekranda en yakın 30 sosyal plan gösteriliyor. Toplu plan hazırlığı sayfa açılışından ayrıldı; böylece Worker kaynak limiti korunuyor.
+        ✓ Drive medya otomasyonu aktif · İlk ekranda en yakın 30 sosyal plan gösteriliyor. Ağır içerik kütüphanesi ve takvim tarayıcı tarafında yüklenir; Worker CPU bütçesi korunur.
       </div>
       <a href="/sosyal/marka" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,padding:"14px 16px",border:"1px solid #d5aa5855",borderRadius:14,background:"linear-gradient(135deg,#13233a,#081522)",color:"#f8fafc",textDecoration:"none",fontWeight:800}}>
         <span><small style={{display:"block",color:"#d5aa58",fontSize:9,letterSpacing:1.5}}>MARKA + HEDEF KİTLE</small>Logo, Facebook kapağı, Instagram öne çıkanları ve Meta kitle merkezi</span>
         <span style={{color:"#d5aa58"}}>Aç →</span>
       </a>
     </div>
-    <SocialContentLibrary />
-    <SocialMediaView initialPosts={posts} availabilityGaps={gaps} />
+    <SocialDeferredContent posts={posts} gaps={gaps} />
   </>;
 }
