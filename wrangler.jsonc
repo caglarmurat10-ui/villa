@@ -7,6 +7,7 @@
   "keep_vars": true,
   "assets": { "directory": ".open-next/assets", "binding": "ASSETS" },
   "vars": {
+    "META_APP_ID": "2566616200453545",
     "APP_BASE_URL": "https://villa-yonetim.caglarmurat10.workers.dev"
   },
   "secrets": {
