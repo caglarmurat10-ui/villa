@@ -3,6 +3,7 @@ import NavigationBridge from "@/components/NavigationBridge";
 import "./globals.css";
 import "./social.css";
 import "./message.css";
+import "./location-message.css";
 import "./navigation.css";
 
 export const metadata: Metadata = {

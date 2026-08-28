@@ -7,6 +7,7 @@ import type { FinancialReservation, PriceRange, Reservation, Villa, VillaLocatio
 import { mainNavigationItems, type DashboardView } from "@/lib/navigation";
 import { reservationCalendarMarkers } from "@/lib/reservationCalendar";
 import { calculateReservationFinancials } from "@/lib/reservationFinancials";
+import { buildVillaCheckoutMessage, buildVillaLocationMessage, normalizeWhatsAppNumber, whatsappUrl } from "@/lib/villaLocationMessages";
 
 type MessageType = "Giriş" | "Çıkış";
 type MovementReminder = { reservation: Reservation; type: "Giriş" | "Çıkış"; date: string; dayLabel: "BUGÜN" | "YARIN" };
@@ -25,18 +26,6 @@ function addDays(value: string, amount: number) {
 }
 
 const today = dateKey();
-function normalizeWhatsAppNumber(value: string) {
-  const digits = value.replace(/\D/g, "");
-  if (digits.startsWith("00")) return digits.slice(2);
-  if (digits.length === 10) return `90${digits}`;
-  if (digits.length === 11 && digits.startsWith("0")) return `90${digits.slice(1)}`;
-  return digits;
-}
-
-function whatsappUrl(phone: string, text: string) {
-  const number = normalizeWhatsAppNumber(phone);
-  return `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
-}
 
 function openReservationMessage(reservation: Reservation, type: MessageType, locations: VillaLocations) {
   if (!normalizeWhatsAppNumber(reservation.phone)) {
@@ -48,8 +37,8 @@ function openReservationMessage(reservation: Reservation, type: MessageType, loc
     return;
   }
   const texts: Record<MessageType, string> = {
-    Giriş: `Merhaba, ${reservation.villa} Villa rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız. Giriş saatimiz 16.00'dır. Varış saatinizi müsait olduğunuzda bizimle paylaşabilirsiniz.\n\nKonum bağlantımız:\n${locations[reservation.villa]}\n\nYola çıkmadan önce bağlantıyı açarak rotanızı kontrol etmenizi rica ederiz. Güvenli ve keyifli bir yolculuk dileriz.`,
-    Çıkış: `Merhaba, bizi tercih ettiğiniz için teşekkür ederiz. Çıkış saatimiz 10.00'dır. Güzel anılarla ayrılmanızı diler, sizi yeniden ağırlamaktan mutluluk duyarız.`,
+    Giriş: buildVillaLocationMessage(reservation.villa, locations[reservation.villa]),
+    Çıkış: buildVillaCheckoutMessage(),
   };
   window.open(whatsappUrl(reservation.phone, texts[type]), "_blank", "noopener,noreferrer");
 }

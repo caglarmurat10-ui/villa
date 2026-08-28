@@ -2,30 +2,11 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import LocationRedirect from "@/components/LocationRedirect";
 import { getVillaLocations } from "@/lib/db";
-
-type VillaSlug = "safira" | "destan";
-
-const villaData: Record<VillaSlug, { name: string; key: "Safira" | "Destan"; image: string }> = {
-  safira: {
-    name: "Villa Safira",
-    key: "Safira",
-    image: "https://www.villapatara.com.tr/uploads/villa-safira-14_743.jpg",
-  },
-  destan: {
-    name: "Villa Destan",
-    key: "Destan",
-    image: "https://www.villavakti.com/thumbs/1200/630/catalog/3318/batch_villa-destan_45-7604.jpg",
-  },
-};
-
-function resolveVilla(value: string) {
-  const slug = value.toLocaleLowerCase("tr-TR") as VillaSlug;
-  return villaData[slug] ? { slug, ...villaData[slug] } : null;
-}
+import { villaProfileFromSlug } from "@/lib/villaProfiles";
 
 export async function generateMetadata({ params }: { params: Promise<{ villa: string }> }): Promise<Metadata> {
   const { villa } = await params;
-  const current = resolveVilla(villa);
+  const current = villaProfileFromSlug(villa);
   if (!current) return {};
   const title = `${current.name} Konum`;
   const description = `${current.name} • Patara, Kaş / Antalya konum bilgisi`;
@@ -37,13 +18,13 @@ export async function generateMetadata({ params }: { params: Promise<{ villa: st
       description,
       type: "website",
       locale: "tr_TR",
-      images: [{ url: current.image, width: 1200, height: 630, alt: current.name }],
+      images: [{ url: current.sourceImageUrl, width: 1200, height: 630, alt: current.name }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: [current.image],
+      images: [current.sourceImageUrl],
     },
   };
 }
@@ -52,10 +33,10 @@ export const dynamic = "force-dynamic";
 
 export default async function LocationPage({ params }: { params: Promise<{ villa: string }> }) {
   const { villa } = await params;
-  const current = resolveVilla(villa);
+  const current = villaProfileFromSlug(villa);
   if (!current) notFound();
   const locations = await getVillaLocations();
-  const href = locations[current.key];
+  const href = locations[current.villa];
   if (!href) notFound();
   return <LocationRedirect href={href} villaName={current.name} />;
 }
