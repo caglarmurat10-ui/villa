@@ -39,6 +39,7 @@ export default function SocialMediaView({ initialPosts, availabilityGaps }: { in
   const [scheduledDate,setScheduledDate]=useState(today);
   const [caption,setCaption]=useState("");
   const [mediaUrl,setMediaUrl]=useState("");
+  const [editingPost,setEditingPost]=useState<SocialPost | null>(null);
   const [filter,setFilter]=useState<"Tümü"|SocialPostStatus>("Tümü");
   const [notice,setNotice]=useState("");
   const [saving,setSaving]=useState(false);
@@ -50,10 +51,21 @@ export default function SocialMediaView({ initialPosts, availabilityGaps }: { in
   const approvalPending=posts.filter(p=>p.status==="Planlandı"&&p.approvalStatus!=="Onaylandı").length;
   const gaps=availabilityGaps.filter(g=>g.startDate>=today()).slice(0,10);
 
+  function resetComposer() {
+    setEditingPost(null);
+    setVilla("Safira");
+    setPlatform("Instagram");
+    setContentType("Gönderi");
+    setScheduledDate(today());
+    setCaption("");
+    setMediaUrl("");
+  }
+
   useEffect(() => {
     function handleTemplate(event: Event) {
       const template = (event as CustomEvent<SocialContentTemplate>).detail;
       if (!template) return;
+      setEditingPost(null);
       setVilla(template.villa);
       setPlatform("Instagram");
       setContentType(template.contentType);
@@ -67,15 +79,39 @@ export default function SocialMediaView({ initialPosts, availabilityGaps }: { in
   }, []);
 
   function useGap(gap: AvailabilityGap) {
+    setEditingPost(null);
     setVilla(gap.villa);
     setCaption(campaignText(gap, platform));
     setScheduledDate(today());
     setNotice(`${villaName(gap.villa)} boş tarih kampanyası hazırlandı.`);
   }
 
+  function edit(post: SocialPost) {
+    if (post.status === "Yayınlandı") {
+      setNotice("Yayınlanmış paylaşım düzenlenmez. Yeni bir paylaşım planı oluşturun.");
+      return;
+    }
+    setEditingPost(post);
+    setVilla(post.villa);
+    setPlatform(post.platform);
+    setContentType(post.contentType);
+    setScheduledDate(post.scheduledDate >= today() ? post.scheduledDate : today());
+    setCaption(post.caption);
+    setMediaUrl(post.mediaUrl);
+    setNotice("Planlanan paylaşım düzenlemeye açıldı. Kaydedilen değişiklikler insan onayını otomatik sıfırlar.");
+    document.querySelector(".social-compose")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
   async function addPost(e: FormEvent) {
     e.preventDefault(); setSaving(true); setNotice("");
     try {
+      if (editingPost) {
+        const r=await fetch(`/api/social-posts/${editingPost.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({scheduledDate,caption,mediaUrl})});
+        const d=await r.json().catch(()=>({}));
+        if(r.ok){setPosts(p=>sort(p.map(x=>x.id===editingPost.id?d.post:x)));resetComposer();setNotice("Paylaşım güncellendi. İçerik değiştiği için insan onayı yeniden gerekli.");}
+        else setNotice(d.error??"Paylaşım güncellenemedi.");
+        return;
+      }
       const r=await fetch("/api/social-posts",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({villa,platform,contentType,scheduledDate,caption,mediaUrl})});
       const d=await r.json().catch(()=>({}));
       if(r.ok){setPosts(p=>sort([d.post,...p]));setCaption("");setMediaUrl("");setNotice("Paylaşım plana eklendi. Yayınlamadan önce insan onayı gerekli.");}
@@ -115,21 +151,23 @@ export default function SocialMediaView({ initialPosts, availabilityGaps }: { in
     if(next==="Yayınlandı"&&post.approvalStatus!=="Onaylandı"){setNotice("Paylaşım yayınlandı olarak işaretlenmeden önce insan onayı verin.");return;}
     try{const r=await fetch(`/api/social-posts/${post.id}`,{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({status:next})});const d=await r.json().catch(()=>({}));if(r.ok){setPosts(p=>sort(p.map(x=>x.id===post.id?d.post:x)));setNotice("Paylaşım durumu güncellendi.");}else setNotice(d.error??"Durum değiştirilemedi.");}catch{setNotice("Bağlantı kurulamadı.");}
   }
-  async function remove(post: SocialPost) { if(!confirm("Bu sosyal medya planını silmek istiyor musunuz?"))return; try{const r=await fetch(`/api/social-posts/${post.id}`,{method:"DELETE"});if(r.ok){setPosts(p=>p.filter(x=>x.id!==post.id));setNotice("Paylaşım planı silindi.");}else setNotice("Paylaşım silinemedi.");}catch{setNotice("Bağlantı kurulamadı.");} }
+  async function remove(post: SocialPost) { if(!confirm("Bu sosyal medya planını silmek istiyor musunuz?"))return; try{const r=await fetch(`/api/social-posts/${post.id}`,{method:"DELETE"});if(r.ok){setPosts(p=>p.filter(x=>x.id!==post.id));if(editingPost?.id===post.id)resetComposer();setNotice("Paylaşım planı silindi.");}else setNotice("Paylaşım silinemedi.");}catch{setNotice("Bağlantı kurulamadı.");} }
   async function copy(post: SocialPost){try{await navigator.clipboard.writeText(post.caption);setNotice("Paylaşım metni kopyalandı.");}catch{setNotice("Metin kopyalanamadı.");}}
 
   return <main className="social-page"><div className="social-top"><a href="/">← Ana panele dön</a><span>Villa Yönetim</span></div><section className="social-panel">
     <div className="social-hero"><div><span className="eyebrow">SOSYAL MEDYA MERKEZİ</span><h1>Boş tarihleri içeriğe dönüştür</h1><p>Villa Safira ve Villa Destan için rezervasyon takviminden kampanya üretin, insan onayından geçirin, planlayın ve takip edin.</p></div><div className="social-overview"><article><span>Planlanan</span><strong>{planned}</strong></article><article><span>Onay bekleyen</span><strong>{approvalPending}</strong></article><article><span>Yayınlanan</span><strong>{published}</strong></article></div></div>
     <div className="availability-box"><div className="availability-head"><div><span className="eyebrow">OTOMATİK UYGUNLUK</span><h2>Yaklaşan boş tarihler</h2></div><small>Rezervasyon takviminden otomatik hesaplanır</small></div><div className="availability-list">{gaps.length===0?<div className="empty">Önümüzdeki 120 günde 2 gece ve üzeri boşluk bulunamadı.</div>:gaps.map((gap,i)=><button type="button" key={`${gap.villa}-${gap.startDate}-${i}`} onClick={()=>useGap(gap)}><strong>{villaName(gap.villa)}</strong><span>{shortDate(gap.startDate)} – {shortDate(gap.endDate)}</span><em>{gap.nights} gece · kampanya hazırla</em></button>)}</div></div>
     {notice&&<p className="message social-message">{notice}</p>}
-    <div className="social-layout"><form className="social-compose" onSubmit={addPost}><div className="social-section-title"><h2>Yeni paylaşım</h2><small>{caption.length}/2200</small></div>
-      <div className="two"><label>Villa<select value={villa} onChange={e=>setVilla(e.target.value as Villa)}><option value="Safira">Villa Safira</option><option value="Destan">Villa Destan</option></select></label><label>Platform<select value={platform} onChange={e=>{const n=e.target.value as SocialPlatform;setPlatform(n);if(!types[n].includes(contentType))setContentType(types[n][0]);}}>{platforms.map(x=><option key={x}>{x}</option>)}</select></label></div>
-      <div className="two"><label>Paylaşım türü<select value={contentType} onChange={e=>setContentType(e.target.value as SocialContentType)}>{types[platform].map(x=><option key={x}>{x}</option>)}</select></label><label>Planlanan tarih<input type="date" min={today()} value={scheduledDate} onChange={e=>setScheduledDate(e.target.value)} required/></label></div>
-      <div className="idea-area"><span>Hazır içerik fikirleri</span><div className="idea-buttons">{ideas.map(([label,fn])=><button type="button" key={label} onClick={()=>setCaption(fn(villa))}>{label}</button>)}</div></div>
-      <label>Görsel bağlantısı<input type="url" placeholder="https://.../villa-fotografi.jpg" value={mediaUrl} onChange={e=>setMediaUrl(e.target.value)} /></label>
-      <div className="social-preview"><div className="social-preview-media">{mediaUrl?<img src={mediaUrl} alt={`${villaName(villa)} paylaşım önizlemesi`} />:<span>Görsel bağlantısı ekleyince önizleme burada görünür.</span>}</div><div className="social-preview-copy"><strong>{villaName(villa)}</strong><small>{platform} · {contentType}</small><p>{caption||"Paylaşım metni önizlemesi"}</p></div></div>
-      <label>Paylaşım metni<textarea rows={8} maxLength={2200} value={caption} onChange={e=>setCaption(e.target.value)} required/></label><button className="save" disabled={saving||!caption.trim()}>{saving?"Kaydediliyor…":"Paylaşımı planla"}</button></form>
+    <div className="social-layout"><form className="social-compose" onSubmit={addPost}><div className="social-section-title"><h2>{editingPost?"Planlanan paylaşımı düzenle":"Yeni paylaşım"}</h2><small>{caption.length}/2200</small></div>
+      <div className="two"><label>Villa<select disabled={Boolean(editingPost)} value={villa} onChange={e=>setVilla(e.target.value as Villa)}><option value="Safira">Villa Safira</option><option value="Destan">Villa Destan</option></select></label><label>Platform<select disabled={Boolean(editingPost)} value={platform} onChange={e=>{const n=e.target.value as SocialPlatform;setPlatform(n);if(!types[n].includes(contentType))setContentType(types[n][0]);}}>{platforms.map(x=><option key={x}>{x}</option>)}</select></label></div>
+      <div className="two"><label>Paylaşım türü<select disabled={Boolean(editingPost)} value={contentType} onChange={e=>setContentType(e.target.value as SocialContentType)}>{types[platform].map(x=><option key={x}>{x}</option>)}</select></label><label>Planlanan tarih<input type="date" min={today()} value={scheduledDate} onChange={e=>setScheduledDate(e.target.value)} required/></label></div>
+      {!editingPost?<div className="idea-area"><span>Hazır içerik fikirleri</span><div className="idea-buttons">{ideas.map(([label,fn])=><button type="button" key={label} onClick={()=>setCaption(fn(villa))}>{label}</button>)}</div></div>:null}
+      <label>Görsel / video bağlantısı<input type="url" placeholder="https://.../gercek-villa-fotografi.jpg" value={mediaUrl} onChange={e=>setMediaUrl(e.target.value)} /></label>
+      <div className="social-preview"><div className="social-preview-media">{mediaUrl?<img src={mediaUrl} alt={`${villaName(villa)} paylaşım önizlemesi`} />:<span>Gerçek villa medyasının bağlantısını ekleyince önizleme burada görünür.</span>}</div><div className="social-preview-copy"><strong>{villaName(villa)}</strong><small>{platform} · {contentType}</small><p>{caption||"Paylaşım metni önizlemesi"}</p></div></div>
+      <label>Paylaşım metni<textarea rows={8} maxLength={2200} value={caption} onChange={e=>setCaption(e.target.value)} required/></label>
+      <button className="save" disabled={saving||!caption.trim()}>{saving?"Kaydediliyor…":editingPost?"Değişiklikleri kaydet":"Paylaşımı planla"}</button>{editingPost?<button type="button" className="cancel" onClick={()=>{resetComposer();setNotice("Düzenleme iptal edildi.");}}>Düzenlemeyi iptal et</button>:null}
+    </form>
       <div className="social-calendar"><div className="social-calendar-head"><h2>Paylaşım takvimi</h2><div className="social-filters">{(["Tümü","Planlandı","Yayınlandı"] as const).map(x=><button key={x} className={filter===x?"active":""} onClick={()=>setFilter(x)}>{x}</button>)}</div></div>
-      <div className="social-post-list">{visible.length===0?<div className="empty">Henüz paylaşım yok.</div>:visible.map(post=><article className={`social-post ${post.status==="Yayınlandı"?"published":""}`} key={post.id}>{post.mediaUrl?<img className="social-post-image" src={post.mediaUrl} alt="" />:null}<div className="social-post-top"><div className="social-badges"><span className={`platform-badge ${tone[post.platform]}`}>{post.platform}</span><span>{post.contentType}</span><span>{villaName(post.villa)}</span></div><div className="social-state-badges"><span className={`approval-status ${post.approvalStatus==="Onaylandı"?"approved":"pending"}`}>{post.approvalStatus==="Onaylandı"?"✓ Onaylandı":"İnsan onayı"}</span><span className={`social-status ${post.status==="Yayınlandı"?"done":"planned"}`}>{post.status}</span></div></div><strong className="social-date">{trDate(post.scheduledDate)}</strong><p className="social-caption">{post.caption}</p><div className="social-actions"><button onClick={()=>copy(post)}>Metni kopyala</button>{post.status==="Planlandı"?<button className={`approval-action ${post.approvalStatus==="Onaylandı"?"approved":""}`} disabled={approving===post.id||publishing===post.id} onClick={()=>approval(post)}>{approving===post.id?"İşleniyor…":post.approvalStatus==="Onaylandı"?"Onayı kaldır":"Onay ver ✓"}</button>:null}{post.platform==="Instagram"&&post.status==="Planlandı"?<button className="publish-action" disabled={publishing===post.id||post.approvalStatus!=="Onaylandı"||!post.mediaUrl} onClick={()=>publishMeta(post,"Instagram")}>{publishing===post.id?"Yayınlanıyor…":post.approvalStatus!=="Onaylandı"?"Önce onay gerekli":"Instagram'da yayınla"}</button>:post.platform==="Facebook"&&post.status==="Planlandı"&&post.contentType==="Gönderi"?<button className="publish-action facebook-publish" disabled={publishing===post.id||post.approvalStatus!=="Onaylandı"} onClick={()=>publishMeta(post,"Facebook")}>{publishing===post.id?"Yayınlanıyor…":post.approvalStatus!=="Onaylandı"?"Önce onay gerekli":"Facebook'ta yayınla"}</button>:<button className="status-action" disabled={post.status==="Planlandı"&&post.approvalStatus!=="Onaylandı"} onClick={()=>status(post)}>{post.status==="Planlandı"?"Yayınlandı ✓":"Plana geri al"}</button>}<button className="delete" onClick={()=>remove(post)}>Sil</button></div></article>)}</div></div>
+      <div className="social-post-list">{visible.length===0?<div className="empty">Henüz paylaşım yok.</div>:visible.map(post=><article className={`social-post ${post.status==="Yayınlandı"?"published":""}`} key={post.id}>{post.mediaUrl?<img className="social-post-image" src={post.mediaUrl} alt="" />:null}<div className="social-post-top"><div className="social-badges"><span className={`platform-badge ${tone[post.platform]}`}>{post.platform}</span><span>{post.contentType}</span><span>{villaName(post.villa)}</span></div><div className="social-state-badges"><span className={`approval-status ${post.approvalStatus==="Onaylandı"?"approved":"pending"}`}>{post.approvalStatus==="Onaylandı"?"✓ Onaylandı":"İnsan onayı"}</span><span className={`social-status ${post.status==="Yayınlandı"?"done":"planned"}`}>{post.status}</span></div></div><strong className="social-date">{trDate(post.scheduledDate)}</strong><p className="social-caption">{post.caption}</p><div className="social-actions"><button onClick={()=>copy(post)}>Metni kopyala</button>{post.status==="Planlandı"?<button onClick={()=>edit(post)}>Düzenle</button>:null}{post.status==="Planlandı"?<button className={`approval-action ${post.approvalStatus==="Onaylandı"?"approved":""}`} disabled={approving===post.id||publishing===post.id} onClick={()=>approval(post)}>{approving===post.id?"İşleniyor…":post.approvalStatus==="Onaylandı"?"Onayı kaldır":"Onay ver ✓"}</button>:null}{post.platform==="Instagram"&&post.status==="Planlandı"?<button className="publish-action" disabled={publishing===post.id||post.approvalStatus!=="Onaylandı"||!post.mediaUrl} onClick={()=>publishMeta(post,"Instagram")}>{publishing===post.id?"Yayınlanıyor…":post.approvalStatus!=="Onaylandı"?"Önce onay gerekli":!post.mediaUrl?"Önce gerçek medya ekle":"Instagram'da yayınla"}</button>:post.platform==="Facebook"&&post.status==="Planlandı"&&post.contentType==="Gönderi"?<button className="publish-action facebook-publish" disabled={publishing===post.id||post.approvalStatus!=="Onaylandı"} onClick={()=>publishMeta(post,"Facebook")}>{publishing===post.id?"Yayınlanıyor…":post.approvalStatus!=="Onaylandı"?"Önce onay gerekli":"Facebook'ta yayınla"}</button>:<button className="status-action" disabled={post.status==="Planlandı"&&post.approvalStatus!=="Onaylandı"} onClick={()=>status(post)}>{post.status==="Planlandı"?"Yayınlandı ✓":"Plana geri al"}</button>}<button className="delete" onClick={()=>remove(post)}>Sil</button></div></article>)}</div></div>
     </div></section></main>;
 }
