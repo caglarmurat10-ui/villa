@@ -11,7 +11,7 @@ export default function MetaDiagnostics({ diagnostic }: { diagnostic: MetaDiagno
 
   return <section className="meta-diagnostic-box">
     <div className="meta-diagnostic-head">
-      <div><span className="eyebrow">META DURUM / TANILAMA</span><h2>Instagram + Facebook yayın altyapısı</h2><p>Secret değerleri gösterilmez. Bu bölüm yalnızca gerekli yapılandırmanın ve hesap bağlantılarının hazır olup olmadığını kontrol eder.</p></div>
+      <div><span className="eyebrow">META DURUM / TANILAMA</span><h2>Instagram + Facebook yayın altyapısı</h2><p>Secret değerleri gösterilmez. Bu bölüm yalnızca gerekli yapılandırmanın ve hesap bağlantılarının hazır olup olmadığını kontrol eder.</p><a className="diag-brand-link" href="/sosyal/marka">Marka / profil ayarlarını aç →</a></div>
       <div className={configReady && accountsReady ? "diag-summary ready" : "diag-summary"}>{configReady && accountsReady ? "Yayına hazır" : "Kurulum devam ediyor"}</div>
     </div>
 
