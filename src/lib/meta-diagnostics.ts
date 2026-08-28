@@ -8,6 +8,7 @@ export type MetaDiagnostic = {
     instagramAppSecret: boolean;
     facebookAppId: boolean;
     facebookAppSecret: boolean;
+    facebookConfigId: boolean;
     baseUrl: boolean;
     database: boolean;
     privateKv: boolean;
@@ -41,6 +42,7 @@ export async function getMetaDiagnostic(accounts: MetaSocialAccount[]): Promise<
   const instagramAppSecret = String(env.META_APP_SECRET ?? process.env.META_APP_SECRET ?? "").trim();
   const facebookAppId = String(env.FACEBOOK_APP_ID ?? process.env.FACEBOOK_APP_ID ?? "").trim();
   const facebookAppSecret = String(env.FACEBOOK_APP_SECRET ?? process.env.FACEBOOK_APP_SECRET ?? "").trim();
+  const facebookConfigId = String(env.FACEBOOK_CONFIG_ID ?? process.env.FACEBOOK_CONFIG_ID ?? "").trim();
   const baseUrl = String(env.APP_BASE_URL ?? process.env.APP_BASE_URL ?? "").trim().replace(/\/+$/, "");
   const hasDatabase = Boolean(env.DB);
   const hasPrivateKv = Boolean(env.META_PRIVATE);
@@ -60,6 +62,7 @@ export async function getMetaDiagnostic(accounts: MetaSocialAccount[]): Promise<
       instagramAppSecret: Boolean(instagramAppSecret),
       facebookAppId: Boolean(facebookAppId),
       facebookAppSecret: Boolean(facebookAppSecret),
+      facebookConfigId: Boolean(facebookConfigId),
       baseUrl: Boolean(baseUrl),
       database: hasDatabase,
       privateKv: hasPrivateKv,
