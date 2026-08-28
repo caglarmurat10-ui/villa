@@ -34,7 +34,7 @@ async function privateKv(): Promise<KVNamespace> {
 async function cryptoKey() {
   const runtime = await env();
   if (!runtime.META_APP_SECRET) throw new Error("META_APP_SECRET tanımlı değil.");
-  const bytes = new TextEncoder().encode(runtime.META_APP_SECRET);
+  const bytes = new TextEncoder().encode(`villa-facebook-private-kv-v1:${runtime.META_APP_SECRET}`);
   const hash = await crypto.subtle.digest("SHA-256", bytes);
   return crypto.subtle.importKey("raw", hash, "AES-GCM", false, ["encrypt", "decrypt"]);
 }
