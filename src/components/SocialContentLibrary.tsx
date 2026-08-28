@@ -30,6 +30,7 @@ export default function SocialContentLibrary() {
   );
 
   const visible = showAll ? filtered : filtered.slice(0, 12);
+  const resolved = filtered.filter((item) => item.mediaResolved).length;
 
   function useTemplate(template: SocialContentTemplate) {
     window.dispatchEvent(new CustomEvent("social-template-use", { detail: template }));
@@ -38,8 +39,8 @@ export default function SocialContentLibrary() {
 
   return <section className="content-library">
     <div className="content-library-head">
-      <div><span className="eyebrow">HAZIR İÇERİK KÜTÜPHANESİ</span><h2>60 hazır Safira + Destan içeriği</h2><p>Önceden hazırlanan gerçek içerik planı. Bir kartı seçince paylaşım formu otomatik doldurulur.</p></div>
-      <strong>{filtered.length} içerik</strong>
+      <div><span className="eyebrow">HAZIR İÇERİK KÜTÜPHANESİ</span><h2>60 hazır Safira + Destan içeriği</h2><p>Drive klasörlerindeki gerçek villa medyasıyla eşleştirilmiştir. Bir kartı seçince doğru villa, metin, tarih ve medya otomatik yüklenir.</p></div>
+      <strong>{resolved}/{filtered.length} gerçek medya eşleşti</strong>
     </div>
     <div className="content-library-filters">
       <div>{(["Tümü", "Safira", "Destan"] as const).map((item) => <button type="button" key={item} className={villa === item ? "active" : ""} onClick={() => { setVilla(item); setShowAll(false); }}>{item === "Tümü" ? "Tüm villalar" : `Villa ${item}`}</button>)}</div>
@@ -49,12 +50,16 @@ export default function SocialContentLibrary() {
     </div>
     <div className="content-template-grid">
       {visible.map((template) => <article key={template.id}>
+        {template.previewUrl ? <a className="content-drive-preview" href={template.driveViewUrl} target="_blank" rel="noreferrer" aria-label={`${template.mediaFile} dosyasını Drive'da aç`}><img src={template.previewUrl} alt={`Villa ${template.villa} · ${template.mediaFile}`} /></a> : null}
         <div className="content-template-top"><span>{template.id}</span><span>{shortDate(template.scheduledDate)}</span></div>
         <div className="content-template-tags"><b>Villa {template.villa}</b><span>{template.format}</span><span>{template.theme}</span></div>
         <h3>{template.hook}</h3>
-        <p className="content-media-name">Medya önerisi: <strong>{template.mediaFile}</strong></p>
+        <p className="content-media-name">{template.mediaResolved ? <><span className="drive-match-ok">✓ Drive doğrulandı</span> · <strong>{template.mediaFile}</strong></> : <>Medya bekleniyor: <strong>{template.mediaFile}</strong></>}</p>
         <p className="content-template-caption">{template.caption}</p>
-        <button type="button" onClick={() => useTemplate(template)}>Bu içeriği kullan →</button>
+        <div className="content-template-actions">
+          <button type="button" disabled={!template.mediaResolved} onClick={() => useTemplate(template)}>{template.mediaResolved ? "Gerçek medya ile kullan →" : "Medya eşleşmesi bekleniyor"}</button>
+          {template.driveViewUrl ? <a href={template.driveViewUrl} target="_blank" rel="noreferrer">Drive'da aç</a> : null}
+        </div>
       </article>)}
     </div>
     {filtered.length > 12 ? <button type="button" className="content-show-all" onClick={() => setShowAll((value) => !value)}>{showAll ? "İlk 12 içeriği göster" : `Tüm ${filtered.length} içeriği göster`}</button> : null}

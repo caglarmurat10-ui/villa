@@ -19,6 +19,8 @@ type SocialPostRow = {
   updated_at: string;
 };
 
+type SocialPostIdentityRow = Pick<SocialPostRow, "id" | "villa" | "platform" | "content_type" | "scheduled_date" | "caption" | "media_url" | "status">;
+
 async function database(): Promise<D1Database> {
   const { env } = await getCloudflareContext({ async: true });
   return env.DB;
@@ -40,6 +42,10 @@ function mapRow(row: SocialPostRow): SocialPost {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
+}
+
+function identity(input: Pick<SocialPostInput, "villa" | "platform" | "contentType" | "scheduledDate" | "caption">) {
+  return `${input.villa}\u001f${input.platform}\u001f${input.contentType}\u001f${input.scheduledDate}\u001f${input.caption}`;
 }
 
 async function ensureTable(db: D1Database) {
@@ -102,6 +108,53 @@ export async function createSocialPost(input: SocialPostInput): Promise<SocialPo
       post.status, post.approvalStatus, post.approvedAt, post.publishedAt, post.createdAt, post.updatedAt,
     ).run();
   return post;
+}
+
+export async function seedSocialPosts(inputs: SocialPostInput[]) {
+  const db = await database();
+  await ensureTable(db);
+  const existingRows = await db.prepare("SELECT id, villa, platform, content_type, scheduled_date, caption, media_url, status FROM social_posts").all<SocialPostIdentityRow>();
+  const existing = new Map(existingRows.results.map((row) => [identity({
+    villa: row.villa,
+    platform: row.platform,
+    contentType: row.content_type,
+    scheduledDate: row.scheduled_date,
+    caption: row.caption,
+  }), row]));
+
+  const pending: SocialPostInput[] = [];
+  const updates: Array<{ id: string; mediaUrl: string }> = [];
+  let skipped = 0;
+
+  for (const input of inputs) {
+    const row = existing.get(identity(input));
+    if (!row) {
+      pending.push(input);
+      continue;
+    }
+    if (row.status === "Planlandı" && (row.media_url ?? "") !== input.mediaUrl) {
+      updates.push({ id: row.id, mediaUrl: input.mediaUrl });
+    } else {
+      skipped += 1;
+    }
+  }
+
+  const now = new Date().toISOString();
+  const insertStatements = pending.map((input) => db.prepare(`INSERT INTO social_posts
+    (id, villa, platform, content_type, scheduled_date, caption, media_url, status, approval_status, approved_at, published_at, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'Planlandı', 'İnsan onayı', NULL, NULL, ?, ?)`)
+    .bind(crypto.randomUUID(), input.villa, input.platform, input.contentType, input.scheduledDate, input.caption, input.mediaUrl, now, now));
+  const updateStatements = updates.map((item) => db.prepare(`UPDATE social_posts
+    SET media_url = ?, approval_status = 'İnsan onayı', approved_at = NULL, updated_at = ?
+    WHERE id = ? AND status = 'Planlandı'`)
+    .bind(item.mediaUrl, now, item.id));
+  const statements = [...insertStatements, ...updateStatements];
+
+  for (let index = 0; index < statements.length; index += 50) {
+    await db.batch(statements.slice(index, index + 50));
+  }
+
+  return { created: pending.length, updated: updates.length, skipped, total: inputs.length };
 }
 
 export async function updateSocialPostApproval(id: string, approvalStatus: SocialPostApproval): Promise<SocialPost | null> {
