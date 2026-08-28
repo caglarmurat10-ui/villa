@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { brandProfiles } from "@/lib/brand-profiles";
-import { highlightAssets, profileAssets, verifiedMediaNotes } from "@/lib/brand-assets";
+import { facebookCoverAssets, highlightAssets, profileAssets, verifiedMediaNotes } from "@/lib/brand-assets";
 import { organicRevivalRules, socialAudiences } from "@/lib/social-audiences";
 import type { Villa } from "@/lib/types";
 
@@ -28,13 +28,15 @@ export default function BrandProfileCenter() {
   return <main className="brand-page">
     <div className="brand-top"><a href="/sosyal">← Sosyal medya merkezine dön</a><span>Villa Yönetim · Marka Ayarları</span></div>
     <section className="brand-shell">
-      <header className="brand-hero"><div><span className="eyebrow">MARKA / PROFİL / CANLANDIRMA MERKEZİ</span><h1>Safira ve Destan sosyal medya standardı</h1><p>Profil ayarları, logo, öne çıkan kapakları, Meta bağlantıları, hedef kitleler ve ilk 30 günlük canlandırma kuralları tek merkezde.</p></div><div className="brand-switch">{(["Safira","Destan"] as Villa[]).map((item) => <button type="button" key={item} className={villa===item?"active":""} onClick={()=>{setVilla(item);setNotice("");}}>Villa {item}</button>)}</div></header>
+      <header className="brand-hero"><div><span className="eyebrow">MARKA / PROFİL / CANLANDIRMA MERKEZİ</span><h1>Safira ve Destan sosyal medya standardı</h1><p>Profil ayarları, logo, Facebook kapağı, öne çıkan kapakları, Meta bağlantıları, hedef kitleler ve ilk 30 günlük canlandırma kuralları tek merkezde.</p></div><div className="brand-switch">{(["Safira","Destan"] as Villa[]).map((item) => <button type="button" key={item} className={villa===item?"active":""} onClick={()=>{setVilla(item);setNotice("");}}>Villa {item}</button>)}</div></header>
       {notice ? <p className="message brand-message">{notice}</p> : null}
 
       <article className="brand-assets-card">
         <div className="brand-assets-logo"><img src={profileAssets[villa]} alt={`Villa ${villa} profil logosu`} /><div><span className="eyebrow">HAZIR PROFİL VARLIĞI</span><h2>Villa {villa} profil logosu</h2><p>Lacivert-altın ortak marka ailesi. Instagram ve Facebook profil fotoğrafı için kare/daire güvenli alanla hazır.</p><a href={profileAssets[villa]} download>Logo SVG dosyasını aç →</a></div></div>
         <div className="brand-connect-actions"><a href={`/api/meta/instagram/connect?villa=${villa}`}>Instagram bağlantısını başlat</a><a href={`/api/meta/facebook/connect?villa=${villa}`}>Facebook bağlantısını başlat</a><a href="/sosyal">Meta durumunu kontrol et</a></div>
       </article>
+
+      <article className="facebook-cover-card"><div className="facebook-cover-copy"><span className="eyebrow">FACEBOOK KAPAK</span><h2>Villa {villa} hazır marka kapağı</h2><p>Gerçek villa fotoğrafı doğrulanana kadar güvenle kullanılabilen, başka bir villayı temsil etmeyen marka kapağı.</p><a href={facebookCoverAssets[villa]} download>Kapak SVG dosyasını aç →</a></div><img src={facebookCoverAssets[villa]} alt={`Villa ${villa} Facebook kapak görseli`} /></article>
 
       <div className="brand-grid">
         <article className="brand-card"><div className="brand-card-head"><div><span>INSTAGRAM</span><h2>Profil standardı</h2></div></div>
