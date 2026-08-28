@@ -1,4 +1,4 @@
-import { getFacebookPageProfile } from "@/lib/facebook";
+import { applyFacebookBrandAssets, getFacebookPageProfile } from "@/lib/facebook";
 import {
   deleteFacebookSelection,
   readFacebookSelection,
@@ -108,10 +108,22 @@ export async function POST(request: Request) {
     return redirectError(request.url, "account-save", error, "Facebook Sayfası güvenli biçimde kaydedilemedi.");
   }
 
+  let brandState = "failed";
+  try {
+    const branding = await applyFacebookBrandAssets(selection.villa, profile.id, page.accessToken);
+    const appliedCount = Number(branding.profile.applied) + Number(branding.cover.applied);
+    brandState = appliedCount === 2 ? "applied" : appliedCount === 1 ? "partial" : "failed";
+    if (branding.profile.error) console.error(`[Facebook Brand][profile] ${safeErrorMessage(new Error(branding.profile.error), "Profil görseli uygulanamadı.")}`);
+    if (branding.cover.error) console.error(`[Facebook Brand][cover] ${safeErrorMessage(new Error(branding.cover.error), "Kapak görseli uygulanamadı.")}`);
+  } catch (error) {
+    console.error(`[Facebook Brand][apply] ${safeErrorMessage(error, "Facebook marka görselleri uygulanamadı.")}`);
+  }
+
   await deleteFacebookSelection(sessionId).catch(() => undefined);
   const target = new URL("/sosyal", request.url);
   target.searchParams.set("meta_platform", "Facebook");
   target.searchParams.set("meta_connected", selection.villa);
+  target.searchParams.set("meta_brand", brandState);
 
   return new Response(null, {
     status: 303,
