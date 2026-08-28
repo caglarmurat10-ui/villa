@@ -1,6 +1,6 @@
 import { createSocialPost, listSocialPosts } from "@/lib/social-db";
 import { socialPostSchema } from "@/lib/schema";
-import { isApprovedDriveMediaUrl, isGoogleDriveMediaUrl } from "@/lib/social-drive-media";
+import { isApprovedMediaUrl, isManagedMediaUrl } from "@/lib/social-drive-media";
 
 export const dynamic = "force-dynamic";
 
@@ -14,8 +14,8 @@ export async function POST(request: Request) {
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
   if (parsed.data.scheduledDate < today) return Response.json({ error: "Geçmiş bir tarihe paylaşım planlanamaz." }, { status: 400 });
 
-  if (parsed.data.mediaUrl && isGoogleDriveMediaUrl(parsed.data.mediaUrl) && !isApprovedDriveMediaUrl(parsed.data.villa, parsed.data.mediaUrl)) {
-    return Response.json({ error: `Seçilen Google Drive medyası Villa ${parsed.data.villa} için doğrulanmış medya havuzunda değil.` }, { status: 400 });
+  if (parsed.data.mediaUrl && isManagedMediaUrl(parsed.data.mediaUrl) && !isApprovedMediaUrl(parsed.data.villa, parsed.data.mediaUrl)) {
+    return Response.json({ error: `Seçilen medya Villa ${parsed.data.villa} için doğrulanmış medya havuzunda değil.` }, { status: 400 });
   }
 
   return Response.json({ post: await createSocialPost(parsed.data) }, { status: 201 });
