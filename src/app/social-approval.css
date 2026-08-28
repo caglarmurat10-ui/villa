@@ -6,5 +6,6 @@
 .social-actions{grid-template-columns:repeat(2,minmax(0,1fr))}
 .social-actions .approval-action{border-color:#a16207;color:#fde68a;background:#422006}
 .social-actions .approval-action.approved{border-color:#15803d;color:#bbf7d0;background:#14532d}
+.social-actions .facebook-publish{border-color:#2563eb;color:#dbeafe;background:#1e40af}
 @media(max-width:850px){.social-overview{grid-template-columns:repeat(3,1fr)}}
 @media(max-width:520px){.social-state-badges{justify-content:flex-start}.social-post-top{flex-direction:column}.social-overview{grid-template-columns:1fr 1fr}.social-actions{grid-template-columns:1fr}}
