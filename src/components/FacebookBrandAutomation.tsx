@@ -21,11 +21,12 @@ export default function FacebookBrandAutomation({ accounts }: { accounts: MetaSo
       });
       const data = await response.json().catch(() => ({}));
       if (response.ok && data.complete) {
-        setNotice(`Villa ${villa}: Facebook profil logosu ve kapak görseli uygulandı.`);
+        setNotice(`Villa ${villa}: Facebook Hakkında metni, profil logosu ve kapak görseli uygulandı.`);
       } else if (response.ok && data.success) {
-        setNotice(`Villa ${villa}: Marka görsellerinden biri uygulandı. Diğeri Meta tarafından reddedildi; bağlantıyı yenileyip tekrar deneyebilirsiniz.`);
+        const applied = [data.detailsApplied ? "Hakkında" : "", data.profileApplied ? "profil" : "", data.coverApplied ? "kapak" : ""].filter(Boolean).join(" + ");
+        setNotice(`Villa ${villa}: ${applied || "marka ayarlarının bir bölümü"} uygulandı. Kalan bölüm için bağlantıyı yenileyip tekrar deneyebilirsiniz.`);
       } else {
-        setNotice(data.error ?? data.profileError ?? data.coverError ?? `Villa ${villa} marka görselleri uygulanamadı.`);
+        setNotice(data.error ?? data.detailsError ?? data.profileError ?? data.coverError ?? `Villa ${villa} marka ayarları uygulanamadı.`);
       }
     } catch {
       setNotice("Facebook marka otomasyonuna bağlanılamadı.");
@@ -35,12 +36,12 @@ export default function FacebookBrandAutomation({ accounts }: { accounts: MetaSo
   }
 
   return <section className="facebook-brand-automation">
-    <div><span className="eyebrow">FACEBOOK OTOMATİK MARKA</span><h2>Profil + kapak görsellerini Sayfalara uygula</h2><p>`pages_manage_metadata` izniyle profil PNG ve gerçek villa fotoğraflı kapak otomatik uygulanır. Bağlantı sırasında da otomatik denenir.</p></div>
+    <div><span className="eyebrow">FACEBOOK OTOMATİK MARKA</span><h2>Sayfa metni + profil + kapak senkronu</h2><p>`pages_manage_metadata` izniyle kontrollü Hakkında metinleri, profil PNG ve gerçek villa fotoğraflı kapak otomatik uygulanır. Sayfa adı, kullanıcı adı, telefon, web sitesi ve kategori doğrulanmadan otomatik değiştirilmez.</p></div>
     {notice ? <p className="message">{notice}</p> : null}
     <div className="facebook-brand-buttons">{villas.map((villa) => {
       const account = accounts.find((item) => item.villa === villa && item.platform === "Facebook");
       return account
-        ? <button type="button" key={villa} disabled={working !== null} onClick={() => apply(villa)}>{working === villa ? "Uygulanıyor…" : `Villa ${villa} Facebook markasını uygula`}</button>
+        ? <button type="button" key={villa} disabled={working !== null} onClick={() => apply(villa)}>{working === villa ? "Senkronlanıyor…" : `Villa ${villa} Facebook ayarlarını senkronla`}</button>
         : <a key={villa} href={`/api/meta/facebook/connect?villa=${villa}`}>Villa {villa} Facebook'u bağla</a>;
     })}</div>
   </section>;
