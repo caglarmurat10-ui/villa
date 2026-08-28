@@ -11,13 +11,15 @@ async function facebookConfig() {
   const { env } = await getCloudflareContext({ async: true });
   const appId = env.FACEBOOK_APP_ID ?? process.env.FACEBOOK_APP_ID;
   const appSecret = env.FACEBOOK_APP_SECRET ?? process.env.FACEBOOK_APP_SECRET;
+  const configId = env.FACEBOOK_CONFIG_ID ?? process.env.FACEBOOK_CONFIG_ID;
   const baseUrl = env.APP_BASE_URL ?? process.env.APP_BASE_URL;
 
   if (!appId) throw new Error("Eksik ortam değişkeni: FACEBOOK_APP_ID. Instagram App ID Facebook Login için kullanılamaz.");
   if (!appSecret) throw new Error("Eksik ortam değişkeni: FACEBOOK_APP_SECRET.");
+  if (!configId) throw new Error("Eksik ortam değişkeni: FACEBOOK_CONFIG_ID. Meta Developer > Facebook İşletme Girişi > Yapılandırmalar bölümünden bir yapılandırma oluşturun.");
   if (!baseUrl) throw new Error("Eksik ortam değişkeni: APP_BASE_URL.");
 
-  return { appId, appSecret, baseUrl: baseUrl.replace(/\/$/, "") };
+  return { appId, appSecret, configId, baseUrl: baseUrl.replace(/\/$/, "") };
 }
 
 function facebookRedirectUri(baseUrl: string) {
@@ -50,13 +52,14 @@ export async function verifyFacebookState(state: string) {
 }
 
 export async function facebookAuthorizeUrl(villa: Villa, nonce: string) {
-  const { appId, baseUrl } = await facebookConfig();
+  const { appId, configId, baseUrl } = await facebookConfig();
   const state = await signFacebookState(villa, nonce);
   const params = new URLSearchParams({
     client_id: appId,
     redirect_uri: facebookRedirectUri(baseUrl),
     response_type: "code",
-    scope: "pages_show_list,pages_read_engagement,pages_manage_posts,pages_manage_metadata",
+    config_id: configId,
+    override_default_response_type: "true",
     state,
     auth_type: "rerequest",
   });
