@@ -43,4 +43,5 @@ export const socialPostSchema = z.object({
 });
 
 export const socialPostStatusSchema = z.object({ status: z.enum(["Planlandı", "Yayınlandı"]) });
+export const socialPostApprovalSchema = z.object({ approvalStatus: z.enum(["İnsan onayı", "Onaylandı"]) });
 export type SocialPostInput = z.infer<typeof socialPostSchema>;
