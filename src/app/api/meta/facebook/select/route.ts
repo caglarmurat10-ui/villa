@@ -28,7 +28,7 @@ function safeErrorMessage(error: unknown, fallback: string) {
 }
 
 function expiredSelectionCookie() {
-  return "fb_page_selection=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0";
+  return "fb_page_selection=; Path=/api/meta/facebook/select; HttpOnly; Secure; SameSite=Strict; Max-Age=0";
 }
 
 function redirectError(requestUrl: string, stage: Stage, error: unknown, fallback: string) {
@@ -48,19 +48,16 @@ function redirectError(requestUrl: string, stage: Stage, error: unknown, fallbac
 }
 
 export async function POST(request: Request) {
-  let sessionId = "";
   let pageId = "";
   try {
     const form = await request.formData();
-    sessionId = String(form.get("sessionId") ?? "").trim();
     pageId = String(form.get("pageId") ?? "").trim();
   } catch (error) {
     return redirectError(request.url, "selection-validate", error, "Facebook Sayfa seçimi okunamadı.");
   }
 
-  const sessionCookie = cookieValue(request.headers.get("cookie"), "fb_page_selection");
-  if (!sessionId || !pageId || !sessionCookie || sessionId !== sessionCookie) {
-    if (sessionId) await deleteFacebookSelection(sessionId).catch(() => undefined);
+  const sessionId = cookieValue(request.headers.get("cookie"), "fb_page_selection");
+  if (!sessionId || !pageId) {
     return redirectError(
       request.url,
       "selection-validate",
