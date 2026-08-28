@@ -1,14 +1,48 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { MetaSocialAccount } from "@/lib/meta-store";
 import type { Villa } from "@/lib/types";
 
 const villas: Villa[] = ["Destan", "Safira"];
 
+const stageLabels: Record<string, string> = {
+  state: "state doğrulama",
+  "nonce-cookie": "güvenlik çerezi",
+  "code-exchange": "erişim anahtarı",
+  "profile-fetch": "profil bilgisi",
+  "database-save": "veritabanı kaydı",
+};
+
 export default function MetaConnections({ initialAccounts }: { initialAccounts: MetaSocialAccount[] }) {
   const [accounts, setAccounts] = useState(initialAccounts);
   const [notice, setNotice] = useState("");
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const connected = params.get("meta_connected");
+    const error = params.get("meta_error");
+    const stage = params.get("meta_stage");
+
+    if (error) {
+      const stageText = stage ? stageLabels[stage] ?? stage : "bağlantı";
+      setNotice(`Instagram bağlantısı tamamlanamadı · ${stageText}: ${error}`);
+    } else if (connected) {
+      setNotice(`Villa ${connected} Instagram hesabı başarıyla bağlandı.`);
+    }
+
+    if (error || connected || stage) {
+      params.delete("meta_error");
+      params.delete("meta_stage");
+      params.delete("meta_connected");
+      const query = params.toString();
+      window.history.replaceState(
+        {},
+        "",
+        `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`,
+      );
+    }
+  }, []);
 
   async function disconnect(villa: Villa) {
     if (!confirm(`Villa ${villa} Instagram bağlantısı kaldırılsın mı?`)) return;

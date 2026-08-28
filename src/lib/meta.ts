@@ -5,9 +5,6 @@ const INSTAGRAM_AUTH = "https://www.instagram.com/oauth/authorize";
 const INSTAGRAM_TOKEN = "https://api.instagram.com/oauth/access_token";
 const INSTAGRAM_GRAPH = "https://graph.instagram.com";
 
-const INSTAGRAM_REDIRECT_URI =
-  "https://villa-yonetim.caglarmurat10.workers.dev/api/meta/instagram/callback";
-
 export async function metaConfig() {
   const { env } = await getCloudflareContext({ async: true });
 
@@ -32,6 +29,10 @@ export async function metaConfig() {
     appSecret,
     baseUrl: baseUrl.replace(/\/$/, ""),
   };
+}
+
+function instagramRedirectUri(baseUrl: string) {
+  return `${baseUrl}/api/meta/instagram/callback`;
 }
 
 export async function makeInstagramState(villa: Villa, nonce: string) {
@@ -85,12 +86,12 @@ export async function instagramAuthorizeUrl(
   villa: Villa,
   nonce: string,
 ) {
-  const { appId } = await metaConfig();
+  const { appId, baseUrl } = await metaConfig();
   const state = await makeInstagramState(villa, nonce);
 
   const params = new URLSearchParams({
     client_id: appId,
-    redirect_uri: INSTAGRAM_REDIRECT_URI,
+    redirect_uri: instagramRedirectUri(baseUrl),
     response_type: "code",
     scope:
       "instagram_business_basic,instagram_business_content_publish",
@@ -102,13 +103,13 @@ export async function instagramAuthorizeUrl(
 }
 
 export async function exchangeInstagramCode(code: string) {
-  const { appId, appSecret } = await metaConfig();
+  const { appId, appSecret, baseUrl } = await metaConfig();
 
   const body = new URLSearchParams({
     client_id: appId,
     client_secret: appSecret,
     grant_type: "authorization_code",
-    redirect_uri: INSTAGRAM_REDIRECT_URI,
+    redirect_uri: instagramRedirectUri(baseUrl),
     code,
   });
 
@@ -135,6 +136,41 @@ export async function exchangeInstagramCode(code: string) {
   return {
     accessToken: data.access_token,
     userId: String(data.user_id ?? ""),
+  };
+}
+
+export async function exchangeInstagramLongLivedToken(
+  shortLivedAccessToken: string,
+) {
+  const { appSecret } = await metaConfig();
+  const params = new URLSearchParams({
+    grant_type: "ig_exchange_token",
+    client_secret: appSecret,
+    access_token: shortLivedAccessToken,
+  });
+
+  const response = await fetch(
+    `${INSTAGRAM_GRAPH}/access_token?${params.toString()}`,
+  );
+
+  const data = (await response.json()) as {
+    access_token?: string;
+    token_type?: string;
+    expires_in?: number;
+    error?: { message?: string };
+  };
+
+  if (!response.ok || !data.access_token) {
+    throw new Error(
+      data.error?.message ??
+        "Instagram uzun süreli erişim anahtarı alınamadı.",
+    );
+  }
+
+  return {
+    accessToken: data.access_token,
+    tokenType: data.token_type ?? "bearer",
+    expiresIn: data.expires_in ?? null,
   };
 }
 
