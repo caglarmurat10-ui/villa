@@ -31,6 +31,7 @@ type FacebookRow = {
   username: string;
   profile_url: string | null;
   connected_at: string;
+  updated_at: string;
 };
 
 async function context() {
@@ -154,23 +155,33 @@ export async function saveFacebookAccount(
     .prepare("SELECT * FROM facebook_account_metadata WHERE villa=?")
     .bind(villa)
     .first<FacebookRow>();
-  let previousToken: string | null = null;
-  if (previous) {
-    previousToken = await getFacebookPageToken(villa, previous.account_id).catch(() => null);
-  }
+  const previousToken = previous
+    ? await getFacebookPageToken(villa, previous.account_id).catch(() => null)
+    : null;
 
   const now = new Date().toISOString();
-  await saveFacebookPageToken(villa, accountId, accessToken);
+  await db.prepare(`INSERT INTO facebook_account_metadata (villa, account_id, username, profile_url, connected_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?)
+    ON CONFLICT(villa) DO UPDATE SET account_id=excluded.account_id, username=excluded.username,
+      profile_url=excluded.profile_url, connected_at=excluded.connected_at, updated_at=excluded.updated_at`)
+    .bind(villa, accountId, username, profileUrl, now, now).run();
+
   try {
-    await db.prepare(`INSERT INTO facebook_account_metadata (villa, account_id, username, profile_url, connected_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(villa) DO UPDATE SET account_id=excluded.account_id, username=excluded.username,
-        profile_url=excluded.profile_url, connected_at=excluded.connected_at, updated_at=excluded.updated_at`)
-      .bind(villa, accountId, username, profileUrl, now, now).run();
+    await saveFacebookPageToken(villa, accountId, accessToken);
   } catch (error) {
-    if (previous && previousToken) {
-      await saveFacebookPageToken(villa, previous.account_id, previousToken).catch(() => undefined);
+    if (previous) {
+      await db.prepare(`INSERT INTO facebook_account_metadata (villa, account_id, username, profile_url, connected_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?)
+        ON CONFLICT(villa) DO UPDATE SET account_id=excluded.account_id, username=excluded.username,
+          profile_url=excluded.profile_url, connected_at=excluded.connected_at, updated_at=excluded.updated_at`)
+        .bind(previous.villa, previous.account_id, previous.username, previous.profile_url, previous.connected_at, previous.updated_at)
+        .run()
+        .catch(() => undefined);
+      if (previousToken) {
+        await saveFacebookPageToken(villa, previous.account_id, previousToken).catch(() => undefined);
+      }
     } else {
+      await db.prepare("DELETE FROM facebook_account_metadata WHERE villa=?").bind(villa).run().catch(() => undefined);
       await deleteFacebookPageToken(villa).catch(() => undefined);
     }
     throw error;
@@ -219,8 +230,8 @@ export async function removeMetaAccount(villa: Villa, platform: "Instagram" | "F
   const db = env.DB;
   await ensureTables(db);
   if (platform === "Facebook") {
-    await db.prepare("DELETE FROM facebook_account_metadata WHERE villa=?").bind(villa).run();
     await deleteFacebookPageToken(villa);
+    await db.prepare("DELETE FROM facebook_account_metadata WHERE villa=?").bind(villa).run();
   } else {
     await db.prepare("DELETE FROM social_accounts WHERE villa=? AND platform='Instagram'").bind(villa).run();
   }
