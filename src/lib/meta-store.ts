@@ -34,40 +34,43 @@ type FacebookRow = {
   updated_at: string;
 };
 
+let tablesReady: Promise<void> | null = null;
+
 async function context() {
   return getCloudflareContext({ async: true });
 }
 
-async function ensureInstagramTable(db: D1Database) {
-  await db.prepare(`CREATE TABLE IF NOT EXISTS social_accounts (
-    villa TEXT NOT NULL CHECK (villa IN ('Safira','Destan')),
-    platform TEXT NOT NULL CHECK (platform IN ('Instagram')),
-    account_id TEXT NOT NULL,
-    username TEXT NOT NULL,
-    access_token TEXT NOT NULL,
-    connected_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL,
-    PRIMARY KEY (villa, platform)
-  )`).run();
-}
-
-async function ensureFacebookTable(db: D1Database) {
-  // Security migration: the legacy table contained Facebook Page tokens in D1.
-  // Drop it rather than carrying any secret value forward.
-  await db.prepare("DROP TABLE IF EXISTS facebook_accounts").run();
-  await db.prepare(`CREATE TABLE IF NOT EXISTS facebook_account_metadata (
-    villa TEXT PRIMARY KEY CHECK (villa IN ('Safira','Destan')),
-    account_id TEXT NOT NULL UNIQUE,
-    username TEXT NOT NULL,
-    profile_url TEXT,
-    connected_at TEXT NOT NULL,
-    updated_at TEXT NOT NULL
-  )`).run();
+async function prepareTables(db: D1Database) {
+  await db.batch([
+    db.prepare(`CREATE TABLE IF NOT EXISTS social_accounts (
+      villa TEXT NOT NULL CHECK (villa IN ('Safira','Destan')),
+      platform TEXT NOT NULL CHECK (platform IN ('Instagram')),
+      account_id TEXT NOT NULL,
+      username TEXT NOT NULL,
+      access_token TEXT NOT NULL,
+      connected_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL,
+      PRIMARY KEY (villa, platform)
+    )`),
+    db.prepare(`CREATE TABLE IF NOT EXISTS facebook_account_metadata (
+      villa TEXT PRIMARY KEY CHECK (villa IN ('Safira','Destan')),
+      account_id TEXT NOT NULL UNIQUE,
+      username TEXT NOT NULL,
+      profile_url TEXT,
+      connected_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )`),
+  ]);
 }
 
 async function ensureTables(db: D1Database) {
-  await ensureInstagramTable(db);
-  await ensureFacebookTable(db);
+  if (!tablesReady) {
+    tablesReady = prepareTables(db).catch((error) => {
+      tablesReady = null;
+      throw error;
+    });
+  }
+  await tablesReady;
 }
 
 async function keyFromSecret(secret: string) {
