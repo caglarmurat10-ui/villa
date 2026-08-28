@@ -111,12 +111,13 @@ export async function POST(request: Request) {
   let brandState = "failed";
   try {
     const branding = await applyFacebookBrandAssets(selection.villa, profile.id, page.accessToken);
-    const appliedCount = Number(branding.profile.applied) + Number(branding.cover.applied);
-    brandState = appliedCount === 2 ? "applied" : appliedCount === 1 ? "partial" : "failed";
+    const appliedCount = Number(branding.details.applied) + Number(branding.profile.applied) + Number(branding.cover.applied);
+    brandState = appliedCount === 3 ? "applied" : appliedCount > 0 ? "partial" : "failed";
+    if (branding.details.error) console.error(`[Facebook Brand][details] ${safeErrorMessage(new Error(branding.details.error), "Sayfa metinleri uygulanamadı.")}`);
     if (branding.profile.error) console.error(`[Facebook Brand][profile] ${safeErrorMessage(new Error(branding.profile.error), "Profil görseli uygulanamadı.")}`);
     if (branding.cover.error) console.error(`[Facebook Brand][cover] ${safeErrorMessage(new Error(branding.cover.error), "Kapak görseli uygulanamadı.")}`);
   } catch (error) {
-    console.error(`[Facebook Brand][apply] ${safeErrorMessage(error, "Facebook marka görselleri uygulanamadı.")}`);
+    console.error(`[Facebook Brand][apply] ${safeErrorMessage(error, "Facebook marka ayarları uygulanamadı.")}`);
   }
 
   await deleteFacebookSelection(sessionId).catch(() => undefined);
