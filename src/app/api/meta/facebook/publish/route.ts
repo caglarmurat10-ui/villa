@@ -2,6 +2,7 @@ import { z } from "zod";
 import { publishFacebookPost } from "@/lib/facebook";
 import { getFacebookCredentials } from "@/lib/meta-store";
 import { getSocialPost, updateSocialPostStatus } from "@/lib/social-db";
+import { isApprovedProxyMediaUrl } from "@/lib/social-drive-media";
 
 const schema = z.object({ postId: z.string().trim().min(1, "Paylaşım kimliği gerekli.") });
 
@@ -27,6 +28,12 @@ export async function POST(request: Request) {
   if (post.approvalStatus !== "Onaylandı") return Response.json({ error: "Facebook yayını için önce insan onayı verilmelidir." }, { status: 409 });
   if (post.contentType !== "Gönderi") {
     return Response.json({ error: "Facebook Hikâye/Reels doğrudan yayını henüz bu medya akışında desteklenmiyor. Bu kayıt Gönderi olarak hazırlanmalıdır." }, { status: 409 });
+  }
+  if (post.mediaUrl) {
+    const allowedOrigins = [new URL(request.url).origin, "https://villa-yonetim.caglarmurat10.workers.dev"];
+    if (!isApprovedProxyMediaUrl(post.villa, post.mediaUrl, allowedOrigins)) {
+      return Response.json({ error: `Villa ${post.villa} için doğrulanmamış medya Facebook'a gönderilemez.` }, { status: 409 });
+    }
   }
 
   try {
