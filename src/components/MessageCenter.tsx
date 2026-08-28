@@ -29,9 +29,10 @@ function locationLink(reservation: Reservation, locations: VillaLocations) {
 function messageText(reservation: Reservation, type: MessageType, locations: VillaLocations) {
   if (type === "Giriş") {
     const mapLink = locationLink(reservation, locations);
-    return `Merhaba, ${villaName(reservation)} rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız. Giriş saatimiz 16.00'dır. Varış saatinizi müsait olduğunuzda bizimle paylaşabilirsiniz.\n\nKonum bağlantımız:\n${mapLink}\n\nŞimdiden iyi yolculuklar dileriz.`;
+    return `Merhaba 👋\n\n${villaName(reservation)} rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız.\n\n📍 ${villaName(reservation)} konumu:\n${mapLink}\n\n🕓 Giriş saatimiz 16.00’dır.\n\nVarış saatinizi müsait olduğunuzda bizimle paylaşabilirsiniz.\n\nVillaya sorunsuz şekilde giriş yapabilmeniz için konuma yaklaşık 15 dakika kala bize haber vermenizi rica ederiz.\n\nŞimdiden iyi yolculuklar dileriz.`;
   }
-  return "Merhaba, bizi tercih ettiğiniz için teşekkür ederiz. Çıkış saatimiz 10.00'dır. Güzel anılarla ayrılmanızı diler, sizi yeniden ağırlamaktan mutluluk duyarız.";
+
+  return `Merhaba 👋\n\nBizi tercih ettiğiniz için teşekkür ederiz.\n\n🧳 Çıkış saatimiz 10.00’dır.\n\nÇıkış öncesinde size iletilen saat ve teslim bilgilerini kontrol etmenizi rica ederiz.\n\nGüzel anılarla ayrılmanızı diler, sizi yeniden ağırlamaktan memnuniyet duyarız.`;
 }
 
 function formatDate(value: string) {
