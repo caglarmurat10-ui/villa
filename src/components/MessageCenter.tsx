@@ -22,13 +22,13 @@ function villaName(reservation: Reservation) {
   return `Villa ${reservation.villa}`;
 }
 
-function locationLink(reservation: Reservation, locations: VillaLocations) {
-  return MAP_LINKS[reservation.villa] || locations[reservation.villa];
+function locationLink(reservation: Reservation) {
+  return MAP_LINKS[reservation.villa];
 }
 
-function messageText(reservation: Reservation, type: MessageType, locations: VillaLocations) {
+function messageText(reservation: Reservation, type: MessageType) {
   if (type === "Giriş") {
-    const mapLink = locationLink(reservation, locations);
+    const mapLink = locationLink(reservation);
     return `Merhaba, ${villaName(reservation)} rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız. Giriş saatimiz 16.00'dır. Varış saatinizi müsait olduğunuzda bizimle paylaşabilirsiniz.\n\nKonum bağlantımız:\n${mapLink}\n\nYola çıkmadan önce bağlantıyı açarak rotanızı kontrol etmenizi rica ederiz. Güvenli ve keyifli bir yolculuk dileriz.`;
   }
   return "Merhaba, bizi tercih ettiğiniz için teşekkür ederiz. Çıkış saatimiz 10.00'dır. Güzel anılarla ayrılmanızı diler, sizi yeniden ağırlamaktan mutluluk duyarız.";
@@ -38,7 +38,7 @@ function formatDate(value: string) {
   return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short" }).format(new Date(`${value}T12:00:00`));
 }
 
-export default function MessageCenter({ reservations, locations }: { reservations: Reservation[]; locations: VillaLocations }) {
+export default function MessageCenter({ reservations }: { reservations: Reservation[]; locations: VillaLocations }) {
   const [phones, setPhones] = useState<Record<string, string>>(() => Object.fromEntries(reservations.map((r) => [r.id, r.phone ?? ""])));
   const [savedPhones, setSavedPhones] = useState<Record<string, string>>(() => Object.fromEntries(reservations.map((r) => [r.id, r.phone ?? ""])));
   const [saving, setSaving] = useState<string | null>(null);
@@ -77,7 +77,7 @@ export default function MessageCenter({ reservations, locations }: { reservation
 
   async function send(reservation: Reservation, type: MessageType) {
     const phone = (phones[reservation.id] ?? "").trim();
-    if (type === "Giriş" && !locationLink(reservation, locations)) {
+    if (type === "Giriş" && !locationLink(reservation)) {
       setNotice((n) => ({ ...n, [reservation.id]: `${villaName(reservation)} konum bağlantısı tanımlı değil.` }));
       return;
     }
@@ -88,7 +88,7 @@ export default function MessageCenter({ reservations, locations }: { reservation
     if (phone !== savedPhones[reservation.id]) {
       if (!await savePhone(reservation)) return;
     }
-    const text = messageText({ ...reservation, phone }, type, locations);
+    const text = messageText({ ...reservation, phone }, type);
     window.open(`https://wa.me/${normalizeWhatsAppNumber(phone)}?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer");
   }
 
