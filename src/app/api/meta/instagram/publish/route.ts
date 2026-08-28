@@ -2,6 +2,7 @@ import { z } from "zod";
 import { publishInstagramImage } from "@/lib/meta";
 import { getInstagramCredentials } from "@/lib/meta-store";
 import { getSocialPost, updateSocialPostStatus } from "@/lib/social-db";
+import { isApprovedProxyMediaUrl } from "@/lib/social-drive-media";
 
 const schema = z.object({
   postId: z.string().trim().min(1, "Paylaşım kimliği gerekli."),
@@ -43,6 +44,10 @@ export async function POST(request: Request) {
   }
   if (!post.mediaUrl) {
     return Response.json({ error: "Instagram yayını için görsel bağlantısı gerekli." }, { status: 409 });
+  }
+  const allowedOrigins = [new URL(request.url).origin, "https://villa-yonetim.caglarmurat10.workers.dev"];
+  if (!isApprovedProxyMediaUrl(post.villa, post.mediaUrl, allowedOrigins)) {
+    return Response.json({ error: `Villa ${post.villa} için doğrulanmamış medya Instagram'a gönderilemez.` }, { status: 409 });
   }
 
   try {
