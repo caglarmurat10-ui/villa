@@ -32,6 +32,9 @@ export async function POST(request: Request) {
   if (post.platform !== "Instagram") {
     return Response.json({ error: "Bu endpoint yalnızca Instagram paylaşımları içindir." }, { status: 400 });
   }
+  if (post.contentType !== "Gönderi") {
+    return Response.json({ error: "Bu yayın akışı yalnızca Instagram görsel gönderileri içindir. Reels ve Hikâye için video/özel medya akışı kullanılmalıdır." }, { status: 409 });
+  }
   if (post.status !== "Planlandı") {
     return Response.json({ error: "Bu paylaşım daha önce yayınlanmış." }, { status: 409 });
   }
