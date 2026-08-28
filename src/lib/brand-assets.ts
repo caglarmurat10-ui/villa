@@ -5,9 +5,10 @@ export const profileAssets: Record<Villa, string> = {
   Destan: "/brand/destan-profile.svg",
 };
 
+// Facebook cover preview always uses a verified real image from the correct villa whitelist.
 export const facebookCoverAssets: Record<Villa, string> = {
-  Safira: "/brand/safira-facebook-cover.svg",
-  Destan: "/brand/destan-facebook-cover.svg",
+  Safira: "/api/media/drive/13ZC4v1qxGmUX0AXfNRWhpAkYprKpfkLB", // Villa Safira (50).jpg
+  Destan: "/api/media/drive/1IipTx5zZfOge9Y1rQJBpW8BK9zBU2tgj", // DJI_0332.jpg
 };
 
 export const highlightAssets = [
@@ -22,19 +23,21 @@ export const highlightAssets = [
 
 export const verifiedMediaNotes: Record<Villa, { status: string; notes: string[] }> = {
   Safira: {
-    status: "Gerçek fotoğraf doğrulaması sürüyor",
+    status: "12 gerçek Safira görseli Drive ile doğrulandı",
     notes: [
-      "WhatsApp konum paylaşımında gerçek Villa Safira dış cephe/havuz fotoğrafı doğrulandı.",
-      "Kapak veya feed için yalnız ham/orijinal Safira fotoğrafı eşleştirildikten sonra kullanılacak.",
-      "AI ile başka villa üretilmeyecek ve Safira diye yayınlanmayacak.",
+      "30 günlük içerik planında kullanılan Safira fotoğrafları gerçek `Safira Resim` Drive klasörüyle dosya ID'si seviyesinde eşleştirildi.",
+      "Facebook kapak önizlemesi gerçek `Villa Safira (50).jpg` dosyasını kullanır.",
+      "Instagram / Facebook yayınında yalnız Safira whitelist'indeki medya ID'leri kabul edilir; Destan medyası teknik olarak reddedilir.",
+      "AI ile başka villa üretilmez ve Villa Safira diye yayınlanmaz.",
     ],
   },
   Destan: {
-    status: "Ham gerçek medya bulundu",
+    status: "7 gerçek Destan görseli Drive ile doğrulandı",
     notes: [
-      "Library içinde `villa destan_43.jpg` gerçek Villa Destan havuz/dış cephe fotoğrafı doğrulandı.",
-      "30 günlük plandaki diğer Destan dosyaları ham medya listesiyle eşleştirilecek.",
-      "Drone içerikleri için DJI_0332 dosyası bulunmadan sahte drone görüntüsü kullanılmayacak.",
+      "30 günlük içerik planında kullanılan Destan fotoğrafları gerçek `destan resim` Drive klasörüyle dosya ID'si seviyesinde eşleştirildi.",
+      "Facebook kapak önizlemesi gerçek `DJI_0332.jpg` drone fotoğrafını kullanır.",
+      "Instagram / Facebook yayınında yalnız Destan whitelist'indeki medya ID'leri kabul edilir; Safira medyası teknik olarak reddedilir.",
+      "Gerçek drone dosyası doğrulandığı için sahte drone görseli kullanılmaz.",
     ],
   },
 };
