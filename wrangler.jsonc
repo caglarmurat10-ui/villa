@@ -9,10 +9,11 @@
   "vars": {
     "META_APP_ID": "2566616200453545",
     "FACEBOOK_APP_ID": "2335943650679330",
+    "FACEBOOK_CONFIG_ID": "1095389230103732",
     "APP_BASE_URL": "https://villa-yonetim.caglarmurat10.workers.dev"
   },
   "secrets": {
-    "required": ["META_APP_SECRET"]
+    "required": ["META_APP_SECRET", "FACEBOOK_APP_SECRET"]
   },
   "kv_namespaces": [
     { "binding": "META_PRIVATE" }
