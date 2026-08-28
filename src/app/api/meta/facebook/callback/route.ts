@@ -63,7 +63,7 @@ function escapeHtml(value: string) {
   }[char] ?? char));
 }
 
-function selectionPage(villa: string, sessionId: string, pages: Array<{ id: string; name: string }>) {
+function selectionPage(villa: string, pages: Array<{ id: string; name: string }>) {
   const options = pages.map((page, index) => `
     <label class="page-option">
       <input type="radio" name="pageId" value="${escapeHtml(page.id)}" ${index === 0 ? "required" : ""}>
@@ -72,7 +72,7 @@ function selectionPage(villa: string, sessionId: string, pages: Array<{ id: stri
 
   return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Facebook Sayfasını Seç</title><style>
   *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#07111f;color:#f8fafc;font-family:system-ui,sans-serif}.card{width:min(640px,100%);padding:26px;border:1px solid #334155;border-radius:20px;background:#0f1b2d}.eyebrow{font-size:11px;font-weight:800;color:#93c5fd;letter-spacing:.08em}.card h1{margin:8px 0 6px;font-size:24px}.card>p{margin:0 0 18px;color:#cbd5e1;line-height:1.5}.page-list{display:grid;gap:9px}.page-option{display:flex;gap:12px;align-items:center;padding:13px;border:1px solid #334155;border-radius:13px;background:#081423;cursor:pointer}.page-option:has(input:checked){border-color:#60a5fa;background:#0b2542}.page-option input{width:18px;height:18px}.page-option span{display:grid;gap:3px}.page-option small{color:#94a3b8}.actions{display:flex;gap:9px;margin-top:18px}.actions button,.actions a{padding:11px 14px;border-radius:10px;font-weight:800;text-decoration:none}.actions button{border:0;background:#2563eb;color:white;cursor:pointer}.actions a{border:1px solid #475569;color:#cbd5e1}.note{margin-top:14px!important;font-size:12px;color:#94a3b8!important}
-  </style></head><body><main class="card"><span class="eyebrow">FACEBOOK SAYFA EŞLEŞTİRME</span><h1>Villa ${escapeHtml(villa)} için sayfayı seçin</h1><p>Otomatik isim eşleştirmesi yapılmaz. Aşağıdaki sayfalardan doğru olanı siz açıkça seçmeden hiçbir Facebook hesabı kaydedilmez.</p><form method="post" action="/api/meta/facebook/select"><input type="hidden" name="sessionId" value="${escapeHtml(sessionId)}"><div class="page-list">${options}</div><div class="actions"><button type="submit">Seçili sayfayı bağla</button><a href="/sosyal">İptal</a></div></form><p class="note">Page tokenı tarayıcıya gönderilmez. Seçim oturumu 10 dakika sonra private KV’den otomatik silinir.</p></main></body></html>`;
+  </style></head><body><main class="card"><span class="eyebrow">FACEBOOK SAYFA EŞLEŞTİRME</span><h1>Villa ${escapeHtml(villa)} için sayfayı seçin</h1><p>Otomatik isim eşleştirmesi yapılmaz. Aşağıdaki sayfalardan doğru olanı siz açıkça seçmeden hiçbir Facebook hesabı kaydedilmez.</p><form method="post" action="/api/meta/facebook/select"><div class="page-list">${options}</div><div class="actions"><button type="submit">Seçili sayfayı bağla</button><a href="/sosyal">İptal</a></div></form><p class="note">Page tokenı tarayıcıya gönderilmez. Seçim oturumu 10 dakika sonra private KV’den otomatik silinir.</p></main></body></html>`;
 }
 
 export async function GET(request: Request) {
@@ -132,9 +132,9 @@ export async function GET(request: Request) {
     "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
   });
   headers.append("Set-Cookie", expiredCookie("fb_oauth_nonce"));
-  headers.append("Set-Cookie", `fb_page_selection=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`);
+  headers.append("Set-Cookie", `fb_page_selection=${sessionId}; Path=/api/meta/facebook/select; HttpOnly; Secure; SameSite=Strict; Max-Age=600`);
 
-  return new Response(selectionPage(parsed.villa, sessionId, pages), {
+  return new Response(selectionPage(parsed.villa, pages), {
     status: 200,
     headers,
   });
