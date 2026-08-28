@@ -9,6 +9,7 @@ declare global {
     META_APP_SECRET?: string;
     FACEBOOK_APP_ID?: string;
     FACEBOOK_APP_SECRET?: string;
+    FACEBOOK_CONFIG_ID?: string;
     APP_BASE_URL?: string;
   }
 }
