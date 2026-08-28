@@ -59,6 +59,6 @@ export const socialContentTemplates: SocialContentTemplate[] = raw.map((item) =>
     driveFileId: media?.fileId ?? "",
     driveViewUrl: media?.viewUrl ?? "",
     previewUrl: media?.previewUrl ?? "",
-    mediaUrl: media?.publishUrl ?? "",
+    mediaUrl: media?.proxyPath ?? "",
   };
 });
