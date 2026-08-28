@@ -124,15 +124,18 @@ export async function GET(request: Request) {
     return redirectError(url, "selection-save", error, "Facebook seçim oturumu oluşturulamadı.");
   }
 
+  const headers = new Headers({
+    "Content-Type": "text/html; charset=utf-8",
+    "Cache-Control": "no-store, max-age=0",
+    "Referrer-Policy": "no-referrer",
+    "X-Frame-Options": "DENY",
+    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
+  });
+  headers.append("Set-Cookie", expiredCookie("fb_oauth_nonce"));
+  headers.append("Set-Cookie", `fb_page_selection=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`);
+
   return new Response(selectionPage(parsed.villa, sessionId, pages), {
     status: 200,
-    headers: {
-      "Content-Type": "text/html; charset=utf-8",
-      "Cache-Control": "no-store, max-age=0",
-      "Referrer-Policy": "no-referrer",
-      "X-Frame-Options": "DENY",
-      "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'",
-      "Set-Cookie": `fb_page_selection=${sessionId}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=600`,
-    },
+    headers,
   });
 }
