@@ -37,11 +37,11 @@ export interface SocialPost {
   contentType: SocialContentType;
   scheduledDate: string;
   caption: string;
-  // Legacy social rows may not have an attached media URL yet.
+  // Legacy social rows may not have an attached media URL or approval columns yet.
   mediaUrl?: string;
   status: SocialPostStatus;
-  approvalStatus: SocialPostApproval;
-  approvedAt: string | null;
+  approvalStatus?: SocialPostApproval;
+  approvedAt?: string | null;
   publishedAt: string | null;
   createdAt: string;
   updatedAt: string;
