@@ -11,7 +11,7 @@ export default function MetaDiagnostics({ diagnostic }: { diagnostic: MetaDiagno
 
   return <section className="meta-diagnostic-box">
     <div className="meta-diagnostic-head">
-      <div><span className="eyebrow">META DURUM / TANILAMA</span><h2>Instagram + Facebook yayın altyapısı</h2><p>Secret değerleri gösterilmez. Bu bölüm yalnızca gerekli yapılandırmanın ve hesap bağlantılarının hazır olup olmadığını kontrol eder.</p><a className="diag-brand-link" href="/sosyal/marka">Marka / profil ayarlarını aç →</a></div>
+      <div><span className="eyebrow">META DURUM / TANILAMA</span><h2>Instagram + Facebook yayın altyapısı</h2><p>Secret değerleri gösterilmez. Facebook Page tokenları D1'e yazılmaz; AES-GCM ile şifrelenip private KV binding'inde tutulur.</p><a className="diag-brand-link" href="/sosyal/marka">Marka / profil ayarlarını aç →</a></div>
       <div className={configReady && accountsReady ? "diag-summary ready" : "diag-summary"}>{configReady && accountsReady ? "Yayına hazır" : "Kurulum devam ediyor"}</div>
     </div>
 
@@ -21,6 +21,7 @@ export default function MetaDiagnostics({ diagnostic }: { diagnostic: MetaDiagno
         <Status ok={diagnostic.configuration.appSecret} label="META_APP_SECRET" />
         <Status ok={diagnostic.configuration.baseUrl} label="APP_BASE_URL" />
         <Status ok={diagnostic.configuration.database} label="D1 / DB" />
+        <Status ok={diagnostic.configuration.privateKv} label="META_PRIVATE KV" />
       </div><p>Graph API: <strong>{diagnostic.graphApiVersion}</strong></p></article>
 
       <article><h3>Hesap bağlantıları</h3><p><strong>{diagnostic.accounts.connected}/{diagnostic.accounts.expected}</strong> bağlantı hazır</p>{diagnostic.accounts.missing.length ? <ul>{diagnostic.accounts.missing.map((item) => <li key={item}>{item} bekleniyor</li>)}</ul> : <p className="diag-complete">Safira ve Destan Instagram/Facebook bağlantıları tamam.</p>}</article>
