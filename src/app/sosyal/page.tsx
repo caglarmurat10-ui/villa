@@ -18,5 +18,16 @@ export default async function SocialPage() {
   const [posts, accounts, reservations] = await Promise.all([listSocialPosts(), listMetaAccounts(), listReservations()]);
   const [diagnostic] = await Promise.all([getMetaDiagnostic(accounts)]);
   const gaps = findAvailabilityGaps(reservations, istanbulToday());
-  return <><MetaDiagnostics diagnostic={diagnostic} /><MetaConnections initialAccounts={accounts} /><SocialContentLibrary /><SocialMediaView initialPosts={posts} availabilityGaps={gaps} /></>;
+  return <>
+    <MetaDiagnostics diagnostic={diagnostic} />
+    <MetaConnections initialAccounts={accounts} />
+    <div style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
+      <a href="/sosyal/marka" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,padding:"14px 16px",border:"1px solid #d5aa5855",borderRadius:14,background:"linear-gradient(135deg,#13233a,#081522)",color:"#f8fafc",textDecoration:"none",fontWeight:800}}>
+        <span><small style={{display:"block",color:"#d5aa58",fontSize:9,letterSpacing:1.5}}>MARKA + HEDEF KİTLE</small>Logo, Facebook kapağı, Instagram öne çıkanları ve Meta kitle merkezi</span>
+        <span style={{color:"#d5aa58"}}>Aç →</span>
+      </a>
+    </div>
+    <SocialContentLibrary />
+    <SocialMediaView initialPosts={posts} availabilityGaps={gaps} />
+  </>;
 }
