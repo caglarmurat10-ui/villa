@@ -23,6 +23,7 @@ export async function ensureDefaultSocialPlan() {
 
   for (const template of socialContentTemplates) {
     if (!template.mediaResolved || !template.mediaUrl || template.scheduledDate < today) continue;
+    if (template.contentType === "Reels" && template.mediaKind !== "video") continue;
     const mediaUrl = new URL(template.mediaUrl, `${baseUrl}/`).toString();
 
     inputs.push({
@@ -32,18 +33,18 @@ export async function ensureDefaultSocialPlan() {
       scheduledDate: template.scheduledDate,
       caption: template.caption,
       mediaUrl,
+      mediaUrls: [mediaUrl],
     });
 
-    // Current Facebook direct publisher supports image/text Feed posts.
-    // Feed + Carousel templates both map to SocialContentType "Gönderi".
-    if (template.contentType === "Gönderi") {
+    if (template.contentType === "Gönderi" || (template.contentType === "Reels" && template.mediaKind === "video")) {
       inputs.push({
         villa: template.villa,
         platform: "Facebook",
-        contentType: "Gönderi",
+        contentType: template.contentType,
         scheduledDate: template.scheduledDate,
         caption: template.caption,
         mediaUrl,
+        mediaUrls: [mediaUrl],
       });
     }
   }
