@@ -6,6 +6,9 @@ const MAX_ATTEMPTS = 3;
 const RETRY_COOLDOWN_MS = 30 * 60 * 1000;
 const PUBLIC_HOSTS = new Set(["safiradestan.com", "www.safiradestan.com"]);
 const ADMIN_HOST = "admin.safiradestan.com";
+const PUBLIC_API_PATHS = new Set([
+  "/api/public/booking-inquiries",
+]);
 const PUBLIC_ROUTE_MAP = new Map([
   ["/", "/site"],
   ["/villa-safira", "/site/villa-safira"],
@@ -76,7 +79,9 @@ function routeRequest(request) {
 
   if (PUBLIC_HOSTS.has(host)) {
     if (url.pathname.startsWith("/api/")) {
-      return { response: new Response("Not Found", { status: 404 }) };
+      return PUBLIC_API_PATHS.has(url.pathname)
+        ? { request }
+        : { response: new Response("Not Found", { status: 404 }) };
     }
 
     if (publicAssetPath(url.pathname)) return { request };

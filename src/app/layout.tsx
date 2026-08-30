@@ -16,6 +16,7 @@ import "./navigation.css";
 import "./operations-shell.css";
 import "./calendar-workspace.css";
 import "./settings-center.css";
+import "./booking-inquiries.css";
 
 const PUBLIC_HOSTS = new Set(["safiradestan.com", "www.safiradestan.com"]);
 

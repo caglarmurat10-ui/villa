@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import type { PriceRange, Reservation, Villa } from "@/lib/types";
 import styles from "./PublicBookingWidget.module.css";
 
@@ -15,6 +15,11 @@ type AvailabilityResult = {
   total?: number;
   nights?: number;
   alternative?: Villa;
+};
+
+type RequestState = {
+  kind: "idle" | "sending" | "success" | "error";
+  message: string;
 };
 
 const money = new Intl.NumberFormat("tr-TR", {
@@ -41,6 +46,12 @@ export default function PublicBookingWidget({
   const [villa, setVilla] = useState<Villa>(initialVilla ?? "Safira");
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
+  const [guestName, setGuestName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [guestCount, setGuestCount] = useState("2");
+  const [note, setNote] = useState("");
+  const [website, setWebsite] = useState("");
+  const [requestState, setRequestState] = useState<RequestState>({ kind: "idle", message: "" });
   const today = new Date().toISOString().slice(0, 10);
 
   const result = useMemo<AvailabilityResult | null>(() => {
@@ -95,6 +106,44 @@ export default function PublicBookingWidget({
   const alternativeHref = result?.alternative === "Safira" ? "/villa-safira" : "/villa-destan";
   const resultClass = result?.kind === "available" ? styles.available : result?.kind === "busy" ? styles.busy : result?.kind === "error" ? styles.error : "";
 
+  function resetRequestFeedback() {
+    if (requestState.kind !== "idle") setRequestState({ kind: "idle", message: "" });
+  }
+
+  async function submitInquiry(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (result?.kind !== "available") return;
+    setRequestState({ kind: "sending", message: "Talebiniz kaydediliyor…" });
+
+    try {
+      const response = await fetch("/api/public/booking-inquiries", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          villa,
+          guestName,
+          phone,
+          checkIn,
+          checkOut,
+          guestCount: Number(guestCount),
+          note,
+          website,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Rezervasyon talebi kaydedilemedi.");
+      setRequestState({
+        kind: "success",
+        message: data.message ?? "Rezervasyon talebiniz alındı. En kısa sürede sizinle iletişime geçeceğiz.",
+      });
+    } catch (error) {
+      setRequestState({
+        kind: "error",
+        message: error instanceof Error ? error.message : "Rezervasyon talebi kaydedilemedi.",
+      });
+    }
+  }
+
   return (
     <div className={styles.widget}>
       <div className={styles.header}>
@@ -108,18 +157,18 @@ export default function PublicBookingWidget({
       <div className={styles.fields}>
         <label>
           <span>Villa</span>
-          <select value={villa} onChange={(event) => setVilla(event.target.value as Villa)} disabled={Boolean(initialVilla)}>
+          <select value={villa} onChange={(event) => { setVilla(event.target.value as Villa); resetRequestFeedback(); }} disabled={Boolean(initialVilla)}>
             <option value="Safira">Villa Safira</option>
             <option value="Destan">Villa Destan</option>
           </select>
         </label>
         <label>
           <span>Giriş</span>
-          <input type="date" min={today} value={checkIn} onChange={(event) => setCheckIn(event.target.value)} />
+          <input type="date" min={today} value={checkIn} onChange={(event) => { setCheckIn(event.target.value); resetRequestFeedback(); }} />
         </label>
         <label>
           <span>Çıkış</span>
-          <input type="date" min={checkIn || today} value={checkOut} onChange={(event) => setCheckOut(event.target.value)} />
+          <input type="date" min={checkIn || today} value={checkOut} onChange={(event) => { setCheckOut(event.target.value); resetRequestFeedback(); }} />
         </label>
       </div>
 
@@ -141,6 +190,58 @@ export default function PublicBookingWidget({
           <p>Villa, giriş ve çıkış tarihini seçin. Sistem rezervasyon ve fiyat kayıtlarını anında karşılaştırsın.</p>
         )}
       </div>
+
+      {result?.kind === "available" && (
+        <form className={styles.requestForm} onSubmit={submitInquiry}>
+          <div className={styles.requestHeading}>
+            <div>
+              <span className={styles.eyebrow}>REZERVASYON TALEBİ</span>
+              <strong>Bu tarihleri ayırtmak için bize ulaşın</strong>
+            </div>
+            <span>Ödeme alınmaz · Talep yönetim ekranına düşer</span>
+          </div>
+
+          <div className={styles.requestGrid}>
+            <label>
+              <span>Ad soyad</span>
+              <input value={guestName} onChange={(event) => setGuestName(event.target.value)} autoComplete="name" minLength={2} maxLength={100} required />
+            </label>
+            <label>
+              <span>Telefon / WhatsApp</span>
+              <input type="tel" inputMode="tel" autoComplete="tel" placeholder="05xx xxx xx xx" value={phone} onChange={(event) => setPhone(event.target.value)} minLength={7} maxLength={30} required />
+            </label>
+            <label>
+              <span>Kişi sayısı</span>
+              <select value={guestCount} onChange={(event) => setGuestCount(event.target.value)}>
+                {Array.from({ length: 12 }, (_, index) => index + 1).map((count) => <option value={count} key={count}>{count} kişi</option>)}
+              </select>
+            </label>
+          </div>
+
+          <label className={styles.requestNote}>
+            <span>Not <em>isteğe bağlı</em></span>
+            <textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} rows={3} placeholder="Özel bir talebiniz varsa yazabilirsiniz." />
+          </label>
+
+          <label className={styles.honeypot} aria-hidden="true">
+            Website
+            <input tabIndex={-1} autoComplete="off" value={website} onChange={(event) => setWebsite(event.target.value)} />
+          </label>
+
+          <div className={styles.submitRow}>
+            <button type="submit" disabled={requestState.kind === "sending" || requestState.kind === "success"}>
+              {requestState.kind === "sending" ? "Gönderiliyor…" : requestState.kind === "success" ? "Talep alındı ✓" : "Rezervasyon talebi gönder"}
+            </button>
+            <small>Bilgileriniz yalnız rezervasyon talebiniz için kullanılır.</small>
+          </div>
+
+          {requestState.kind !== "idle" && (
+            <div className={`${styles.requestStatus} ${requestState.kind === "success" ? styles.requestSuccess : requestState.kind === "error" ? styles.requestError : ""}`} aria-live="polite">
+              {requestState.message}
+            </div>
+          )}
+        </form>
+      )}
 
       <div className={styles.trust}>
         <span>✓ Canlı müsaitlik</span>

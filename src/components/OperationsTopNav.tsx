@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 const items = [
   ["/", "Genel Bakış", "⌂"],
   ["/rezervasyonlar", "Rezervasyonlar", "▤"],
+  ["/talepler", "Talepler", "◈"],
   ["/takvim", "Takvim", "▦"],
   ["/villalar", "Villalar", "⌂"],
   ["/misafirler", "Misafirler", "◎"],

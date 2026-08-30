@@ -3,7 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 const PUBLIC_HOSTS = new Set(["safiradestan.com", "www.safiradestan.com"]);
 const ADMIN_HOSTS = new Set(["admin.safiradestan.com"]);
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
-const PUBLIC_API_PATHS = new Set(["/api/health", "/api/system/version"]);
+const PUBLIC_API_PATHS = new Set([
+  "/api/health",
+  "/api/system/version",
+  "/api/public/booking-inquiries",
+]);
 const WORKER_ALLOWED_PATHS = new Set([
   "/api/health",
   "/api/system/version",
