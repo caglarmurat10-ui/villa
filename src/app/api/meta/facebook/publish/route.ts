@@ -2,7 +2,7 @@ import { z } from "zod";
 import { publishFacebookPost } from "@/lib/facebook";
 import { getFacebookCredentials } from "@/lib/meta-store";
 import {
-  beginSocialPublishAttempt,
+  claimSocialPublishAttempt,
   getSocialPost,
   markSocialPublishFailure,
   markSocialPublishSuccess,
@@ -41,22 +41,25 @@ export async function POST(request: Request) {
     }
   }
 
-  let attemptStarted = false;
+  const account = await getFacebookCredentials(post.villa).catch((error) => {
+    console.error(`[Facebook Credentials] ${safePublicError(error)}`);
+    return null;
+  });
+  if (!account) return Response.json({ error: `Villa ${post.villa} Facebook Sayfası bağlı değil veya bağlantısı yenilenmeli.` }, { status: 409 });
+
+  const claim = await claimSocialPublishAttempt(post.id);
+  if (!claim) {
+    return Response.json({ error: "Bu paylaşım başka bir yayın işlemi tarafından işleniyor veya artık yayına uygun değil." }, { status: 409 });
+  }
+
+  const { lockToken } = claim;
   try {
-    const account = await getFacebookCredentials(post.villa);
-    if (!account) return Response.json({ error: `Villa ${post.villa} Facebook Sayfası bağlı değil.` }, { status: 409 });
-
-    await beginSocialPublishAttempt(post.id);
-    attemptStarted = true;
-
     const facebookPostId = await publishFacebookPost(account.accountId, account.accessToken, post.caption, post.mediaUrl || undefined);
-    const publishedPost = await markSocialPublishSuccess(post.id, facebookPostId);
+    const publishedPost = await markSocialPublishSuccess(post.id, lockToken, facebookPostId);
     return Response.json({ success: true, facebookPostId, username: account.username, post: publishedPost });
   } catch (error) {
     const message = safePublicError(error);
-    if (attemptStarted) {
-      try { await markSocialPublishFailure(post.id, message); } catch {}
-    }
+    try { await markSocialPublishFailure(post.id, lockToken, message); } catch {}
     console.error(`[Facebook Publish] ${message}`);
     return Response.json({ error: message }, { status: 502 });
   }
