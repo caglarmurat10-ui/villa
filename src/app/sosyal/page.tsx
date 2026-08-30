@@ -60,7 +60,7 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
     {metaConnected ? <section style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
       <div style={{padding:"13px 15px",border:"1px solid #22c55e66",borderRadius:13,background:"#071b16",color:"#bbf7d0",fontSize:12,lineHeight:1.5}}>
         <strong style={{display:"block",marginBottom:4,color:"#fff"}}>✓ {metaPlatform || "Meta"} bağlantısı tamamlandı</strong>
-        <span>Villa {metaConnected} hesabı başarıyla kaydedildi.</span>
+        <span>{metaConnected === "Safira ve Destan" ? "Safira ve Destan Facebook Sayfaları aynı yetkilendirme oturumunda birlikte kaydedildi." : `Villa ${metaConnected} hesabı başarıyla kaydedildi.`}</span>
         {metaBrand ? <small style={{display:"block",marginTop:5,color:"#86efac"}}>Marka uygulama sonucu: {metaBrand}</small> : null}
       </div>
     </section> : null}
@@ -71,10 +71,11 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
       <div style={{padding:"16px",border:"1px solid #1877f255",borderRadius:16,background:"linear-gradient(135deg,#0b1c35,#081522)",color:"#f8fafc"}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"flex-start",flexWrap:"wrap"}}>
           <div>
-            <small style={{display:"block",color:"#60a5fa",fontSize:9,fontWeight:900,letterSpacing:1.4}}>FACEBOOK BAĞLANTISI · META UI FB-2</small>
+            <small style={{display:"block",color:"#60a5fa",fontSize:9,fontWeight:900,letterSpacing:1.4}}>FACEBOOK BAĞLANTISI · ORTAK OAUTH</small>
             <h2 style={{margin:"5px 0 4px",fontSize:19}}>Safira ve Destan Facebook Sayfaları</h2>
-            <p style={{margin:0,color:"#b8c6d8",fontSize:12}}>Bu bölüm sunucu tarafında oluşturulur; Facebook bağlantı düğmeleri tarayıcı/CSS durumundan bağımsız olarak her zaman görünür.</p>
+            <p style={{margin:0,color:"#b8c6d8",fontSize:12}}>Facebook iki villa için tek Meta yetkilendirme oturumunda bağlanır. Safira ve Destan Sayfalarını aynı seçim ekranında açıkça eşleştiririz; iki Page tokenı birlikte güncellenir.</p>
           </div>
+          <a href="/api/meta/facebook/connect?villa=Safira" style={{display:"inline-block",padding:"10px 13px",borderRadius:10,background:"#1877f2",color:"#fff",fontSize:11,fontWeight:900,textDecoration:"none"}}>İki Facebook Sayfasını birlikte bağla / yenile</a>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:10,marginTop:13}}>
           {villas.map((villa) => {
@@ -86,7 +87,7 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
                 <a href="/sosyal/marka" style={{display:"inline-block",marginTop:9,color:"#93c5fd",fontSize:11,fontWeight:800,textDecoration:"none"}}>Marka ayarlarını kontrol et →</a>
               </> : <>
                 <span style={{display:"block",color:"#fbbf24",fontSize:11}}>Henüz bağlı değil</span>
-                <a href={`/api/meta/facebook/connect?villa=${villa}`} style={{display:"inline-block",marginTop:9,padding:"9px 12px",borderRadius:9,background:"#1877f2",color:"#fff",fontSize:11,fontWeight:900,textDecoration:"none"}}>Facebook'u bağla</a>
+                <a href="/api/meta/facebook/connect?villa=Safira" style={{display:"inline-block",marginTop:9,padding:"9px 12px",borderRadius:9,background:"#1877f2",color:"#fff",fontSize:11,fontWeight:900,textDecoration:"none"}}>İki Sayfayı birlikte bağla</a>
               </>}
             </article>;
           })}
