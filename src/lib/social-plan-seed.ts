@@ -24,7 +24,11 @@ export async function ensureDefaultSocialPlan() {
   for (const template of socialContentTemplates) {
     if (!template.mediaResolved || !template.mediaUrl || template.scheduledDate < today) continue;
     if (template.contentType === "Reels" && template.mediaKind !== "video") continue;
-    const mediaUrl = new URL(template.mediaUrl, `${baseUrl}/`).toString();
+    const mediaUrls = (template.mediaUrls.length ? template.mediaUrls : [template.mediaUrl])
+      .map((url) => new URL(url, `${baseUrl}/`).toString())
+      .slice(0, 10);
+    const mediaUrl = mediaUrls[0] ?? "";
+    if (!mediaUrl) continue;
 
     inputs.push({
       villa: template.villa,
@@ -33,7 +37,7 @@ export async function ensureDefaultSocialPlan() {
       scheduledDate: template.scheduledDate,
       caption: template.caption,
       mediaUrl,
-      mediaUrls: [mediaUrl],
+      mediaUrls,
     });
 
     if (template.contentType === "Gönderi" || (template.contentType === "Reels" && template.mediaKind === "video")) {
@@ -44,7 +48,7 @@ export async function ensureDefaultSocialPlan() {
         scheduledDate: template.scheduledDate,
         caption: template.caption,
         mediaUrl,
-        mediaUrls: [mediaUrl],
+        mediaUrls,
       });
     }
   }
