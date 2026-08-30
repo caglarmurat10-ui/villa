@@ -40,7 +40,38 @@ function formatDate(value: string) {
 }
 
 export default function MessageCenter({ reservations, locations }: { reservations: Reservation[]; locations: VillaLocations }) {
+  const [items, setItems] = useState(reservations);
+  const [phoneDrafts, setPhoneDrafts] = useState<Record<string, string>>(() => Object.fromEntries(reservations.map((reservation) => [reservation.id, reservation.phone ?? ""])));
   const [notice, setNotice] = useState<Record<string, string>>({});
+  const [savingPhone, setSavingPhone] = useState<string | null>(null);
+
+  async function savePhone(reservation: Reservation) {
+    const phone = (phoneDrafts[reservation.id] ?? "").trim();
+    if (normalizeWhatsAppNumber(phone).length < 10) {
+      setNotice((current) => ({ ...current, [reservation.id]: "Geçerli bir WhatsApp numarası girin." }));
+      return;
+    }
+
+    setSavingPhone(reservation.id);
+    setNotice((current) => ({ ...current, [reservation.id]: "" }));
+    try {
+      const response = await fetch(`/api/reservations/${reservation.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phone }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "WhatsApp numarası kaydedilemedi.");
+
+      setItems((current) => current.map((item) => item.id === reservation.id ? data.reservation : item));
+      setPhoneDrafts((current) => ({ ...current, [reservation.id]: data.reservation.phone ?? phone }));
+      setNotice((current) => ({ ...current, [reservation.id]: "WhatsApp numarası kaydedildi." }));
+    } catch (error) {
+      setNotice((current) => ({ ...current, [reservation.id]: error instanceof Error ? error.message : "WhatsApp numarası kaydedilemedi." }));
+    } finally {
+      setSavingPhone(null);
+    }
+  }
 
   function send(reservation: Reservation, type: MessageType) {
     const phone = (reservation.phone ?? "").trim();
@@ -51,26 +82,43 @@ export default function MessageCenter({ reservations, locations }: { reservation
       return;
     }
     if (number.length < 10) {
-      setNotice((current) => ({ ...current, [reservation.id]: "Bu rezervasyonda kayıtlı WhatsApp numarası yok. Ana Takip bölümünden rezervasyonu düzenleyip numarayı ekleyin." }));
+      setNotice((current) => ({ ...current, [reservation.id]: "Önce aşağıdaki alana WhatsApp numarasını girip kaydedin." }));
       return;
     }
 
     const text = messageText(reservation, type, locations);
     const url = `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
-
-    // Kullanıcı tıklamasından hemen sonra, araya async kayıt işlemi sokmadan WhatsApp'a geç.
-    // Mobil tarayıcıların popup engeline takılmaması için aynı sekmede yönlendiriyoruz.
     window.location.href = url;
   }
 
   return <main className="message-page">
     <div className="message-top"><a href="/">← Ana panele dön</a><span>Villa Yönetim</span></div>
     <section className="message-panel">
-      <div className="message-hero"><div><span className="eyebrow">WHATSAPP MESAJLARI</span><h1>Hazır müşteri mesajları</h1><p>Rezervasyonda daha önce kaydedilen WhatsApp numarası kullanılır. Giriş veya çıkışa dokunduğunuzda ilgili kişi doğrudan WhatsApp'ta açılır.</p></div></div>
-      <div className="message-list">{reservations.length === 0 ? <div className="message-empty">Aktif rezervasyon yok.</div> : reservations.map((reservation) => <article className="message-card" key={reservation.id}>
+      <div className="message-hero"><div><span className="eyebrow">WHATSAPP MESAJLARI</span><h1>Hazır müşteri mesajları</h1><p>Her rezervasyonda WhatsApp numarasını buradan girebilir veya değiştirebilirsiniz. Kaydettikten sonra Giriş ya da Çıkış düğmesi ilgili kişiyi doğrudan WhatsApp'ta açar.</p></div></div>
+      <div className="message-list">{items.length === 0 ? <div className="message-empty">Aktif rezervasyon yok.</div> : items.map((reservation) => <article className="message-card" key={reservation.id}>
         <div className={`message-villa ${reservation.villa.toLowerCase()}`}>{reservation.villa[0]}</div>
-        <div className="message-info"><strong>{reservation.guestName}</strong><span>{villaName(reservation)} · {formatDate(reservation.checkIn)} — {formatDate(reservation.checkOut)}</span><span className={reservation.phone ? "contact-ready" : "contact-missing"}>{reservation.phone ? `WhatsApp: ${reservation.phone}` : "WhatsApp numarası eksik"}</span>{notice[reservation.id] ? <small>{notice[reservation.id]}</small> : null}</div>
-        <div className="message-actions"><button className="checkin" onClick={() => send(reservation, "Giriş")}>Giriş & konum</button><button className="checkout" onClick={() => send(reservation, "Çıkış")}>Çıkış</button></div>
+        <div className="message-info">
+          <strong>{reservation.guestName}</strong>
+          <span>{villaName(reservation)} · {formatDate(reservation.checkIn)} — {formatDate(reservation.checkOut)}</span>
+          <span className={reservation.phone ? "contact-ready" : "contact-missing"}>{reservation.phone ? `Kayıtlı WhatsApp: ${reservation.phone}` : "WhatsApp numarası eksik"}</span>
+          <label>
+            <span>WhatsApp numarası</span>
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="05xx xxx xx xx"
+              value={phoneDrafts[reservation.id] ?? ""}
+              onChange={(event) => setPhoneDrafts((current) => ({ ...current, [reservation.id]: event.target.value }))}
+            />
+          </label>
+          {notice[reservation.id] ? <small>{notice[reservation.id]}</small> : null}
+        </div>
+        <div className="message-actions">
+          <button className="phone-save" disabled={savingPhone === reservation.id} onClick={() => void savePhone(reservation)}>{savingPhone === reservation.id ? "Kaydediliyor…" : "Numarayı kaydet"}</button>
+          <button className="checkin" onClick={() => send(reservation, "Giriş")}>Giriş & konum</button>
+          <button className="checkout" onClick={() => send(reservation, "Çıkış")}>Çıkış</button>
+        </div>
       </article>)}</div>
     </section>
   </main>;
