@@ -1,6 +1,6 @@
 import { getFacebookPageProfile } from "@/lib/facebook";
 import { getInstagramProfile, getInstagramPublishingLimit } from "@/lib/meta";
-import { getFacebookCredentials, getInstagramCredentials } from "@/lib/meta-store";
+import { getFacebookCredentials, getInstagramCredentials, listMetaAccounts } from "@/lib/meta-store";
 import { brandProfiles } from "@/lib/brand-profiles";
 import type { Villa } from "@/lib/types";
 
@@ -8,9 +8,42 @@ const villas: Villa[] = ["Safira", "Destan"];
 
 export const dynamic = "force-dynamic";
 
+type HealthFailureReason = "configuration" | "expired-token" | "credentials" | "meta-api";
+
+function safeFailure(error: unknown, platform: "Instagram" | "Facebook") {
+  const message = error instanceof Error ? error.message : "";
+  if (/META_APP_SECRET|FACEBOOK_APP_SECRET|FACEBOOK_CONFIG_ID|META_PRIVATE|APP_BASE_URL|APP_ID/i.test(message)) {
+    return {
+      reason: "configuration" as HealthFailureReason,
+      label: "Cloudflare Meta yapılandırması eksik",
+    };
+  }
+  if (/süresi dolmuş|expired/i.test(message)) {
+    return {
+      reason: "expired-token" as HealthFailureReason,
+      label: `${platform} erişim anahtarının süresi dolmuş; yeniden bağlayın`,
+    };
+  }
+  if (/private KV|token|erişim anahtar|OAuth/i.test(message)) {
+    return {
+      reason: "credentials" as HealthFailureReason,
+      label: `${platform} erişim anahtarı geçersiz veya eksik; yeniden bağlayın`,
+    };
+  }
+  return {
+    reason: "meta-api" as HealthFailureReason,
+    label: `${platform} Meta API doğrulaması başarısız; yeniden bağlayın`,
+  };
+}
+
 export async function GET() {
+  const accounts = await listMetaAccounts();
+  const connected = new Set(accounts.map((item) => `${item.villa}:${item.platform}`));
+
   const checks = await Promise.all(villas.flatMap((villa) => [
     (async () => {
+      const isConnected = connected.has(`${villa}:Instagram`);
+      if (!isConnected) return { villa, platform: "Instagram" as const, connected: false, healthy: false, label: "Bağlı değil" };
       try {
         const account = await getInstagramCredentials(villa);
         if (!account) return { villa, platform: "Instagram" as const, connected: false, healthy: false, label: "Bağlı değil" };
@@ -27,11 +60,13 @@ export async function GET() {
           label: healthy ? `@${profile.username} · API kotası ${quota.remaining}/${quota.quotaTotal}` : "Hesap kimliği değişmiş",
           quota,
         };
-      } catch {
-        return { villa, platform: "Instagram" as const, connected: true, healthy: false, label: "Yeniden bağlanmalı" };
+      } catch (error) {
+        return { villa, platform: "Instagram" as const, connected: true, healthy: false, ...safeFailure(error, "Instagram") };
       }
     })(),
     (async () => {
+      const isConnected = connected.has(`${villa}:Facebook`);
+      if (!isConnected) return { villa, platform: "Facebook" as const, connected: false, healthy: false, label: "Bağlı değil" };
       try {
         const account = await getFacebookCredentials(villa);
         if (!account) return { villa, platform: "Facebook" as const, connected: false, healthy: false, label: "Bağlı değil" };
@@ -47,15 +82,17 @@ export async function GET() {
           brandAligned,
           label: healthy ? `${profile.name} · ${brandAligned ? "Hakkında güncel" : "Hakkında senkronu gerekli"}` : "Sayfa kimliği değişmiş",
         };
-      } catch {
-        return { villa, platform: "Facebook" as const, connected: true, healthy: false, label: "Yeniden bağlanmalı" };
+      } catch (error) {
+        return { villa, platform: "Facebook" as const, connected: true, healthy: false, ...safeFailure(error, "Facebook") };
       }
     })(),
   ]));
 
   return Response.json({
     checkedAt: new Date().toISOString(),
-    healthy: checks.filter((item) => item.connected).every((item) => item.healthy),
+    healthy: checks.every((item) => item.connected && item.healthy),
+    connectedCount: checks.filter((item) => item.connected).length,
+    expectedCount: checks.length,
     checks,
   }, {
     headers: { "Cache-Control": "no-store" },
