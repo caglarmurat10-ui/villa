@@ -4,6 +4,19 @@ const DEFAULT_PUBLISH_TIME = "12:00";
 const DEFAULT_LIMIT = 2;
 const MAX_ATTEMPTS = 3;
 const RETRY_COOLDOWN_MS = 30 * 60 * 1000;
+const PUBLIC_HOSTS = new Set(["safiradestan.com", "www.safiradestan.com"]);
+const ADMIN_HOST = "admin.safiradestan.com";
+const PUBLIC_ROUTE_MAP = new Map([
+  ["/", "/site"],
+  ["/villa-safira", "/site/villa-safira"],
+  ["/villa-destan", "/site/villa-destan"],
+]);
+const TRANSITION_PATHS = new Set([
+  "/api/health",
+  "/api/system/version",
+  "/api/meta/instagram/callback",
+  "/api/meta/facebook/callback",
+]);
 
 function safeTime(value) {
   const normalized = String(value ?? "").trim();
@@ -43,6 +56,45 @@ function safeCronError(value) {
     .slice(0, 320);
 }
 
+function publicAssetPath(pathname) {
+  return pathname.startsWith("/_next/") ||
+    pathname.startsWith("/villas/") ||
+    pathname === "/app-icon.svg" ||
+    pathname === "/favicon.ico" ||
+    pathname === "/robots.txt" ||
+    pathname === "/sitemap.xml";
+}
+
+function routeRequest(request) {
+  const url = new URL(request.url);
+  const host = url.hostname.toLowerCase();
+
+  if (host === "www.safiradestan.com") {
+    url.hostname = "safiradestan.com";
+    return { response: Response.redirect(url.toString(), 308) };
+  }
+
+  if (PUBLIC_HOSTS.has(host)) {
+    if (url.pathname.startsWith("/api/")) {
+      return { response: new Response("Not Found", { status: 404 }) };
+    }
+
+    if (publicAssetPath(url.pathname)) return { request };
+
+    const target = PUBLIC_ROUTE_MAP.get(url.pathname);
+    if (!target) return { response: new Response("Not Found", { status: 404 }) };
+
+    url.pathname = target;
+    return { request: new Request(url.toString(), request) };
+  }
+
+  if (host === ADMIN_HOST) return { request };
+
+  if (TRANSITION_PATHS.has(url.pathname)) return { request };
+
+  return { response: new Response("Not Found", { status: 404 }) };
+}
+
 async function duePosts(env, scheduledAt) {
   const clock = istanbulClock(scheduledAt);
   const publishTime = safeTime(env.SOCIAL_AUTO_PUBLISH_TIME);
@@ -76,7 +128,7 @@ async function duePosts(env, scheduledAt) {
 }
 
 async function publishThroughApp(post, env, ctx) {
-  const baseUrl = String(env.APP_BASE_URL ?? "https://villa-yonetim.caglarmurat10.workers.dev").replace(/\/$/, "");
+  const baseUrl = String(env.APP_BASE_URL ?? "https://admin.safiradestan.com").replace(/\/$/, "");
   const endpoint = post.platform === "Instagram"
     ? "/api/meta/instagram/publish"
     : "/api/meta/facebook/publish";
@@ -130,7 +182,9 @@ async function runSocialCron(controller, env, ctx) {
 
 export default {
   fetch(request, env, ctx) {
-    return nextWorker.fetch(request, env, ctx);
+    const routed = routeRequest(request);
+    if (routed.response) return routed.response;
+    return nextWorker.fetch(routed.request, env, ctx);
   },
 
   async scheduled(controller, env, ctx) {
