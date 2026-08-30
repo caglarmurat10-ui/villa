@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 type Check = {
   villa: "Safira" | "Destan";
@@ -24,11 +24,39 @@ type Readiness = {
   checks: Check[];
 };
 
+type SmokePlan = {
+  id: string;
+  villa: "Safira" | "Destan";
+  platform: "Instagram" | "Facebook";
+  status: "Planlandı" | "Yayınlandı";
+  approvalStatus: "İnsan onayı" | "Onaylandı";
+  scheduledDate: string;
+  caption: string;
+  mediaUrl: string;
+  platformPostId?: string | null;
+  lastPublishError?: string | null;
+  publishAttemptCount?: number;
+};
+
 export default function MetaPublishTestCenter() {
   const [readiness, setReadiness] = useState<Readiness | null>(null);
+  const [plans, setPlans] = useState<SmokePlan[]>([]);
   const [notice, setNotice] = useState("");
   const [checking, setChecking] = useState(false);
   const [preparing, setPreparing] = useState(false);
+  const [working, setWorking] = useState<string | null>(null);
+
+  async function loadPlans() {
+    try {
+      const response = await fetch("/api/meta/smoke-plans", { cache: "no-store" });
+      const data = await response.json().catch(() => ({}));
+      if (response.ok) setPlans(Array.isArray(data.plans) ? data.plans : []);
+    } catch {}
+  }
+
+  useEffect(() => {
+    void loadPlans();
+  }, []);
 
   async function runCheck() {
     setChecking(true);
@@ -61,12 +89,67 @@ export default function MetaPublishTestCenter() {
         setNotice(data.error ?? "Kontrollü yayın planları hazırlanamadı.");
         return;
       }
-      setNotice(`${data.message} Yeni: ${data.createdCount}, mevcut: ${data.existingCount}.`);
-      window.setTimeout(() => window.location.reload(), 900);
+      setPlans(Array.isArray(data.plans) ? data.plans : []);
+      setNotice(`${data.message} Yeni: ${data.createdCount}, mevcut: ${data.existingCount}. Aşağıdaki dört karttan tek tek ilerleyebilirsiniz.`);
     } catch {
       setNotice("Kontrollü yayın planları hazırlanırken bağlantı kurulamadı.");
     } finally {
       setPreparing(false);
+    }
+  }
+
+  async function approve(plan: SmokePlan) {
+    if (plan.status !== "Planlandı") return;
+    setWorking(plan.id);
+    setNotice("");
+    try {
+      const response = await fetch(`/api/social-posts/${plan.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ approvalStatus: "Onaylandı" }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setNotice(data.error ?? "Test planı onaylanamadı.");
+        return;
+      }
+      await loadPlans();
+      setNotice(`✓ Villa ${plan.villa} ${plan.platform} test planı insan onayından geçti. Henüz yayınlanmadı.`);
+    } catch {
+      setNotice("Test planı onaylanırken bağlantı kurulamadı.");
+    } finally {
+      setWorking(null);
+    }
+  }
+
+  async function publish(plan: SmokePlan) {
+    if (plan.status !== "Planlandı" || plan.approvalStatus !== "Onaylandı") return;
+    const confirmed = window.confirm(`Villa ${plan.villa} ${plan.platform} test gönderisi GERÇEKTEN yayınlanacak. Devam edilsin mi?`);
+    if (!confirmed) return;
+
+    setWorking(plan.id);
+    setNotice("");
+    try {
+      const endpoint = plan.platform === "Instagram"
+        ? "/api/meta/instagram/publish"
+        : "/api/meta/facebook/publish";
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ postId: plan.id }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setNotice(data.error ?? `${plan.platform} test yayını başarısız.`);
+        await loadPlans();
+        return;
+      }
+      await loadPlans();
+      setNotice(`✓ Villa ${plan.villa} ${plan.platform} gerçek test yayını tamamlandı. Meta gönderi kimliği kaydedildi.`);
+    } catch {
+      setNotice(`${plan.platform} test yayını sırasında bağlantı kurulamadı.`);
+    } finally {
+      setWorking(null);
     }
   }
 
@@ -94,6 +177,33 @@ export default function MetaPublishTestCenter() {
           {check.platform === "Instagram" && check.quota ? <p style={{margin:"5px 0 0",fontSize:9,color:"#93c5fd"}}>Instagram kotası: {check.quota.remaining ?? "?"}/{check.quota.quotaTotal ?? "?"}</p> : null}
           <p style={{margin:"5px 0 0",fontSize:9,color:"#8fa4bd"}}>Destek: {check.capabilities.join(" · ")}{check.manualOnly?.length?` · Manuel: ${check.manualOnly.join(", ")}`:""}</p>
         </article>)}
+      </div> : null}
+
+      {plans.length ? <div style={{marginTop:14,borderTop:"1px solid #203b59",paddingTop:14}}>
+        <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}>
+          <div><strong style={{fontSize:12}}>Kontrollü test planları</strong><p style={{margin:"3px 0 0",fontSize:10,color:"#8fa4bd"}}>Planları başka yerde aramanız gerekmez. Onay ve gerçek yayın burada, tek tek yapılır.</p></div>
+          <span style={{fontSize:10,color:"#93c5fd",fontWeight:900}}>{plans.length}/4 plan bulundu</span>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:9,marginTop:10}}>
+          {plans.map((plan) => {
+            const published = plan.status === "Yayınlandı";
+            const approved = plan.approvalStatus === "Onaylandı";
+            const busy = working === plan.id;
+            return <article key={plan.id} style={{padding:12,border:`1px solid ${published?"#22c55e66":approved?"#3b82f666":"#475569"}`,borderRadius:12,background:"#071321"}}>
+              <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
+                <strong style={{fontSize:11}}>Villa {plan.villa} · {plan.platform}</strong>
+                <b style={{fontSize:9,color:published?"#86efac":approved?"#93c5fd":"#fbbf24"}}>{published?"✓ Yayınlandı":approved?"Onaylandı":"İnsan onayı bekliyor"}</b>
+              </div>
+              <p style={{margin:"7px 0 0",fontSize:9,color:"#9fb0c5",lineHeight:1.45}}>{plan.caption.split("\n")[0]}</p>
+              {plan.lastPublishError ? <p style={{margin:"6px 0 0",fontSize:9,color:"#fca5a5"}}>Son hata: {plan.lastPublishError}</p> : null}
+              {plan.platformPostId ? <p style={{margin:"6px 0 0",fontSize:9,color:"#86efac"}}>Meta ID: {plan.platformPostId}</p> : null}
+              <div style={{display:"flex",gap:7,marginTop:10,flexWrap:"wrap"}}>
+                <button type="button" onClick={() => approve(plan)} disabled={busy || published || approved} style={{border:"1px solid #3b82f666",borderRadius:8,padding:"8px 10px",background:!published&&!approved?"#172554":"#17263c",color:!published&&!approved?"#bfdbfe":"#64748b",fontSize:10,fontWeight:900,cursor:!published&&!approved?"pointer":"not-allowed"}}>{busy?"İşleniyor…":approved?"✓ Onaylandı":"1. İnsan onayı ver"}</button>
+                <button type="button" onClick={() => publish(plan)} disabled={busy || published || !approved} style={{border:"1px solid #22c55e66",borderRadius:8,padding:"8px 10px",background:approved&&!published?"#123522":"#17263c",color:approved&&!published?"#bbf7d0":"#64748b",fontSize:10,fontWeight:900,cursor:approved&&!published?"pointer":"not-allowed"}}>{published?"✓ Gerçek yayın tamam":busy?"Yayınlanıyor…":"2. Gerçek yayını gönder"}</button>
+              </div>
+            </article>;
+          })}
+        </div>
       </div> : null}
     </div>
   </section>;
