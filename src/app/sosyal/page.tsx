@@ -1,5 +1,6 @@
 import MetaConnections from "@/components/MetaConnections";
 import MetaDiagnostics from "@/components/MetaDiagnostics";
+import MetaPublishTestCenter from "@/components/MetaPublishTestCenter";
 import SocialDeferredContent from "@/components/SocialDeferredContent";
 import SocialPublishHealth from "@/components/SocialPublishHealth";
 import { listMetaAccounts } from "@/lib/meta-store";
@@ -96,6 +97,7 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
     </section>
 
     <MetaConnections initialAccounts={accounts} />
+    <MetaPublishTestCenter />
     <SocialPublishHealth posts={posts} />
     <div style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
       <div style={{marginBottom:10,padding:"10px 13px",border:"1px solid #22c55e55",borderRadius:12,background:"#071b16",color:"#bbf7d0",fontSize:11,fontWeight:700}}>
