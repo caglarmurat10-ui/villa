@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import NavigationBridge from "@/components/NavigationBridge";
+import OperationsTopNav from "@/components/OperationsTopNav";
 import "./globals.css";
 import "./social.css";
 import "./social-approval.css";
@@ -10,6 +11,8 @@ import "./brand-account-status.css";
 import "./brand-assets.css";
 import "./message.css";
 import "./navigation.css";
+import "./operations-shell.css";
+import "./calendar-workspace.css";
 
 export const metadata: Metadata = {
   title: "Villa Yönetim",
@@ -34,5 +37,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="tr"><body><NavigationBridge />{children}<a className="social-shortcut" href="/sosyal">◎ Sosyal</a></body></html>;
+  return <html lang="tr"><body><NavigationBridge /><OperationsTopNav />{children}</body></html>;
 }
