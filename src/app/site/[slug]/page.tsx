@@ -11,7 +11,7 @@ const villas = {
     villa: "Safira" as Villa,
     name: "Villa Safira",
     cover: "/villas/safira-hero.webp",
-    secondary: "/villas/safira-hero.webp",
+    secondary: "/villas/safira-alt.webp",
     label: "VILLA 01",
     description: "Patara’nın doğal dokusu içinde, özel alanınızdan vazgeçmeden sakin ve özgür bir Akdeniz tatili.",
     quote: "Günün hiçbir saatinde acele etmeniz gerekmeyen bir yer.",
