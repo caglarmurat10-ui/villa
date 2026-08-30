@@ -15,6 +15,10 @@ type SocialPostRow = {
   approval_status?: SocialPostApproval | null;
   approved_at?: string | null;
   published_at: string | null;
+  platform_post_id?: string | null;
+  publish_attempt_count?: number | null;
+  last_publish_attempt_at?: string | null;
+  last_publish_error?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -41,6 +45,10 @@ function mapRow(row: SocialPostRow): SocialPost {
     approvalStatus: row.approval_status ?? "İnsan onayı",
     approvedAt: row.approved_at ?? null,
     publishedAt: row.published_at,
+    platformPostId: row.platform_post_id ?? null,
+    publishAttemptCount: Number(row.publish_attempt_count ?? 0),
+    lastPublishAttemptAt: row.last_publish_attempt_at ?? null,
+    lastPublishError: row.last_publish_error ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -64,17 +72,25 @@ async function prepareTable(db: D1Database) {
       approval_status TEXT NOT NULL DEFAULT 'İnsan onayı' CHECK (approval_status IN ('İnsan onayı', 'Onaylandı')),
       approved_at TEXT,
       published_at TEXT,
+      platform_post_id TEXT,
+      publish_attempt_count INTEGER NOT NULL DEFAULT 0,
+      last_publish_attempt_at TEXT,
+      last_publish_error TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     )`),
     db.prepare("CREATE INDEX IF NOT EXISTS social_posts_schedule_idx ON social_posts (status, scheduled_date)"),
   ]);
 
-  // Legacy deployments may predate these columns. Run compatibility ALTERs once per isolate,
-  // not on every request.
+  // Eski deployment'larda eksik sütunları isolate başına yalnız bir kez tamamla.
   try { await db.prepare("ALTER TABLE social_posts ADD COLUMN media_url TEXT NOT NULL DEFAULT ''").run(); } catch {}
   try { await db.prepare("ALTER TABLE social_posts ADD COLUMN approval_status TEXT NOT NULL DEFAULT 'İnsan onayı' CHECK (approval_status IN ('İnsan onayı', 'Onaylandı'))").run(); } catch {}
   try { await db.prepare("ALTER TABLE social_posts ADD COLUMN approved_at TEXT").run(); } catch {}
+  try { await db.prepare("ALTER TABLE social_posts ADD COLUMN platform_post_id TEXT").run(); } catch {}
+  try { await db.prepare("ALTER TABLE social_posts ADD COLUMN publish_attempt_count INTEGER NOT NULL DEFAULT 0").run(); } catch {}
+  try { await db.prepare("ALTER TABLE social_posts ADD COLUMN last_publish_attempt_at TEXT").run(); } catch {}
+  try { await db.prepare("ALTER TABLE social_posts ADD COLUMN last_publish_error TEXT").run(); } catch {}
+  try { await db.prepare("CREATE INDEX IF NOT EXISTS social_posts_publish_state_idx ON social_posts (status, approval_status, scheduled_date, last_publish_attempt_at)").run(); } catch {}
 }
 
 async function ensureTable(db: D1Database) {
@@ -85,6 +101,11 @@ async function ensureTable(db: D1Database) {
     });
   }
   await tableReady;
+}
+
+async function fetchSocialPost(db: D1Database, id: string): Promise<SocialPost | null> {
+  const row = await db.prepare("SELECT * FROM social_posts WHERE id = ?").bind(id).first<SocialPostRow>();
+  return row ? mapRow(row) : null;
 }
 
 export async function listSocialPosts(limit?: number): Promise<SocialPost[]> {
@@ -101,8 +122,7 @@ export async function listSocialPosts(limit?: number): Promise<SocialPost[]> {
 export async function getSocialPost(id: string): Promise<SocialPost | null> {
   const db = await database();
   await ensureTable(db);
-  const row = await db.prepare("SELECT * FROM social_posts WHERE id = ?").bind(id).first<SocialPostRow>();
-  return row ? mapRow(row) : null;
+  return fetchSocialPost(db, id);
 }
 
 export async function createSocialPost(input: SocialPostInput): Promise<SocialPost> {
@@ -116,14 +136,19 @@ export async function createSocialPost(input: SocialPostInput): Promise<SocialPo
     approvalStatus: "İnsan onayı",
     approvedAt: null,
     publishedAt: null,
+    platformPostId: null,
+    publishAttemptCount: 0,
+    lastPublishAttemptAt: null,
+    lastPublishError: null,
     createdAt: now,
     updatedAt: now,
   };
   await db.prepare(`INSERT INTO social_posts
-    (id, villa, platform, content_type, scheduled_date, caption, media_url, status, approval_status, approved_at, published_at, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+    (id, villa, platform, content_type, scheduled_date, caption, media_url, status, approval_status, approved_at, published_at, platform_post_id, publish_attempt_count, last_publish_attempt_at, last_publish_error, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
       post.id, post.villa, post.platform, post.contentType, post.scheduledDate, post.caption, post.mediaUrl,
-      post.status, post.approvalStatus, post.approvedAt, post.publishedAt, post.createdAt, post.updatedAt,
+      post.status, post.approvalStatus, post.approvedAt, post.publishedAt, post.platformPostId, post.publishAttemptCount,
+      post.lastPublishAttemptAt, post.lastPublishError, post.createdAt, post.updatedAt,
     ).run();
   return post;
 }
@@ -159,11 +184,11 @@ export async function seedSocialPosts(inputs: SocialPostInput[]) {
 
   const now = new Date().toISOString();
   const insertStatements = pending.map((input) => db.prepare(`INSERT INTO social_posts
-    (id, villa, platform, content_type, scheduled_date, caption, media_url, status, approval_status, approved_at, published_at, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'Planlandı', 'İnsan onayı', NULL, NULL, ?, ?)`)
+    (id, villa, platform, content_type, scheduled_date, caption, media_url, status, approval_status, approved_at, published_at, platform_post_id, publish_attempt_count, last_publish_attempt_at, last_publish_error, created_at, updated_at)
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'Planlandı', 'İnsan onayı', NULL, NULL, NULL, 0, NULL, NULL, ?, ?)`)
     .bind(crypto.randomUUID(), input.villa, input.platform, input.contentType, input.scheduledDate, input.caption, input.mediaUrl, now, now));
   const updateStatements = updates.map((item) => db.prepare(`UPDATE social_posts
-    SET media_url = ?, approval_status = 'İnsan onayı', approved_at = NULL, updated_at = ?
+    SET media_url = ?, approval_status = 'İnsan onayı', approved_at = NULL, last_publish_error = NULL, updated_at = ?
     WHERE id = ? AND status = 'Planlandı'`)
     .bind(item.mediaUrl, now, item.id));
   const statements = [...insertStatements, ...updateStatements];
@@ -182,8 +207,47 @@ export async function updateSocialPostApproval(id: string, approvalStatus: Socia
   const approvedAt = approvalStatus === "Onaylandı" ? now : null;
   await db.prepare("UPDATE social_posts SET approval_status = ?, approved_at = ?, updated_at = ? WHERE id = ?")
     .bind(approvalStatus, approvedAt, now, id).run();
-  const row = await db.prepare("SELECT * FROM social_posts WHERE id = ?").bind(id).first<SocialPostRow>();
-  return row ? mapRow(row) : null;
+  return fetchSocialPost(db, id);
+}
+
+export async function beginSocialPublishAttempt(id: string): Promise<SocialPost | null> {
+  const db = await database();
+  await ensureTable(db);
+  const now = new Date().toISOString();
+  await db.prepare(`UPDATE social_posts
+    SET publish_attempt_count = COALESCE(publish_attempt_count, 0) + 1,
+        last_publish_attempt_at = ?,
+        last_publish_error = NULL,
+        updated_at = ?
+    WHERE id = ? AND status = 'Planlandı'`)
+    .bind(now, now, id).run();
+  return fetchSocialPost(db, id);
+}
+
+export async function markSocialPublishFailure(id: string, errorMessage: string): Promise<SocialPost | null> {
+  const db = await database();
+  await ensureTable(db);
+  const now = new Date().toISOString();
+  await db.prepare(`UPDATE social_posts
+    SET last_publish_error = ?, updated_at = ?
+    WHERE id = ? AND status = 'Planlandı'`)
+    .bind(errorMessage.slice(0, 500), now, id).run();
+  return fetchSocialPost(db, id);
+}
+
+export async function markSocialPublishSuccess(id: string, platformPostId: string): Promise<SocialPost | null> {
+  const db = await database();
+  await ensureTable(db);
+  const now = new Date().toISOString();
+  await db.prepare(`UPDATE social_posts
+    SET status = 'Yayınlandı',
+        published_at = ?,
+        platform_post_id = ?,
+        last_publish_error = NULL,
+        updated_at = ?
+    WHERE id = ? AND status = 'Planlandı'`)
+    .bind(now, platformPostId, now, id).run();
+  return fetchSocialPost(db, id);
 }
 
 export async function updateSocialPostStatus(id: string, status: SocialPostStatus): Promise<SocialPost | null> {
@@ -193,8 +257,7 @@ export async function updateSocialPostStatus(id: string, status: SocialPostStatu
   const publishedAt = status === "Yayınlandı" ? now : null;
   await db.prepare("UPDATE social_posts SET status = ?, published_at = ?, updated_at = ? WHERE id = ?")
     .bind(status, publishedAt, now, id).run();
-  const row = await db.prepare("SELECT * FROM social_posts WHERE id = ?").bind(id).first<SocialPostRow>();
-  return row ? mapRow(row) : null;
+  return fetchSocialPost(db, id);
 }
 
 export async function deleteSocialPost(id: string): Promise<boolean> {
