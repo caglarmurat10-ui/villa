@@ -1,0 +1,1 @@
+hero replacement pending binary blob
