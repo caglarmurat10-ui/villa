@@ -5,17 +5,9 @@ import { getVillaLocations } from "@/lib/db";
 
 type VillaSlug = "safira" | "destan";
 
-const villaData: Record<VillaSlug, { name: string; key: "Safira" | "Destan"; image: string }> = {
-  safira: {
-    name: "Villa Safira",
-    key: "Safira",
-    image: "https://www.villapatara.com.tr/uploads/villa-safira-14_743.jpg",
-  },
-  destan: {
-    name: "Villa Destan",
-    key: "Destan",
-    image: "https://www.villavakti.com/thumbs/1200/630/catalog/3318/batch_villa-destan_45-7604.jpg",
-  },
+const villaData: Record<VillaSlug, { name: string; key: "Safira" | "Destan" }> = {
+  safira: { name: "Villa Safira", key: "Safira" },
+  destan: { name: "Villa Destan", key: "Destan" },
 };
 
 function resolveVilla(value: string) {
@@ -32,19 +24,8 @@ export async function generateMetadata({ params }: { params: Promise<{ villa: st
   return {
     title,
     description,
-    openGraph: {
-      title,
-      description,
-      type: "website",
-      locale: "tr_TR",
-      images: [{ url: current.image, width: 1200, height: 630, alt: current.name }],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [current.image],
-    },
+    openGraph: { title, description, type: "website", locale: "tr_TR" },
+    twitter: { card: "summary", title, description },
   };
 }
 
