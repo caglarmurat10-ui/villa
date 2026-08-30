@@ -1,0 +1,1 @@
+Static villa images are bundled here for Cloudflare delivery.
