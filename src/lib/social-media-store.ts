@@ -69,20 +69,27 @@ export async function replaceSocialPostMedia(postId: string, items: Array<{ medi
   const db = await database();
   await ensure(db);
   const now = new Date().toISOString();
+  const editablePost = `id = ?
+    AND status = 'Planlandı'
+    AND (publish_lock_token IS NULL OR publish_lock_expires_at IS NULL OR publish_lock_expires_at <= ?)`;
   const statements = [
-    db.prepare("DELETE FROM social_post_media WHERE post_id = ?").bind(postId),
+    db.prepare(`DELETE FROM social_post_media
+      WHERE post_id = ?
+        AND EXISTS (SELECT 1 FROM social_posts WHERE ${editablePost})`)
+      .bind(postId, postId, now),
     db.prepare(`UPDATE social_posts
       SET media_url = ?, approval_status = 'İnsan onayı', approved_at = NULL,
           publish_lock_token = NULL, publish_lock_expires_at = NULL,
           last_publish_error = NULL, updated_at = ?
-      WHERE id = ? AND status = 'Planlandı'`)
-      .bind(items[0]?.mediaUrl ?? "", now, postId),
+      WHERE ${editablePost}`)
+      .bind(items[0]?.mediaUrl ?? "", now, postId, now),
   ];
   for (let position = 0; position < items.length; position += 1) {
     const item = items[position];
     statements.push(db.prepare(`INSERT INTO social_post_media(post_id, position, media_url, media_kind, created_at)
-      VALUES (?, ?, ?, ?, ?)`)
-      .bind(postId, position, item.mediaUrl, item.kind, now));
+      SELECT ?, ?, ?, ?, ?
+      WHERE EXISTS (SELECT 1 FROM social_posts WHERE ${editablePost})`)
+      .bind(postId, position, item.mediaUrl, item.kind, now, postId, now));
   }
   await db.batch(statements);
   return listSocialPostMedia(postId);
