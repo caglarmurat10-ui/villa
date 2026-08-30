@@ -1,1 +1,1 @@
-Static villa images are bundled here for Cloudflare delivery.
+Villa public static assets live in this folder and are served by Cloudflare from the same origin.
