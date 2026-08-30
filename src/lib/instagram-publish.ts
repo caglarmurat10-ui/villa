@@ -64,7 +64,6 @@ export async function publishInstagramSingleImage(
   const params: Record<string, string> = { image_url: imageUrl, caption };
   if (altText) params.alt_text = altText.slice(0, 1000);
   const containerId = await createContainer(accountId, accessToken, params);
-  await waitUntilReady(containerId, accessToken, 4);
   return publishContainer(accountId, accessToken, containerId);
 }
 
@@ -87,7 +86,6 @@ export async function publishInstagramCarousel(
     }
     const childId = await createContainer(accountId, accessToken, params);
     if (item.kind === "video") await waitUntilReady(childId, accessToken);
-    else await waitUntilReady(childId, accessToken, 4);
     children.push(childId);
   }
 
@@ -96,7 +94,6 @@ export async function publishInstagramCarousel(
     children: children.join(","),
     caption,
   });
-  await waitUntilReady(parentId, accessToken, 6);
   return publishContainer(accountId, accessToken, parentId);
 }
 
@@ -125,6 +122,6 @@ export async function publishInstagramStory(
   if (media.kind === "video") params.video_url = media.mediaUrl;
   else params.image_url = media.mediaUrl;
   const containerId = await createContainer(accountId, accessToken, params);
-  await waitUntilReady(containerId, accessToken, media.kind === "video" ? 12 : 4);
+  if (media.kind === "video") await waitUntilReady(containerId, accessToken);
   return publishContainer(accountId, accessToken, containerId);
 }
