@@ -6,7 +6,7 @@ import styles from "./site.module.css";
 export const dynamic = "force-dynamic";
 
 const MEDIA = {
-  safiraHero: "/media/safira-hero",
+  safiraHero: "/villas/safira-hero.jpg",
   safiraAlt: "/media/safira-alt",
   destanHero: "/media/destan-hero",
   destanSuite: "/media/destan-suite",
