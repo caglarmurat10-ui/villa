@@ -5,7 +5,7 @@ import {
 } from "@/lib/facebook-private-store";
 import { saveFacebookAccount } from "@/lib/meta-store";
 
-type Stage = "selection-validate" | "profile-fetch" | "account-save";
+type Stage = "selection-validate" | "task-check" | "profile-fetch" | "account-save";
 
 function cookieValue(header: string | null, name: string) {
   if (!header) return "";
@@ -84,6 +84,17 @@ export async function POST(request: Request) {
       "selection-validate",
       new Error("Seçilen Facebook Sayfası OAuth oturumundaki izinli sayfalar arasında değil."),
       "Facebook Sayfa seçimi doğrulanamadı.",
+    );
+  }
+
+  const tasks = new Set((page.tasks ?? []).map((task) => task.toUpperCase()));
+  if (tasks.size > 0 && !tasks.has("CREATE_CONTENT") && !tasks.has("MANAGE")) {
+    await deleteFacebookSelection(sessionId).catch(() => undefined);
+    return redirectError(
+      request.url,
+      "task-check",
+      new Error(`Seçilen Facebook Sayfasında içerik yönetme görevi yok. Meta'nın döndürdüğü Page tasks: ${[...tasks].join(", ") || "yok"}. CREATE_CONTENT veya MANAGE görevi gerekir.`),
+      "Facebook Sayfasında yayın yetkisi doğrulanamadı.",
     );
   }
 
