@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { PriceRange, Reservation, Villa } from "@/lib/types";
+import styles from "./PublicBookingWidget.module.css";
 
 type BookingReservation = Pick<Reservation, "villa" | "checkIn" | "checkOut">;
 type BookingPrice = Pick<PriceRange, "villa" | "startDate" | "endDate" | "nightlyRate">;
@@ -92,18 +93,19 @@ export default function PublicBookingWidget({
   }, [checkIn, checkOut, prices, reservations, villa]);
 
   const alternativeHref = result?.alternative === "Safira" ? "/villa-safira" : "/villa-destan";
+  const resultClass = result?.kind === "available" ? styles.available : result?.kind === "busy" ? styles.busy : result?.kind === "error" ? styles.error : "";
 
   return (
-    <div className="publicBookingWidget">
-      <div className="publicBookingHeader">
+    <div className={styles.widget}>
+      <div className={styles.header}>
         <div>
-          <span className="publicBookingEyebrow">DOĞRUDAN · CANLI VERİ</span>
-          <div className="publicBookingTitle">Tarihinizi kontrol edin</div>
+          <span className={styles.eyebrow}>DOĞRUDAN · CANLI VERİ</span>
+          <div className={styles.title}>Tarihinizi kontrol edin</div>
         </div>
-        <span className="publicBookingLive"><i /> Yönetim takvimiyle senkron</span>
+        <span className={styles.live}><i /> Yönetim takvimiyle senkron</span>
       </div>
 
-      <div className="publicBookingFields">
+      <div className={styles.fields}>
         <label>
           <span>Villa</span>
           <select value={villa} onChange={(event) => setVilla(event.target.value as Villa)} disabled={Boolean(initialVilla)}>
@@ -121,16 +123,16 @@ export default function PublicBookingWidget({
         </label>
       </div>
 
-      <div className={`publicBookingResult ${result?.kind ?? "idle"}`} aria-live="polite">
+      <div className={`${styles.result} ${resultClass}`} aria-live="polite">
         {result ? (
           <>
-            <div className="publicBookingResultTop">
+            <div className={styles.resultTop}>
               <strong>{result.title}</strong>
               {typeof result.total === "number" && <b>{money.format(result.total)}</b>}
             </div>
             <p>{result.detail}</p>
             {result.alternative && (
-              <Link className="publicBookingAlternative" href={alternativeHref}>
+              <Link className={styles.alternative} href={alternativeHref}>
                 Villa {result.alternative}&apos;ı aynı tarihler için incele →
               </Link>
             )}
@@ -140,7 +142,7 @@ export default function PublicBookingWidget({
         )}
       </div>
 
-      <div className="publicBookingTrust">
+      <div className={styles.trust}>
         <span>✓ Canlı müsaitlik</span>
         <span>✓ Dönemsel fiyat</span>
         <span>✓ Doğrudan rezervasyon</span>
