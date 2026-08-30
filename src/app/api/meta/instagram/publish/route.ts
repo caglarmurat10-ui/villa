@@ -1,5 +1,11 @@
 import { z } from "zod";
-import { getInstagramPublishingLimit, publishInstagramImage } from "@/lib/meta";
+import { getInstagramPublishingLimit } from "@/lib/meta";
+import {
+  publishInstagramCarousel,
+  publishInstagramReel,
+  publishInstagramSingleImage,
+  publishInstagramStory,
+} from "@/lib/instagram-publish";
 import { getInstagramCredentials } from "@/lib/meta-store";
 import {
   claimSocialPublishAttempt,
@@ -7,7 +13,8 @@ import {
   markSocialPublishFailure,
   markSocialPublishSuccess,
 } from "@/lib/social-db";
-import { isApprovedProxyMediaUrl } from "@/lib/social-drive-media";
+import { approvedProxyMediaAsset } from "@/lib/social-drive-media";
+import { listSocialPostMedia, type SocialPostMediaItem } from "@/lib/social-media-store";
 
 const schema = z.object({
   postId: z.string().trim().min(1, "Paylaşım kimliği gerekli."),
@@ -33,14 +40,35 @@ export async function POST(request: Request) {
   const post = await getSocialPost(parsed.data.postId);
   if (!post) return Response.json({ error: "Paylaşım bulunamadı." }, { status: 404 });
   if (post.platform !== "Instagram") return Response.json({ error: "Bu endpoint yalnızca Instagram paylaşımları içindir." }, { status: 400 });
-  if (post.contentType !== "Gönderi") return Response.json({ error: "Bu yayın akışı yalnızca Instagram görsel gönderileri içindir. Reels ve Hikâye için video/özel medya akışı kullanılmalıdır." }, { status: 409 });
   if (post.status !== "Planlandı") return Response.json({ error: "Bu paylaşım daha önce yayınlanmış." }, { status: 409 });
   if (post.approvalStatus !== "Onaylandı") return Response.json({ error: "Instagram yayını için önce insan onayı verilmelidir." }, { status: 409 });
-  if (!post.mediaUrl) return Response.json({ error: "Instagram yayını için görsel bağlantısı gerekli." }, { status: 409 });
 
   const allowedOrigins = [new URL(request.url).origin, "https://villa-yonetim.caglarmurat10.workers.dev"];
-  if (!isApprovedProxyMediaUrl(post.villa, post.mediaUrl, allowedOrigins)) {
-    return Response.json({ error: `Villa ${post.villa} için doğrulanmamış medya Instagram'a gönderilemez.` }, { status: 409 });
+  let media: SocialPostMediaItem[] = await listSocialPostMedia(post.id);
+  if (media.length === 0 && post.mediaUrl) {
+    const asset = approvedProxyMediaAsset(post.villa, post.mediaUrl, allowedOrigins);
+    if (asset) media = [{ position: 0, mediaUrl: post.mediaUrl, kind: asset.mediaKind }];
+  }
+
+  if (media.length === 0) return Response.json({ error: "Instagram yayını için doğrulanmış medya gerekli." }, { status: 409 });
+  for (const item of media) {
+    const asset = approvedProxyMediaAsset(post.villa, item.mediaUrl, allowedOrigins);
+    if (!asset || asset.mediaKind !== item.kind) {
+      return Response.json({ error: `Villa ${post.villa} için doğrulanmamış veya medya türü değişmiş dosya Instagram'a gönderilemez.` }, { status: 409 });
+    }
+  }
+
+  if (post.contentType === "Gönderi" && media.length === 1 && media[0]?.kind !== "image") {
+    return Response.json({ error: "Tek video Instagram Gönderi yerine Reels olarak yayınlanmalıdır." }, { status: 409 });
+  }
+  if (post.contentType === "Gönderi" && media.length > 10) {
+    return Response.json({ error: "Instagram Carousel en fazla 10 medya içerebilir." }, { status: 409 });
+  }
+  if (post.contentType === "Reels" && (media.length !== 1 || media[0]?.kind !== "video")) {
+    return Response.json({ error: "Instagram Reels için tek bir doğrulanmış video gerekli." }, { status: 409 });
+  }
+  if (post.contentType === "Hikâye" && media.length !== 1) {
+    return Response.json({ error: "Instagram Hikâye için tek bir doğrulanmış görsel veya video gerekli." }, { status: 409 });
   }
 
   const account = await getInstagramCredentials(post.villa).catch((error) => {
@@ -63,19 +91,30 @@ export async function POST(request: Request) {
       return Response.json({ error: message, quota: limit }, { status: 429 });
     }
 
-    const mediaId = await publishInstagramImage(
-      account.accountId,
-      account.accessToken,
-      post.mediaUrl,
-      post.caption,
-      `Villa ${post.villa}, Patara / Kaş özel havuzlu villa`,
-    );
-    const publishedPost = await markSocialPublishSuccess(post.id, lockToken, mediaId);
+    let mediaId: string;
+    if (post.contentType === "Reels") {
+      mediaId = await publishInstagramReel(account.accountId, account.accessToken, media[0].mediaUrl, post.caption);
+    } else if (post.contentType === "Hikâye") {
+      mediaId = await publishInstagramStory(account.accountId, account.accessToken, media[0]);
+    } else if (media.length > 1) {
+      mediaId = await publishInstagramCarousel(account.accountId, account.accessToken, media, post.caption);
+    } else {
+      mediaId = await publishInstagramSingleImage(
+        account.accountId,
+        account.accessToken,
+        media[0].mediaUrl,
+        post.caption,
+        `Villa ${post.villa}, Patara / Kaş özel havuzlu villa`,
+      );
+    }
 
+    const publishedPost = await markSocialPublishSuccess(post.id, lockToken, mediaId);
     return Response.json({
       success: true,
       mediaId,
       username: account.username,
+      contentType: post.contentType,
+      mediaCount: media.length,
       quota: { ...limit, remaining: Math.max(0, limit.remaining - 1) },
       post: publishedPost,
     });
