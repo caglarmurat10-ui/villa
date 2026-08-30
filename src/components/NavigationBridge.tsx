@@ -24,12 +24,24 @@ export default function NavigationBridge() {
       return originalOpen(url, target, features);
     }) as typeof window.open;
 
+    const handleClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      const button = target?.closest("button");
+      if (button?.textContent?.trim() === "Mesaj paneli") {
+        event.preventDefault();
+        event.stopPropagation();
+        window.location.assign("/mesajlar");
+      }
+    };
+    document.addEventListener("click", handleClick, true);
+
     return () => {
       window.open = originalOpen;
+      document.removeEventListener("click", handleClick, true);
     };
   }, []);
 
-  // Mesajlar, giriş ve çıkış aksiyonları Dashboard içindeki özgün davranışını kullanır.
-  // Bu köprü yalnızca eski giriş cümlesi kaldıysa WhatsApp mesajını son metinle eşitler.
+  // Eski Dashboard'dan kalan tek görünür köprü olan "Mesaj paneli" yeni /mesajlar sayfasına gider.
+  // WhatsApp açılışında da yalnız eski giriş cümlesi kalmışsa son metinle eşitlenir.
   return null;
 }
