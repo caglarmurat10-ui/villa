@@ -17,7 +17,7 @@
     "FACEBOOK_CONFIG_ID": "1095389230103732",
     "APP_BASE_URL": "https://admin.safiradestan.com",
     "INSTAGRAM_OAUTH_BASE_URL": "https://admin.safiradestan.com",
-    "SOCIAL_AUTO_PUBLISH_ENABLED": "false",
+    "SOCIAL_AUTO_PUBLISH_ENABLED": "true",
     "SOCIAL_AUTO_PUBLISH_TIME": "12:00",
     "SOCIAL_AUTO_PUBLISH_LIMIT": "2"
   },
