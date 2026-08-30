@@ -1,70 +1,62 @@
 # Villa Yönetim
 
-Villa Safira ve Villa Destan için Cloudflare üzerinde çalışan rezervasyon, operasyon ve sosyal medya yönetim uygulaması.
+Villa Safira ve Villa Destan için Cloudflare Workers üzerinde çalışan rezervasyon, operasyon ve sosyal medya yönetim uygulaması.
 
-## Production
+## Üretim mimarisi
 
-- Uygulama: `https://villa-yonetim.caglarmurat10.workers.dev`
-- Runtime: Cloudflare Workers + OpenNext
-- Veritabanı: Cloudflare D1 (`DB`)
-- Meta özel token deposu: Workers KV (`META_PRIVATE`)
-- Kaynak kodun güncel sürümü `main` ile `agent/cloudflare-migration` branch'lerinde eşittir.
+- Next.js + OpenNext for Cloudflare
+- Cloudflare Workers
+- Cloudflare D1 (`DB`)
+- Meta özel token saklama için Workers KV (`META_PRIVATE`)
+- Production branch: `agent/cloudflare-migration`
+- Canlı adres: `https://villa-yonetim.caglarmurat10.workers.dev`
 
-## Temel modüller
+## Operasyon modülleri
 
 - Rezervasyonlar
 - Safira / Destan ayrı takvimleri
 - Misafirler ve görevler
 - WhatsApp giriş / çıkış mesajları
-- Temizlik ve bakım operasyonu
-- Finans, raporlar ve hesaplama
-- Komisyon, konum ve dönemsel fiyat ayarları
-- Instagram / Facebook bağlantı, içerik ve yayın yönetimi
-- Sosyal medya marka ve medya merkezi
-- JSON yedek ve CSV dışa aktarma
+- Temizlik ve bakım
+- Finans ve hesaplama
+- Raporlar
+- Fiyat dönemleri, komisyon ve villa konum ayarları
 
-## Cloudflare geliştirme
+## Instagram / Facebook
+
+- Instagram Business OAuth ve uzun ömürlü token
+- Instagram token bitiş takibi ve güvenli yenileme
+- Facebook Login for Business (`FACEBOOK_CONFIG_ID`)
+- Facebook gerekli izin ve Page task doğrulaması
+- Facebook Page tokenları yalnız private KV içinde tutulur
+- Safira / Destan hesap ve medya sahipliği sunucu tarafında doğrulanır
+- Gerçek yayında insan onayı zorunludur
+- Yayın deneme sayısı, son güvenli hata ve Meta post ID D1 üzerinde takip edilir
+- Ücretli reklam harcaması otomatik başlatılmaz
+
+## Gerekli ortam değişkenleri
+
+Normal vars:
+- `APP_BASE_URL`
+- `META_APP_ID`
+- `FACEBOOK_APP_ID`
+- `FACEBOOK_CONFIG_ID`
+
+Secrets:
+- `META_APP_SECRET`
+- `FACEBOOK_APP_SECRET`
+
+Secret değerleri repoya yazılmamalıdır.
+
+## Yerel geliştirme
 
 ```bash
 npm install
 npm run dev
-npm run lint
-npm run build
-npm run preview
-npm run deploy
 ```
 
-`npm run deploy`, OpenNext build'ini oluşturup Cloudflare Workers'a dağıtır.
+Cloudflare build/deploy:
 
-## Cloudflare bindings
-
-`wrangler.jsonc` production yapılandırmasının kaynağıdır.
-
-- `DB`: D1 veritabanı
-- `META_PRIVATE`: hassas Meta tokenları için private KV
-- `APP_BASE_URL`: production URL
-- `META_APP_ID`: Instagram uygulama kimliği
-- `FACEBOOK_APP_ID`: Facebook uygulama kimliği
-- `FACEBOOK_CONFIG_ID`: Facebook Login for Business yapılandırma kimliği
-
-Secret değerler repoya yazılmaz:
-
-- `META_APP_SECRET`
-- `FACEBOOK_APP_SECRET`
-
-## Meta güvenliği
-
-- Facebook Sayfası villa adına göre tahmin edilmez; açık ve doğrulanmış seçim kullanılır.
-- Facebook tokenları D1'e plaintext yazılmaz; private KV içinde şifreli saklanır.
-- Instagram/Facebook authorization code, token ve app secret loglanmaz.
-- Safira ve Destan hesap/medya sahipliği server-side doğrulanır.
-- Sosyal medya gönderileri insan onayı olmadan gerçek hesaba yayınlanmaz.
-- Ücretli reklam harcaması açık kullanıcı onayı olmadan başlatılmaz.
-
-## D1 migrations
-
-`migrations/` klasörü production şemasının geçmişini içerir ve silinmemelidir.
-
-## Not
-
-Vercel production hedefi değildir. Uygulamanın gerçek production ortamı Cloudflare Workers'tır.
+```bash
+npm run deploy
+```
