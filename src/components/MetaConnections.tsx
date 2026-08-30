@@ -82,7 +82,11 @@ export default function MetaConnections({ initialAccounts }: { initialAccounts: 
         <div><strong>Villa {villa}</strong><span>{platform}</span></div>
         {account ? <>
           <p>{platform === "Instagram" ? `@${account.username}` : account.username}</p>
-          <div className="meta-actions"><span className="meta-ok">✓ Bağlı</span><button onClick={() => disconnect(villa, platform)}>Bağlantıyı kaldır</button></div>
+          <div className="meta-actions">
+            <span className="meta-ok">✓ Bağlı</span>
+            <a href={connectHref} style={{fontSize:10,fontWeight:900,color:"#93c5fd",textDecoration:"none"}}>Yeniden bağla</a>
+            <button onClick={() => disconnect(villa, platform)}>Bağlantıyı kaldır</button>
+          </div>
         </> : <>
           <p>{platform === "Facebook" ? "Bağlantıdan sonra Sayfa seçimi ve güvenli marka senkronu yapılacak" : "Henüz bağlanmadı"}</p>
           <a className="meta-connect-button" href={connectHref}>{platform}'u bağla</a>
