@@ -11,12 +11,19 @@ export async function metaConfig() {
   const appId = env.META_APP_ID ?? process.env.META_APP_ID;
   const appSecret = env.META_APP_SECRET ?? process.env.META_APP_SECRET;
   const baseUrl = env.APP_BASE_URL ?? process.env.APP_BASE_URL;
+  const oauthBaseUrl = env.INSTAGRAM_OAUTH_BASE_URL ?? process.env.INSTAGRAM_OAUTH_BASE_URL ?? baseUrl;
 
   if (!appId) throw new Error("Eksik ortam değişkeni: META_APP_ID");
   if (!appSecret) throw new Error("Eksik ortam değişkeni: META_APP_SECRET");
   if (!baseUrl) throw new Error("Eksik ortam değişkeni: APP_BASE_URL");
+  if (!oauthBaseUrl) throw new Error("Eksik ortam değişkeni: INSTAGRAM_OAUTH_BASE_URL");
 
-  return { appId, appSecret, baseUrl: baseUrl.replace(/\/$/, "") };
+  return {
+    appId,
+    appSecret,
+    baseUrl: baseUrl.replace(/\/$/, ""),
+    oauthBaseUrl: oauthBaseUrl.replace(/\/$/, ""),
+  };
 }
 
 function instagramRedirectUri(baseUrl: string) {
@@ -48,11 +55,11 @@ export async function verifyInstagramState(state: string) {
 }
 
 export async function instagramAuthorizeUrl(villa: Villa, nonce: string) {
-  const { appId, baseUrl } = await metaConfig();
+  const { appId, oauthBaseUrl } = await metaConfig();
   const state = await makeInstagramState(villa, nonce);
   const params = new URLSearchParams({
     client_id: appId,
-    redirect_uri: instagramRedirectUri(baseUrl),
+    redirect_uri: instagramRedirectUri(oauthBaseUrl),
     response_type: "code",
     scope: "instagram_business_basic,instagram_business_content_publish",
     state,
@@ -62,12 +69,12 @@ export async function instagramAuthorizeUrl(villa: Villa, nonce: string) {
 }
 
 export async function exchangeInstagramCode(code: string) {
-  const { appId, appSecret, baseUrl } = await metaConfig();
+  const { appId, appSecret, oauthBaseUrl } = await metaConfig();
   const body = new URLSearchParams({
     client_id: appId,
     client_secret: appSecret,
     grant_type: "authorization_code",
-    redirect_uri: instagramRedirectUri(baseUrl),
+    redirect_uri: instagramRedirectUri(oauthBaseUrl),
     code,
   });
   const response = await fetch(INSTAGRAM_TOKEN, {

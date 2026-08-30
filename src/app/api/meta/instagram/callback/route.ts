@@ -2,6 +2,7 @@ import {
   exchangeInstagramCode,
   exchangeInstagramLongLivedToken,
   getInstagramProfile,
+  metaConfig,
   verifyInstagramState,
 } from "@/lib/meta";
 import { saveInstagramAccount } from "@/lib/meta-store";
@@ -38,8 +39,16 @@ function oauthCookieExpired() {
   return "ig_oauth_nonce=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0";
 }
 
-function errorRedirect(url: URL, stage: MetaStage, message: string) {
-  const target = new URL("/sosyal", url.origin);
+async function appBaseUrl(fallback: string) {
+  try {
+    return (await metaConfig()).baseUrl;
+  } catch {
+    return fallback;
+  }
+}
+
+async function errorRedirect(url: URL, stage: MetaStage, message: string) {
+  const target = new URL("/sosyal", await appBaseUrl(url.origin));
   target.searchParams.set("meta_platform", "Instagram");
   target.searchParams.set("meta_error", message);
   target.searchParams.set("meta_stage", stage);
@@ -49,11 +58,12 @@ function errorRedirect(url: URL, stage: MetaStage, message: string) {
     headers: {
       Location: target.toString(),
       "Set-Cookie": oauthCookieExpired(),
+      "Cache-Control": "no-store",
     },
   });
 }
 
-function stageFailure(
+async function stageFailure(
   url: URL,
   stage: MetaStage,
   error: unknown,
@@ -186,7 +196,7 @@ export async function GET(request: Request) {
     );
   }
 
-  const target = new URL("/sosyal", url.origin);
+  const target = new URL("/sosyal", (await metaConfig()).baseUrl);
   target.searchParams.set("meta_platform", "Instagram");
   target.searchParams.set("meta_connected", parsed.villa);
 
@@ -195,6 +205,7 @@ export async function GET(request: Request) {
     headers: {
       Location: target.toString(),
       "Set-Cookie": oauthCookieExpired(),
+      "Cache-Control": "no-store",
     },
   });
 }

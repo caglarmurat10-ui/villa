@@ -44,6 +44,7 @@ export async function getMetaDiagnostic(accounts: MetaSocialAccount[]): Promise<
   const facebookAppSecret = String(env.FACEBOOK_APP_SECRET ?? process.env.FACEBOOK_APP_SECRET ?? "").trim();
   const facebookConfigId = String(env.FACEBOOK_CONFIG_ID ?? process.env.FACEBOOK_CONFIG_ID ?? "").trim();
   const baseUrl = String(env.APP_BASE_URL ?? process.env.APP_BASE_URL ?? "").trim().replace(/\/+$/, "");
+  const instagramOAuthBaseUrl = String(env.INSTAGRAM_OAUTH_BASE_URL ?? process.env.INSTAGRAM_OAUTH_BASE_URL ?? baseUrl).trim().replace(/\/+$/, "");
   const hasDatabase = Boolean(env.DB);
   const hasPrivateKv = Boolean(env.META_PRIVATE);
 
@@ -69,7 +70,7 @@ export async function getMetaDiagnostic(accounts: MetaSocialAccount[]): Promise<
     },
     baseUrl,
     callbacks: {
-      instagram: baseUrl ? `${baseUrl}/api/meta/instagram/callback` : "",
+      instagram: instagramOAuthBaseUrl ? `${instagramOAuthBaseUrl}/api/meta/instagram/callback` : "",
       facebook: baseUrl ? `${baseUrl}/api/meta/facebook/callback` : "",
     },
     requiredScopes: {
