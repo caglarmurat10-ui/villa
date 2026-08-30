@@ -1,1 +1,0 @@
-Static villa images are served directly from /public/villas. Hero JPEG verified and replaced.
