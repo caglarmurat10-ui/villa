@@ -6,6 +6,7 @@ import {
   verifyFacebookState,
 } from "@/lib/facebook";
 import { createFacebookSelection } from "@/lib/facebook-private-store";
+import { listMetaAccounts, saveFacebookAccount } from "@/lib/meta-store";
 
 type MetaStage =
   | "state"
@@ -77,6 +78,29 @@ function selectionPage(villa: string, pages: Array<{ id: string; name: string }>
   </style></head><body><main class="card"><span class="eyebrow">FACEBOOK SAYFA EŞLEŞTİRME</span><h1>Villa ${escapeHtml(villa)} için sayfayı seçin</h1><p>Otomatik isim eşleştirmesi yapılmaz. Aşağıdaki sayfalardan doğru olanı siz açıkça seçmeden hiçbir Facebook hesabı kaydedilmez.</p><form method="post" action="/api/meta/facebook/select"><div class="page-list">${options}</div><div class="actions"><button type="submit">Seçili sayfayı bağla</button><a href="/sosyal">İptal</a></div></form><p class="note">Page tokenı tarayıcıya gönderilmez. Seçim oturumu 10 dakika sonra private KV’den otomatik silinir.</p></main></body></html>`;
 }
 
+async function refreshExistingFacebookMappings(
+  pages: Awaited<ReturnType<typeof getFacebookPages>>,
+) {
+  const accounts = (await listMetaAccounts()).filter((account) => account.platform === "Facebook");
+  for (const account of accounts) {
+    const page = pages.find((candidate) => candidate.id === account.accountId);
+    if (!page) continue;
+    try {
+      await saveFacebookAccount(
+        account.villa,
+        account.accountId,
+        account.username,
+        account.profileUrl ?? "",
+        page.accessToken,
+      );
+    } catch (error) {
+      console.error(
+        `[Facebook OAuth][mapped-token-refresh][${account.villa}] ${safeErrorMessage(error, "Mevcut Facebook Page tokenı yenilenemedi.")}`,
+      );
+    }
+  }
+}
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const providerError = url.searchParams.get("error") || url.searchParams.get("error_reason");
@@ -127,6 +151,12 @@ export async function GET(request: Request) {
   } catch (error) {
     return redirectError(url, "page-fetch", error, "Facebook Sayfaları alınamadı.");
   }
+
+  // Business Login yeni bir kullanıcı tokenı ürettiğinde Meta aynı Page için yeni
+  // Page tokenları döndürebilir ve daha önce saklanan tokenları geçersiz kılabilir.
+  // Mevcut villa↔Page eşleşmesini değiştirmeden, OAuth oturumunda açıkça erişilebilir
+  // olan ve zaten eşleştirilmiş Page tokenlarını private KV içinde yenile.
+  await refreshExistingFacebookMappings(pages);
 
   let sessionId: string;
   try {
