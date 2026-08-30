@@ -6,10 +6,10 @@ import styles from "./site.module.css";
 export const dynamic = "force-dynamic";
 
 const MEDIA = {
-  safiraHero: "/villas/safira-hero.jpg",
-  safiraAlt: "/villas/safira-alt.jpg",
-  destanHero: "/villas/destan-hero.jpg",
-  destanSuite: "/villas/destan-suite.jpg",
+  safiraHero: "/villas/safira-hero-20260830.jpg",
+  safiraAlt: "/villas/safira-alt-20260830.jpg",
+  destanHero: "/villas/destan-hero-20260830.jpg",
+  destanSuite: "/villas/destan-suite-20260830.jpg",
 } as const;
 
 export default async function PublicHomePage() {
