@@ -52,6 +52,7 @@ export async function POST(request: Request) {
         scheduledDate,
         caption: postCaption,
         mediaUrl,
+        mediaUrls: [mediaUrl],
       });
       await replaceSocialPostMedia(post.id, [{ mediaUrl, kind: "image" }]);
       prepared.push({ id: post.id, villa, platform, created: true });
