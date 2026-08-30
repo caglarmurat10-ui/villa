@@ -2,8 +2,10 @@ import { applyFacebookBrandAssets, getFacebookPageProfile } from "@/lib/facebook
 import {
   deleteFacebookSelection,
   readFacebookSelection,
+  type FacebookPageCandidate,
 } from "@/lib/facebook-private-store";
 import { saveFacebookAccount } from "@/lib/meta-store";
+import type { Villa } from "@/lib/types";
 
 type Stage = "selection-validate" | "task-check" | "profile-fetch" | "account-save";
 
@@ -47,17 +49,60 @@ function redirectError(requestUrl: string, stage: Stage, error: unknown, fallbac
   });
 }
 
-export async function POST(request: Request) {
-  let pageId = "";
-  try {
-    const form = await request.formData();
-    pageId = String(form.get("pageId") ?? "").trim();
-  } catch (error) {
-    return redirectError(request.url, "selection-validate", error, "Facebook Sayfa seçimi okunamadı.");
+function validatePublishingTask(page: FacebookPageCandidate) {
+  const tasks = new Set((page.tasks ?? []).map((task) => task.toUpperCase()));
+  if (tasks.size > 0 && !tasks.has("CREATE_CONTENT") && !tasks.has("MANAGE")) {
+    throw new Error(`Seçilen ${page.name} Sayfasında içerik yönetme görevi yok. Meta'nın döndürdüğü Page tasks: ${[...tasks].join(", ") || "yok"}. CREATE_CONTENT veya MANAGE görevi gerekir.`);
   }
+}
 
+async function profileForSave(page: FacebookPageCandidate) {
+  try {
+    return await getFacebookPageProfile(page.id, page.accessToken);
+  } catch (error) {
+    console.error(`[Facebook Select][profile-fetch-soft][${page.id}] ${safeErrorMessage(error, "Facebook profil ayrıntıları okunamadı.")}`);
+    return {
+      id: page.id,
+      name: page.name,
+      username: page.name,
+      link: "",
+      bio: "",
+      description: "",
+      coverUrl: "",
+      pictureUrl: "",
+    };
+  }
+}
+
+async function saveMappedPage(villa: Villa, page: FacebookPageCandidate) {
+  validatePublishingTask(page);
+  const profile = await profileForSave(page);
+  await saveFacebookAccount(
+    villa,
+    profile.id,
+    profile.username || profile.name,
+    profile.link,
+    page.accessToken,
+  );
+  return profile;
+}
+
+async function applyBrand(villa: Villa, page: FacebookPageCandidate) {
+  try {
+    const branding = await applyFacebookBrandAssets(villa, page.id, page.accessToken);
+    if (branding.details.error) console.error(`[Facebook Brand][${villa}][details] ${safeErrorMessage(new Error(branding.details.error), "Sayfa metinleri uygulanamadı.")}`);
+    if (branding.profile.error) console.error(`[Facebook Brand][${villa}][profile] ${safeErrorMessage(new Error(branding.profile.error), "Profil görseli uygulanamadı.")}`);
+    if (branding.cover.error) console.error(`[Facebook Brand][${villa}][cover] ${safeErrorMessage(new Error(branding.cover.error), "Kapak görseli uygulanamadı.")}`);
+    return Number(branding.details.applied) + Number(branding.profile.applied) + Number(branding.cover.applied);
+  } catch (error) {
+    console.error(`[Facebook Brand][${villa}][apply] ${safeErrorMessage(error, "Facebook marka ayarları uygulanamadı.")}`);
+    return 0;
+  }
+}
+
+export async function POST(request: Request) {
   const sessionId = cookieValue(request.headers.get("cookie"), "fb_page_selection");
-  if (!sessionId || !pageId) {
+  if (!sessionId) {
     return redirectError(
       request.url,
       "selection-validate",
@@ -76,6 +121,86 @@ export async function POST(request: Request) {
     );
   }
 
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch (error) {
+    return redirectError(request.url, "selection-validate", error, "Facebook Sayfa seçimi okunamadı.");
+  }
+
+  if (selection.mode === "all") {
+    const safiraPageId = String(form.get("safiraPageId") ?? "").trim();
+    const destanPageId = String(form.get("destanPageId") ?? "").trim();
+    if (!safiraPageId || !destanPageId || safiraPageId === destanPageId) {
+      return redirectError(
+        request.url,
+        "selection-validate",
+        new Error("Safira ve Destan için iki farklı Facebook Sayfası seçilmelidir."),
+        "Facebook Sayfa eşleştirmesi doğrulanamadı.",
+      );
+    }
+
+    const safiraPage = selection.pages.find((candidate) => candidate.id === safiraPageId);
+    const destanPage = selection.pages.find((candidate) => candidate.id === destanPageId);
+    if (!safiraPage || !destanPage) {
+      await deleteFacebookSelection(sessionId).catch(() => undefined);
+      return redirectError(
+        request.url,
+        "selection-validate",
+        new Error("Seçilen Facebook Sayfalarından biri OAuth oturumundaki izinli Sayfalar arasında değil."),
+        "Facebook Sayfa eşleştirmesi doğrulanamadı.",
+      );
+    }
+
+    try {
+      validatePublishingTask(safiraPage);
+      validatePublishingTask(destanPage);
+    } catch (error) {
+      await deleteFacebookSelection(sessionId).catch(() => undefined);
+      return redirectError(request.url, "task-check", error, "Facebook Sayfalarında yayın yetkisi doğrulanamadı.");
+    }
+
+    try {
+      await saveMappedPage("Safira", safiraPage);
+      await saveMappedPage("Destan", destanPage);
+    } catch (error) {
+      await deleteFacebookSelection(sessionId).catch(() => undefined);
+      return redirectError(request.url, "account-save", error, "Facebook Sayfaları birlikte güvenli biçimde kaydedilemedi.");
+    }
+
+    const [safiraApplied, destanApplied] = await Promise.all([
+      applyBrand("Safira", safiraPage),
+      applyBrand("Destan", destanPage),
+    ]);
+    const appliedCount = safiraApplied + destanApplied;
+    const brandState = appliedCount === 6 ? "applied" : appliedCount > 0 ? "partial" : "failed";
+
+    await deleteFacebookSelection(sessionId).catch(() => undefined);
+    const target = new URL("/sosyal", request.url);
+    target.searchParams.set("meta_platform", "Facebook");
+    target.searchParams.set("meta_connected", "Safira ve Destan");
+    target.searchParams.set("meta_brand", brandState);
+    target.searchParams.set("meta_joint", "1");
+
+    return new Response(null, {
+      status: 303,
+      headers: {
+        Location: target.toString(),
+        "Set-Cookie": expiredSelectionCookie(),
+      },
+    });
+  }
+
+  const pageId = String(form.get("pageId") ?? "").trim();
+  if (!pageId) {
+    return redirectError(
+      request.url,
+      "selection-validate",
+      new Error("Facebook Sayfası seçilmedi."),
+      "Facebook Sayfa seçimi doğrulanamadı.",
+    );
+  }
+
   const page = selection.pages.find((candidate) => candidate.id === pageId);
   if (!page) {
     await deleteFacebookSelection(sessionId).catch(() => undefined);
@@ -87,49 +212,22 @@ export async function POST(request: Request) {
     );
   }
 
-  const tasks = new Set((page.tasks ?? []).map((task) => task.toUpperCase()));
-  if (tasks.size > 0 && !tasks.has("CREATE_CONTENT") && !tasks.has("MANAGE")) {
-    await deleteFacebookSelection(sessionId).catch(() => undefined);
-    return redirectError(
-      request.url,
-      "task-check",
-      new Error(`Seçilen Facebook Sayfasında içerik yönetme görevi yok. Meta'nın döndürdüğü Page tasks: ${[...tasks].join(", ") || "yok"}. CREATE_CONTENT veya MANAGE görevi gerekir.`),
-      "Facebook Sayfasında yayın yetkisi doğrulanamadı.",
-    );
-  }
-
-  let profile: Awaited<ReturnType<typeof getFacebookPageProfile>>;
   try {
-    profile = await getFacebookPageProfile(page.id, page.accessToken);
+    validatePublishingTask(page);
   } catch (error) {
     await deleteFacebookSelection(sessionId).catch(() => undefined);
-    return redirectError(request.url, "profile-fetch", error, "Facebook Sayfa profili alınamadı.");
+    return redirectError(request.url, "task-check", error, "Facebook Sayfasında yayın yetkisi doğrulanamadı.");
   }
 
   try {
-    await saveFacebookAccount(
-      selection.villa,
-      profile.id,
-      profile.username || profile.name,
-      profile.link,
-      page.accessToken,
-    );
+    await saveMappedPage(selection.villa, page);
   } catch (error) {
     await deleteFacebookSelection(sessionId).catch(() => undefined);
     return redirectError(request.url, "account-save", error, "Facebook Sayfası güvenli biçimde kaydedilemedi.");
   }
 
-  let brandState = "failed";
-  try {
-    const branding = await applyFacebookBrandAssets(selection.villa, profile.id, page.accessToken);
-    const appliedCount = Number(branding.details.applied) + Number(branding.profile.applied) + Number(branding.cover.applied);
-    brandState = appliedCount === 3 ? "applied" : appliedCount > 0 ? "partial" : "failed";
-    if (branding.details.error) console.error(`[Facebook Brand][details] ${safeErrorMessage(new Error(branding.details.error), "Sayfa metinleri uygulanamadı.")}`);
-    if (branding.profile.error) console.error(`[Facebook Brand][profile] ${safeErrorMessage(new Error(branding.profile.error), "Profil görseli uygulanamadı.")}`);
-    if (branding.cover.error) console.error(`[Facebook Brand][cover] ${safeErrorMessage(new Error(branding.cover.error), "Kapak görseli uygulanamadı.")}`);
-  } catch (error) {
-    console.error(`[Facebook Brand][apply] ${safeErrorMessage(error, "Facebook marka ayarları uygulanamadı.")}`);
-  }
+  const appliedCount = await applyBrand(selection.villa, page);
+  const brandState = appliedCount === 3 ? "applied" : appliedCount > 0 ? "partial" : "failed";
 
   await deleteFacebookSelection(sessionId).catch(() => undefined);
   const target = new URL("/sosyal", request.url);
