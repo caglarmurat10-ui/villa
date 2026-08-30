@@ -14,6 +14,7 @@ export type DriveMediaAsset = {
 };
 
 const source: Array<[Villa, string, string, DriveMediaKind]> = [
+  ["Safira", "safira.mp4", "1dgpGq8V3gwVrMfeJrslGEY-l2nB34pMD", "video"],
   ["Safira", "Villa Safira (6).jpg", "1xXvR6kjIL4S7UsCEr0RaiLtIYtGk1NOq", "image"],
   ["Safira", "Villa Safira (14).jpg", "1PGdf22BGfwu_WcUMzL_dJIMMznsp4XLn", "image"],
   ["Safira", "Villa Safira (18).jpg", "1pPw2PH_ADjnghDvx_WDFx_I5j7lUIeU0", "image"],
@@ -26,6 +27,7 @@ const source: Array<[Villa, string, string, DriveMediaKind]> = [
   ["Safira", "Villa Safira (44).jpg", "1P2grXSd9NSG-zjGzHdi-TghTBD6DEj-I", "image"],
   ["Safira", "Villa Safira (47).jpg", "1NwvQ8PVRkjwFtyANCuOF0BUi5V96cWwM", "image"],
   ["Safira", "Villa Safira (50).jpg", "13ZC4v1qxGmUX0AXfNRWhpAkYprKpfkLB", "image"],
+  ["Destan", "destan.mp4", "112oripO5bo-yomytO7R8maziaEHPzhgl", "video"],
   ["Destan", "villa destan.jpg", "1YAM5xbBCHJn3WedtW6rvcgaSKimmVZq4", "image"],
   ["Destan", "villa destan_05.jpg", "1vTtiCMXHuPRG0PDPhSPokUL404woQnJu", "image"],
   ["Destan", "villa destan_12.jpg", "15PvAe31O0Imul_BbiTHbq041tXAhfGKc", "image"],
