@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "villa-yonetim",
-  "main": "./custom-worker.ts",
+  "main": ".open-next/worker.js",
   "compatibility_date": "2026-08-19",
   "compatibility_flags": ["nodejs_compat"],
   "keep_vars": true,
