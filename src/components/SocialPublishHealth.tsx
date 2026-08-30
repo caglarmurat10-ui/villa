@@ -12,18 +12,20 @@ function formatTime(value?: string | null) {
 }
 
 export default function SocialPublishHealth({ posts }: { posts: SocialPost[] }) {
+  const ready = posts.filter((post) => post.status === "Planlandı" && post.approvalStatus === "Onaylandı" && !post.lastPublishError);
   const failed = posts.filter((post) => post.status === "Planlandı" && Boolean(post.lastPublishError));
   const attempted = posts.filter((post) => (post.publishAttemptCount ?? 0) > 0);
   const publishedTracked = posts.filter((post) => post.status === "Yayınlandı" && Boolean(post.platformPostId));
-  const recent = attempted
+  const recent = [...attempted]
     .sort((a, b) => (b.lastPublishAttemptAt ?? "").localeCompare(a.lastPublishAttemptAt ?? ""))
     .slice(0, 6);
 
   return <section style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
     <div style={{border:"1px solid #334b69",borderRadius:16,background:"#081522",padding:16,color:"#eef6ff"}}>
       <div style={{display:"flex",justifyContent:"space-between",gap:14,alignItems:"flex-start",flexWrap:"wrap"}}>
-        <div><small style={{display:"block",fontSize:9,fontWeight:900,letterSpacing:1.4,color:"#93c5fd"}}>YAYIN MOTORU SAĞLIĞI</small><h2 style={{margin:"5px 0 4px",fontSize:18}}>Instagram + Facebook yayın takibi</h2><p style={{margin:0,color:"#9fb0c5",fontSize:11}}>Meta gönderi kimliği, deneme sayısı ve son güvenli hata D1 üzerinde tutulur.</p></div>
+        <div><small style={{display:"block",fontSize:9,fontWeight:900,letterSpacing:1.4,color:"#93c5fd"}}>YAYIN MOTORU SAĞLIĞI</small><h2 style={{margin:"5px 0 4px",fontSize:18}}>Instagram + Facebook yayın takibi</h2><p style={{margin:0,color:"#9fb0c5",fontSize:11}}>İnsan onayı korunur; Meta gönderi kimliği, deneme sayısı ve son güvenli hata D1 üzerinde tutulur.</p></div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <span style={{padding:"7px 10px",borderRadius:999,background:"#172554",color:"#bfdbfe",fontSize:10,fontWeight:900}}>Yayına hazır {ready.length}</span>
           <span style={{padding:"7px 10px",borderRadius:999,background:"#123522",color:"#86efac",fontSize:10,fontWeight:900}}>ID doğrulanan {publishedTracked.length}</span>
           <span style={{padding:"7px 10px",borderRadius:999,background:failed.length?"#451a1a":"#17263c",color:failed.length?"#fecaca":"#bfdbfe",fontSize:10,fontWeight:900}}>Hatalı {failed.length}</span>
         </div>
