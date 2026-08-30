@@ -1,34 +1,70 @@
 # Villa Yönetim
 
-Safira ve Destan için bağımsız rezervasyon yönetim uygulaması.
+Villa Safira ve Villa Destan için Cloudflare üzerinde çalışan rezervasyon, operasyon ve sosyal medya yönetim uygulaması.
 
-## Yerel çalıştırma
+## Production
 
-1. Node.js 24 kurulu olmalı.
-2. `npm install`
-3. `npm run dev`
-4. Tarayıcıda `http://localhost:3000`
+- Uygulama: `https://villa-yonetim.caglarmurat10.workers.dev`
+- Runtime: Cloudflare Workers + OpenNext
+- Veritabanı: Cloudflare D1 (`DB`)
+- Meta özel token deposu: Workers KV (`META_PRIVATE`)
+- Kaynak kodun güncel sürümü `main` ile `agent/cloudflare-migration` branch'lerinde eşittir.
 
-Veritabanı ilk açılışta `data/villa.db` olarak oluşur. JSON yedeği uygulamadaki **Yedeği indir** düğmesiyle alınabilir.
+## Temel modüller
 
-## Facebook / Meta güvenlik mimarisi
+- Rezervasyonlar
+- Safira / Destan ayrı takvimleri
+- Misafirler ve görevler
+- WhatsApp giriş / çıkış mesajları
+- Temizlik ve bakım operasyonu
+- Finans, raporlar ve hesaplama
+- Komisyon, konum ve dönemsel fiyat ayarları
+- Instagram / Facebook bağlantı, içerik ve yayın yönetimi
+- Sosyal medya marka ve medya merkezi
+- JSON yedek ve CSV dışa aktarma
 
-- Facebook Sayfası villa adına göre otomatik eşleştirilmez. OAuth sonrasında kullanıcı, Meta hesabındaki yönetilebilir Sayfalar arasından doğru Sayfayı açıkça seçer.
-- Facebook Page tokenları D1'e yazılmaz. Kalıcı token ve 10 dakikalık seçim oturumları `META_PRIVATE` Workers KV binding'inde AES-GCM ile şifreli tutulur.
-- D1 yalnızca Facebook Page metadata bilgisini tutar: villa, Page ID, ad/kullanıcı adı, profil URL'si ve zaman damgaları.
-- `migrations/0003_facebook_security.sql` eski `facebook_accounts` tablosunu siler; bu tabloda daha önce token saklanmış olabileceği için eski Facebook bağlantıları yeniden yetkilendirilmelidir.
-- `META_PRIVATE` binding'i `wrangler.jsonc` içinde kaynak ID'si verilmeden tanımlıdır. Güncel Wrangler automatic provisioning ile Cloudflare deploy sırasında oluşturulabilir.
-- Eski `agent/facebook-meta-integration-20260828` branch'i güvenlik mimarisi için kaynak olarak kullanılmamalıdır.
+## Cloudflare geliştirme
 
-## İlk sürüm özellikleri
+```bash
+npm install
+npm run dev
+npm run lint
+npm run build
+npm run preview
+npm run deploy
+```
 
-- İki villa için merkezî rezervasyon kaydı
-- Tarih çakışmasını sunucu tarafında engelleme
-- Gelir, tahsilat ve kalan bakiye özeti
-- Booking, Airbnb, doğrudan ve diğer kanal ayrımı
-- Silinen kayıtları veritabanında koruyan soft-delete
-- İşlem denetim kaydı
-- JSON yedek dışa aktarma
-- Docker/self-hosting için Next.js standalone çıktı
+`npm run deploy`, OpenNext build'ini oluşturup Cloudflare Workers'a dağıtır.
 
-Henüz kullanıcı girişi, düzenleme, ödeme hareketleri, otomatik yedek planı ve eski sistemden veri aktarımı eklenmedi. Bunlar ikinci aşamadır.
+## Cloudflare bindings
+
+`wrangler.jsonc` production yapılandırmasının kaynağıdır.
+
+- `DB`: D1 veritabanı
+- `META_PRIVATE`: hassas Meta tokenları için private KV
+- `APP_BASE_URL`: production URL
+- `META_APP_ID`: Instagram uygulama kimliği
+- `FACEBOOK_APP_ID`: Facebook uygulama kimliği
+- `FACEBOOK_CONFIG_ID`: Facebook Login for Business yapılandırma kimliği
+
+Secret değerler repoya yazılmaz:
+
+- `META_APP_SECRET`
+- `FACEBOOK_APP_SECRET`
+
+## Meta güvenliği
+
+- Facebook Sayfası villa adına göre tahmin edilmez; açık ve doğrulanmış seçim kullanılır.
+- Facebook tokenları D1'e plaintext yazılmaz; private KV içinde şifreli saklanır.
+- Instagram/Facebook authorization code, token ve app secret loglanmaz.
+- Safira ve Destan hesap/medya sahipliği server-side doğrulanır.
+- Sosyal medya gönderileri insan onayı olmadan gerçek hesaba yayınlanmaz.
+- Ücretli reklam harcaması açık kullanıcı onayı olmadan başlatılmaz.
+
+## D1 migrations
+
+`migrations/` klasörü production şemasının geçmişini içerir ve silinmemelidir.
+
+## Not
+
+Vercel production hedefi değildir. Uygulamanın gerçek production ortamı Cloudflare Workers'tır.
