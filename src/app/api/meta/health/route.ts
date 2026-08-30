@@ -47,19 +47,39 @@ export async function GET() {
       try {
         const account = await getInstagramCredentials(villa);
         if (!account) return { villa, platform: "Instagram" as const, connected: false, healthy: false, label: "Bağlı değil" };
-        const [profile, quota] = await Promise.all([
-          getInstagramProfile(account.accessToken),
-          getInstagramPublishingLimit(account.accountId, account.accessToken),
-        ]);
+
+        const profile = await getInstagramProfile(account.accessToken);
         const healthy = profile.id === account.accountId;
-        return {
-          villa,
-          platform: "Instagram" as const,
-          connected: true,
-          healthy,
-          label: healthy ? `@${profile.username} · API kotası ${quota.remaining}/${quota.quotaTotal}` : "Hesap kimliği değişmiş",
-          quota,
-        };
+        if (!healthy) {
+          return {
+            villa,
+            platform: "Instagram" as const,
+            connected: true,
+            healthy: false,
+            label: "Hesap kimliği değişmiş",
+          };
+        }
+
+        try {
+          const quota = await getInstagramPublishingLimit(account.accountId, account.accessToken);
+          return {
+            villa,
+            platform: "Instagram" as const,
+            connected: true,
+            healthy: true,
+            label: `@${profile.username} · API kotası ${quota.remaining}/${quota.quotaTotal}`,
+            quota,
+          };
+        } catch {
+          return {
+            villa,
+            platform: "Instagram" as const,
+            connected: true,
+            healthy: true,
+            quotaAvailable: false,
+            label: `@${profile.username} · API bağlantısı sağlıklı · kota şu an okunamadı`,
+          };
+        }
       } catch (error) {
         return { villa, platform: "Instagram" as const, connected: true, healthy: false, ...safeFailure(error, "Instagram") };
       }
