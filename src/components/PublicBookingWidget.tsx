@@ -1,10 +1,32 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { PriceRange, Reservation, Villa } from "@/lib/types";
 
 type BookingReservation = Pick<Reservation, "villa" | "checkIn" | "checkOut">;
 type BookingPrice = Pick<PriceRange, "villa" | "startDate" | "endDate" | "nightlyRate">;
+
+type AvailabilityResult = {
+  kind: "available" | "busy" | "error";
+  title: string;
+  detail: string;
+  total?: number;
+  nights?: number;
+  alternative?: Villa;
+};
+
+const money = new Intl.NumberFormat("tr-TR", {
+  style: "currency",
+  currency: "TRY",
+  maximumFractionDigits: 0,
+});
+
+function isOccupied(reservations: BookingReservation[], villa: Villa, checkIn: string, checkOut: string) {
+  return reservations.some(
+    (item) => item.villa === villa && item.checkIn < checkOut && item.checkOut > checkIn,
+  );
+}
 
 export default function PublicBookingWidget({
   reservations,
@@ -18,15 +40,26 @@ export default function PublicBookingWidget({
   const [villa, setVilla] = useState<Villa>(initialVilla ?? "Safira");
   const [checkIn, setCheckIn] = useState("");
   const [checkOut, setCheckOut] = useState("");
+  const today = new Date().toISOString().slice(0, 10);
 
-  const result = useMemo(() => {
+  const result = useMemo<AvailabilityResult | null>(() => {
     if (!checkIn || !checkOut) return null;
-    if (checkOut <= checkIn) return { kind: "error" as const, text: "Çıkış tarihi girişten sonra olmalı." };
+    if (checkOut <= checkIn) {
+      return { kind: "error", title: "Tarihleri kontrol edin", detail: "Çıkış tarihi girişten sonra olmalı." };
+    }
 
-    const occupied = reservations.some(
-      (item) => item.villa === villa && item.checkIn < checkOut && item.checkOut > checkIn,
-    );
-    if (occupied) return { kind: "busy" as const, text: "Seçtiğiniz tarihlerde bu villa dolu." };
+    if (isOccupied(reservations, villa, checkIn, checkOut)) {
+      const alternative: Villa = villa === "Safira" ? "Destan" : "Safira";
+      const alternativeAvailable = !isOccupied(reservations, alternative, checkIn, checkOut);
+      return {
+        kind: "busy",
+        title: `Villa ${villa} bu tarihlerde dolu`,
+        detail: alternativeAvailable
+          ? `Aynı tarihler için Villa ${alternative} müsait görünüyor.`
+          : "Aynı tarihlerde diğer villamız da dolu görünüyor.",
+        alternative: alternativeAvailable ? alternative : undefined,
+      };
+    }
 
     let total = 0;
     let nights = 0;
@@ -40,16 +73,36 @@ export default function PublicBookingWidget({
       nights += 1;
     }
 
-    if (missingPrice) return { kind: "available" as const, text: `Müsait görünüyor · ${nights} gece · Fiyat için bize ulaşın.` };
+    if (missingPrice) {
+      return {
+        kind: "available",
+        title: `Villa ${villa} müsait`,
+        detail: `${nights} gece için müsaitlik doğrulandı. Bu dönem için fiyat bilgisi yönetim ekibinden teyit edilecek.`,
+        nights,
+      };
+    }
+
     return {
-      kind: "available" as const,
-      text: `Müsait · ${nights} gece · ${new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 }).format(total)}`,
+      kind: "available",
+      title: `Villa ${villa} müsait`,
+      detail: `${nights} gece · Toplam konaklama bedeli`,
+      total,
+      nights,
     };
   }, [checkIn, checkOut, prices, reservations, villa]);
 
+  const alternativeHref = result?.alternative === "Safira" ? "/villa-safira" : "/villa-destan";
+
   return (
     <div className="publicBookingWidget">
-      <div className="publicBookingTitle">Tarihinizi kontrol edin</div>
+      <div className="publicBookingHeader">
+        <div>
+          <span className="publicBookingEyebrow">DOĞRUDAN · CANLI VERİ</span>
+          <div className="publicBookingTitle">Tarihinizi kontrol edin</div>
+        </div>
+        <span className="publicBookingLive"><i /> Yönetim takvimiyle senkron</span>
+      </div>
+
       <div className="publicBookingFields">
         <label>
           <span>Villa</span>
@@ -60,15 +113,37 @@ export default function PublicBookingWidget({
         </label>
         <label>
           <span>Giriş</span>
-          <input type="date" value={checkIn} onChange={(event) => setCheckIn(event.target.value)} />
+          <input type="date" min={today} value={checkIn} onChange={(event) => setCheckIn(event.target.value)} />
         </label>
         <label>
           <span>Çıkış</span>
-          <input type="date" min={checkIn || undefined} value={checkOut} onChange={(event) => setCheckOut(event.target.value)} />
+          <input type="date" min={checkIn || today} value={checkOut} onChange={(event) => setCheckOut(event.target.value)} />
         </label>
       </div>
+
       <div className={`publicBookingResult ${result?.kind ?? "idle"}`} aria-live="polite">
-        {result?.text ?? "Villa, giriş ve çıkış tarihini seçin; sistem mevcut rezervasyon takvimini anında kontrol etsin."}
+        {result ? (
+          <>
+            <div className="publicBookingResultTop">
+              <strong>{result.title}</strong>
+              {typeof result.total === "number" && <b>{money.format(result.total)}</b>}
+            </div>
+            <p>{result.detail}</p>
+            {result.alternative && (
+              <Link className="publicBookingAlternative" href={alternativeHref}>
+                Villa {result.alternative}&apos;ı aynı tarihler için incele →
+              </Link>
+            )}
+          </>
+        ) : (
+          <p>Villa, giriş ve çıkış tarihini seçin. Sistem rezervasyon ve fiyat kayıtlarını anında karşılaştırsın.</p>
+        )}
+      </div>
+
+      <div className="publicBookingTrust">
+        <span>✓ Canlı müsaitlik</span>
+        <span>✓ Dönemsel fiyat</span>
+        <span>✓ Doğrudan rezervasyon</span>
       </div>
     </div>
   );
