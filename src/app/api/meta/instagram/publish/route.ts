@@ -2,7 +2,7 @@ import { z } from "zod";
 import { getInstagramPublishingLimit, publishInstagramImage } from "@/lib/meta";
 import { getInstagramCredentials } from "@/lib/meta-store";
 import {
-  beginSocialPublishAttempt,
+  claimSocialPublishAttempt,
   getSocialPost,
   markSocialPublishFailure,
   markSocialPublishSuccess,
@@ -43,18 +43,23 @@ export async function POST(request: Request) {
     return Response.json({ error: `Villa ${post.villa} için doğrulanmamış medya Instagram'a gönderilemez.` }, { status: 409 });
   }
 
-  let attemptStarted = false;
+  const account = await getInstagramCredentials(post.villa).catch((error) => {
+    console.error(`[Instagram Credentials] ${safePublicError(error)}`);
+    return null;
+  });
+  if (!account) return Response.json({ error: `Villa ${post.villa} Instagram hesabı bağlı değil veya bağlantısı yenilenmeli.` }, { status: 409 });
+
+  const claim = await claimSocialPublishAttempt(post.id);
+  if (!claim) {
+    return Response.json({ error: "Bu paylaşım başka bir yayın işlemi tarafından işleniyor veya artık yayına uygun değil." }, { status: 409 });
+  }
+
+  const { lockToken } = claim;
   try {
-    const account = await getInstagramCredentials(post.villa);
-    if (!account) return Response.json({ error: `Villa ${post.villa} Instagram hesabı bağlı değil.` }, { status: 409 });
-
-    await beginSocialPublishAttempt(post.id);
-    attemptStarted = true;
-
     const limit = await getInstagramPublishingLimit(account.accountId, account.accessToken);
     if (limit.remaining <= 0) {
       const message = `Instagram API yayın kotası dolu (${limit.quotaUsage}/${limit.quotaTotal}). Kota yenilenene kadar yayın gönderilmedi.`;
-      await markSocialPublishFailure(post.id, message);
+      await markSocialPublishFailure(post.id, lockToken, message);
       return Response.json({ error: message, quota: limit }, { status: 429 });
     }
 
@@ -65,7 +70,7 @@ export async function POST(request: Request) {
       post.caption,
       `Villa ${post.villa}, Patara / Kaş özel havuzlu villa`,
     );
-    const publishedPost = await markSocialPublishSuccess(post.id, mediaId);
+    const publishedPost = await markSocialPublishSuccess(post.id, lockToken, mediaId);
 
     return Response.json({
       success: true,
@@ -76,9 +81,7 @@ export async function POST(request: Request) {
     });
   } catch (error) {
     const message = safePublicError(error);
-    if (attemptStarted) {
-      try { await markSocialPublishFailure(post.id, message); } catch {}
-    }
+    try { await markSocialPublishFailure(post.id, lockToken, message); } catch {}
     console.error(`[Instagram Publish] ${message}`);
     return Response.json({ error: message }, { status: 502 });
   }
