@@ -3,6 +3,7 @@ import MetaDiagnostics from "@/components/MetaDiagnostics";
 import SocialDeferredContent from "@/components/SocialDeferredContent";
 import SocialPublishHealth from "@/components/SocialPublishHealth";
 import { listMetaAccounts } from "@/lib/meta-store";
+import { maintainLegacyInstagramConnections } from "@/lib/instagram-maintenance";
 import { getMetaDiagnostic } from "@/lib/meta-diagnostics";
 import { listReservations } from "@/lib/db";
 import { findAvailabilityGaps } from "@/lib/social-availability";
@@ -18,11 +19,14 @@ function istanbulToday() {
 const villas: Villa[] = ["Safira", "Destan"];
 
 export default async function SocialPage() {
-  const [posts, accounts, reservations] = await Promise.all([
+  const [posts, initialAccounts, reservations] = await Promise.all([
     listSocialPosts(30),
     listMetaAccounts(),
     listReservations(),
   ]);
+
+  const maintenance = await maintainLegacyInstagramConnections(initialAccounts);
+  const accounts = maintenance.refreshed ? await listMetaAccounts() : initialAccounts;
   const diagnostic = await getMetaDiagnostic(accounts);
   const gaps = findAvailabilityGaps(reservations, istanbulToday());
   const facebookByVilla = new Map(
