@@ -37,12 +37,16 @@ export interface SocialPost {
   contentType: SocialContentType;
   scheduledDate: string;
   caption: string;
-  // Legacy social rows may not have an attached media URL or approval columns yet.
+  // Legacy sosyal kayıtlarında bu alanlar henüz bulunmayabilir.
   mediaUrl?: string;
   status: SocialPostStatus;
   approvalStatus?: SocialPostApproval;
   approvedAt?: string | null;
   publishedAt: string | null;
+  platformPostId?: string | null;
+  publishAttemptCount?: number;
+  lastPublishAttemptAt?: string | null;
+  lastPublishError?: string | null;
   createdAt: string;
   updatedAt: string;
 }
