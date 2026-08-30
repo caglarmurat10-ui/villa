@@ -34,7 +34,7 @@ function istanbulClock(date: Date) {
     minute: "2-digit",
     hourCycle: "h23",
   }).formatToParts(date);
-  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  const value = (type: string) => parts.find((part) => part.type === type)?.value ?? "";
   return {
     date: `${value("year")}-${value("month")}-${value("day")}`,
     time: `${value("hour")}:${value("minute")}`,
@@ -56,47 +56,35 @@ async function duePosts(env: CloudflareEnv, scheduledAt: Date): Promise<DueSocia
   const clock = istanbulClock(scheduledAt);
   const publishTime = safeTime(env.SOCIAL_AUTO_PUBLISH_TIME);
   const limit = safeLimit(env.SOCIAL_AUTO_PUBLISH_LIMIT);
+  const cooldownBefore = new Date(scheduledAt.getTime() - RETRY_COOLDOWN_MS).toISOString();
+  const commonFilter = `status = 'Planlandı'
+      AND approval_status = 'Onaylandı'
+      AND platform IN ('Instagram', 'Facebook')
+      AND content_type = 'Gönderi'
+      AND (platform = 'Facebook' OR length(trim(COALESCE(media_url, ''))) > 0)
+      AND COALESCE(publish_attempt_count, 0) < ?
+      AND (last_publish_attempt_at IS NULL OR last_publish_attempt_at <= ?)`;
 
-  // Bugünün içerikleri belirlenen Türkiye saatinden önce çıkmaz.
+  // Bugünün içerikleri belirlenen Türkiye saatinden önce çıkmaz; geçmiş tarihli onaylı işler yakalanır.
   if (clock.time < publishTime) {
     const overdue = await env.DB.prepare(`SELECT id, villa, platform, scheduled_date, publish_attempt_count
       FROM social_posts
-      WHERE status = 'Planlandı'
-        AND approval_status = 'Onaylandı'
-        AND platform IN ('Instagram', 'Facebook')
-        AND content_type = 'Gönderi'
+      WHERE ${commonFilter}
         AND scheduled_date < ?
-        AND COALESCE(publish_attempt_count, 0) < ?
-        AND (last_publish_attempt_at IS NULL OR last_publish_attempt_at <= ?)
       ORDER BY scheduled_date ASC, COALESCE(approved_at, created_at) ASC
       LIMIT ?`)
-      .bind(
-        clock.date,
-        MAX_ATTEMPTS,
-        new Date(scheduledAt.getTime() - RETRY_COOLDOWN_MS).toISOString(),
-        limit,
-      )
+      .bind(MAX_ATTEMPTS, cooldownBefore, clock.date, limit)
       .all<DueSocialPost>();
     return overdue.results;
   }
 
   const result = await env.DB.prepare(`SELECT id, villa, platform, scheduled_date, publish_attempt_count
     FROM social_posts
-    WHERE status = 'Planlandı'
-      AND approval_status = 'Onaylandı'
-      AND platform IN ('Instagram', 'Facebook')
-      AND content_type = 'Gönderi'
+    WHERE ${commonFilter}
       AND scheduled_date <= ?
-      AND COALESCE(publish_attempt_count, 0) < ?
-      AND (last_publish_attempt_at IS NULL OR last_publish_attempt_at <= ?)
     ORDER BY scheduled_date ASC, COALESCE(approved_at, created_at) ASC
     LIMIT ?`)
-    .bind(
-      clock.date,
-      MAX_ATTEMPTS,
-      new Date(scheduledAt.getTime() - RETRY_COOLDOWN_MS).toISOString(),
-      limit,
-    )
+    .bind(MAX_ATTEMPTS, cooldownBefore, clock.date, limit)
     .all<DueSocialPost>();
   return result.results;
 }
