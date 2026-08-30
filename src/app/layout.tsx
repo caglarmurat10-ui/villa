@@ -5,6 +5,7 @@ import "./globals.css";
 import "./social.css";
 import "./social-approval.css";
 import "./social-content-library.css";
+import "./social-media-picker.css";
 import "./meta-diagnostics.css";
 import "./brand-profile.css";
 import "./brand-account-status.css";
