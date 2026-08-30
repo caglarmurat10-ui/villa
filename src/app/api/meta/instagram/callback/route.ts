@@ -40,6 +40,7 @@ function oauthCookieExpired() {
 
 function errorRedirect(url: URL, stage: MetaStage, message: string) {
   const target = new URL("/sosyal", url.origin);
+  target.searchParams.set("meta_platform", "Instagram");
   target.searchParams.set("meta_error", message);
   target.searchParams.set("meta_stage", stage);
 
@@ -174,6 +175,7 @@ export async function GET(request: Request) {
       profile.id || shortLivedToken.userId,
       profile.username,
       longLivedToken.accessToken,
+      longLivedToken.expiresIn,
     );
   } catch (error) {
     return stageFailure(
@@ -185,6 +187,7 @@ export async function GET(request: Request) {
   }
 
   const target = new URL("/sosyal", url.origin);
+  target.searchParams.set("meta_platform", "Instagram");
   target.searchParams.set("meta_connected", parsed.villa);
 
   return new Response(null, {
