@@ -5,6 +5,7 @@ import { brandProfiles } from "@/lib/brand-profiles";
 import type { Villa } from "@/lib/types";
 
 const villas: Villa[] = ["Safira", "Destan"];
+const FACEBOOK_GRAPH = "https://graph.facebook.com/v26.0";
 
 export const dynamic = "force-dynamic";
 
@@ -34,6 +35,22 @@ function safeFailure(error: unknown, platform: "Instagram" | "Facebook") {
     reason: "meta-api" as HealthFailureReason,
     label: `${platform} Meta API doğrulaması başarısız; yeniden bağlayın`,
   };
+}
+
+async function getFacebookCoreProfile(pageId: string, accessToken: string) {
+  const url = new URL(`${FACEBOOK_GRAPH}/${encodeURIComponent(pageId)}`);
+  url.searchParams.set("fields", "id,name");
+  url.searchParams.set("access_token", accessToken);
+  const response = await fetch(url, { method: "GET" });
+  const payload = (await response.json().catch(() => ({}))) as {
+    id?: string;
+    name?: string;
+    error?: { code?: number };
+  };
+  if (!response.ok || !payload.id) {
+    throw new Error(`Facebook Sayfa kimliği doğrulanamadı (HTTP ${response.status}${payload.error?.code ? ` / ${payload.error.code}` : ""}).`);
+  }
+  return { id: payload.id, name: payload.name ?? "Facebook Sayfası" };
 }
 
 export async function GET() {
@@ -90,18 +107,41 @@ export async function GET() {
       try {
         const account = await getFacebookCredentials(villa);
         if (!account) return { villa, platform: "Facebook" as const, connected: false, healthy: false, label: "Bağlı değil" };
-        const profile = await getFacebookPageProfile(account.accountId, account.accessToken);
-        const healthy = profile.id === account.accountId;
-        const brand = brandProfiles[villa].facebook;
-        const brandAligned = profile.bio.trim() === brand.intro.trim() && profile.description.trim() === brand.about.trim();
-        return {
-          villa,
-          platform: "Facebook" as const,
-          connected: true,
-          healthy,
-          brandAligned,
-          label: healthy ? `${profile.name} · ${brandAligned ? "Hakkında güncel" : "Hakkında senkronu gerekli"}` : "Sayfa kimliği değişmiş",
-        };
+
+        const coreProfile = await getFacebookCoreProfile(account.accountId, account.accessToken);
+        if (coreProfile.id !== account.accountId) {
+          return {
+            villa,
+            platform: "Facebook" as const,
+            connected: true,
+            healthy: false,
+            label: "Sayfa kimliği değişmiş",
+          };
+        }
+
+        try {
+          const profile = await getFacebookPageProfile(account.accountId, account.accessToken);
+          const brand = brandProfiles[villa].facebook;
+          const brandAligned = profile.bio.trim() === brand.intro.trim() && profile.description.trim() === brand.about.trim();
+          return {
+            villa,
+            platform: "Facebook" as const,
+            connected: true,
+            healthy: true,
+            brandAligned,
+            label: `${profile.name} · ${brandAligned ? "Hakkında güncel" : "Hakkında senkronu gerekli"}`,
+          };
+        } catch {
+          return {
+            villa,
+            platform: "Facebook" as const,
+            connected: true,
+            healthy: true,
+            brandAligned: null,
+            brandDetailsAvailable: false,
+            label: `${coreProfile.name} · API bağlantısı sağlıklı · Hakkında denetimi şu an kullanılamıyor`,
+          };
+        }
       } catch (error) {
         return { villa, platform: "Facebook" as const, connected: true, healthy: false, ...safeFailure(error, "Facebook") };
       }
