@@ -1,7 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 
 const PUBLIC_HOSTS = new Set(["safiradestan.com", "www.safiradestan.com"]);
+const ADMIN_HOSTS = new Set(["admin.safiradestan.com"]);
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1"]);
 const PUBLIC_API_PATHS = new Set(["/api/health", "/api/system/version"]);
+const WORKER_ALLOWED_PATHS = new Set([
+  "/api/health",
+  "/api/system/version",
+  "/api/meta/instagram/callback",
+  "/api/meta/facebook/callback",
+]);
 const PUBLIC_REWRITES = new Map([
   ["/", "/site"],
   ["/villa-safira", "/site/villa-safira"],
@@ -21,12 +29,19 @@ function notFound() {
 
 export function middleware(request: NextRequest) {
   const host = (request.headers.get("host") ?? "").split(":")[0].toLowerCase();
+  const { pathname } = request.nextUrl;
 
-  if (!PUBLIC_HOSTS.has(host)) {
+  if (LOCAL_HOSTS.has(host) || ADMIN_HOSTS.has(host)) {
     return NextResponse.next();
   }
 
-  const { pathname } = request.nextUrl;
+  if (host.endsWith(".workers.dev")) {
+    return WORKER_ALLOWED_PATHS.has(pathname) ? NextResponse.next() : notFound();
+  }
+
+  if (!PUBLIC_HOSTS.has(host)) {
+    return notFound();
+  }
 
   if (pathname.startsWith("/api/")) {
     return PUBLIC_API_PATHS.has(pathname) ? NextResponse.next() : notFound();
