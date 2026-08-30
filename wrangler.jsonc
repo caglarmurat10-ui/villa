@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "villa-yonetim",
-  "main": ".open-next/worker.js",
+  "main": "./custom-worker.ts",
   "compatibility_date": "2026-08-19",
   "compatibility_flags": ["nodejs_compat"],
   "keep_vars": true,
@@ -10,7 +10,10 @@
     "META_APP_ID": "2566616200453545",
     "FACEBOOK_APP_ID": "2335943650679330",
     "FACEBOOK_CONFIG_ID": "1095389230103732",
-    "APP_BASE_URL": "https://villa-yonetim.caglarmurat10.workers.dev"
+    "APP_BASE_URL": "https://villa-yonetim.caglarmurat10.workers.dev",
+    "SOCIAL_AUTO_PUBLISH_ENABLED": "true",
+    "SOCIAL_AUTO_PUBLISH_TIME": "12:00",
+    "SOCIAL_AUTO_PUBLISH_LIMIT": "2"
   },
   "secrets": {
     "required": ["META_APP_SECRET", "FACEBOOK_APP_SECRET"]
@@ -21,5 +24,8 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "villa-yonetim", "database_id": "fa8fc6ec-9cc5-4c92-ba04-b23f2a9b8106" }
   ],
+  "triggers": {
+    "crons": ["*/15 * * * *"]
+  },
   "observability": { "enabled": true }
 }
