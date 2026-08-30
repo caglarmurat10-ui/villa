@@ -39,6 +39,9 @@ export interface SocialPost {
   caption: string;
   // Legacy sosyal kayıtlarında bu alanlar henüz bulunmayabilir.
   mediaUrl?: string;
+  // Gönderi için 2-10 öğe varsa Instagram/Facebook carousel olarak işlenir.
+  // İlk öğe mediaUrl ile aynı tutulur; server authoritative D1 kaydını kullanır.
+  mediaUrls?: string[];
   status: SocialPostStatus;
   approvalStatus?: SocialPostApproval;
   approvedAt?: string | null;
