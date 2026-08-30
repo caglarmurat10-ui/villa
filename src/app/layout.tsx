@@ -13,6 +13,7 @@ import "./message.css";
 import "./navigation.css";
 import "./operations-shell.css";
 import "./calendar-workspace.css";
+import "./settings-center.css";
 
 export const metadata: Metadata = {
   title: "Villa Yönetim",
