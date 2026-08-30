@@ -9,10 +9,13 @@ export type FacebookPageCandidate = {
   tasks: string[];
 };
 
+export type FacebookSelectionMode = "single" | "all";
+
 type SelectionPayload = {
   villa: Villa;
   pages: FacebookPageCandidate[];
   createdAt: string;
+  mode?: FacebookSelectionMode;
 };
 
 type TokenPayload = {
@@ -71,9 +74,13 @@ async function decryptJson<T>(value: string): Promise<T> {
   return JSON.parse(new TextDecoder().decode(decrypted)) as T;
 }
 
-export async function createFacebookSelection(villa: Villa, pages: FacebookPageCandidate[]) {
+export async function createFacebookSelection(
+  villa: Villa,
+  pages: FacebookPageCandidate[],
+  mode: FacebookSelectionMode = "single",
+) {
   const sessionId = crypto.randomUUID().replaceAll("-", "") + crypto.randomUUID().replaceAll("-", "");
-  const payload: SelectionPayload = { villa, pages, createdAt: new Date().toISOString() };
+  const payload: SelectionPayload = { villa, pages, mode, createdAt: new Date().toISOString() };
   await (await privateKv()).put(`facebook:selection:${sessionId}`, await encryptJson(payload), { expirationTtl: 600 });
   return sessionId;
 }

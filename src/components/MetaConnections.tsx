@@ -12,9 +12,11 @@ const stageLabels: Record<string, string> = {
   state: "state doğrulama",
   "nonce-cookie": "güvenlik çerezi",
   "code-exchange": "erişim anahtarı",
+  "permission-check": "Facebook izinleri",
   "page-fetch": "Facebook Sayfalarını alma",
   "selection-save": "güvenli seçim oturumu",
   "selection-validate": "Sayfa seçimi doğrulama",
+  "task-check": "Sayfa yayın yetkisi",
   "profile-fetch": "profil bilgisi",
   "account-save": "güvenli hesap kaydı",
   "database-save": "veritabanı kaydı",
@@ -30,13 +32,23 @@ export default function MetaConnections({ initialAccounts }: { initialAccounts: 
     const error = params.get("meta_error");
     const stage = params.get("meta_stage");
     const brand = params.get("meta_brand");
+    const joint = params.get("meta_joint") === "1";
     const platform = params.get("meta_platform") === "Facebook" ? "Facebook" : "Instagram";
 
     if (error) {
       const stageText = stage ? stageLabels[stage] ?? stage : "bağlantı";
       setNotice(`${platform} bağlantısı tamamlanamadı · ${stageText}: ${error}`);
     } else if (connected) {
-      if (platform === "Facebook" && brand === "applied") {
+      if (platform === "Facebook" && joint) {
+        const brandText = brand === "applied"
+          ? " Marka ayarları iki Sayfaya da uygulandı."
+          : brand === "partial"
+            ? " Bağlantılar tamamlandı; bazı marka alanları Marka Merkezi'nden tekrar uygulanabilir."
+            : brand === "failed"
+              ? " Bağlantılar tamamlandı; marka alanları daha sonra Marka Merkezi'nden uygulanabilir."
+              : "";
+        setNotice(`Safira ve Destan Facebook Sayfaları aynı Meta yetkilendirme oturumuyla birlikte bağlandı.${brandText}`);
+      } else if (platform === "Facebook" && brand === "applied") {
         setNotice(`Villa ${connected} Facebook Sayfası bağlandı; Hakkında metni, profil logosu ve kapak görseli otomatik uygulandı.`);
       } else if (platform === "Facebook" && brand === "partial") {
         setNotice(`Villa ${connected} Facebook Sayfası bağlandı; marka ayarlarının bir bölümü uygulandı. Marka Merkezi'nden güvenle tekrar deneyebilirsiniz.`);
@@ -47,12 +59,13 @@ export default function MetaConnections({ initialAccounts }: { initialAccounts: 
       }
     }
 
-    if (error || connected || stage || brand || params.has("meta_platform")) {
+    if (error || connected || stage || brand || joint || params.has("meta_platform")) {
       params.delete("meta_error");
       params.delete("meta_stage");
       params.delete("meta_connected");
       params.delete("meta_platform");
       params.delete("meta_brand");
+      params.delete("meta_joint");
       const query = params.toString();
       window.history.replaceState({}, "", `${window.location.pathname}${query ? `?${query}` : ""}${window.location.hash}`);
     }
@@ -71,25 +84,25 @@ export default function MetaConnections({ initialAccounts }: { initialAccounts: 
   }
 
   return <section className="meta-connect-box">
-    <div className="meta-connect-head"><div><span className="eyebrow">META BAĞLANTILARI</span><h2>Instagram ve Facebook hesaplarını Villa Yönetim'e bağla</h2><p>Safira ve Destan hesapları ayrı tutulur. Facebook'ta otomatik isim eşleştirmesi yapılmaz; OAuth sonrasında doğru Sayfayı siz açıkça seçersiniz. Facebook Page tokenları D1'e yazılmaz, şifreli private KV'de saklanır. Facebook bağlantısında güvenli Hakkında metni, profil logosu ve gerçek villa fotoğraflı kapak otomatik uygulanmayı dener.</p></div></div>
+    <div className="meta-connect-head"><div><span className="eyebrow">META BAĞLANTILARI</span><h2>Instagram ve Facebook hesaplarını Villa Yönetim'e bağla</h2><p>Instagram hesapları villa bazında ayrı tutulur. Facebook ise Safira ve Destan için tek ortak Meta OAuth oturumuyla bağlanır; iki Sayfa aynı ekranda açıkça eşleştirilir ve iki güncel Page tokenı birlikte private KV'ye yazılır. Otomatik isim eşleştirmesi yapılmaz.</p></div></div>
     {notice ? <p className="message">{notice}</p> : null}
     <div className="meta-account-grid">{villas.flatMap((villa) => platforms.map((platform) => {
       const account = accounts.find((item) => item.villa === villa && item.platform === platform);
       const connectHref = platform === "Instagram"
         ? `/api/meta/instagram/connect?villa=${villa}`
-        : `/api/meta/facebook/connect?villa=${villa}`;
+        : "/api/meta/facebook/connect?villa=Safira";
       return <article key={`${villa}-${platform}`} className={account ? "connected" : ""}>
         <div><strong>Villa {villa}</strong><span>{platform}</span></div>
         {account ? <>
           <p>{platform === "Instagram" ? `@${account.username}` : account.username}</p>
           <div className="meta-actions">
             <span className="meta-ok">✓ Bağlı</span>
-            <a href={connectHref} style={{fontSize:10,fontWeight:900,color:"#93c5fd",textDecoration:"none"}}>Yeniden bağla</a>
+            <a href={connectHref} style={{fontSize:10,fontWeight:900,color:"#93c5fd",textDecoration:"none"}}>{platform === "Facebook" ? "İki Sayfayı birlikte yenile" : "Yeniden bağla"}</a>
             <button onClick={() => disconnect(villa, platform)}>Bağlantıyı kaldır</button>
           </div>
         </> : <>
-          <p>{platform === "Facebook" ? "Bağlantıdan sonra Sayfa seçimi ve güvenli marka senkronu yapılacak" : "Henüz bağlanmadı"}</p>
-          <a className="meta-connect-button" href={connectHref}>{platform}'u bağla</a>
+          <p>{platform === "Facebook" ? "Safira ve Destan Facebook bağlantısı tek oturumda birlikte yapılacak" : "Henüz bağlanmadı"}</p>
+          <a className="meta-connect-button" href={connectHref}>{platform === "Facebook" ? "Facebook'u birlikte bağla" : "Instagram'u bağla"}</a>
         </>}
       </article>;
     }))}</div>

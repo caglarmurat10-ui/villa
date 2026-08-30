@@ -6,7 +6,6 @@ import {
   verifyFacebookState,
 } from "@/lib/facebook";
 import { createFacebookSelection } from "@/lib/facebook-private-store";
-import { listMetaAccounts, saveFacebookAccount } from "@/lib/meta-store";
 
 type MetaStage =
   | "state"
@@ -66,39 +65,18 @@ function escapeHtml(value: string) {
   }[char] ?? char));
 }
 
-function selectionPage(villa: string, pages: Array<{ id: string; name: string }>) {
-  const options = pages.map((page, index) => `
-    <label class="page-option">
-      <input type="radio" name="pageId" value="${escapeHtml(page.id)}" ${index === 0 ? "required" : ""}>
-      <span><strong>${escapeHtml(page.name)}</strong><small>Page ID: ${escapeHtml(page.id)}</small></span>
-    </label>`).join("");
-
-  return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Facebook Sayfasını Seç</title><style>
-  *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#07111f;color:#f8fafc;font-family:system-ui,sans-serif}.card{width:min(640px,100%);padding:26px;border:1px solid #334155;border-radius:20px;background:#0f1b2d}.eyebrow{font-size:11px;font-weight:800;color:#93c5fd;letter-spacing:.08em}.card h1{margin:8px 0 6px;font-size:24px}.card>p{margin:0 0 18px;color:#cbd5e1;line-height:1.5}.page-list{display:grid;gap:9px}.page-option{display:flex;gap:12px;align-items:center;padding:13px;border:1px solid #334155;border-radius:13px;background:#081423;cursor:pointer}.page-option:has(input:checked){border-color:#60a5fa;background:#0b2542}.page-option input{width:18px;height:18px}.page-option span{display:grid;gap:3px}.page-option small{color:#94a3b8}.actions{display:flex;gap:9px;margin-top:18px}.actions button,.actions a{padding:11px 14px;border-radius:10px;font-weight:800;text-decoration:none}.actions button{border:0;background:#2563eb;color:white;cursor:pointer}.actions a{border:1px solid #475569;color:#cbd5e1}.note{margin-top:14px!important;font-size:12px;color:#94a3b8!important}
-  </style></head><body><main class="card"><span class="eyebrow">FACEBOOK SAYFA EŞLEŞTİRME</span><h1>Villa ${escapeHtml(villa)} için sayfayı seçin</h1><p>Otomatik isim eşleştirmesi yapılmaz. Aşağıdaki sayfalardan doğru olanı siz açıkça seçmeden hiçbir Facebook hesabı kaydedilmez.</p><form method="post" action="/api/meta/facebook/select"><div class="page-list">${options}</div><div class="actions"><button type="submit">Seçili sayfayı bağla</button><a href="/sosyal">İptal</a></div></form><p class="note">Page tokenı tarayıcıya gönderilmez. Seçim oturumu 10 dakika sonra private KV’den otomatik silinir.</p></main></body></html>`;
+function pageOptions(pages: Array<{ id: string; name: string }>) {
+  return [
+    '<option value="">Facebook Sayfasını seçin</option>',
+    ...pages.map((page) => `<option value="${escapeHtml(page.id)}">${escapeHtml(page.name)} · ${escapeHtml(page.id)}</option>`),
+  ].join("");
 }
 
-async function refreshExistingFacebookMappings(
-  pages: Awaited<ReturnType<typeof getFacebookPages>>,
-) {
-  const accounts = (await listMetaAccounts()).filter((account) => account.platform === "Facebook");
-  for (const account of accounts) {
-    const page = pages.find((candidate) => candidate.id === account.accountId);
-    if (!page) continue;
-    try {
-      await saveFacebookAccount(
-        account.villa,
-        account.accountId,
-        account.username,
-        account.profileUrl ?? "",
-        page.accessToken,
-      );
-    } catch (error) {
-      console.error(
-        `[Facebook OAuth][mapped-token-refresh][${account.villa}] ${safeErrorMessage(error, "Mevcut Facebook Page tokenı yenilenemedi.")}`,
-      );
-    }
-  }
+function selectionPage(pages: Array<{ id: string; name: string }>) {
+  const options = pageOptions(pages);
+  return `<!doctype html><html lang="tr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Facebook Sayfalarını Eşleştir</title><style>
+  *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#07111f;color:#f8fafc;font-family:system-ui,sans-serif}.card{width:min(720px,100%);padding:26px;border:1px solid #334155;border-radius:20px;background:#0f1b2d}.eyebrow{font-size:11px;font-weight:800;color:#93c5fd;letter-spacing:.08em}.card h1{margin:8px 0 6px;font-size:24px}.card>p{margin:0 0 18px;color:#cbd5e1;line-height:1.5}.mapping{display:grid;gap:12px}.row{display:grid;gap:7px;padding:14px;border:1px solid #334155;border-radius:13px;background:#081423}.row strong{font-size:13px}.row select{width:100%;padding:11px 12px;border:1px solid #475569;border-radius:10px;background:#0b1728;color:#f8fafc;font:inherit}.actions{display:flex;gap:9px;margin-top:18px}.actions button,.actions a{padding:11px 14px;border-radius:10px;font-weight:800;text-decoration:none}.actions button{border:0;background:#2563eb;color:white;cursor:pointer}.actions a{border:1px solid #475569;color:#cbd5e1}.note{margin-top:14px!important;font-size:12px;color:#94a3b8!important}.warning{padding:10px 12px;border-radius:10px;background:#2a1c08;color:#fde68a!important;border:1px solid #f59e0b55}
+  </style></head><body><main class="card"><span class="eyebrow">ORTAK FACEBOOK YETKİLENDİRMESİ</span><h1>Safira ve Destan Sayfalarını birlikte eşleştirin</h1><p>İki Facebook Sayfası aynı OAuth oturumundan alınan güncel Page tokenlarıyla birlikte kaydedilecek. Böylece bir villayı yeniden bağlamak diğer villanın tokenını geçersiz bırakmayacak.</p><p class="warning">Safira ve Destan için iki farklı Sayfa seçin. Otomatik isim eşleştirmesi yapılmaz.</p><form method="post" action="/api/meta/facebook/select"><div class="mapping"><label class="row"><strong>Villa Safira → Facebook Sayfası</strong><select name="safiraPageId" required>${options}</select></label><label class="row"><strong>Villa Destan → Facebook Sayfası</strong><select name="destanPageId" required>${options}</select></label></div><div class="actions"><button type="submit">İki Sayfayı birlikte bağla</button><a href="/sosyal">İptal</a></div></form><p class="note">Page tokenları tarayıcıya gönderilmez. Seçim oturumu private KV içinde şifreli tutulur ve 10 dakika sonra silinir.</p></main></body></html>`;
 }
 
 export async function GET(request: Request) {
@@ -148,19 +126,16 @@ export async function GET(request: Request) {
   let pages: Awaited<ReturnType<typeof getFacebookPages>>;
   try {
     pages = await getFacebookPages(userAccessToken);
+    if (pages.length < 2) {
+      throw new Error("Facebook bu yetkilendirmede iki Sayfayı birlikte döndürmedi. Meta izin ekranında Villa Safira ve Villa Destan Sayfalarının ikisine de erişim verin; mümkünse ‘mevcut ve gelecekteki tüm Sayfalar’ seçeneğini kullanın.");
+    }
   } catch (error) {
     return redirectError(url, "page-fetch", error, "Facebook Sayfaları alınamadı.");
   }
 
-  // Business Login yeni bir kullanıcı tokenı ürettiğinde Meta aynı Page için yeni
-  // Page tokenları döndürebilir ve daha önce saklanan tokenları geçersiz kılabilir.
-  // Mevcut villa↔Page eşleşmesini değiştirmeden, OAuth oturumunda açıkça erişilebilir
-  // olan ve zaten eşleştirilmiş Page tokenlarını private KV içinde yenile.
-  await refreshExistingFacebookMappings(pages);
-
   let sessionId: string;
   try {
-    sessionId = await createFacebookSelection(parsed.villa, pages);
+    sessionId = await createFacebookSelection(parsed.villa, pages, "all");
   } catch (error) {
     return redirectError(url, "selection-save", error, "Facebook seçim oturumu oluşturulamadı.");
   }
@@ -175,7 +150,7 @@ export async function GET(request: Request) {
   headers.append("Set-Cookie", expiredCookie("fb_oauth_nonce"));
   headers.append("Set-Cookie", `fb_page_selection=${sessionId}; Path=/api/meta/facebook/select; HttpOnly; Secure; SameSite=Strict; Max-Age=600`);
 
-  return new Response(selectionPage(parsed.villa, pages), {
+  return new Response(selectionPage(pages), {
     status: 200,
     headers,
   });
