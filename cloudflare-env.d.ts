@@ -1,3 +1,5 @@
+/// <reference types="@cloudflare/workers-types" />
+
 import type { D1Database, Fetcher, KVNamespace } from "@cloudflare/workers-types";
 
 declare global {
