@@ -104,6 +104,24 @@ export async function exchangeInstagramLongLivedToken(shortLivedAccessToken: str
   return { accessToken: data.access_token, tokenType: data.token_type ?? "bearer", expiresIn: data.expires_in ?? null };
 }
 
+export async function refreshInstagramLongLivedToken(accessToken: string) {
+  const params = new URLSearchParams({
+    grant_type: "ig_refresh_token",
+    access_token: accessToken,
+  });
+  const response = await fetch(`${INSTAGRAM_GRAPH}/refresh_access_token?${params.toString()}`);
+  const data = (await response.json().catch(() => ({}))) as {
+    access_token?: string;
+    token_type?: string;
+    expires_in?: number;
+    error?: { message?: string };
+  };
+  if (!response.ok || !data.access_token) {
+    throw new Error(data.error?.message ?? "Instagram uzun süreli erişim anahtarı yenilenemedi.");
+  }
+  return { accessToken: data.access_token, tokenType: data.token_type ?? "bearer", expiresIn: data.expires_in ?? null };
+}
+
 export async function getInstagramProfile(accessToken: string) {
   const params = new URLSearchParams({ fields: "id,username", access_token: accessToken });
   const response = await fetch(`${INSTAGRAM_GRAPH}/me?${params.toString()}`);
