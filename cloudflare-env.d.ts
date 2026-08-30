@@ -11,6 +11,9 @@ declare global {
     FACEBOOK_APP_SECRET?: string;
     FACEBOOK_CONFIG_ID?: string;
     APP_BASE_URL?: string;
+    SOCIAL_AUTO_PUBLISH_ENABLED?: string;
+    SOCIAL_AUTO_PUBLISH_TIME?: string;
+    SOCIAL_AUTO_PUBLISH_LIMIT?: string;
   }
 }
 
