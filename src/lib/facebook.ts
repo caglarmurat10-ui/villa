@@ -7,6 +7,13 @@ const META_GRAPH_VERSION = "v26.0";
 const META_GRAPH = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
 const FACEBOOK_AUTH = `https://www.facebook.com/${META_GRAPH_VERSION}/dialog/oauth`;
 
+export const REQUIRED_FACEBOOK_PERMISSIONS = [
+  "pages_show_list",
+  "pages_read_engagement",
+  "pages_manage_posts",
+  "pages_manage_metadata",
+] as const;
+
 async function facebookConfig() {
   const { env } = await getCloudflareContext({ async: true });
   const appId = env.FACEBOOK_APP_ID ?? process.env.FACEBOOK_APP_ID;
@@ -110,6 +117,23 @@ export async function exchangeFacebookLongLivedToken(shortLivedAccessToken: stri
   }
 
   return { accessToken: data.access_token, expiresIn: data.expires_in ?? null };
+}
+
+export async function getFacebookPermissionStatus(userAccessToken: string) {
+  const url = new URL(`${META_GRAPH}/me/permissions`);
+  url.searchParams.set("access_token", userAccessToken);
+  const response = await fetch(url, { method: "GET" });
+  const payload = (await response.json().catch(() => ({}))) as {
+    data?: Array<{ permission?: string; status?: string }>;
+    error?: { code?: number };
+  };
+  if (!response.ok) {
+    throw new Error(`Facebook izin durumu alınamadı (HTTP ${response.status}${payload.error?.code ? ` / ${payload.error.code}` : ""}).`);
+  }
+  const statuses = new Map((payload.data ?? []).filter((row) => row.permission).map((row) => [row.permission!, row.status ?? "unknown"]));
+  const granted = REQUIRED_FACEBOOK_PERMISSIONS.filter((permission) => statuses.get(permission) === "granted");
+  const missing = REQUIRED_FACEBOOK_PERMISSIONS.filter((permission) => statuses.get(permission) !== "granted");
+  return { granted, missing, complete: missing.length === 0 };
 }
 
 type FacebookPageApi = {
