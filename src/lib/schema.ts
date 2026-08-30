@@ -24,13 +24,16 @@ export const priceRangeSchema = z.object({
   nightlyRate: z.coerce.number().positive("Fiyat sıfırdan büyük olmalı"),
 }).refine((value) => value.endDate >= value.startDate, { message: "Bitiş tarihi başlangıçtan önce olamaz", path: ["endDate"] });
 
+const mediaUrlSchema = z.string().url("Geçerli bir medya bağlantısı girin");
+
 export const socialPostSchema = z.object({
   villa: z.enum(["Safira", "Destan"]),
   platform: z.enum(["Instagram", "Facebook", "TikTok", "WhatsApp Durum"]),
   contentType: z.enum(["Gönderi", "Hikâye", "Reels", "Durum"]),
   scheduledDate: z.iso.date(),
   caption: z.string().trim().min(1, "Paylaşım metni gerekli").max(2200, "Paylaşım metni en fazla 2200 karakter olabilir"),
-  mediaUrl: z.union([z.literal(""), z.string().url("Geçerli bir görsel bağlantısı girin")]).default(""),
+  mediaUrl: z.union([z.literal(""), mediaUrlSchema]).default(""),
+  mediaUrls: z.array(mediaUrlSchema).max(10, "Bir paylaşımda en fazla 10 medya kullanılabilir").default([]),
 }).superRefine((value, context) => {
   const allowed = value.platform === "WhatsApp Durum"
     ? ["Durum"]
@@ -40,6 +43,18 @@ export const socialPostSchema = z.object({
   if (!allowed.includes(value.contentType)) {
     context.addIssue({ code: "custom", path: ["contentType"], message: "Seçilen platform için paylaşım türü geçerli değil." });
   }
+
+  const media = [...new Set([...(value.mediaUrls ?? []), ...(value.mediaUrl ? [value.mediaUrl] : [])])];
+  if ((value.contentType === "Hikâye" || value.contentType === "Reels") && media.length > 1) {
+    context.addIssue({ code: "custom", path: ["mediaUrls"], message: `${value.contentType} için tek medya seçilmelidir.` });
+  }
+  if (media.length > 1 && value.contentType !== "Gönderi") {
+    context.addIssue({ code: "custom", path: ["mediaUrls"], message: "Çoklu medya yalnız Gönderi/Carousel için kullanılabilir." });
+  }
+});
+
+export const socialPostMediaSchema = z.object({
+  mediaUrls: z.array(mediaUrlSchema).min(1, "En az bir medya seçin").max(10, "En fazla 10 medya seçebilirsiniz"),
 });
 
 export const socialPostStatusSchema = z.object({ status: z.enum(["Planlandı", "Yayınlandı"]) });
