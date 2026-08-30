@@ -1,1 +1,1 @@
-hero replacement pending binary blob
+Static villa images are served directly from /public/villas.
