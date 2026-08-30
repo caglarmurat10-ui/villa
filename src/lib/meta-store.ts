@@ -5,6 +5,7 @@ import {
   getFacebookPageToken,
   saveFacebookPageToken,
 } from "./facebook-private-store";
+import { refreshInstagramLongLivedToken } from "./meta";
 import type { Villa } from "./types";
 
 export type MetaSocialAccount = {
@@ -14,6 +15,7 @@ export type MetaSocialAccount = {
   username: string;
   connectedAt: string;
   profileUrl?: string;
+  tokenExpiresAt?: string;
 };
 
 type InstagramRow = {
@@ -23,6 +25,8 @@ type InstagramRow = {
   username: string;
   access_token: string;
   connected_at: string;
+  updated_at: string;
+  token_expires_at: string | null;
 };
 
 type FacebookRow = {
@@ -35,6 +39,8 @@ type FacebookRow = {
 };
 
 let tablesReady: Promise<void> | null = null;
+const TOKEN_REFRESH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+const TOKEN_MIN_REFRESH_AGE_MS = 24 * 60 * 60 * 1000;
 
 async function context() {
   return getCloudflareContext({ async: true });
@@ -50,6 +56,7 @@ async function prepareTables(db: D1Database) {
       access_token TEXT NOT NULL,
       connected_at TEXT NOT NULL,
       updated_at TEXT NOT NULL,
+      token_expires_at TEXT,
       PRIMARY KEY (villa, platform)
     )`),
     db.prepare(`CREATE TABLE IF NOT EXISTS facebook_account_metadata (
@@ -61,6 +68,7 @@ async function prepareTables(db: D1Database) {
       updated_at TEXT NOT NULL
     )`),
   ]);
+  try { await db.prepare("ALTER TABLE social_accounts ADD COLUMN token_expires_at TEXT").run(); } catch {}
 }
 
 async function ensureTables(db: D1Database) {
@@ -105,8 +113,20 @@ async function decrypt(value: string, secret: string) {
   return new TextDecoder().decode(decrypted);
 }
 
+function expirationFromSeconds(expiresIn?: number | null) {
+  if (!expiresIn || !Number.isFinite(expiresIn) || expiresIn <= 0) return null;
+  return new Date(Date.now() + expiresIn * 1000).toISOString();
+}
+
 function publicInstagramAccount(row: InstagramRow): MetaSocialAccount {
-  return { villa: row.villa, platform: "Instagram", accountId: row.account_id, username: row.username, connectedAt: row.connected_at };
+  return {
+    villa: row.villa,
+    platform: "Instagram",
+    accountId: row.account_id,
+    username: row.username,
+    connectedAt: row.connected_at,
+    tokenExpiresAt: row.token_expires_at ?? undefined,
+  };
 }
 
 function publicFacebookAccount(row: FacebookRow): MetaSocialAccount {
@@ -120,19 +140,28 @@ function publicFacebookAccount(row: FacebookRow): MetaSocialAccount {
   };
 }
 
-export async function saveInstagramAccount(villa: Villa, accountId: string, username: string, accessToken: string) {
+export async function saveInstagramAccount(
+  villa: Villa,
+  accountId: string,
+  username: string,
+  accessToken: string,
+  expiresIn?: number | null,
+) {
   const { env } = await context();
   if (!env.META_APP_SECRET) throw new Error("META_APP_SECRET tanımlı değil.");
   const db = env.DB;
   await ensureTables(db);
   const now = new Date().toISOString();
   const token = await encrypt(accessToken, env.META_APP_SECRET);
-  await db.prepare(`INSERT INTO social_accounts (villa, platform, account_id, username, access_token, connected_at, updated_at)
-    VALUES (?, 'Instagram', ?, ?, ?, ?, ?)
+  const tokenExpiresAt = expirationFromSeconds(expiresIn);
+  await db.prepare(`INSERT INTO social_accounts
+    (villa, platform, account_id, username, access_token, connected_at, updated_at, token_expires_at)
+    VALUES (?, 'Instagram', ?, ?, ?, ?, ?, ?)
     ON CONFLICT(villa, platform) DO UPDATE SET account_id=excluded.account_id, username=excluded.username,
-      access_token=excluded.access_token, connected_at=excluded.connected_at, updated_at=excluded.updated_at`)
-    .bind(villa, accountId, username, token, now, now).run();
-  return { villa, platform: "Instagram" as const, accountId, username, connectedAt: now };
+      access_token=excluded.access_token, connected_at=excluded.connected_at, updated_at=excluded.updated_at,
+      token_expires_at=excluded.token_expires_at`)
+    .bind(villa, accountId, username, token, now, now, tokenExpiresAt).run();
+  return { villa, platform: "Instagram" as const, accountId, username, connectedAt: now, tokenExpiresAt: tokenExpiresAt ?? undefined };
 }
 
 export async function saveFacebookAccount(
@@ -214,7 +243,41 @@ export async function getInstagramCredentials(villa: Villa) {
   await ensureTables(db);
   const row = await db.prepare("SELECT * FROM social_accounts WHERE villa=? AND platform='Instagram'").bind(villa).first<InstagramRow>();
   if (!row) return null;
-  return { ...publicInstagramAccount(row), accessToken: await decrypt(row.access_token, env.META_APP_SECRET) };
+
+  let accessToken = await decrypt(row.access_token, env.META_APP_SECRET);
+  let tokenExpiresAt = row.token_expires_at;
+  const nowMs = Date.now();
+  const expiresMs = tokenExpiresAt ? Date.parse(tokenExpiresAt) : Number.NaN;
+  const updatedMs = Date.parse(row.updated_at);
+
+  if (Number.isFinite(expiresMs) && expiresMs <= nowMs) {
+    throw new Error(`Villa ${villa} Instagram erişim anahtarının süresi dolmuş; hesabı yeniden bağlayın.`);
+  }
+
+  const nearExpiry = Number.isFinite(expiresMs) && expiresMs - nowMs <= TOKEN_REFRESH_WINDOW_MS;
+  const oldEnoughToRefresh = Number.isFinite(updatedMs) && nowMs - updatedMs >= TOKEN_MIN_REFRESH_AGE_MS;
+
+  if (nearExpiry && oldEnoughToRefresh) {
+    try {
+      const refreshed = await refreshInstagramLongLivedToken(accessToken);
+      const encrypted = await encrypt(refreshed.accessToken, env.META_APP_SECRET);
+      const refreshedExpiresAt = expirationFromSeconds(refreshed.expiresIn);
+      const refreshedAt = new Date().toISOString();
+      await db.prepare(`UPDATE social_accounts
+        SET access_token=?, token_expires_at=?, updated_at=?
+        WHERE villa=? AND platform='Instagram'`)
+        .bind(encrypted, refreshedExpiresAt, refreshedAt, villa).run();
+      accessToken = refreshed.accessToken;
+      tokenExpiresAt = refreshedExpiresAt;
+    } catch (error) {
+      console.error(`[Instagram Token Refresh][${villa}] ${error instanceof Error ? error.message.slice(0, 240) : "Token yenileme başarısız."}`);
+    }
+  }
+
+  return {
+    ...publicInstagramAccount({ ...row, token_expires_at: tokenExpiresAt }),
+    accessToken,
+  };
 }
 
 export async function getFacebookCredentials(villa: Villa) {
