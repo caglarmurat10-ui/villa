@@ -16,9 +16,24 @@ function istanbulToday() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
 }
 
+function firstParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] ?? "" : value ?? "";
+}
+
 const villas: Villa[] = ["Safira", "Destan"];
 
-export default async function SocialPage() {
+type SocialPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>;
+};
+
+export default async function SocialPage({ searchParams }: SocialPageProps) {
+  const params = searchParams ? await searchParams : {};
+  const metaPlatform = firstParam(params.meta_platform);
+  const metaError = firstParam(params.meta_error);
+  const metaStage = firstParam(params.meta_stage);
+  const metaConnected = firstParam(params.meta_connected);
+  const metaBrand = firstParam(params.meta_brand);
+
   const [posts, initialAccounts, reservations] = await Promise.all([
     listSocialPosts(30),
     listMetaAccounts(),
@@ -34,6 +49,22 @@ export default async function SocialPage() {
   );
 
   return <>
+    {metaError ? <section style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
+      <div style={{padding:"13px 15px",border:"1px solid #ef444477",borderRadius:13,background:"#2a1014",color:"#fecaca",fontSize:12,lineHeight:1.5}}>
+        <strong style={{display:"block",marginBottom:4,color:"#fff"}}>{metaPlatform || "Meta"} bağlantısı tamamlanamadı</strong>
+        <span>{metaError}</span>
+        {metaStage ? <small style={{display:"block",marginTop:5,color:"#fca5a5"}}>Aşama: {metaStage}</small> : null}
+      </div>
+    </section> : null}
+
+    {metaConnected ? <section style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
+      <div style={{padding:"13px 15px",border:"1px solid #22c55e66",borderRadius:13,background:"#071b16",color:"#bbf7d0",fontSize:12,lineHeight:1.5}}>
+        <strong style={{display:"block",marginBottom:4,color:"#fff"}}>✓ {metaPlatform || "Meta"} bağlantısı tamamlandı</strong>
+        <span>Villa {metaConnected} hesabı başarıyla kaydedildi.</span>
+        {metaBrand ? <small style={{display:"block",marginTop:5,color:"#86efac"}}>Marka uygulama sonucu: {metaBrand}</small> : null}
+      </div>
+    </section> : null}
+
     <MetaDiagnostics diagnostic={diagnostic} />
 
     <section style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
