@@ -5,12 +5,20 @@ declare global {
     DB: D1Database;
     ASSETS: Fetcher;
     META_PRIVATE: KVNamespace;
+    CF_VERSION_METADATA?: {
+      id: string;
+      tag?: string;
+      timestamp: string;
+    };
     META_APP_ID?: string;
     META_APP_SECRET?: string;
     FACEBOOK_APP_ID?: string;
     FACEBOOK_APP_SECRET?: string;
     FACEBOOK_CONFIG_ID?: string;
     APP_BASE_URL?: string;
+    SOCIAL_AUTO_PUBLISH_ENABLED?: string;
+    SOCIAL_AUTO_PUBLISH_TIME?: string;
+    SOCIAL_AUTO_PUBLISH_LIMIT?: string;
   }
 }
 

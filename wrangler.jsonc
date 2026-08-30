@@ -29,6 +29,9 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "villa-yonetim", "database_id": "fa8fc6ec-9cc5-4c92-ba04-b23f2a9b8106" }
   ],
+  "version_metadata": {
+    "binding": "CF_VERSION_METADATA"
+  },
   "triggers": {
     "crons": ["*/15 * * * *"]
   },
