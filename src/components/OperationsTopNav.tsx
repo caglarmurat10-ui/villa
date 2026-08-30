@@ -14,6 +14,7 @@ const items = [
   ["/temizlik", "Temizlik", "✦"],
   ["/bakim", "Bakım", "⚒"],
   ["/finans", "Finans", "₺"],
+  ["/hesaplama", "Hesaplama", "∑"],
   ["/raporlar", "Raporlar", "▥"],
   ["/sosyal", "Sosyal Medya", "◉"],
   ["/ayarlar", "Ayarlar", "⚙"],
