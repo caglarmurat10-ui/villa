@@ -51,13 +51,19 @@ async function duePosts(env, scheduledAt) {
   const commonFilter = `status = 'Planlandı'
       AND approval_status = 'Onaylandı'
       AND platform IN ('Instagram', 'Facebook')
-      AND content_type = 'Gönderi'
-      AND (platform = 'Facebook' OR length(trim(COALESCE(media_url, ''))) > 0)
+      AND (
+        (platform = 'Instagram' AND content_type IN ('Gönderi', 'Hikâye', 'Reels'))
+        OR (platform = 'Facebook' AND content_type IN ('Gönderi', 'Reels'))
+      )
+      AND (
+        (platform = 'Facebook' AND content_type = 'Gönderi')
+        OR length(trim(COALESCE(media_url, ''))) > 0
+      )
       AND COALESCE(publish_attempt_count, 0) < ?
       AND (last_publish_attempt_at IS NULL OR last_publish_attempt_at <= ?)`;
 
   const dateClause = clock.time < publishTime ? "scheduled_date < ?" : "scheduled_date <= ?";
-  const result = await env.DB.prepare(`SELECT id, villa, platform, scheduled_date, publish_attempt_count
+  const result = await env.DB.prepare(`SELECT id, villa, platform, content_type, scheduled_date, publish_attempt_count
     FROM social_posts
     WHERE ${commonFilter}
       AND ${dateClause}
@@ -82,7 +88,7 @@ async function publishThroughApp(post, env, ctx) {
   }), env, ctx);
 
   if (response.ok) {
-    console.log(`[Social Cron] Villa ${post.villa} ${post.platform} yayını tamamlandı.`);
+    console.log(`[Social Cron] Villa ${post.villa} ${post.platform} ${post.content_type} yayını tamamlandı.`);
     return;
   }
 
