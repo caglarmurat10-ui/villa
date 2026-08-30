@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { publishFacebookPost } from "@/lib/facebook";
 import { getFacebookCredentials } from "@/lib/meta-store";
-import { getSocialPost, updateSocialPostStatus } from "@/lib/social-db";
+import {
+  beginSocialPublishAttempt,
+  getSocialPost,
+  markSocialPublishFailure,
+  markSocialPublishSuccess,
+} from "@/lib/social-db";
 import { isApprovedProxyMediaUrl } from "@/lib/social-drive-media";
 
 const schema = z.object({ postId: z.string().trim().min(1, "Paylaşım kimliği gerekli.") });
@@ -36,15 +41,22 @@ export async function POST(request: Request) {
     }
   }
 
+  let attemptStarted = false;
   try {
     const account = await getFacebookCredentials(post.villa);
     if (!account) return Response.json({ error: `Villa ${post.villa} Facebook Sayfası bağlı değil.` }, { status: 409 });
 
-    const postId = await publishFacebookPost(account.accountId, account.accessToken, post.caption, post.mediaUrl || undefined);
-    const publishedPost = await updateSocialPostStatus(post.id, "Yayınlandı");
-    return Response.json({ success: true, facebookPostId: postId, username: account.username, post: publishedPost });
+    await beginSocialPublishAttempt(post.id);
+    attemptStarted = true;
+
+    const facebookPostId = await publishFacebookPost(account.accountId, account.accessToken, post.caption, post.mediaUrl || undefined);
+    const publishedPost = await markSocialPublishSuccess(post.id, facebookPostId);
+    return Response.json({ success: true, facebookPostId, username: account.username, post: publishedPost });
   } catch (error) {
     const message = safePublicError(error);
+    if (attemptStarted) {
+      try { await markSocialPublishFailure(post.id, message); } catch {}
+    }
     console.error(`[Facebook Publish] ${message}`);
     return Response.json({ error: message }, { status: 502 });
   }
