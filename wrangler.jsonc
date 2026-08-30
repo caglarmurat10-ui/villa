@@ -16,6 +16,7 @@
     "FACEBOOK_APP_ID": "2335943650679330",
     "FACEBOOK_CONFIG_ID": "1095389230103732",
     "APP_BASE_URL": "https://admin.safiradestan.com",
+    "INSTAGRAM_OAUTH_BASE_URL": "https://villa-yonetim.caglarmurat10.workers.dev",
     "SOCIAL_AUTO_PUBLISH_ENABLED": "true",
     "SOCIAL_AUTO_PUBLISH_TIME": "12:00",
     "SOCIAL_AUTO_PUBLISH_LIMIT": "2"
