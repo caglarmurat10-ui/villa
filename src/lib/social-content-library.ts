@@ -4,7 +4,7 @@ import content03 from "@/data/social-content-03.json";
 import content04 from "@/data/social-content-04.json";
 import content05 from "@/data/social-content-05.json";
 import content06 from "@/data/social-content-06.json";
-import { resolveDriveMedia } from "./social-drive-media";
+import { resolveDriveMedia, type DriveMediaKind } from "./social-drive-media";
 import type { SocialContentType, Villa } from "./types";
 
 export type SocialContentTemplate = {
@@ -18,6 +18,7 @@ export type SocialContentTemplate = {
   hook: string;
   caption: string;
   mediaResolved: boolean;
+  mediaKind: DriveMediaKind | "";
   driveFileId: string;
   driveViewUrl: string;
   previewUrl: string;
@@ -26,7 +27,7 @@ export type SocialContentTemplate = {
 
 type RawTemplate = Omit<
   SocialContentTemplate,
-  "villa" | "format" | "contentType" | "mediaResolved" | "driveFileId" | "driveViewUrl" | "previewUrl" | "mediaUrl"
+  "villa" | "format" | "contentType" | "mediaResolved" | "mediaKind" | "driveFileId" | "driveViewUrl" | "previewUrl" | "mediaUrl"
 > & {
   villa: string;
   format: string;
@@ -56,6 +57,7 @@ export const socialContentTemplates: SocialContentTemplate[] = raw.map((item) =>
     format: (item.format === "Story" || item.format === "Reels" || item.format === "Carousel") ? item.format : "Feed",
     contentType: contentType(item.format),
     mediaResolved: Boolean(media),
+    mediaKind: media?.mediaKind ?? "",
     driveFileId: media?.fileId ?? "",
     driveViewUrl: media?.viewUrl ?? "",
     previewUrl: media?.previewUrl ?? "",
