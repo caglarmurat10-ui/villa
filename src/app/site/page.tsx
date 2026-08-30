@@ -1,83 +1,79 @@
 import Link from "next/link";
+import PublicBookingWidget from "@/components/PublicBookingWidget";
+import { listPriceRanges, listReservations } from "@/lib/db";
 import styles from "./site.module.css";
 
-export default function PublicHomePage() {
+export const dynamic = "force-dynamic";
+
+export default async function PublicHomePage() {
+  const [reservations, prices] = await Promise.all([listReservations(), listPriceRanges()]);
+  const bookingReservations = reservations.map(({ villa, checkIn, checkOut }) => ({ villa, checkIn, checkOut }));
+  const bookingPrices = prices.map(({ villa, startDate, endDate, nightlyRate }) => ({ villa, startDate, endDate, nightlyRate }));
+
   return (
     <main className={styles.page}>
       <section className={styles.hero}>
+        <img className={styles.heroImage} src="/villas/safira-hero.webp" alt="Villa Safira ve özel havuzu" />
+        <div className={styles.heroShade} />
         <nav className={styles.nav} aria-label="Ana menü">
-          <div className={styles.brand}>SAFIRA & DESTAN VILLAS</div>
+          <Link href="/" className={styles.brand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></Link>
           <div className={styles.navlinks}>
             <a href="#villalar">Villalar</a>
+            <a href="#musaitlik">Müsaitlik</a>
             <a href="#deneyim">Deneyim</a>
             <a href="#iletisim" className={styles.cta}>İletişim</a>
           </div>
         </nav>
 
-        <div className={styles.heroInner}>
-          <div>
-            <div className={styles.eyebrow}>Patara · Kaş · Antalya</div>
-            <h1 className={styles.title}>Akdeniz’de size özel bir kaçış.</h1>
-            <p className={styles.lead}>
-              Villa Safira ve Villa Destan’ı tek çatı altında keşfedin. Müsaitlik, fiyat ve rezervasyon sürecini doğrudan yönetin.
-            </p>
-            <div className={styles.actions}>
-              <a className={styles.primary} href="#villalar">Villaları keşfet</a>
-              <a className={styles.secondary} href="#iletisim">Rezervasyon bilgisi</a>
-            </div>
+        <div className={styles.heroCopy}>
+          <div className={styles.eyebrow}>Patara · Kaş · Antalya</div>
+          <h1 className={styles.title}>Akdeniz’de<br />kendinize ait<br />bir yer.</h1>
+          <p className={styles.lead}>Villa Safira ve Villa Destan. Özel havuz, özgürlük ve doğrudan rezervasyon kolaylığıyla Patara’da size ait bir tatil deneyimi.</p>
+          <div className={styles.actions}>
+            <a className={styles.primary} href="#musaitlik">Müsaitlik ara</a>
+            <a className={styles.secondary} href="#villalar">Villaları keşfet</a>
           </div>
-          <div className={styles.heroArt} aria-label="Villa Safira ve Villa Destan">
-            <img src="/brand/safira-facebook-cover.svg" alt="Villa Safira" />
-            <img src="/brand/destan-facebook-cover.svg" alt="Villa Destan" />
-          </div>
+        </div>
+        <div className={styles.heroNote}><span>01</span><p>İki ayrı villa.<br />Tek bir özenli deneyim.</p></div>
+      </section>
+
+      <section className={styles.bookingBand} id="musaitlik">
+        <div className={styles.bookingWrap}>
+          <div className={styles.bookingIntro}><span className={styles.kicker}>CANLI TAKVİM</span><h2>Tatil tarihiniz<br />müsait mi?</h2><p>Takvim doğrudan yönetim sistemindeki rezervasyonlarla kontrol edilir.</p></div>
+          <PublicBookingWidget reservations={bookingReservations} prices={bookingPrices} />
         </div>
       </section>
 
       <section className={styles.section} id="villalar">
-        <div className={styles.sectionHead}>
-          <h2>İki villa, tek deneyim.</h2>
-          <p>Her villa için ayrı tanıtım, müsaitlik ve rezervasyon akışı olacak. Yönetim panelindeki verilerle doğrudan bağlantılı çalışacak.</p>
-        </div>
-        <div className={styles.cards}>
-          <article className={styles.card}>
-            <img src="/brand/safira-facebook-cover.svg" alt="Villa Safira tanıtımı" />
-            <div className={styles.cardBody}>
-              <h3>Villa Safira</h3>
-              <p>Sade, özel ve huzurlu bir tatil deneyimi için tasarlanmış Villa Safira’yı ayrıntılarıyla inceleyin.</p>
-              <Link href="/villa-safira">Villa Safira’yı incele →</Link>
-            </div>
-          </article>
-          <article className={styles.card}>
-            <img src="/brand/destan-facebook-cover.svg" alt="Villa Destan tanıtımı" />
-            <div className={styles.cardBody}>
-              <h3>Villa Destan</h3>
-              <p>Akdeniz tatilini özel villa konforuyla birleştiren Villa Destan’ın ayrıntılarını keşfedin.</p>
-              <Link href="/villa-destan">Villa Destan’ı incele →</Link>
-            </div>
-          </article>
+        <div className={styles.editorialHead}><span className={styles.kicker}>VİLLALARIMIZ</span><h2>Hangisi sizin<br />tatiliniz?</h2><p>İki villayı da gerçek fotoğraflarıyla keşfedin; size en uygun olanı seçin.</p></div>
+        <div className={styles.villaGrid}>
+          <Link className={styles.villaStory} href="/villa-safira">
+            <div className={styles.storyImage}><img src="/villas/safira-hero.webp" alt="Villa Safira dış görünüm ve havuz" /><span>Safira&apos;yı keşfet ↗</span></div>
+            <div className={styles.storyMeta}><div><small>VILLA 01</small><h3>Villa Safira</h3></div><p>Doğayla çevrili, ferah ve özel bir villa tatili.</p></div>
+          </Link>
+          <Link className={`${styles.villaStory} ${styles.storyOffset}`} href="/villa-destan">
+            <div className={styles.storyImage}><img src="/villas/destan-hero.webp" alt="Villa Destan havuz ve bahçe görünümü" /><span>Destan&apos;ı keşfet ↗</span></div>
+            <div className={styles.storyMeta}><div><small>VILLA 02</small><h3>Villa Destan</h3></div><p>Özel alanları ve güçlü detaylarıyla özgün bir kaçış.</p></div>
+          </Link>
         </div>
       </section>
 
-      <section className={styles.strip} id="deneyim">
-        <div className={styles.section}>
-          <div className={styles.sectionHead}>
-            <h2>Doğrudan ve kolay.</h2>
-            <p>Siteyi yalnızca vitrin olarak değil, rezervasyon sisteminin müşteri tarafı olarak kuruyoruz.</p>
-          </div>
-          <div className={styles.features}>
-            <div className={styles.feature}><img src="/brand/highlight-musaitlik.svg" alt="" /><strong>Canlı müsaitlik</strong><span>Rezervasyon programıyla aynı takvim.</span></div>
-            <div className={styles.feature}><img src="/brand/highlight-villa.svg" alt="" /><strong>Villa detayları</strong><span>Her villa için ayrı, güçlü tanıtım sayfası.</span></div>
-            <div className={styles.feature}><img src="/brand/highlight-patara.svg" alt="" /><strong>Patara & Kaş</strong><span>Bölgeyi ve tatil deneyimini birlikte anlatan içerik.</span></div>
-            <div className={styles.feature}><img src="/brand/highlight-iletisim.svg" alt="" /><strong>Doğrudan iletişim</strong><span>WhatsApp ve rezervasyon talebi akışı.</span></div>
-          </div>
-        </div>
+      <section className={styles.experience} id="deneyim">
+        <div className={styles.experiencePhoto}><img src="/villas/destan-suite.webp" alt="Villa Destan yatak odası ve jakuzi" /></div>
+        <div className={styles.experienceCopy}><span className={styles.kicker}>DOĞRUDAN KONAKLAMA</span><h2>Arada kimse yok.<br />Tatiliniz bize emanet.</h2><p>Rezervasyon takvimi, dönemsel fiyatlar ve villa bilgileri aynı yönetim altyapısından gelir. Böylece gördüğünüz bilgiyle bizim gördüğümüz bilgi aynı kalır.</p><div className={styles.points}><div><b>01</b><span>Canlı müsaitlik</span></div><div><b>02</b><span>Doğrudan iletişim</span></div><div><b>03</b><span>Şeffaf fiyat</span></div></div></div>
+      </section>
+
+      <section className={styles.locationBlock}>
+        <span className={styles.kicker}>PATARA · KAŞ</span>
+        <h2>Günün ritmini<br />siz belirleyin.</h2>
+        <p>Sabah havuz başında, gün içinde Akdeniz’in kıyılarında, akşam yeniden kendi alanınızda. Safira & Destan, tatili programdan çıkarıp size bırakmak için var.</p>
+        <a href="#iletisim">Rezervasyon hakkında konuşalım →</a>
       </section>
 
       <footer className={styles.footer} id="iletisim">
-        <div className={styles.footerInner}>
-          <div><strong>Safira & Destan Villas</strong><p>Patara · Kaş · Antalya</p></div>
-          <div><p>Doğrudan rezervasyon altyapısı hazırlanıyor.</p></div>
-        </div>
+        <div className={styles.footerBrand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></div>
+        <div className={styles.footerGrid}><div><small>KONUM</small><p>Patara · Kaş · Antalya</p></div><div><small>REZERVASYON</small><p>Müsaitlik kontrolünü yukarıdaki canlı takvimden yapabilirsiniz.</p></div><div><small>WEB</small><p>safiradestan.com</p></div></div>
+        <div className={styles.footerBottom}>Safira & Destan Villas <span>Akdeniz’de size ait bir tatil.</span></div>
       </footer>
     </main>
   );
