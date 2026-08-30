@@ -24,8 +24,5 @@
   "d1_databases": [
     { "binding": "DB", "database_name": "villa-yonetim", "database_id": "fa8fc6ec-9cc5-4c92-ba04-b23f2a9b8106" }
   ],
-  "triggers": {
-    "crons": ["*/15 * * * *"]
-  },
   "observability": { "enabled": true }
 }
