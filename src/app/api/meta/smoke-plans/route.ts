@@ -1,7 +1,7 @@
 import { createSocialPost, listSocialPosts } from "@/lib/social-db";
 import { replaceSocialPostMedia } from "@/lib/social-media-store";
 import { socialDriveMedia } from "@/lib/social-drive-media";
-import type { Villa } from "@/lib/types";
+import type { SocialPost, Villa } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
@@ -16,6 +16,44 @@ function caption(villa: Villa) {
   return villa === "Safira"
     ? "Villa Safira | Patara, Kaş 🌿\n\nDoğayla iç içe, sakin ve özel bir tatil için Villa Safira. Uygun tarihler ve rezervasyon bilgisi için mesaj gönderebilirsiniz.\n\n#Kaş #Patara #VillaSafira #villatatili #kiralıkvilla"
     : "Villa Destan | Patara, Kaş 🌿\n\nHuzurlu, bağımsız ve keyifli bir villa tatili için Villa Destan. Uygun tarihler ve rezervasyon bilgisi için mesaj gönderebilirsiniz.\n\n#Kaş #Patara #VillaDestan #villatatili #kiralıkvilla";
+}
+
+function isSmokePlan(post: SocialPost, scheduledDate: string) {
+  return post.scheduledDate === scheduledDate &&
+    post.contentType === "Gönderi" &&
+    (post.platform === "Instagram" || post.platform === "Facebook") &&
+    post.caption === caption(post.villa);
+}
+
+function serialize(post: SocialPost) {
+  return {
+    id: post.id,
+    villa: post.villa,
+    platform: post.platform,
+    status: post.status,
+    approvalStatus: post.approvalStatus,
+    scheduledDate: post.scheduledDate,
+    caption: post.caption,
+    mediaUrl: post.mediaUrl,
+    platformPostId: post.platformPostId ?? null,
+    lastPublishError: post.lastPublishError ?? null,
+    publishAttemptCount: post.publishAttemptCount ?? 0,
+  };
+}
+
+export async function GET() {
+  const scheduledDate = todayIstanbul();
+  const posts = await listSocialPosts(100);
+  const plans = posts
+    .filter((post) => isSmokePlan(post, scheduledDate))
+    .sort((a, b) => `${a.villa}-${a.platform}`.localeCompare(`${b.villa}-${b.platform}`))
+    .map(serialize);
+
+  return Response.json({
+    scheduledDate,
+    plans,
+    count: plans.length,
+  }, { headers: { "Cache-Control": "no-store" } });
 }
 
 export async function POST(request: Request) {
@@ -59,10 +97,14 @@ export async function POST(request: Request) {
     }
   }
 
+  const current = await listSocialPosts(100);
+  const plans = current.filter((post) => isSmokePlan(post, scheduledDate)).map(serialize);
+
   return Response.json({
     success: true,
     scheduledDate,
     prepared,
+    plans,
     createdCount: prepared.filter((item) => item.created).length,
     existingCount: prepared.filter((item) => !item.created).length,
     approvalStatus: "İnsan onayı",
