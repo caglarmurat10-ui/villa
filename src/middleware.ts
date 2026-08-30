@@ -7,6 +7,7 @@ const PUBLIC_API_PATHS = new Set(["/api/health", "/api/system/version"]);
 const WORKER_ALLOWED_PATHS = new Set([
   "/api/health",
   "/api/system/version",
+  "/api/meta/instagram/connect",
   "/api/meta/instagram/callback",
   "/api/meta/facebook/callback",
 ]);
