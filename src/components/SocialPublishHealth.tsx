@@ -1,3 +1,6 @@
+"use client";
+
+import { useMemo, useState } from "react";
 import type { SocialPost } from "@/lib/types";
 
 function formatTime(value?: string | null) {
@@ -16,17 +19,67 @@ function compactCaption(value: string) {
   return normalized.length > 120 ? `${normalized.slice(0, 117)}…` : normalized;
 }
 
+function todayIstanbul() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
+}
+
 export default function SocialPublishHealth({ posts }: { posts: SocialPost[] }) {
-  const ready = posts.filter((post) => post.status === "Planlandı" && post.approvalStatus === "Onaylandı" && !post.lastPublishError);
-  const readyQueue = [...ready]
+  const [items, setItems] = useState(posts);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [notice, setNotice] = useState("");
+
+  const ready = useMemo(() => items.filter((post) => post.status === "Planlandı" && post.approvalStatus === "Onaylandı" && !post.lastPublishError), [items]);
+  const readyQueue = useMemo(() => [...ready]
     .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate) || (a.approvedAt ?? a.createdAt ?? "").localeCompare(b.approvedAt ?? b.createdAt ?? ""))
-    .slice(0, 12);
-  const failed = posts.filter((post) => post.status === "Planlandı" && Boolean(post.lastPublishError));
-  const attempted = posts.filter((post) => (post.publishAttemptCount ?? 0) > 0);
-  const publishedTracked = posts.filter((post) => post.status === "Yayınlandı" && Boolean(post.platformPostId));
+    .slice(0, 12), [ready]);
+  const today = todayIstanbul();
+  const dueReady = ready.filter((post) => post.scheduledDate <= today);
+  const failed = items.filter((post) => post.status === "Planlandı" && Boolean(post.lastPublishError));
+  const attempted = items.filter((post) => (post.publishAttemptCount ?? 0) > 0);
+  const publishedTracked = items.filter((post) => post.status === "Yayınlandı" && Boolean(post.platformPostId));
   const recent = [...attempted]
     .sort((a, b) => (b.lastPublishAttemptAt ?? "").localeCompare(a.lastPublishAttemptAt ?? ""))
     .slice(0, 6);
+
+  async function removeApproval(postId: string, quiet = false) {
+    const response = await fetch(`/api/social-posts/${encodeURIComponent(postId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ approvalStatus: "İnsan onayı" }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(data.error ?? "Onay kaldırılamadı.");
+    setItems((current) => current.map((post) => post.id === postId ? { ...post, approvalStatus: "İnsan onayı", approvedAt: null } : post));
+    if (!quiet) setNotice("✓ Otomatik yayın onayı kaldırıldı; içerik silinmedi ve yeniden incelenebilir.");
+  }
+
+  async function pauseOne(postId: string) {
+    setBusy(postId);
+    setNotice("");
+    try {
+      await removeApproval(postId);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Onay kaldırılamadı.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function pauseDueQueue() {
+    if (!dueReady.length) return;
+    const confirmed = window.confirm(`${dueReady.length} adet bugün veya geçmiş tarihli onaylı içerik otomatik yayından çıkarılacak. İçerikler silinmeyecek ve insan onayına dönecek. Devam edilsin mi?`);
+    if (!confirmed) return;
+    setBusy("bulk");
+    setNotice("");
+    try {
+      for (const post of dueReady) await removeApproval(post.id, true);
+      setNotice(`✓ ${dueReady.length} gecikmiş/bugünkü içerik otomatik yayın kuyruğundan güvenle çıkarıldı. Gelecek tarihli planlara dokunulmadı.`);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Kuyruk güncellenemedi.");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   return <section style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
     <div style={{border:"1px solid #334b69",borderRadius:16,background:"#081522",padding:16,color:"#eef6ff"}}>
@@ -39,18 +92,27 @@ export default function SocialPublishHealth({ posts }: { posts: SocialPost[] }) 
         </div>
       </div>
 
+      {notice ? <div style={{marginTop:12,padding:"9px 11px",borderRadius:10,border:"1px solid #2e5075",background:"#0b1b2e",color:"#bfdbfe",fontSize:10}}>{notice}</div> : null}
+
       {readyQueue.length ? <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap",marginBottom:8}}>
-          <div><strong style={{fontSize:11}}>Otomatik yayın açılırsa sırada bekleyen onaylı içerikler</strong><p style={{margin:"3px 0 0",fontSize:9,color:"#8fa4bd"}}>Cron şu anda kapalı tutuluyor. Bu liste gözden geçirilmeden otomatik yayın yeniden açılmamalı.</p></div>
-          <span style={{fontSize:9,color:"#fbbf24",fontWeight:900}}>Gösterilen {readyQueue.length}/{ready.length}</span>
+          <div><strong style={{fontSize:11}}>Otomatik yayın açılırsa sırada bekleyen onaylı içerikler</strong><p style={{margin:"3px 0 0",fontSize:9,color:"#8fa4bd"}}>Cron şu anda kapalı tutuluyor. Bugün veya geçmiş tarihli içerikleri topluca insan onayına döndürüp yayın patlamasını önleyebiliriz.</p></div>
+          <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+            {dueReady.length ? <button type="button" onClick={pauseDueQueue} disabled={busy !== null} style={{border:"1px solid #f59e0b66",borderRadius:9,padding:"7px 10px",background:"#3a2606",color:"#fde68a",fontSize:9,fontWeight:900,cursor:busy?"wait":"pointer"}}>{busy === "bulk" ? "Durduruluyor…" : `Bugün/gecikmiş ${dueReady.length} içeriği durdur`}</button> : null}
+            <span style={{fontSize:9,color:"#fbbf24",fontWeight:900}}>Gösterilen {readyQueue.length}/{ready.length}</span>
+          </div>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:8}}>
-          {readyQueue.map((post) => <article key={post.id} style={{padding:"10px 11px",border:"1px solid #7c5d1d",borderRadius:11,background:"#17150b"}}>
-            <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"start"}}><strong style={{fontSize:10}}>Villa {post.villa} · {post.platform}</strong><span style={{fontSize:9,color:"#fbbf24",fontWeight:900}}>{post.scheduledDate}</span></div>
-            <div style={{marginTop:4,fontSize:9,color:"#d6c89a"}}>{post.contentType} · Onaylandı · otomatik yayın bekliyor</div>
-            <p style={{margin:"6px 0 0",fontSize:9,lineHeight:1.45,color:"#b8c6d8"}}>{compactCaption(post.caption)}</p>
-            <code style={{display:"block",marginTop:6,fontSize:8,color:"#70869f",overflowWrap:"anywhere"}}>ID: {post.id}</code>
-          </article>)}
+          {readyQueue.map((post) => {
+            const due = post.scheduledDate <= today;
+            return <article key={post.id} style={{padding:"10px 11px",border:`1px solid ${due?"#a16207":"#315b43"}`,borderRadius:11,background:due?"#17150b":"#0b1712"}}>
+              <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"start"}}><strong style={{fontSize:10}}>Villa {post.villa} · {post.platform}</strong><span style={{fontSize:9,color:due?"#fbbf24":"#86efac",fontWeight:900}}>{post.scheduledDate}</span></div>
+              <div style={{marginTop:4,fontSize:9,color:due?"#d6c89a":"#a7d8b8"}}>{post.contentType} · Onaylandı · {due?"bugün/gecikmiş":"gelecek tarihli"}</div>
+              <p style={{margin:"6px 0 0",fontSize:9,lineHeight:1.45,color:"#b8c6d8"}}>{compactCaption(post.caption)}</p>
+              <code style={{display:"block",marginTop:6,fontSize:8,color:"#70869f",overflowWrap:"anywhere"}}>ID: {post.id}</code>
+              <button type="button" onClick={() => pauseOne(post.id)} disabled={busy !== null} style={{marginTop:8,border:"1px solid #47617f",borderRadius:8,padding:"6px 9px",background:"#102238",color:"#dbeafe",fontSize:9,fontWeight:800,cursor:busy?"wait":"pointer"}}>{busy === post.id ? "Durduruluyor…" : "Onayı kaldır / otomatik yayından çıkar"}</button>
+            </article>;
+          })}
         </div>
       </div> : <div style={{marginTop:14,padding:"10px 12px",border:"1px solid #1f5f3b",borderRadius:11,background:"#071b16",color:"#86efac",fontSize:10}}>Onaylı bekleyen otomatik yayın kuyruğu boş.</div>}
 
