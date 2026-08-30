@@ -2,6 +2,7 @@ import {
   exchangeFacebookCode,
   exchangeFacebookLongLivedToken,
   getFacebookPages,
+  getFacebookPermissionStatus,
   verifyFacebookState,
 } from "@/lib/facebook";
 import { createFacebookSelection } from "@/lib/facebook-private-store";
@@ -10,6 +11,7 @@ type MetaStage =
   | "state"
   | "nonce-cookie"
   | "code-exchange"
+  | "permission-check"
   | "page-fetch"
   | "selection-save";
 
@@ -108,6 +110,15 @@ export async function GET(request: Request) {
     userAccessToken = longLived.accessToken;
   } catch (error) {
     return redirectError(url, "code-exchange", error, "Facebook erişim anahtarı alınamadı.");
+  }
+
+  try {
+    const permissions = await getFacebookPermissionStatus(userAccessToken);
+    if (!permissions.complete) {
+      throw new Error(`Facebook Business Login yapılandırmasında eksik veya verilmemiş izinler: ${permissions.missing.join(", ")}. Tek yapılandırmada dört iznin de granted olması gerekir.`);
+    }
+  } catch (error) {
+    return redirectError(url, "permission-check", error, "Facebook izinleri doğrulanamadı.");
   }
 
   let pages: Awaited<ReturnType<typeof getFacebookPages>>;
