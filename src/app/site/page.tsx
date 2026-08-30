@@ -7,9 +7,9 @@ export const dynamic = "force-dynamic";
 
 const MEDIA = {
   safiraHero: "/villas/safira-hero.jpg",
-  safiraAlt: "/media/safira-alt",
-  destanHero: "/media/destan-hero",
-  destanSuite: "/media/destan-suite",
+  safiraAlt: "/villas/safira-alt.jpg",
+  destanHero: "/villas/destan-hero.jpg",
+  destanSuite: "/villas/destan-suite.jpg",
 } as const;
 
 export default async function PublicHomePage() {
