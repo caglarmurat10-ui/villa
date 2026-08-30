@@ -59,6 +59,7 @@ function safeCronError(value) {
 function publicAssetPath(pathname) {
   return pathname.startsWith("/_next/") ||
     pathname.startsWith("/villas/") ||
+    pathname.startsWith("/media/") ||
     pathname === "/app-icon.svg" ||
     pathname === "/favicon.ico" ||
     pathname === "/robots.txt" ||

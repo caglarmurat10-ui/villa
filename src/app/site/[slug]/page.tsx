@@ -10,8 +10,8 @@ const villas = {
   "villa-safira": {
     villa: "Safira" as Villa,
     name: "Villa Safira",
-    cover: "https://drive.google.com/uc?export=view&id=1JL-isYYwAC7gtdKvIVogGnvZjB_3rXs5",
-    secondary: "https://drive.google.com/uc?export=view&id=1RqmKOcfGBYrSF1ZJHaJhKdN915nmUrlS",
+    cover: "/media/safira-hero",
+    secondary: "/media/safira-alt",
     label: "VILLA 01",
     description: "Patara’nın doğal dokusu içinde, özel alanınızdan vazgeçmeden sakin ve özgür bir Akdeniz tatili.",
     quote: "Günün hiçbir saatinde acele etmeniz gerekmeyen bir yer.",
@@ -19,8 +19,8 @@ const villas = {
   "villa-destan": {
     villa: "Destan" as Villa,
     name: "Villa Destan",
-    cover: "https://drive.google.com/uc?export=view&id=1IipTx5zZfOge9Y1rQJBpW8BK9zBU2tgj",
-    secondary: "https://drive.google.com/uc?export=view&id=1NmKtSAV2d4SUdYZo3qpfTJuROhgRExIH",
+    cover: "/media/destan-hero",
+    secondary: "/media/destan-suite",
     label: "VILLA 02",
     description: "Özel havuzu, geniş yaşam alanları ve güçlü iç mekân detaylarıyla kendi ritminizde bir tatil deneyimi.",
     quote: "Dışarı çıkmak istemeyeceğiniz kadar size ait.",
@@ -50,7 +50,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
   return (
     <main className={styles.page}>
       <section className={`${styles.hero} ${styles.detailHero}`}>
-        <img className={styles.heroImage} src={villa.cover} alt={villa.name} referrerPolicy="no-referrer" />
+        <img className={styles.heroImage} src={villa.cover} alt={villa.name} />
         <div className={styles.heroShade} />
         <nav className={styles.nav} aria-label="Villa menüsü">
           <Link href="/" className={styles.brand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></Link>
@@ -65,8 +65,8 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
       </section>
 
       <section className={styles.gallery} id="galeri">
-        <figure className={styles.galleryMain}><img src={villa.cover} alt={`${villa.name} dış alanı`} referrerPolicy="no-referrer" /></figure>
-        <figure className={styles.gallerySide}><img src={villa.secondary} alt={`${villa.name} yaşam alanı`} referrerPolicy="no-referrer" /></figure>
+        <figure className={styles.galleryMain}><img src={villa.cover} alt={`${villa.name} dış alanı`} /></figure>
+        <figure className={styles.gallerySide}><img src={villa.secondary} alt={`${villa.name} yaşam alanı`} /></figure>
       </section>
 
       <section className={styles.detailFeatures}>
