@@ -44,6 +44,27 @@ export async function listSocialPostMedia(postId: string): Promise<SocialPostMed
   return result.results.map((row) => ({ position: row.position, mediaUrl: row.media_url, kind: row.media_kind }));
 }
 
+export async function listSocialPostMediaBulk(postIds: string[]) {
+  const unique = [...new Set(postIds)].slice(0, 100);
+  const result = new Map<string, SocialPostMediaItem[]>();
+  for (const id of unique) result.set(id, []);
+  if (unique.length === 0) return result;
+
+  const db = await database();
+  await ensure(db);
+  const placeholders = unique.map(() => "?").join(",");
+  const rows = await db.prepare(`SELECT post_id, position, media_url, media_kind
+    FROM social_post_media WHERE post_id IN (${placeholders}) ORDER BY post_id, position ASC`)
+    .bind(...unique)
+    .all<{ post_id: string; position: number; media_url: string; media_kind: SocialMediaKind }>();
+  for (const row of rows.results) {
+    const items = result.get(row.post_id) ?? [];
+    items.push({ position: row.position, mediaUrl: row.media_url, kind: row.media_kind });
+    result.set(row.post_id, items);
+  }
+  return result;
+}
+
 export async function replaceSocialPostMedia(postId: string, items: Array<{ mediaUrl: string; kind: SocialMediaKind }>) {
   const db = await database();
   await ensure(db);
