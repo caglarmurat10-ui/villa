@@ -52,6 +52,10 @@ export function middleware(request: NextRequest) {
     return PUBLIC_API_PATHS.has(pathname) ? NextResponse.next() : notFound();
   }
 
+  if (pathname === "/manifest.webmanifest") {
+    return NextResponse.next();
+  }
+
   const rewritePath = PUBLIC_REWRITES.get(pathname);
   if (rewritePath) {
     const url = request.nextUrl.clone();
