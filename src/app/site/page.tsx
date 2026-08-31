@@ -1,9 +1,37 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import PublicBookingWidget from "@/components/PublicBookingWidget";
 import { listPriceRanges, listReservations } from "@/lib/db";
 import styles from "./site.module.css";
 
 export const dynamic = "force-dynamic";
+
+const ORIGIN = "https://safiradestan.com";
+const SOCIAL_LINKS = [
+  "https://www.instagram.com/villasafirapatara/",
+  "https://www.instagram.com/villadestanpatara/",
+];
+
+export const metadata: Metadata = {
+  title: "Patara Kaş Özel Havuzlu Villa | Villa Safira & Villa Destan",
+  description: "Patara, Kaş'ta Villa Safira ve Villa Destan. Özel havuzlu villa tatili için gerçek fotoğrafları inceleyin, canlı müsaitlik ve fiyat kontrolü yapın, doğrudan rezervasyon talebi gönderin.",
+  alternates: { canonical: ORIGIN },
+  openGraph: {
+    title: "Patara Kaş Özel Havuzlu Villa | Villa Safira & Villa Destan",
+    description: "Patara'da iki özel havuzlu villa; canlı müsaitlik, dönemsel fiyat ve doğrudan rezervasyon.",
+    url: ORIGIN,
+    siteName: "Safira & Destan Villas",
+    locale: "tr_TR",
+    type: "website",
+    images: [{ url: "/villas/safira-hero-20260830.jpg", alt: "Villa Safira Patara Kaş özel havuzlu villa" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Safira & Destan Villas | Patara · Kaş",
+    description: "Özel havuzlu villa, canlı müsaitlik ve doğrudan rezervasyon.",
+    images: ["/villas/safira-hero-20260830.jpg"],
+  },
+};
 
 const MEDIA = {
   safiraHero: "/villas/safira-hero-20260830.jpg",
@@ -12,6 +40,26 @@ const MEDIA = {
   destanSuite: "/villas/destan-suite-20260830.jpg",
 } as const;
 
+const structuredData = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "WebSite",
+      "@id": `${ORIGIN}/#website`,
+      url: ORIGIN,
+      name: "Safira & Destan Villas",
+      inLanguage: "tr-TR",
+    },
+    {
+      "@type": "Organization",
+      "@id": `${ORIGIN}/#organization`,
+      name: "Safira & Destan Villas",
+      url: ORIGIN,
+      sameAs: SOCIAL_LINKS,
+    },
+  ],
+};
+
 export default async function PublicHomePage() {
   const [reservations, prices] = await Promise.all([listReservations(), listPriceRanges()]);
   const bookingReservations = reservations.map(({ villa, checkIn, checkOut }) => ({ villa, checkIn, checkOut }));
@@ -19,8 +67,9 @@ export default async function PublicHomePage() {
 
   return (
     <main className={styles.page}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       <section className={styles.hero}>
-        <img className={styles.heroImage} src={MEDIA.safiraHero} alt="Villa Safira ve özel havuzu" />
+        <img className={styles.heroImage} src={MEDIA.safiraHero} alt="Patara Kaş Villa Safira özel havuzu ve dış yaşam alanı" />
         <div className={styles.heroShade} />
         <nav className={styles.nav} aria-label="Ana menü">
           <Link href="/" className={styles.brand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></Link>
@@ -35,7 +84,7 @@ export default async function PublicHomePage() {
         <div className={styles.heroCopy}>
           <div className={styles.eyebrow}>Patara · Kaş · Antalya</div>
           <h1 className={styles.title}>Akdeniz’de<br />kendinize ait<br />bir yer.</h1>
-          <p className={styles.lead}>Villa Safira ve Villa Destan. Özel havuz, özgürlük ve doğrudan rezervasyon kolaylığıyla Patara’da size ait bir tatil deneyimi.</p>
+          <p className={styles.lead}>Villa Safira ve Villa Destan. Patara, Kaş’ta özel havuzlu villa tatili; özgürlük, mahremiyet ve doğrudan rezervasyon kolaylığıyla size ait bir Akdeniz deneyimi.</p>
           <div className={styles.actions}>
             <a className={styles.primary} href="#musaitlik">Müsaitlik ara</a>
             <a className={styles.secondary} href="#villalar">Villaları keşfet</a>
@@ -52,35 +101,35 @@ export default async function PublicHomePage() {
       </section>
 
       <section className={styles.section} id="villalar">
-        <div className={styles.editorialHead}><span className={styles.kicker}>VİLLALARIMIZ</span><h2>Hangisi sizin<br />tatiliniz?</h2><p>İki villayı da gerçek fotoğraflarıyla keşfedin; size en uygun olanı seçin.</p></div>
+        <div className={styles.editorialHead}><span className={styles.kicker}>PATARA VİLLA KİRALAMA</span><h2>Hangisi sizin<br />tatiliniz?</h2><p>Villa Safira ve Villa Destan’ı gerçek fotoğraflarıyla keşfedin; Patara’da özel havuzlu villa tatili için size en uygun seçeneği bulun.</p></div>
         <div className={styles.villaGrid}>
           <Link className={styles.villaStory} href="/villa-safira">
-            <div className={styles.storyImage}><img src={MEDIA.safiraHero} alt="Villa Safira dış görünüm ve havuz" /><span>Safira&apos;yı keşfet ↗</span></div>
-            <div className={styles.storyMeta}><div><small>VILLA 01</small><h3>Villa Safira</h3></div><p>Doğayla çevrili, ferah ve özel bir villa tatili.</p></div>
+            <div className={styles.storyImage}><img src={MEDIA.safiraHero} alt="Villa Safira Patara Kaş dış görünüm ve özel havuz" /><span>Safira&apos;yı keşfet ↗</span></div>
+            <div className={styles.storyMeta}><div><small>VILLA 01</small><h3>Villa Safira</h3></div><p>Doğayla çevrili, ferah ve özel havuzlu bir Patara villa tatili.</p></div>
           </Link>
           <Link className={`${styles.villaStory} ${styles.storyOffset}`} href="/villa-destan">
-            <div className={styles.storyImage}><img src={MEDIA.destanHero} alt="Villa Destan havuz ve bahçe görünümü" /><span>Destan&apos;ı keşfet ↗</span></div>
-            <div className={styles.storyMeta}><div><small>VILLA 02</small><h3>Villa Destan</h3></div><p>Özel alanları ve güçlü detaylarıyla özgün bir kaçış.</p></div>
+            <div className={styles.storyImage}><img src={MEDIA.destanHero} alt="Villa Destan Patara Kaş özel havuz ve bahçe görünümü" /><span>Destan&apos;ı keşfet ↗</span></div>
+            <div className={styles.storyMeta}><div><small>VILLA 02</small><h3>Villa Destan</h3></div><p>Özel havuzu ve güçlü yaşam alanlarıyla mahremiyet odaklı bir kaçış.</p></div>
           </Link>
         </div>
       </section>
 
       <section className={styles.experience} id="deneyim">
-        <div className={styles.experiencePhoto}><img src={MEDIA.destanSuite} alt="Villa Destan yatak odası ve jakuzi" /></div>
+        <div className={styles.experiencePhoto}><img src={MEDIA.destanSuite} alt="Villa Destan yatak odası, jakuzi ve iç mekân" /></div>
         <div className={styles.experienceCopy}><span className={styles.kicker}>DOĞRUDAN KONAKLAMA</span><h2>Arada kimse yok.<br />Tatiliniz bize emanet.</h2><p>Rezervasyon takvimi, dönemsel fiyatlar ve villa bilgileri aynı yönetim altyapısından gelir. Böylece gördüğünüz bilgiyle bizim gördüğümüz bilgi aynı kalır.</p><div className={styles.points}><div><b>01</b><span>Canlı müsaitlik</span></div><div><b>02</b><span>Doğrudan iletişim</span></div><div><b>03</b><span>Şeffaf fiyat</span></div></div></div>
       </section>
 
       <section className={styles.locationBlock}>
         <span className={styles.kicker}>PATARA · KAŞ</span>
-        <h2>Günün ritmini<br />siz belirleyin.</h2>
-        <p>Sabah havuz başında, gün içinde Akdeniz’in kıyılarında, akşam yeniden kendi alanınızda. Safira & Destan, tatili programdan çıkarıp size bırakmak için var.</p>
+        <h2>Patara’da özel havuzlu<br />villa tatili.</h2>
+        <p>Sabah havuz başında, gün içinde Patara ve Kaş’ın Akdeniz atmosferinde, akşam yeniden tamamen size ait alanda. Safira & Destan; özel havuz, bağımsız yaşam alanı, canlı müsaitlik ve doğrudan rezervasyonu tek yerde buluşturur.</p>
         <a href="#iletisim">Rezervasyon hakkında konuşalım →</a>
       </section>
 
       <footer className={styles.footer} id="iletisim">
         <div className={styles.footerBrand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></div>
-        <div className={styles.footerGrid}><div><small>KONUM</small><p>Patara · Kaş · Antalya</p></div><div><small>REZERVASYON</small><p>Müsaitlik kontrolünü yukarıdaki canlı takvimden yapabilirsiniz.</p></div><div><small>WEB</small><p>safiradestan.com</p></div></div>
-        <div className={styles.footerBottom}>Safira & Destan Villas <span>Akdeniz’de size ait bir tatil.</span></div>
+        <div className={styles.footerGrid}><div><small>KONUM</small><p>Patara · Kaş · Antalya</p></div><div><small>REZERVASYON</small><p>Müsaitlik kontrolünü yukarıdaki canlı takvimden yapabilirsiniz.</p></div><div><small>SOSYAL</small><p><a href="https://www.instagram.com/villasafirapatara/" rel="me noopener noreferrer">Villa Safira Instagram</a><br /><a href="https://www.instagram.com/villadestanpatara/" rel="me noopener noreferrer">Villa Destan Instagram</a></p></div></div>
+        <div className={styles.footerBottom}>Safira & Destan Villas <span>Patara’da size ait bir tatil.</span></div>
       </footer>
     </main>
   );
