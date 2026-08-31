@@ -1,0 +1,137 @@
+import type { Villa } from "./types";
+
+export type VillaSlug = "villa-safira" | "villa-destan";
+
+export interface VillaHighlight {
+  title: string;
+  description: string;
+}
+
+export interface VillaFaq {
+  question: string;
+  answer: string;
+}
+
+export interface VillaGalleryImage {
+  src: string;
+  webp: string;
+  alt: string;
+}
+
+export interface VillaContent {
+  slug: VillaSlug;
+  villa: Villa;
+  name: string;
+  label: string;
+  cover: string;
+  coverAlt: string;
+  secondary: string;
+  secondaryAlt: string;
+  gallery: VillaGalleryImage[];
+  instagram: string;
+  facebook: string;
+  description: string;
+  quote: string;
+  highlights: VillaHighlight[];
+}
+
+// Yalnızca doğrulanmış bilgiler: mevcut yayında olan içerik, D1 (facebook_account_metadata,
+// social_accounts) ve işletme sahibinin bildirdiği gerçek fotoğraf envanteri temel alınmıştır.
+// Yatak/banyo sayısı, maksimum kapasite, check-in/out saatleri gibi doğrulanmamış özellikler
+// eklenmemiştir — bkz. C:\villa-agent-state\remaining.md.
+export const VILLAS: Record<VillaSlug, VillaContent> = {
+  "villa-safira": {
+    slug: "villa-safira",
+    villa: "Safira",
+    name: "Villa Safira",
+    label: "VILLA 01",
+    cover: "/villas/safira-hero-20260830.jpg",
+    coverAlt: "Villa Safira Patara Kaş dış görünüm ve özel havuz",
+    secondary: "/villas/safira-alt-20260830.jpg",
+    secondaryAlt: "Villa Safira yaşam alanı ve villa detayları",
+    gallery: [
+      { src: "/villas/gallery/safira/safira-havuz-genel-manzara.jpg", webp: "/villas/gallery/safira/safira-havuz-genel-manzara.webp", alt: "Villa Safira özel havuz ve genel dış görünüm" },
+      { src: "/villas/gallery/safira/safira-havuz-kusbakisi.jpg", webp: "/villas/gallery/safira/safira-havuz-kusbakisi.webp", alt: "Villa Safira kuşbakışı genel görünüm" },
+      { src: "/villas/gallery/safira/safira-havuz-doga.jpg", webp: "/villas/gallery/safira/safira-havuz-doga.webp", alt: "Villa Safira havuz ve doğa manzarası" },
+      { src: "/villas/gallery/safira/safira-havuz-genis-aci.jpg", webp: "/villas/gallery/safira/safira-havuz-genis-aci.webp", alt: "Villa Safira havuz geniş açı görünüm" },
+      { src: "/villas/gallery/safira/safira-havuz-aktivite.jpg", webp: "/villas/gallery/safira/safira-havuz-aktivite.webp", alt: "Villa Safira havuz başı aktivite" },
+      { src: "/villas/gallery/safira/safira-salon-yemek.jpg", webp: "/villas/gallery/safira/safira-salon-yemek.webp", alt: "Villa Safira salon ve yemek alanı" },
+      { src: "/villas/gallery/safira/safira-yatak-odasi.jpg", webp: "/villas/gallery/safira/safira-yatak-odasi.webp", alt: "Villa Safira yatak odası" },
+      { src: "/villas/gallery/safira/safira-jakuzili-oda.jpg", webp: "/villas/gallery/safira/safira-jakuzili-oda.webp", alt: "Villa Safira jakuzili oda" },
+      { src: "/villas/gallery/safira/safira-cocuk-oyun-alani.jpg", webp: "/villas/gallery/safira/safira-cocuk-oyun-alani.webp", alt: "Villa Safira bahçe ve çocuk oyun alanı" },
+      { src: "/villas/gallery/safira/safira-bbq-havuz.jpg", webp: "/villas/gallery/safira/safira-bbq-havuz.webp", alt: "Villa Safira BBQ ve havuz alanı" },
+      { src: "/villas/gallery/safira/safira-havuzbasi.jpg", webp: "/villas/gallery/safira/safira-havuzbasi.webp", alt: "Villa Safira havuz başı yaşam alanı" },
+    ],
+    instagram: "https://www.instagram.com/villasafirapatara/",
+    facebook: "https://www.facebook.com/105073114600720",
+    description: "Patara’nın doğal dokusu içinde, özel havuzunuzdan ve bağımsız yaşam alanınızdan vazgeçmeden sakin ve özgür bir Akdeniz tatili.",
+    quote: "Günün hiçbir saatinde acele etmeniz gerekmeyen bir yer.",
+    highlights: [
+      { title: "Özel havuz", description: "Villaya özel, doğayla çevrili havuz alanı." },
+      { title: "Bahçe ve çocuk oyun alanı", description: "Yeşillik içinde açık hava yaşam alanı ve çocuklar için oyun köşesi." },
+      { title: "BBQ alanı", description: "Havuz kenarında açık hava yemek / BBQ imkânı." },
+      { title: "Jakuzili oda", description: "Konaklama alanlarından birinde jakuzi bulunur." },
+      { title: "Salon ve yemek alanı", description: "Geniş, ferah bir iç mekân yaşam alanı." },
+    ],
+  },
+  "villa-destan": {
+    slug: "villa-destan",
+    villa: "Destan",
+    name: "Villa Destan",
+    label: "VILLA 02",
+    cover: "/villas/destan-hero-20260830.jpg",
+    coverAlt: "Villa Destan Patara Kaş özel havuz ve bahçe görünümü",
+    secondary: "/villas/destan-suite-20260830.jpg",
+    secondaryAlt: "Villa Destan yatak odası, jakuzi ve iç mekân",
+    gallery: [
+      { src: "/villas/gallery/destan/destan-drone-genel-gorunum.jpg", webp: "/villas/gallery/destan/destan-drone-genel-gorunum.webp", alt: "Villa Destan kuşbakışı drone görünümü" },
+      { src: "/villas/gallery/destan/destan-aksam-havuz.jpg", webp: "/villas/gallery/destan/destan-aksam-havuz.webp", alt: "Villa Destan akşam dış görünüm ve havuz" },
+      { src: "/villas/gallery/destan/destan-gece-havuz.jpg", webp: "/villas/gallery/destan/destan-gece-havuz.webp", alt: "Villa Destan gece havuz ambiyansı" },
+      { src: "/villas/gallery/destan/destan-salon-yemek.jpg", webp: "/villas/gallery/destan/destan-salon-yemek.webp", alt: "Villa Destan salon ve yemek alanı" },
+      { src: "/villas/gallery/destan/destan-jakuzili-yatak-odasi.jpg", webp: "/villas/gallery/destan/destan-jakuzili-yatak-odasi.webp", alt: "Villa Destan jakuzili yatak odası" },
+      { src: "/villas/gallery/destan/destan-havuzbasi.jpg", webp: "/villas/gallery/destan/destan-havuzbasi.webp", alt: "Villa Destan havuz başı yaşam alanı" },
+      { src: "/villas/gallery/destan/destan-bahce-dinlenme.jpg", webp: "/villas/gallery/destan/destan-bahce-dinlenme.webp", alt: "Villa Destan bahçe ve dinlenme alanı" },
+    ],
+    instagram: "https://www.instagram.com/villadestanpatara/",
+    facebook: "https://www.facebook.com/1309122082284129",
+    description: "Patara, Kaş’ta özel havuzu, geniş yaşam alanları ve güçlü iç mekân detaylarıyla kendi ritminizde, mahremiyet odaklı bir villa tatili.",
+    quote: "Dışarı çıkmak istemeyeceğiniz kadar size ait.",
+    highlights: [
+      { title: "Özel havuz", description: "Gündüz ve akşam kullanıma açık özel havuz." },
+      { title: "Bahçe", description: "Dinlenme için ayrılmış açık hava alanı." },
+      { title: "Jakuzili yatak odası", description: "Konaklama alanlarından birinde jakuzi bulunur." },
+      { title: "Salon ve yemek alanı", description: "Geniş iç mekân oturma ve yemek alanı." },
+      { title: "Kuşbakışı / drone görünüm", description: "Villanın genel yerleşimi havadan da belgelenmiştir." },
+    ],
+  },
+};
+
+export const FAQ_ITEMS: VillaFaq[] = [
+  {
+    question: "Rezervasyon nasıl işliyor?",
+    answer: "Sitede seçtiğiniz tarihler doğrudan yönetim sistemimizdeki gerçek rezervasyon takvimiyle karşılaştırılır. Müsaitse rezervasyon talebi gönderirsiniz, ekibimiz en kısa sürede sizinle iletişime geçer.",
+  },
+  {
+    question: "Talep gönderince rezervasyon kesinleşmiş olur mu?",
+    answer: "Hayır. Web sitesinden gönderilen talep bir ön talep kaydıdır; ekibimiz sizinle iletişime geçip detayları teyit ettikten sonra rezervasyon kesinleşir.",
+  },
+  {
+    question: "Sitede online ödeme alınıyor mu?",
+    answer: "Hayır, rezervasyon talebi aşamasında herhangi bir ödeme alınmaz. Ödeme ve depozito detayları ekibimizle doğrudan görüşülür.",
+  },
+  {
+    question: "Fiyata neler dahil?",
+    answer: "Gösterilen tutar, seçtiğiniz tarihler için sistemdeki dönemsel gecelik fiyatlardan hesaplanan toplam konaklama bedelidir. Bazı dönemler için fiyat henüz tanımlı değilse bu durum sonuçta belirtilir ve ekibimiz sizinle teyitleşir.",
+  },
+  {
+    question: "İki villa arasındaki fark nedir?",
+    answer: "Villa Safira ve Villa Destan, Patara/Kaş bölgesinde ayrı iki özel havuzlu villadır; her birinin kendine özgü yaşam alanı ve karakteri vardır. Detayları ilgili villa sayfasında inceleyebilirsiniz.",
+  },
+];
+
+export const REGION_INFO = {
+  kicker: "PATARA · KAŞ · ANTALYA",
+  title: "Patara’da özel havuzlu villa tatili.",
+  body: "Villa Safira ve Villa Destan, Antalya’nın Kaş ilçesine bağlı Patara bölgesinde yer alır. Patara; uzun kumsalı, antik kenti ve Likya kültürüyle bilinen, Kaş merkezine yakın bir tatil bölgesidir. Bölgeye ulaşım genellikle Dalaman veya Antalya havalimanları üzerinden sağlanır.",
+  note: "Gizlilik nedeniyle villaların tam adresi bu sayfada paylaşılmaz. Rezervasyon talebiniz onaylandığında konum ve ulaşım bilgileri doğrudan sizinle paylaşılır.",
+};

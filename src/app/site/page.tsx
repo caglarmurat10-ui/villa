@@ -2,14 +2,17 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PublicBookingWidget from "@/components/PublicBookingWidget";
 import { listPriceRanges, listReservations } from "@/lib/db";
+import { VILLAS, FAQ_ITEMS, REGION_INFO } from "@/lib/villa-content";
 import styles from "./site.module.css";
 
 export const dynamic = "force-dynamic";
 
 const ORIGIN = "https://safiradestan.com";
 const SOCIAL_LINKS = [
-  "https://www.instagram.com/villasafirapatara/",
-  "https://www.instagram.com/villadestanpatara/",
+  VILLAS["villa-safira"].instagram,
+  VILLAS["villa-destan"].instagram,
+  VILLAS["villa-safira"].facebook,
+  VILLAS["villa-destan"].facebook,
 ];
 
 export const metadata: Metadata = {
@@ -34,10 +37,10 @@ export const metadata: Metadata = {
 };
 
 const MEDIA = {
-  safiraHero: "/villas/safira-hero-20260830.jpg",
-  safiraAlt: "/villas/safira-alt-20260830.jpg",
-  destanHero: "/villas/destan-hero-20260830.jpg",
-  destanSuite: "/villas/destan-suite-20260830.jpg",
+  safiraHero: VILLAS["villa-safira"].cover,
+  safiraAlt: VILLAS["villa-safira"].secondary,
+  destanHero: VILLAS["villa-destan"].cover,
+  destanSuite: VILLAS["villa-destan"].secondary,
 } as const;
 
 const structuredData = {
@@ -77,6 +80,7 @@ export default async function PublicHomePage() {
             <a href="#villalar">Villalar</a>
             <a href="#musaitlik">Müsaitlik</a>
             <a href="#deneyim">Deneyim</a>
+            <a href="#sss">SSS</a>
             <a href="#iletisim" className={styles.cta}>İletişim</a>
           </div>
         </nav>
@@ -104,31 +108,54 @@ export default async function PublicHomePage() {
         <div className={styles.editorialHead}><span className={styles.kicker}>PATARA VİLLA KİRALAMA</span><h2>Hangisi sizin<br />tatiliniz?</h2><p>Villa Safira ve Villa Destan’ı gerçek fotoğraflarıyla keşfedin; Patara’da özel havuzlu villa tatili için size en uygun seçeneği bulun.</p></div>
         <div className={styles.villaGrid}>
           <Link className={styles.villaStory} href="/villa-safira">
-            <div className={styles.storyImage}><img src={MEDIA.safiraHero} alt="Villa Safira Patara Kaş dış görünüm ve özel havuz" /><span>Safira&apos;yı keşfet ↗</span></div>
+            <div className={styles.storyImage}><img src={MEDIA.safiraHero} alt="Villa Safira Patara Kaş dış görünüm ve özel havuz" loading="lazy" /><span>Safira&apos;yı keşfet ↗</span></div>
             <div className={styles.storyMeta}><div><small>VILLA 01</small><h3>Villa Safira</h3></div><p>Doğayla çevrili, ferah ve özel havuzlu bir Patara villa tatili.</p></div>
           </Link>
           <Link className={`${styles.villaStory} ${styles.storyOffset}`} href="/villa-destan">
-            <div className={styles.storyImage}><img src={MEDIA.destanHero} alt="Villa Destan Patara Kaş özel havuz ve bahçe görünümü" /><span>Destan&apos;ı keşfet ↗</span></div>
+            <div className={styles.storyImage}><img src={MEDIA.destanHero} alt="Villa Destan Patara Kaş özel havuz ve bahçe görünümü" loading="lazy" /><span>Destan&apos;ı keşfet ↗</span></div>
             <div className={styles.storyMeta}><div><small>VILLA 02</small><h3>Villa Destan</h3></div><p>Özel havuzu ve güçlü yaşam alanlarıyla mahremiyet odaklı bir kaçış.</p></div>
           </Link>
         </div>
       </section>
 
       <section className={styles.experience} id="deneyim">
-        <div className={styles.experiencePhoto}><img src={MEDIA.destanSuite} alt="Villa Destan yatak odası, jakuzi ve iç mekân" /></div>
+        <div className={styles.experiencePhoto}><img src={MEDIA.destanSuite} alt="Villa Destan yatak odası, jakuzi ve iç mekân" loading="lazy" /></div>
         <div className={styles.experienceCopy}><span className={styles.kicker}>DOĞRUDAN KONAKLAMA</span><h2>Arada kimse yok.<br />Tatiliniz bize emanet.</h2><p>Rezervasyon takvimi, dönemsel fiyatlar ve villa bilgileri aynı yönetim altyapısından gelir. Böylece gördüğünüz bilgiyle bizim gördüğümüz bilgi aynı kalır.</p><div className={styles.points}><div><b>01</b><span>Canlı müsaitlik</span></div><div><b>02</b><span>Doğrudan iletişim</span></div><div><b>03</b><span>Şeffaf fiyat</span></div></div></div>
       </section>
 
       <section className={styles.locationBlock}>
-        <span className={styles.kicker}>PATARA · KAŞ</span>
-        <h2>Patara’da özel havuzlu<br />villa tatili.</h2>
-        <p>Sabah havuz başında, gün içinde Patara ve Kaş’ın Akdeniz atmosferinde, akşam yeniden tamamen size ait alanda. Safira & Destan; özel havuz, bağımsız yaşam alanı, canlı müsaitlik ve doğrudan rezervasyonu tek yerde buluşturur.</p>
+        <span className={styles.kicker}>{REGION_INFO.kicker}</span>
+        <h2>{REGION_INFO.title}</h2>
+        <p>{REGION_INFO.body}</p>
         <a href="#iletisim">Rezervasyon hakkında konuşalım →</a>
+      </section>
+
+      <section className={styles.faq} id="sss">
+        <span className={styles.kicker}>SIK SORULAN SORULAR</span>
+        <h2>Merak edilenler</h2>
+        {FAQ_ITEMS.map((item) => (
+          <details className={styles.faqItem} key={item.question}>
+            <summary>{item.question}</summary>
+            <p>{item.answer}</p>
+          </details>
+        ))}
       </section>
 
       <footer className={styles.footer} id="iletisim">
         <div className={styles.footerBrand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></div>
-        <div className={styles.footerGrid}><div><small>KONUM</small><p>Patara · Kaş · Antalya</p></div><div><small>REZERVASYON</small><p>Müsaitlik kontrolünü yukarıdaki canlı takvimden yapabilirsiniz.</p></div><div><small>SOSYAL</small><p><a href="https://www.instagram.com/villasafirapatara/" rel="me noopener noreferrer">Villa Safira Instagram</a><br /><a href="https://www.instagram.com/villadestanpatara/" rel="me noopener noreferrer">Villa Destan Instagram</a></p></div></div>
+        <div className={styles.footerGrid}>
+          <div><small>KONUM</small><p>Patara · Kaş · Antalya</p></div>
+          <div><small>REZERVASYON</small><p>Müsaitlik kontrolünü yukarıdaki canlı takvimden yapabilirsiniz.</p></div>
+          <div>
+            <small>SOSYAL</small>
+            <p>
+              <a href={VILLAS["villa-safira"].instagram} rel="me noopener noreferrer">Villa Safira Instagram</a><br />
+              <a href={VILLAS["villa-safira"].facebook} rel="me noopener noreferrer">Villa Safira Facebook</a><br />
+              <a href={VILLAS["villa-destan"].instagram} rel="me noopener noreferrer">Villa Destan Instagram</a><br />
+              <a href={VILLAS["villa-destan"].facebook} rel="me noopener noreferrer">Villa Destan Facebook</a>
+            </p>
+          </div>
+        </div>
         <div className={styles.footerBottom}>Safira & Destan Villas <span>Patara’da size ait bir tatil.</span></div>
       </footer>
     </main>

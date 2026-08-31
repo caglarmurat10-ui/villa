@@ -541,6 +541,84 @@
   line-height: .93;
 }
 
+.socialRow { display: flex; gap: 22px; flex-wrap: wrap; justify-content: center; }
+
+.highlights {
+  width: min(90vw, 1300px);
+  margin: auto;
+  padding: 0 0 116px;
+}
+.highlights .kicker { color: #6b6459; margin-bottom: 20px; }
+.highlights h2 {
+  margin: 0 0 44px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: clamp(40px, 4.4vw, 58px);
+  line-height: 1;
+  letter-spacing: -.03em;
+}
+.highlightGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+}
+.highlightCard {
+  padding-top: 16px;
+  border-top: 1px solid #bfb5a6;
+}
+.highlightCard h3 {
+  margin: 0 0 8px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 21px;
+  font-weight: 400;
+}
+.highlightCard p { margin: 0; font-size: 14px; line-height: 1.6; color: #665f55; }
+
+.faq {
+  width: min(84vw, 980px);
+  margin: auto;
+  padding: 0 0 122px;
+}
+.faq .kicker { color: #6b6459; margin-bottom: 20px; text-align: center; display: block; }
+.faq h2 {
+  margin: 0 0 44px;
+  text-align: center;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: clamp(40px, 4.4vw, 58px);
+}
+.faqItem {
+  border-top: 1px solid #bfb5a6;
+  padding: 22px 0;
+}
+.faqItem:last-child { border-bottom: 1px solid #bfb5a6; }
+.faqItem summary {
+  cursor: pointer;
+  list-style: none;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 19px;
+}
+.faqItem summary::-webkit-details-marker { display: none; }
+.faqItem summary::after {
+  content: '+';
+  font-size: 22px;
+  color: var(--gold);
+  transition: transform .2s ease;
+  flex-shrink: 0;
+}
+.faqItem[open] summary::after { transform: rotate(45deg); }
+.faqItem p {
+  margin: 16px 0 0;
+  font-size: 14px;
+  line-height: 1.72;
+  color: #665f55;
+  max-width: 720px;
+}
+
 @media (max-width: 900px) {
   .nav { width: calc(100% - 44px); padding: 21px 0; }
   .navlinks { gap: 0; }
@@ -592,6 +670,13 @@
   .gallerySide { margin-top: 0 !important; aspect-ratio: 1.2; }
 
   .detailFeatures { width: calc(100% - 44px); grid-template-columns: 1fr; padding-bottom: 86px; gap: 34px; }
+
+  .highlights { width: calc(100% - 44px); padding-bottom: 86px; }
+  .highlightGrid { grid-template-columns: 1fr; gap: 26px; }
+
+  .faq { width: calc(100% - 44px); padding-bottom: 86px; }
+  .faq h2 { font-size: clamp(38px, 10vw, 52px); }
+  .faqItem summary { font-size: 17px; }
 }
 
 @media (max-width: 520px) {
