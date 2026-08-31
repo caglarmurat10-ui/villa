@@ -26,6 +26,7 @@ const TRANSITION_PATHS = new Set([
 const ADMIN_LOGIN_PATH = "/login";
 const ADMIN_LOGIN_API = "/api/auth/login";
 const ADMIN_LOGOUT_API = "/api/auth/logout";
+const ADMIN_CHANGE_PASSWORD_API = "/api/auth/change-password";
 const ADMIN_PUBLIC_PATHS = new Set([
   ADMIN_LOGIN_PATH,
   "/api/health",
@@ -37,6 +38,14 @@ const ADMIN_SESSION_COOKIE = "__Host-villa_admin_session";
 const ADMIN_SESSION_TTL_SECONDS = 12 * 60 * 60;
 const ADMIN_MIN_PASSWORD_LENGTH = 12;
 const ADMIN_MIN_SESSION_SECRET_LENGTH = 32;
+const ADMIN_MIN_NEW_PASSWORD_LENGTH = 14;
+const ADMIN_MAX_NEW_PASSWORD_LENGTH = 256;
+const ADMIN_PBKDF2_ITERATIONS = 210000;
+const ADMIN_PBKDF2_HASH_BITS = 256;
+const ADMIN_BOOTSTRAP_CREDENTIAL_VERSION = 0;
+const ADMIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const ADMIN_RATE_LIMIT_MAX_FAILURES = 5;
+const ADMIN_RATE_LIMIT_DELAY_MS = 350;
 const TEXT_ENCODER = new TextEncoder();
 const TEXT_DECODER = new TextDecoder();
 
@@ -168,12 +177,13 @@ async function hmacKey(secret, usages) {
   );
 }
 
-async function createAdminSession(secret) {
+async function createAdminSession(secret, credentialVersion) {
   const now = Math.floor(Date.now() / 1000);
   const payload = base64UrlEncode(TEXT_ENCODER.encode(JSON.stringify({
     v: 1,
     iat: now,
     exp: now + ADMIN_SESSION_TTL_SECONDS,
+    cv: credentialVersion,
   })));
   const key = await hmacKey(secret, ["sign"]);
   const signature = await crypto.subtle.sign("HMAC", key, TEXT_ENCODER.encode(payload));
@@ -191,7 +201,8 @@ function cookieValue(request, name) {
   return "";
 }
 
-async function verifyAdminSession(request, secret) {
+async function verifyAdminSession(request, env) {
+  const secret = env.ADMIN_SESSION_SECRET;
   if (typeof secret !== "string" || secret.length < ADMIN_MIN_SESSION_SECRET_LENGTH) return false;
   const token = cookieValue(request, ADMIN_SESSION_COOKIE);
   const [payload, signature, extra] = token.split(".");
@@ -209,11 +220,16 @@ async function verifyAdminSession(request, secret) {
 
     const data = JSON.parse(TEXT_DECODER.decode(base64UrlDecode(payload)));
     const now = Math.floor(Date.now() / 1000);
-    return data?.v === 1 &&
+    const structurallyValid = data?.v === 1 &&
       Number.isInteger(data.iat) &&
       Number.isInteger(data.exp) &&
       data.iat <= now + 60 &&
-      data.exp > now;
+      data.exp > now &&
+      Number.isInteger(data.cv);
+    if (!structurallyValid) return false;
+
+    const credential = await getAdminCredential(env);
+    return data.cv === credential.credentialVersion;
   } catch {
     return false;
   }
@@ -232,11 +248,91 @@ async function safePasswordMatch(provided, expected) {
   return difference === 0;
 }
 
+function constantTimeBytesEqual(a, b) {
+  if (a.length !== b.length) return false;
+  let difference = 0;
+  for (let index = 0; index < a.length; index += 1) difference |= a[index] ^ b[index];
+  return difference === 0;
+}
+
+async function pbkdf2DeriveBits(password, saltBytes, iterations) {
+  const keyMaterial = await crypto.subtle.importKey("raw", TEXT_ENCODER.encode(password), "PBKDF2", false, ["deriveBits"]);
+  const derived = await crypto.subtle.deriveBits(
+    { name: "PBKDF2", hash: "SHA-256", salt: saltBytes, iterations },
+    keyMaterial,
+    ADMIN_PBKDF2_HASH_BITS,
+  );
+  return new Uint8Array(derived);
+}
+
+async function hashNewPassword(password) {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const hash = await pbkdf2DeriveBits(password, salt, ADMIN_PBKDF2_ITERATIONS);
+  return {
+    hash: base64UrlEncode(hash),
+    salt: base64UrlEncode(salt),
+    iterations: ADMIN_PBKDF2_ITERATIONS,
+  };
+}
+
+async function verifyPasswordAgainstHash(password, saltB64, hashB64, iterations) {
+  try {
+    const salt = base64UrlDecode(saltB64);
+    const expected = base64UrlDecode(hashB64);
+    const computed = await pbkdf2DeriveBits(password, salt, iterations);
+    return constantTimeBytesEqual(computed, expected);
+  } catch {
+    return false;
+  }
+}
+
 function adminAuthConfigured(env) {
   return typeof env.ADMIN_PASSWORD === "string" &&
     env.ADMIN_PASSWORD.length >= ADMIN_MIN_PASSWORD_LENGTH &&
     typeof env.ADMIN_SESSION_SECRET === "string" &&
     env.ADMIN_SESSION_SECRET.length >= ADMIN_MIN_SESSION_SECRET_LENGTH;
+}
+
+async function getAdminCredential(env) {
+  const row = await env.DB.prepare(
+    "SELECT password_hash, password_salt, password_iterations, credential_version FROM admin_auth_state WHERE id = 1",
+  ).first();
+
+  if (row) {
+    return {
+      kind: "d1",
+      credentialVersion: row.credential_version,
+      verify: (password) => verifyPasswordAgainstHash(password, row.password_salt, row.password_hash, row.password_iterations),
+    };
+  }
+
+  return {
+    kind: "bootstrap",
+    credentialVersion: ADMIN_BOOTSTRAP_CREDENTIAL_VERSION,
+    verify: (password) => safePasswordMatch(password, env.ADMIN_PASSWORD),
+  };
+}
+
+function clientIp(request) {
+  return request.headers.get("cf-connecting-ip") || "unknown";
+}
+
+async function isAuthRateLimited(env, ip, scope) {
+  const since = new Date(Date.now() - ADMIN_RATE_LIMIT_WINDOW_MS).toISOString();
+  const row = await env.DB.prepare(
+    "SELECT COUNT(*) as cnt FROM audit_log WHERE entity_id = ? AND action = ? AND created_at >= ?",
+  ).bind(ip, `${scope}_FAILED`, since).first();
+  return (row?.cnt ?? 0) >= ADMIN_RATE_LIMIT_MAX_FAILURES;
+}
+
+async function recordAuthFailure(env, ip, scope) {
+  await env.DB.prepare(
+    "INSERT INTO audit_log (entity_id, action, payload, created_at) VALUES (?, ?, '{}', ?)",
+  ).bind(ip, `${scope}_FAILED`, new Date().toISOString()).run();
+}
+
+function authDelay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function handleAdminLogin(request, env) {
@@ -248,18 +344,28 @@ async function handleAdminLogin(request, env) {
     return jsonResponse({ error: "Yönetim girişi geçici olarak kullanılamıyor." }, 503);
   }
 
+  const ip = clientIp(request);
+  if (await isAuthRateLimited(env, ip, "LOGIN")) {
+    return jsonResponse({ error: "Çok fazla başarısız deneme. Lütfen birkaç dakika sonra tekrar deneyin." }, 429);
+  }
+
   const payload = await request.json().catch(() => null);
   const password = typeof payload?.password === "string" ? payload.password : "";
   if (password.length < ADMIN_MIN_PASSWORD_LENGTH || password.length > 256) {
+    await recordAuthFailure(env, ip, "LOGIN");
+    await authDelay(ADMIN_RATE_LIMIT_DELAY_MS);
     return jsonResponse({ error: "Parola hatalı." }, 401);
   }
 
-  const matches = await safePasswordMatch(password, env.ADMIN_PASSWORD);
+  const credential = await getAdminCredential(env);
+  const matches = await credential.verify(password);
   if (!matches) {
+    await recordAuthFailure(env, ip, "LOGIN");
+    await authDelay(ADMIN_RATE_LIMIT_DELAY_MS);
     return jsonResponse({ error: "Parola hatalı." }, 401);
   }
 
-  const session = await createAdminSession(env.ADMIN_SESSION_SECRET);
+  const session = await createAdminSession(env.ADMIN_SESSION_SECRET, credential.credentialVersion);
   return jsonResponse(
     { ok: true, expiresIn: ADMIN_SESSION_TTL_SECONDS },
     200,
@@ -282,15 +388,91 @@ function handleAdminLogout(request) {
   );
 }
 
+function isAllowedAdminOrigin(request) {
+  const origin = request.headers.get("origin");
+  return origin === ADMIN_ORIGIN;
+}
+
+async function handleChangePassword(request, env) {
+  if (request.method !== "POST") {
+    return jsonResponse({ error: "Method Not Allowed" }, 405, { Allow: "POST" });
+  }
+  if (!isAllowedAdminOrigin(request)) {
+    return jsonResponse({ error: "Geçersiz istek kaynağı." }, 403);
+  }
+  if (!adminAuthConfigured(env)) {
+    console.error("[Admin Auth] Required secrets are missing or too short.");
+    return jsonResponse({ error: "Yönetim girişi geçici olarak kullanılamıyor." }, 503);
+  }
+
+  const authenticated = await verifyAdminSession(request, env);
+  if (!authenticated) {
+    return jsonResponse({ error: "Yönetim oturumu gerekli." }, 401);
+  }
+
+  const ip = clientIp(request);
+  if (await isAuthRateLimited(env, ip, "CHANGE_PASSWORD")) {
+    return jsonResponse({ error: "Çok fazla deneme. Lütfen birkaç dakika sonra tekrar deneyin." }, 429);
+  }
+
+  const payload = await request.json().catch(() => null);
+  const currentPassword = typeof payload?.currentPassword === "string" ? payload.currentPassword : "";
+  const newPassword = typeof payload?.newPassword === "string" ? payload.newPassword : "";
+
+  const credential = await getAdminCredential(env);
+  const currentValid = currentPassword.length > 0 && await credential.verify(currentPassword);
+  if (!currentValid) {
+    await recordAuthFailure(env, ip, "CHANGE_PASSWORD");
+    await authDelay(ADMIN_RATE_LIMIT_DELAY_MS);
+    return jsonResponse({ error: "Mevcut parola hatalı." }, 401);
+  }
+
+  if (newPassword.length < ADMIN_MIN_NEW_PASSWORD_LENGTH || newPassword.length > ADMIN_MAX_NEW_PASSWORD_LENGTH) {
+    return jsonResponse({ error: `Yeni parola ${ADMIN_MIN_NEW_PASSWORD_LENGTH}-${ADMIN_MAX_NEW_PASSWORD_LENGTH} karakter arasında olmalı.` }, 400);
+  }
+
+  if (await credential.verify(newPassword)) {
+    return jsonResponse({ error: "Yeni parola mevcut parolayla aynı olamaz." }, 400);
+  }
+
+  const { hash, salt, iterations } = await hashNewPassword(newPassword);
+  const now = new Date().toISOString();
+  const nextVersion = credential.credentialVersion + 1;
+
+  await env.DB.batch([
+    env.DB.prepare(`INSERT INTO admin_auth_state (id, password_hash, password_salt, password_iterations, credential_version, updated_at)
+      VALUES (1, ?, ?, ?, ?, ?)
+      ON CONFLICT(id) DO UPDATE SET
+        password_hash = excluded.password_hash,
+        password_salt = excluded.password_salt,
+        password_iterations = excluded.password_iterations,
+        credential_version = excluded.credential_version,
+        updated_at = excluded.updated_at`)
+      .bind(hash, salt, iterations, nextVersion, now),
+    env.DB.prepare("INSERT INTO audit_log (entity_id, action, payload, created_at) VALUES ('admin', 'ADMIN_PASSWORD_CHANGED', ?, ?)")
+      .bind(JSON.stringify({ credentialVersion: nextVersion }), now),
+  ]);
+
+  const session = await createAdminSession(env.ADMIN_SESSION_SECRET, nextVersion);
+  return jsonResponse(
+    { ok: true },
+    200,
+    {
+      "Set-Cookie": `${ADMIN_SESSION_COOKIE}=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${ADMIN_SESSION_TTL_SECONDS}`,
+    },
+  );
+}
+
 async function adminAuthGate(request, env) {
   const url = new URL(request.url);
   if (url.hostname.toLowerCase() !== ADMIN_HOST) return null;
 
   if (url.pathname === ADMIN_LOGIN_API) return handleAdminLogin(request, env);
   if (url.pathname === ADMIN_LOGOUT_API) return handleAdminLogout(request);
+  if (url.pathname === ADMIN_CHANGE_PASSWORD_API) return handleChangePassword(request, env);
   if (adminPublicAssetPath(url.pathname) || ADMIN_PUBLIC_PATHS.has(url.pathname)) return null;
 
-  const authenticated = await verifyAdminSession(request, env.ADMIN_SESSION_SECRET);
+  const authenticated = await verifyAdminSession(request, env);
   if (url.pathname === ADMIN_LOGIN_PATH) {
     return authenticated ? Response.redirect(new URL("/", url).toString(), 303) : null;
   }
