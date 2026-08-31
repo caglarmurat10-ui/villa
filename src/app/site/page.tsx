@@ -73,7 +73,7 @@ export default async function PublicHomePage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       <a href="#ana-icerik" className={styles.skipLink}>İçeriğe atla</a>
       <section className={styles.hero}>
-        <img className={styles.heroImage} src={MEDIA.safiraHero} alt="Patara Kaş Villa Safira özel havuzu ve dış yaşam alanı" />
+        <img className={styles.heroImage} src={MEDIA.safiraHero} alt="Patara Kaş Villa Safira özel havuzu ve dış yaşam alanı" fetchPriority="high" />
         <div className={styles.heroShade} />
         <nav className={styles.nav} aria-label="Ana menü">
           <Link href="/" className={styles.brand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></Link>

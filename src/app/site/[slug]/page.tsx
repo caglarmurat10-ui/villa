@@ -89,7 +89,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       <a href="#ana-icerik" className={styles.skipLink}>İçeriğe atla</a>
       <section className={`${styles.hero} ${styles.detailHero}`}>
-        <img className={styles.heroImage} src={villa.cover} alt={villa.coverAlt} />
+        <img className={styles.heroImage} src={villa.cover} alt={villa.coverAlt} fetchPriority="high" />
         <div className={styles.heroShade} />
         <nav className={styles.nav} aria-label="Villa menüsü">
           <Link href="/" className={styles.brand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></Link>
@@ -142,7 +142,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
         <span className={styles.kicker}>{REGION_INFO.kicker}</span>
         <h2>{REGION_INFO.title}</h2>
         <p>{REGION_INFO.body}</p>
-        <p style={{ fontSize: 13, opacity: .8 }}>{REGION_INFO.note}</p>
+        <p style={{ fontSize: 13 }}>{REGION_INFO.note}</p>
       </section>
 
       <section className={styles.faq} id="sss">

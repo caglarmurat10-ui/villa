@@ -95,7 +95,8 @@ function publicAssetPath(pathname) {
     pathname === "/app-icon-512.png" ||
     pathname === "/favicon.ico" ||
     pathname === "/robots.txt" ||
-    pathname === "/sitemap.xml";
+    pathname === "/sitemap.xml" ||
+    pathname === "/manifest.webmanifest";
 }
 
 function adminPublicAssetPath(pathname) {
