@@ -87,6 +87,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
   return (
     <main className={styles.page}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+      <a href="#ana-icerik" className={styles.skipLink}>İçeriğe atla</a>
       <section className={`${styles.hero} ${styles.detailHero}`}>
         <img className={styles.heroImage} src={villa.cover} alt={villa.coverAlt} />
         <div className={styles.heroShade} />
@@ -94,7 +95,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
           <Link href="/" className={styles.brand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></Link>
           <div className={styles.navlinks}><Link href="/">Ana sayfa</Link><a href="#galeri">Villa</a><a href="#sss">SSS</a><a className={styles.cta} href="#rezervasyon">Müsaitlik</a></div>
         </nav>
-        <div className={styles.detailHeroCopy}><span className={styles.eyebrow}>{villa.label} · PATARA · KAŞ</span><h1 className={styles.title}>{villa.name}</h1><p className={styles.lead}>{villa.description}</p><a className={styles.primary} href="#rezervasyon">Tarih kontrol et</a></div>
+        <div className={styles.detailHeroCopy} id="ana-icerik" tabIndex={-1}><span className={styles.eyebrow}>{villa.label} · PATARA · KAŞ</span><h1 className={styles.title}>{villa.name}</h1><p className={styles.lead}>{villa.description}</p><a className={styles.primary} href="#rezervasyon">Tarih kontrol et</a></div>
       </section>
 
       <section className={styles.detailIntro}>

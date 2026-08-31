@@ -71,6 +71,7 @@ export default async function PublicHomePage() {
   return (
     <main className={styles.page}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+      <a href="#ana-icerik" className={styles.skipLink}>İçeriğe atla</a>
       <section className={styles.hero}>
         <img className={styles.heroImage} src={MEDIA.safiraHero} alt="Patara Kaş Villa Safira özel havuzu ve dış yaşam alanı" />
         <div className={styles.heroShade} />
@@ -85,7 +86,7 @@ export default async function PublicHomePage() {
           </div>
         </nav>
 
-        <div className={styles.heroCopy}>
+        <div className={styles.heroCopy} id="ana-icerik" tabIndex={-1}>
           <div className={styles.eyebrow}>Patara · Kaş · Antalya</div>
           <h1 className={styles.title}>Akdeniz’de<br />kendinize ait<br />bir yer.</h1>
           <p className={styles.lead}>Villa Safira ve Villa Destan. Patara, Kaş’ta özel havuzlu villa tatili; özgürlük, mahremiyet ve doğrudan rezervasyon kolaylığıyla size ait bir Akdeniz deneyimi.</p>

@@ -106,4 +106,8 @@
 @media (max-width: 720px) {
   .months { grid-template-columns: 1fr; }
   .monthsLabel { display: none; }
+  .calendar { padding: 14px 10px; }
+  .grid { gap: 5px; }
+  .day { font-size: 13px; min-height: 40px; }
+  .navBtn { width: 40px; height: 40px; }
 }

@@ -14,6 +14,22 @@
 }
 
 .page * { box-sizing: border-box; }
+
+.skipLink {
+  position: absolute;
+  z-index: 100;
+  top: -100px;
+  left: 16px;
+  padding: 12px 18px;
+  background: #f7f3e9;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 800;
+  text-decoration: none;
+  border-radius: 4px;
+  transition: top .15s ease;
+}
+.skipLink:focus { top: 16px; }
 .page a { color: inherit; }
 .page a:focus-visible,
 .page button:focus-visible,
