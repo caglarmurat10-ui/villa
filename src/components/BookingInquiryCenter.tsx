@@ -143,6 +143,7 @@ export default function BookingInquiryCenter({ initialItems }: { initialItems: B
               <div><span>Telefon / WhatsApp</span><strong>{item.phone}</strong></div>
               <div><span>Fiyat</span><strong>{item.quotedTotal === null ? "Teyit gerekli" : money.format(item.quotedTotal)}</strong></div>
               <div><span>Talep zamanı</span><strong>{formatCreated(item.createdAt)}</strong></div>
+              <div><span>Kaynak</span><strong>{item.source}</strong></div>
             </div>
 
             {item.note ? <div className="inquiry-note"><span>Misafir notu</span><p>{item.note}</p></div> : null}

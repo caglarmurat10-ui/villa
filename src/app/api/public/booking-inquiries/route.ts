@@ -17,6 +17,7 @@ const schema = z.object({
   guestCount: z.coerce.number().int().min(1).max(12),
   note: z.string().trim().max(500).default(""),
   website: z.string().max(0).optional().default(""),
+  source: z.string().trim().max(40).optional().default("web"),
 }).superRefine((value, context) => {
   if (value.checkOut <= value.checkIn) {
     context.addIssue({ code: "custom", path: ["checkOut"], message: "Çıkış tarihi girişten sonra olmalı." });

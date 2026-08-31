@@ -1,9 +1,30 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { PriceRange, Reservation, Villa } from "@/lib/types";
 import styles from "./PublicBookingWidget.module.css";
+
+const KNOWN_SOURCES = new Set(["instagram", "facebook", "google", "whatsapp", "direct"]);
+
+function resolveSource(): string {
+  if (typeof window === "undefined") return "web";
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const utmSource = params.get("utm_source")?.toLowerCase().trim();
+    if (utmSource && KNOWN_SOURCES.has(utmSource)) return utmSource;
+    if (utmSource) return utmSource.slice(0, 40);
+
+    const referrer = document.referrer ? new URL(document.referrer).hostname.toLowerCase() : "";
+    if (referrer.includes("instagram.com")) return "instagram";
+    if (referrer.includes("facebook.com") || referrer.includes("fb.com")) return "facebook";
+    if (referrer.includes("google.")) return "google";
+    if (referrer.includes("whatsapp.com")) return "whatsapp";
+    return "direct";
+  } catch {
+    return "web";
+  }
+}
 
 type BookingReservation = Pick<Reservation, "villa" | "checkIn" | "checkOut">;
 type BookingPrice = Pick<PriceRange, "villa" | "startDate" | "endDate" | "nightlyRate">;
@@ -52,7 +73,12 @@ export default function PublicBookingWidget({
   const [note, setNote] = useState("");
   const [website, setWebsite] = useState("");
   const [requestState, setRequestState] = useState<RequestState>({ kind: "idle", message: "" });
+  const [source, setSource] = useState("web");
   const today = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    setSource(resolveSource());
+  }, []);
 
   const result = useMemo<AvailabilityResult | null>(() => {
     if (!checkIn || !checkOut) return null;
@@ -128,6 +154,7 @@ export default function PublicBookingWidget({
           guestCount: Number(guestCount),
           note,
           website,
+          source,
         }),
       });
       const data = await response.json().catch(() => ({}));

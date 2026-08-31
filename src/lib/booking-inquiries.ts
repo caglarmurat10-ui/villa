@@ -17,7 +17,7 @@ export interface BookingInquiry {
   quotedTotal: number | null;
   quotedNights: number;
   status: BookingInquiryStatus;
-  source: "web";
+  source: string;
   convertedReservationId: string | null;
   convertedAt: string | null;
   createdAt: string;
@@ -32,6 +32,7 @@ export interface BookingInquiryInput {
   checkOut: string;
   guestCount: number;
   note: string;
+  source?: string;
 }
 
 type BookingInquiryRow = {
@@ -47,7 +48,7 @@ type BookingInquiryRow = {
   quoted_total: number | null;
   quoted_nights: number;
   status: BookingInquiryStatus;
-  source: "web";
+  source: string;
   converted_reservation_id: string | null;
   converted_at: string | null;
   created_at: string;
@@ -197,7 +198,7 @@ export async function createBookingInquiry(input: BookingInquiryInput) {
     quotedTotal: quote.total,
     quotedNights: quote.nights,
     status: "Yeni",
-    source: "web",
+    source: input.source?.trim() || "web",
     convertedReservationId: null,
     convertedAt: null,
     createdAt: now,
