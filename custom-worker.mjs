@@ -129,9 +129,12 @@ function routeRequest(request) {
 
   if (host === ADMIN_HOST) return { request };
 
-  if (host.endsWith(".workers.dev") && LEGACY_ADMIN_ENTRY_PATHS.has(url.pathname)) {
-    const destination = new URL(`${url.pathname}${url.search}`, ADMIN_ORIGIN);
-    return { response: Response.redirect(destination.toString(), 308) };
+  if (host.endsWith(".workers.dev")) {
+    if (LEGACY_ADMIN_ENTRY_PATHS.has(url.pathname)) {
+      const destination = new URL(`${url.pathname}${url.search}`, ADMIN_ORIGIN);
+      return { response: Response.redirect(destination.toString(), 308) };
+    }
+    return { response: new Response("Not Found", { status: 404 }) };
   }
 
   if (TRANSITION_PATHS.has(url.pathname)) return { request };
