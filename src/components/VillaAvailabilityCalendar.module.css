@@ -1,0 +1,109 @@
+.calendar {
+  border: 1px solid #d3c8b5;
+  background: rgba(255, 255, 255, .5);
+  padding: 18px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.monthsLabel {
+  font-size: 10px;
+  letter-spacing: .1em;
+  font-weight: 800;
+  color: #746b5d;
+  text-transform: uppercase;
+}
+
+.navBtn {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #d3c8b5;
+  background: #fff;
+  color: #15211b;
+  cursor: pointer;
+  border-radius: 50%;
+  font-size: 15px;
+  line-height: 1;
+}
+.navBtn:hover { background: #f3efe7; }
+
+.months {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+}
+
+.monthTitle {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 15px;
+  margin-bottom: 10px;
+  color: #15211b;
+}
+
+.weekdays {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  margin-bottom: 4px;
+}
+.weekdays span {
+  font-size: 9px;
+  text-align: center;
+  color: #9e957f;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px;
+}
+
+.empty { display: block; }
+
+.day {
+  aspect-ratio: 1;
+  border: none;
+  background: transparent;
+  color: #15211b;
+  font-size: 12px;
+  cursor: pointer;
+  border-radius: 4px;
+}
+.day:hover:not(:disabled) { background: rgba(185, 155, 104, .18); }
+.day:focus-visible { outline: 2px solid #9e8255; outline-offset: 1px; }
+
+.disabled {
+  color: #c9c0ae;
+  text-decoration: line-through;
+  cursor: not-allowed;
+}
+
+.inRange { background: rgba(185, 155, 104, .22); }
+
+.selected {
+  background: #173f2a;
+  color: #fff;
+  font-weight: 700;
+}
+
+.legend {
+  display: flex;
+  gap: 18px;
+  margin-top: 14px;
+  font-size: 10px;
+  color: #746b5d;
+}
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { width: 9px; height: 9px; border-radius: 2px; display: inline-block; }
+.legendAvailable { background: rgba(185, 155, 104, .18); border: 1px solid #d3c8b5; }
+.legendBooked { background: #efe9de; text-decoration: line-through; }
+.legendSelected { background: #173f2a; }
+
+@media (max-width: 720px) {
+  .months { grid-template-columns: 1fr; }
+  .monthsLabel { display: none; }
+}

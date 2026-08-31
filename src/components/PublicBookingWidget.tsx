@@ -1,9 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import type { PriceRange, Reservation, Villa } from "@/lib/types";
+import VillaAvailabilityCalendar from "./VillaAvailabilityCalendar";
 import styles from "./PublicBookingWidget.module.css";
+
+const dateLabel = new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short" });
+function formatDateLabel(iso: string) {
+  if (!iso) return "Seçilmedi";
+  return dateLabel.format(new Date(`${iso}T00:00:00Z`));
+}
 
 const KNOWN_SOURCES = new Set(["instagram", "facebook", "google", "whatsapp", "direct"]);
 
@@ -73,12 +80,7 @@ export default function PublicBookingWidget({
   const [note, setNote] = useState("");
   const [website, setWebsite] = useState("");
   const [requestState, setRequestState] = useState<RequestState>({ kind: "idle", message: "" });
-  const [source, setSource] = useState("web");
-  const today = new Date().toISOString().slice(0, 10);
-
-  useEffect(() => {
-    setSource(resolveSource());
-  }, []);
+  const [source] = useState(() => resolveSource());
 
   const result = useMemo<AvailabilityResult | null>(() => {
     if (!checkIn || !checkOut) return null;
@@ -184,20 +186,28 @@ export default function PublicBookingWidget({
       <div className={styles.fields}>
         <label>
           <span>Villa</span>
-          <select value={villa} onChange={(event) => { setVilla(event.target.value as Villa); resetRequestFeedback(); }} disabled={Boolean(initialVilla)}>
+          <select value={villa} onChange={(event) => { setVilla(event.target.value as Villa); setCheckIn(""); setCheckOut(""); resetRequestFeedback(); }} disabled={Boolean(initialVilla)}>
             <option value="Safira">Villa Safira</option>
             <option value="Destan">Villa Destan</option>
           </select>
         </label>
-        <label>
-          <span>Giriş</span>
-          <input type="date" min={today} value={checkIn} onChange={(event) => { setCheckIn(event.target.value); resetRequestFeedback(); }} />
-        </label>
-        <label>
-          <span>Çıkış</span>
-          <input type="date" min={checkIn || today} value={checkOut} onChange={(event) => { setCheckOut(event.target.value); resetRequestFeedback(); }} />
-        </label>
+        <div className={styles.datePreview}>
+          <div><span>Giriş</span><strong>{formatDateLabel(checkIn)}</strong></div>
+          <div><span>Çıkış</span><strong>{formatDateLabel(checkOut)}</strong></div>
+        </div>
       </div>
+
+      <VillaAvailabilityCalendar
+        villa={villa}
+        reservations={reservations}
+        checkIn={checkIn}
+        checkOut={checkOut}
+        onChange={({ checkIn: nextCheckIn, checkOut: nextCheckOut }) => {
+          setCheckIn(nextCheckIn);
+          setCheckOut(nextCheckOut);
+          resetRequestFeedback();
+        }}
+      />
 
       <div className={`${styles.result} ${resultClass}`} aria-live="polite">
         {result ? (
