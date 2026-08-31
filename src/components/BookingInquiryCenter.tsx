@@ -72,9 +72,33 @@ export default function BookingInquiryCenter({ initialItems }: { initialItems: B
       setNotice("Bu talepte geçerli bir WhatsApp numarası bulunmuyor.");
       return;
     }
-    if (item.status === "Yeni") await changeStatus(item.id, "İletişime geçildi");
+    if (item.status === "Yeni" && !item.convertedReservationId) await changeStatus(item.id, "İletişime geçildi");
     const text = `Merhaba, Villa ${item.villa} için ${formatStay(item.checkIn, item.checkOut)} tarihli rezervasyon talebiniz bize ulaştı. Size yardımcı olmaktan memnuniyet duyarız.`;
     window.location.href = `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
+  }
+
+  async function convertInquiry(item: BookingInquiry) {
+    if (item.convertedReservationId) return;
+    const accepted = window.confirm(
+      `${item.guestName} talebini Villa ${item.villa} için gerçek rezervasyona dönüştürmek istiyor musunuz?\n\nTarihler ve güncel fiyat yeniden kontrol edilecek.`,
+    );
+    if (!accepted) return;
+
+    setBusyId(item.id);
+    setNotice("");
+    try {
+      const response = await fetch(`/api/booking-inquiries/${item.id}/convert`, { method: "POST" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error ?? "Talep rezervasyona dönüştürülemedi.");
+      setItems((current) => current.map((entry) => entry.id === item.id ? data.inquiry : entry));
+      setNotice(data.alreadyConverted
+        ? "Bu talep zaten rezervasyona dönüştürülmüş."
+        : "Rezervasyon oluşturuldu. Talep otomatik olarak kapatıldı.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Talep rezervasyona dönüştürülemedi.");
+    } finally {
+      setBusyId(null);
+    }
   }
 
   return <main className="inquiry-page">
@@ -83,7 +107,7 @@ export default function BookingInquiryCenter({ initialItems }: { initialItems: B
         <div>
           <span className="eyebrow">DOĞRUDAN REZERVASYON</span>
           <h1>Web talepleri</h1>
-          <p>safiradestan.com üzerinden gelen talepleri burada takip edin, WhatsApp ile yanıtlayın ve durumlarını güncelleyin.</p>
+          <p>safiradestan.com üzerinden gelen talepleri burada takip edin, WhatsApp ile yanıtlayın ve onaylanan talebi tek işlemle gerçek rezervasyona dönüştürün.</p>
         </div>
         <div className="inquiry-stats">
           <div><strong>{counts.new}</strong><span>Yeni</span></div>
@@ -109,7 +133,10 @@ export default function BookingInquiryCenter({ initialItems }: { initialItems: B
                 <h2>{item.guestName}</h2>
                 <p>{formatStay(item.checkIn, item.checkOut)} · {item.guestCount} kişi · {item.quotedNights} gece</p>
               </div>
-              <span className={`inquiry-status status-${item.status === "Yeni" ? "new" : item.status === "İletişime geçildi" ? "contacted" : "closed"}`}>{item.status}</span>
+              <div className="inquiry-state-stack">
+                <span className={`inquiry-status status-${item.status === "Yeni" ? "new" : item.status === "İletişime geçildi" ? "contacted" : "closed"}`}>{item.status}</span>
+                {item.convertedReservationId ? <span className="inquiry-converted">✓ Rezervasyona dönüştürüldü</span> : null}
+              </div>
             </div>
 
             <div className="inquiry-details">
@@ -122,9 +149,16 @@ export default function BookingInquiryCenter({ initialItems }: { initialItems: B
 
             <div className="inquiry-actions">
               <button className="inquiry-whatsapp" disabled={busyId === item.id} onClick={() => void openWhatsApp(item)}>WhatsApp&apos;ta aç</button>
-              <button disabled={busyId === item.id || item.status === "Yeni"} onClick={() => void changeStatus(item.id, "Yeni")}>Yeni</button>
-              <button disabled={busyId === item.id || item.status === "İletişime geçildi"} onClick={() => void changeStatus(item.id, "İletişime geçildi")}>İletişime geçildi</button>
-              <button disabled={busyId === item.id || item.status === "Kapatıldı"} onClick={() => void changeStatus(item.id, "Kapatıldı")}>Kapat</button>
+              {item.convertedReservationId ? (
+                <a className="inquiry-reservation-link" href="/rezervasyonlar">Rezervasyonları aç</a>
+              ) : (
+                <button className="inquiry-convert" disabled={busyId === item.id || item.status === "Kapatıldı"} onClick={() => void convertInquiry(item)}>
+                  {busyId === item.id ? "İşleniyor…" : "Rezervasyona dönüştür"}
+                </button>
+              )}
+              <button disabled={busyId === item.id || Boolean(item.convertedReservationId) || item.status === "Yeni"} onClick={() => void changeStatus(item.id, "Yeni")}>Yeni</button>
+              <button disabled={busyId === item.id || Boolean(item.convertedReservationId) || item.status === "İletişime geçildi"} onClick={() => void changeStatus(item.id, "İletişime geçildi")}>İletişime geçildi</button>
+              <button disabled={busyId === item.id || Boolean(item.convertedReservationId) || item.status === "Kapatıldı"} onClick={() => void changeStatus(item.id, "Kapatıldı")}>Kapat</button>
             </div>
           </article>
         )}
