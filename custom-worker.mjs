@@ -21,6 +21,23 @@ const TRANSITION_PATHS = new Set([
   "/api/meta/facebook/callback",
 ]);
 
+const ADMIN_LOGIN_PATH = "/login";
+const ADMIN_LOGIN_API = "/api/auth/login";
+const ADMIN_LOGOUT_API = "/api/auth/logout";
+const ADMIN_PUBLIC_PATHS = new Set([
+  ADMIN_LOGIN_PATH,
+  "/api/health",
+  "/api/system/version",
+  "/api/meta/instagram/callback",
+  "/api/meta/facebook/callback",
+]);
+const ADMIN_SESSION_COOKIE = "__Host-villa_admin_session";
+const ADMIN_SESSION_TTL_SECONDS = 12 * 60 * 60;
+const ADMIN_MIN_PASSWORD_LENGTH = 12;
+const ADMIN_MIN_SESSION_SECRET_LENGTH = 32;
+const TEXT_ENCODER = new TextEncoder();
+const TEXT_DECODER = new TextDecoder();
+
 function safeTime(value) {
   const normalized = String(value ?? "").trim();
   return /^(?:[01]\d|2[0-3]):[0-5]\d$/.test(normalized) ? normalized : DEFAULT_PUBLISH_TIME;
@@ -68,6 +85,10 @@ function publicAssetPath(pathname) {
     pathname === "/sitemap.xml";
 }
 
+function adminPublicAssetPath(pathname) {
+  return publicAssetPath(pathname) || pathname === "/manifest.webmanifest";
+}
+
 function routeRequest(request) {
   const url = new URL(request.url);
   const host = url.hostname.toLowerCase();
@@ -98,6 +119,182 @@ function routeRequest(request) {
   if (TRANSITION_PATHS.has(url.pathname)) return { request };
 
   return { response: new Response("Not Found", { status: 404 }) };
+}
+
+function jsonResponse(payload, status = 200, headers = {}) {
+  return new Response(JSON.stringify(payload), {
+    status,
+    headers: {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store, max-age=0",
+      ...headers,
+    },
+  });
+}
+
+function base64UrlEncode(bytes) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+function base64UrlDecode(value) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/");
+  const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, "=");
+  const binary = atob(padded);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  return bytes;
+}
+
+async function hmacKey(secret, usages) {
+  return crypto.subtle.importKey(
+    "raw",
+    TEXT_ENCODER.encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    usages,
+  );
+}
+
+async function createAdminSession(secret) {
+  const now = Math.floor(Date.now() / 1000);
+  const payload = base64UrlEncode(TEXT_ENCODER.encode(JSON.stringify({
+    v: 1,
+    iat: now,
+    exp: now + ADMIN_SESSION_TTL_SECONDS,
+  })));
+  const key = await hmacKey(secret, ["sign"]);
+  const signature = await crypto.subtle.sign("HMAC", key, TEXT_ENCODER.encode(payload));
+  return `${payload}.${base64UrlEncode(new Uint8Array(signature))}`;
+}
+
+function cookieValue(request, name) {
+  const header = request.headers.get("cookie") ?? "";
+  for (const part of header.split(";")) {
+    const separator = part.indexOf("=");
+    if (separator < 0) continue;
+    const key = part.slice(0, separator).trim();
+    if (key === name) return part.slice(separator + 1).trim();
+  }
+  return "";
+}
+
+async function verifyAdminSession(request, secret) {
+  if (typeof secret !== "string" || secret.length < ADMIN_MIN_SESSION_SECRET_LENGTH) return false;
+  const token = cookieValue(request, ADMIN_SESSION_COOKIE);
+  const [payload, signature, extra] = token.split(".");
+  if (!payload || !signature || extra) return false;
+
+  try {
+    const key = await hmacKey(secret, ["verify"]);
+    const verified = await crypto.subtle.verify(
+      "HMAC",
+      key,
+      base64UrlDecode(signature),
+      TEXT_ENCODER.encode(payload),
+    );
+    if (!verified) return false;
+
+    const data = JSON.parse(TEXT_DECODER.decode(base64UrlDecode(payload)));
+    const now = Math.floor(Date.now() / 1000);
+    return data?.v === 1 &&
+      Number.isInteger(data.iat) &&
+      Number.isInteger(data.exp) &&
+      data.iat <= now + 60 &&
+      data.exp > now;
+  } catch {
+    return false;
+  }
+}
+
+async function safePasswordMatch(provided, expected) {
+  const [left, right] = await Promise.all([
+    crypto.subtle.digest("SHA-256", TEXT_ENCODER.encode(provided)),
+    crypto.subtle.digest("SHA-256", TEXT_ENCODER.encode(expected)),
+  ]);
+  const a = new Uint8Array(left);
+  const b = new Uint8Array(right);
+  if (a.length !== b.length) return false;
+  let difference = 0;
+  for (let index = 0; index < a.length; index += 1) difference |= a[index] ^ b[index];
+  return difference === 0;
+}
+
+function adminAuthConfigured(env) {
+  return typeof env.ADMIN_PASSWORD === "string" &&
+    env.ADMIN_PASSWORD.length >= ADMIN_MIN_PASSWORD_LENGTH &&
+    typeof env.ADMIN_SESSION_SECRET === "string" &&
+    env.ADMIN_SESSION_SECRET.length >= ADMIN_MIN_SESSION_SECRET_LENGTH;
+}
+
+async function handleAdminLogin(request, env) {
+  if (request.method !== "POST") {
+    return jsonResponse({ error: "Method Not Allowed" }, 405, { Allow: "POST" });
+  }
+  if (!adminAuthConfigured(env)) {
+    console.error("[Admin Auth] Required secrets are missing or too short.");
+    return jsonResponse({ error: "Yönetim girişi geçici olarak kullanılamıyor." }, 503);
+  }
+
+  const payload = await request.json().catch(() => null);
+  const password = typeof payload?.password === "string" ? payload.password : "";
+  if (password.length < ADMIN_MIN_PASSWORD_LENGTH || password.length > 256) {
+    return jsonResponse({ error: "Parola hatalı." }, 401);
+  }
+
+  const matches = await safePasswordMatch(password, env.ADMIN_PASSWORD);
+  if (!matches) {
+    return jsonResponse({ error: "Parola hatalı." }, 401);
+  }
+
+  const session = await createAdminSession(env.ADMIN_SESSION_SECRET);
+  return jsonResponse(
+    { ok: true, expiresIn: ADMIN_SESSION_TTL_SECONDS },
+    200,
+    {
+      "Set-Cookie": `${ADMIN_SESSION_COOKIE}=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${ADMIN_SESSION_TTL_SECONDS}`,
+    },
+  );
+}
+
+function handleAdminLogout(request) {
+  if (request.method !== "POST") {
+    return jsonResponse({ error: "Method Not Allowed" }, 405, { Allow: "POST" });
+  }
+  return jsonResponse(
+    { ok: true },
+    200,
+    {
+      "Set-Cookie": `${ADMIN_SESSION_COOKIE}=; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=0`,
+    },
+  );
+}
+
+async function adminAuthGate(request, env) {
+  const url = new URL(request.url);
+  if (url.hostname.toLowerCase() !== ADMIN_HOST) return null;
+
+  if (url.pathname === ADMIN_LOGIN_API) return handleAdminLogin(request, env);
+  if (url.pathname === ADMIN_LOGOUT_API) return handleAdminLogout(request);
+  if (adminPublicAssetPath(url.pathname) || ADMIN_PUBLIC_PATHS.has(url.pathname)) return null;
+
+  const authenticated = await verifyAdminSession(request, env.ADMIN_SESSION_SECRET);
+  if (url.pathname === ADMIN_LOGIN_PATH) {
+    return authenticated ? Response.redirect(new URL("/", url).toString(), 303) : null;
+  }
+  if (authenticated) return null;
+
+  if (url.pathname.startsWith("/api/")) {
+    return jsonResponse({ error: "Yönetim oturumu gerekli." }, 401);
+  }
+
+  const loginUrl = new URL(ADMIN_LOGIN_PATH, url);
+  const next = `${url.pathname}${url.search}`;
+  if (next !== "/") loginUrl.searchParams.set("next", next);
+  return Response.redirect(loginUrl.toString(), 303);
 }
 
 async function duePosts(env, scheduledAt) {
@@ -186,7 +383,10 @@ async function runSocialCron(controller, env, ctx) {
 }
 
 export default {
-  fetch(request, env, ctx) {
+  async fetch(request, env, ctx) {
+    const authResponse = await adminAuthGate(request, env);
+    if (authResponse) return authResponse;
+
     const routed = routeRequest(request);
     if (routed.response) return routed.response;
     return nextWorker.fetch(routed.request, env, ctx);

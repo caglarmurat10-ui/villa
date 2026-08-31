@@ -22,7 +22,12 @@
     "SOCIAL_AUTO_PUBLISH_LIMIT": "2"
   },
   "secrets": {
-    "required": ["META_APP_SECRET", "FACEBOOK_APP_SECRET"]
+    "required": [
+      "META_APP_SECRET",
+      "FACEBOOK_APP_SECRET",
+      "ADMIN_PASSWORD",
+      "ADMIN_SESSION_SECRET"
+    ]
   },
   "kv_namespaces": [
     { "binding": "META_PRIVATE" }
