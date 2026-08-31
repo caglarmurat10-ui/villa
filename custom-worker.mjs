@@ -6,6 +6,8 @@ const MAX_ATTEMPTS = 3;
 const RETRY_COOLDOWN_MS = 30 * 60 * 1000;
 const PUBLIC_HOSTS = new Set(["safiradestan.com", "www.safiradestan.com"]);
 const ADMIN_HOST = "admin.safiradestan.com";
+const ADMIN_ORIGIN = `https://${ADMIN_HOST}`;
+const LEGACY_ADMIN_ENTRY_PATHS = new Set(["/", "/login"]);
 const PUBLIC_API_PATHS = new Set([
   "/api/public/booking-inquiries",
 ]);
@@ -80,6 +82,8 @@ function publicAssetPath(pathname) {
   return pathname.startsWith("/_next/") ||
     pathname.startsWith("/villas/") ||
     pathname === "/app-icon.svg" ||
+    pathname === "/app-icon-192.png" ||
+    pathname === "/app-icon-512.png" ||
     pathname === "/favicon.ico" ||
     pathname === "/robots.txt" ||
     pathname === "/sitemap.xml";
@@ -115,6 +119,11 @@ function routeRequest(request) {
   }
 
   if (host === ADMIN_HOST) return { request };
+
+  if (host.endsWith(".workers.dev") && LEGACY_ADMIN_ENTRY_PATHS.has(url.pathname)) {
+    const destination = new URL(`${url.pathname}${url.search}`, ADMIN_ORIGIN);
+    return { response: Response.redirect(destination.toString(), 308) };
+  }
 
   if (TRANSITION_PATHS.has(url.pathname)) return { request };
 
