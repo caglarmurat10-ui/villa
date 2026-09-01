@@ -1,5 +1,5 @@
 import { parseNotificationForm, verifyNotificationHash } from "@/lib/payments/paytr/callback";
-import { getPaymentByMerchantOid, markPaymentFailed, markPaymentPaid } from "@/lib/payments/db";
+import { getPaymentByMerchantOid, markPaymentFailed, markPaymentPaid, isTerminalStatus } from "@/lib/payments/db";
 import { logPaymentAudit } from "@/lib/payments/audit";
 
 export const dynamic = "force-dynamic";
@@ -41,14 +41,36 @@ export async function POST(request: Request) {
     return okResponse();
   }
 
-  if (payment.status === "paid") {
-    // Idempotent: aynı başarılı callback tekrar geldi, no-op.
-    await logPaymentAudit("PAYMENT_CALLBACK_DUPLICATE", { paymentId: payment.id, reservationId: payment.reservationId, villa: payment.villa, status: notification.status });
+  // PayTR kuralı: bir merchant_oid için yalnız İLK notification state'i belirler. Terminal durumdaki
+  // (paid/failed/cancelled) bir kayda gelen HER SONRAKI callback - aynı sonucu tekrar bildirse bile,
+  // ya da FARKLI bir sonuç bildirse bile (ör. failed sonrası success) - state'i değiştirmez.
+  if (isTerminalStatus(payment.status)) {
+    await logPaymentAudit("PAYMENT_CALLBACK_TERMINAL_IGNORED", { paymentId: payment.id, reservationId: payment.reservationId, villa: payment.villa, status: payment.status });
     return okResponse();
   }
 
   if (notification.status === "success") {
-    await markPaymentPaid(payment.id, payment.reservationId, notification.totalAmountMinor);
+    // total_amount, taksit/vade farkıyla requested_amount'tan YÜKSEK olabilir (normal, PayTR'ın
+    // kendi dokümante ettiği davranış) - bu yüzden eşitlik değil, alt sınır kontrolü yapılır.
+    // payment_amount ise (varsa) bizim orijinal isteğimizin birebir yankısı olmalı - markup'a tabi
+    // değil, bu yüzden tam eşleşmesi beklenir.
+    const totalOk = notification.totalAmountMinor >= payment.requestedAmountMinor;
+    const paymentAmountOk = notification.paymentAmountMinor === undefined || notification.paymentAmountMinor === payment.requestedAmountMinor;
+    const currencyOk = !notification.currency || notification.currency === "TL" || notification.currency === "TRY";
+
+    if (!totalOk || !paymentAmountOk || !currencyOk) {
+      await logPaymentAudit("PAYMENT_CALLBACK_AMOUNT_MISMATCH", {
+        paymentId: payment.id,
+        reservationId: payment.reservationId,
+        villa: payment.villa,
+        amountMinor: notification.totalAmountMinor,
+      });
+      // State değiştirilmez (paid yapılmaz) - ama hash zaten geçerli olduğu için sonsuz retry'ı
+      // durdurmak amacıyla OK dönülür, bu durum yalnız audit_log üzerinden manuel incelenir.
+      return okResponse();
+    }
+
+    await markPaymentPaid(payment, notification.totalAmountMinor);
     await logPaymentAudit("PAYMENT_PAID", {
       paymentId: payment.id,
       reservationId: payment.reservationId,

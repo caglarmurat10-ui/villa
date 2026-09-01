@@ -12,6 +12,7 @@ interface PaymentRow {
   requestedAmountMinor: number;
   createdAt: string;
   paidAt: string | null;
+  testMode: boolean;
 }
 
 const TYPE_LABEL: Record<string, string> = { deposit: "%20 Ön Ödeme", full_payment: "Tam Ödeme", balance_payment: "Kalan Bakiye" };
@@ -126,9 +127,9 @@ export default function PaytrPaymentPanel({ reservation, onClose }: { reservatio
             {payments.length === 0 ? (
               <p style={{ fontSize: 10, color: "#8fa4bd", margin: 0 }}>Henüz ödeme kaydı yok.</p>
             ) : payments.map((payment) => (
-              <div key={payment.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 10px", border: "1px solid #1f3551", borderRadius: 8, background: "#0b1728", fontSize: 10 }}>
-                <span>{TYPE_LABEL[payment.paymentType] ?? payment.paymentType}</span>
-                <span style={{ color: payment.status === "paid" ? "#86efac" : payment.status === "failed" ? "#fca5a5" : "#9fb0c5" }}>{STATUS_LABEL[payment.status] ?? payment.status}</span>
+              <div key={payment.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 10px", border: `1px solid ${payment.testMode ? "#a16207" : "#1f3551"}`, borderRadius: 8, background: "#0b1728", fontSize: 10 }}>
+                <span>{payment.testMode ? <b style={{ color: "#fbbf24" }}>TEST · </b> : null}{TYPE_LABEL[payment.paymentType] ?? payment.paymentType}</span>
+                <span style={{ color: payment.status === "paid" ? "#86efac" : payment.status === "failed" ? "#fca5a5" : "#9fb0c5" }}>{payment.testMode && payment.status === "paid" ? "TEST — Başarılı" : (STATUS_LABEL[payment.status] ?? payment.status)}</span>
                 <b>{money.format(payment.requestedAmountMinor / 100)}</b>
               </div>
             ))}

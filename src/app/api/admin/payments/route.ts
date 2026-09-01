@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { findReservation } from "@/lib/db";
-import { createPayment, listPaymentsForReservation, computeReservationPaymentSummary } from "@/lib/payments/db";
+import { createPayment, listPaymentsForReservation, computeReservationPaymentSummary, hasActiveNonTestAttempt } from "@/lib/payments/db";
 import { logPaymentAudit } from "@/lib/payments/audit";
 import { isPaytrConfigured } from "@/lib/payments/paytr/config";
 import { DEPOSIT_PERCENTAGE, FULL_PAYMENT_MAX_INSTALLMENT, PAYTR_TEST_MODE } from "@/lib/payments/types";
@@ -27,7 +27,8 @@ export async function GET(request: Request) {
 }
 
 // Tutar HER ZAMAN reservations.total_amount'tan (backend) hesaplanır - istemciden hiçbir tutar
-// kabul edilmez.
+// kabul edilmez. Aşırı ödeme (overcharge) ve aynı anda birden fazla aktif deneme, PayTR
+// yapılandırılmış olsa bile burada engellenir - test denemeleri bu korumaların dışında tutulur.
 export async function POST(request: Request) {
   const configured = await isPaytrConfigured();
   if (!configured) {
@@ -45,10 +46,28 @@ export async function POST(request: Request) {
     return Response.json({ error: "Rezervasyon bulunamadı." }, { status: 404 });
   }
 
+  const testMode = PAYTR_TEST_MODE;
+
+  if (!testMode) {
+    const hasActive = await hasActiveNonTestAttempt(reservationId);
+    if (hasActive) {
+      await logPaymentAudit("PAYMENT_ACTIVE_ATTEMPT_BLOCKED", { reservationId, villa: reservation.villa, paymentType });
+      return Response.json({ error: "Bu rezervasyon için zaten aktif bir ödeme denemesi var." }, { status: 409 });
+    }
+  }
+
   const reservationTotalMinor = Math.round(reservation.totalAmount * 100);
   const requestedAmountMinor = paymentType === "deposit"
     ? Math.round((reservationTotalMinor * DEPOSIT_PERCENTAGE) / 100)
     : reservationTotalMinor;
+
+  if (!testMode) {
+    const summary = await computeReservationPaymentSummary(reservationId);
+    if (summary.paidTotalMinor + requestedAmountMinor > summary.reservationTotalMinor) {
+      await logPaymentAudit("PAYMENT_OVERCHARGE_BLOCKED", { reservationId, villa: reservation.villa, paymentType, amountMinor: requestedAmountMinor });
+      return Response.json({ error: "Bu tutar rezervasyon toplamını aşıyor. Kalan bakiye ödeme akışı henüz aktif değil." }, { status: 409 });
+    }
+  }
 
   const payment = await createPayment({
     reservationId,
@@ -57,7 +76,7 @@ export async function POST(request: Request) {
     requestedAmountMinor,
     noInstallment: paymentType === "deposit",
     maxInstallment: paymentType === "deposit" ? 0 : FULL_PAYMENT_MAX_INSTALLMENT,
-    testMode: PAYTR_TEST_MODE,
+    testMode,
   });
 
   await logPaymentAudit("PAYMENT_CREATED", {

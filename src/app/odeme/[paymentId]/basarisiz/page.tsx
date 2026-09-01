@@ -35,19 +35,15 @@ export default async function PaymentFailureInfoPage({ params }: { params: Promi
         {payment.status === "paid" ? (
           <>
             <p>✓ Ödemeniz aslında alınmış görünüyor. Teşekkür ederiz — en kısa sürede sizinle iletişime geçeceğiz.</p>
-            <PaymentResultTracker success villaId={toVillaId(payment.villa)} villaName={villaName} paymentType={analyticsPaymentType} />
+            <PaymentResultTracker success villaId={toVillaId(payment.villa)} villaName={villaName} paymentType={analyticsPaymentType} testMode={payment.testMode} />
           </>
         ) : payment.status === "failed" ? (
           <>
-            <p>Ödemeniz tamamlanamadı. Kartınızla ilgili bir sorun oluşmuş olabilir.</p>
-            <Link className={styles.experienceLink} href={`/odeme/${paymentId}`}>Tekrar dene →</Link>
-            <PaymentResultTracker success={false} villaId={toVillaId(payment.villa)} villaName={villaName} paymentType={analyticsPaymentType} />
+            <p>Ödemeniz tamamlanamadı. Kartınızla ilgili bir sorun oluşmuş olabilir. Yeni bir ödeme linki için lütfen bizimle iletişime geçin.</p>
+            <PaymentResultTracker success={false} villaId={toVillaId(payment.villa)} villaName={villaName} paymentType={analyticsPaymentType} testMode={payment.testMode} />
           </>
         ) : (
-          <>
-            <p>İşlem tamamlanamadı. Tekrar deneyebilirsiniz.</p>
-            <Link className={styles.experienceLink} href={`/odeme/${paymentId}`}>Tekrar dene →</Link>
-          </>
+          <p>Bu ödeme denemesi tamamlanamadı. Yeni bir ödeme linki için lütfen bizimle iletişime geçin.</p>
         )}
       </section>
     </main>

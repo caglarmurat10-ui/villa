@@ -36,7 +36,7 @@ export default async function PaymentSuccessInfoPage({ params }: { params: Promi
         {confirmed ? (
           <>
             <p>✓ Ödemeniz alındı ve onaylandı. Teşekkür ederiz — en kısa sürede sizinle iletişime geçeceğiz.</p>
-            <PaymentResultTracker success villaId={toVillaId(payment.villa)} villaName={villaName} paymentType={analyticsPaymentType} />
+            <PaymentResultTracker success villaId={toVillaId(payment.villa)} villaName={villaName} paymentType={analyticsPaymentType} testMode={payment.testMode} />
           </>
         ) : (
           <p>Ödemeniz alınmış olabilir, onay bekleniyor. Bu sayfa kesin sonucu göstermiyor — birkaç dakika içinde durum güncellenmezse bizimle iletişime geçin.</p>

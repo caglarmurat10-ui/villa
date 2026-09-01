@@ -8,15 +8,17 @@ export default function PaymentResultTracker({
   villaId,
   villaName,
   paymentType,
+  testMode,
 }: {
   success: boolean;
   villaId: VillaId;
   villaName: string;
   paymentType: PaymentTypeAnalytics;
+  testMode: boolean;
 }) {
   useEffect(() => {
-    trackPaymentResult(success, { villa_id: villaId, villa_name: villaName }, paymentType);
-  }, [success, villaId, villaName, paymentType]);
+    trackPaymentResult(success, { villa_id: villaId, villa_name: villaName }, paymentType, testMode);
+  }, [success, villaId, villaName, paymentType, testMode]);
 
   return null;
 }

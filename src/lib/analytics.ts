@@ -162,12 +162,14 @@ export function trackOtaBookingClick(channel: OtaBookingChannel, ref: VillaRef, 
 
 export type PaymentTypeAnalytics = "deposit" | "full_payment";
 
-// PayTR ödeme akışı event'leri - merchant_oid/e-posta/telefon/kart bilgisi ASLA gönderilmez.
-// Key event değil, generate_lead tek primary olarak kalır.
-export function trackBeginCheckout(ref: VillaRef, paymentType: PaymentTypeAnalytics) {
-  pushEvent("begin_checkout", { ...ref, payment_type: paymentType, payment_provider: "paytr" });
+// PayTR ödeme akışı event'leri - merchant_oid/e-posta/telefon/kart/ad/adres bilgisi ASLA gönderilmez.
+// Key event değil, generate_lead tek primary olarak kalır. test_mode parametresi, bu event'lerin
+// GTM/GA4 tarafında gerçek gelir/dönüşüm ölçümünden filtrelenebilmesi için taşınır - test ödemesi
+// asla gerçek "revenue" gibi sayılmamalı.
+export function trackBeginCheckout(ref: VillaRef, paymentType: PaymentTypeAnalytics, testMode: boolean) {
+  pushEvent("begin_checkout", { ...ref, payment_type: paymentType, payment_provider: "paytr", test_mode: testMode });
 }
 
-export function trackPaymentResult(success: boolean, ref: VillaRef, paymentType: PaymentTypeAnalytics) {
-  pushEvent(success ? "payment_success" : "payment_failed", { ...ref, payment_type: paymentType, payment_provider: "paytr" });
+export function trackPaymentResult(success: boolean, ref: VillaRef, paymentType: PaymentTypeAnalytics, testMode: boolean) {
+  pushEvent(success ? "payment_success" : "payment_failed", { ...ref, payment_type: paymentType, payment_provider: "paytr", test_mode: testMode });
 }

@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getPayment, computeReservationPaymentSummary } from "@/lib/payments/db";
+import { getPayment, computeReservationPaymentSummary, maybeExpirePayment } from "@/lib/payments/db";
 import { toVillaId } from "@/lib/analytics";
 import CheckoutForm from "@/components/payments/CheckoutForm";
 import styles from "../../site/site.module.css";
@@ -22,8 +22,9 @@ function minorToTry(minor: number) {
 
 export default async function PaymentCheckoutPage({ params }: { params: Promise<{ paymentId: string }> }) {
   const { paymentId } = await params;
-  const payment = await getPayment(paymentId);
+  let payment = await getPayment(paymentId);
   if (!payment) notFound();
+  payment = await maybeExpirePayment(payment);
 
   const summary = await computeReservationPaymentSummary(payment.reservationId);
   const villaName = `Villa ${payment.villa}`;
@@ -37,7 +38,7 @@ export default async function PaymentCheckoutPage({ params }: { params: Promise<
           <Link href="/" className={styles.brand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></Link>
         </nav>
         <div className={styles.policyHeadCopy}>
-          <span className={styles.eyebrow}>GÜVENLİ ÖDEME</span>
+          <span className={styles.eyebrow}>GÜVENLİ ÖDEME{payment.testMode ? " · TEST MODU" : ""}</span>
           <h1 className={styles.policyTitle}>{villaName} — {paymentTypeLabel}</h1>
           <p className={styles.lead}>
             {dateFormat.format(new Date(`${payment.checkIn}T00:00:00`))} — {dateFormat.format(new Date(`${payment.checkOut}T00:00:00`))}
@@ -56,12 +57,16 @@ export default async function PaymentCheckoutPage({ params }: { params: Promise<
       <section className={styles.policyBody}>
         {payment.status === "paid" ? (
           <p>✓ Bu ödeme tamamlandı. Teşekkür ederiz — en kısa sürede sizinle iletişime geçeceğiz.</p>
+        ) : payment.status === "pending" ? (
+          <p>Bu ödeme için işlem sürüyor. Sonucu birkaç dakika içinde bu sayfada görebilirsiniz — sayfayı yenileyin.</p>
+        ) : payment.status === "failed" || payment.status === "cancelled" ? (
+          <p>Bu ödeme denemesi artık geçerli değil. Yeni bir ödeme linki için lütfen bizimle iletişime geçin.</p>
         ) : (
           <>
             {payment.paymentType === "full_payment" && (
               <p>Tam ödeme seçeneğinde uygun kredi kartlarına 6 taksite kadar ödeme imkânı sunulabilir. Kullanılabilir taksit seçenekleri ve varsa vade farkı PayTR ödeme ekranında kartınıza göre gösterilir.</p>
             )}
-            <CheckoutForm paymentId={payment.id} villaId={toVillaId(payment.villa)} villaName={villaName} paymentType={analyticsPaymentType} />
+            <CheckoutForm paymentId={payment.id} villaId={toVillaId(payment.villa)} villaName={villaName} paymentType={analyticsPaymentType} testMode={payment.testMode} />
           </>
         )}
       </section>

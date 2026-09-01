@@ -14,7 +14,10 @@ export interface TokenRequestInput {
   paymentType: PaymentType;
   noInstallment: boolean;
   maxInstallment: number;
+  // Gerçek müşteri bilgisi - sahte/varsayılan değer ASLA kabul edilmez, çağıran taraf (checkout
+  // route) bunları zod ile zorunlu kılar. "Misafir"/"05000000000"/sabit adres gibi fallback YOK.
   userName: string;
+  userAddress: string;
   userPhone: string;
   okUrl: string;
   failUrl: string;
@@ -48,6 +51,11 @@ export async function requestPaytrToken(input: TokenRequestInput): Promise<Token
   if (!credentials) {
     return { ok: false, error: "Ödeme sistemi henüz yapılandırılmadı." };
   }
+  if (!input.userName.trim() || !input.userAddress.trim() || !input.userPhone.trim()) {
+    // Sahte/varsayılan PII ile token isteği ASLA yapılmaz - çağıran taraf zaten zod ile bunu
+    // zorunlu kılıyor, bu ikinci bir savunma katmanı.
+    return { ok: false, error: "Gerekli müşteri bilgileri eksik." };
+  }
 
   const paymentAmount = String(input.amountMinor);
   const noInstallment = input.noInstallment ? "1" : "0";
@@ -74,15 +82,19 @@ export async function requestPaytrToken(input: TokenRequestInput): Promise<Token
     debug_on: input.testMode ? "1" : "0",
     no_installment: noInstallment,
     max_installment: maxInstallment,
-    user_name: input.userName || "Misafir",
-    user_address: "Patara, Kas, Antalya",
-    user_phone: input.userPhone || "05000000000",
+    user_name: input.userName,
+    user_address: input.userAddress,
+    user_phone: input.userPhone,
     merchant_ok_url: input.okUrl,
     merchant_fail_url: input.failUrl,
     timeout_limit: String(TIMEOUT_LIMIT_MINUTES),
     currency,
     test_mode: testMode,
     lang: "tr",
+    // iframe_v2/iframe_v2_dark hash girdisine dahil değil (resmi algoritma yalnız yukarıdaki 10
+    // alanı kullanır) - PayTR'ın güncel arayüzünü seçmek için eklenen ayrı, hash-dışı parametreler.
+    iframe_v2: "1",
+    iframe_v2_dark: "0",
   });
 
   let response: Response;

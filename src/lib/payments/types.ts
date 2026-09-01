@@ -24,10 +24,11 @@ export interface Payment {
   providerCustomerTotalMinor: number | null;
   providerFeeMinor: number | null;
   merchantNetMinor: number | null;
-  guestEmail: string | null;
+  // guest_email/PayTR token BİLEREK modelde yok - kod artık bunları D1'e hiç yazmıyor (gerekli
+  // değilse PII/session verisi saklanmaz). guest_email/token kolonları D1 şemasında hâlâ var
+  // (0012'den, nullable) ama unused - riskli bir migration'la kaldırılmadı, yalnız kullanılmıyor.
   noInstallment: boolean;
   maxInstallment: number;
-  token: string | null;
   tokenExpiresAt: string | null;
   testMode: boolean;
   lastError: string | null;
@@ -49,3 +50,8 @@ export const DEPOSIT_PERCENTAGE = 20; // reservation-policy.ts'teki POLICY_SUMMA
 // test_mode=1 gönderilir. Canlıya geçiş yalnızca bu sabiti değiştiren AYRI bir kod değişikliği +
 // deploy + kullanıcının açık onayıyla olur - bir ortam değişkeni yanlışlıkla canlıyı açamaz.
 export const PAYTR_TEST_MODE = true;
+
+// Lazy-expiry için token_expires_at üzerine eklenen tampon süre - PayTR'ın kendi retry davranışı
+// (~1 dakikada bir, doğrulanmış OK gelene kadar) tam sınırda gelen gerçek bir callback'le
+// yarışmamak için. Gerçek bir "cron" değil, yalnızca okuma anında uygulanan bir kontrol.
+export const EXPIRY_GRACE_MINUTES = 5;
