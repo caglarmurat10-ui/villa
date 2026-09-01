@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { findReservation } from "@/lib/db";
-import { createPayment, listPaymentsForReservation, computeReservationPaymentSummary, hasActiveNonTestAttempt } from "@/lib/payments/db";
+import { createPayment, listPaymentsForReservation, computeReservationPaymentSummary } from "@/lib/payments/db";
 import { logPaymentAudit } from "@/lib/payments/audit";
 import { isPaytrConfigured } from "@/lib/payments/paytr/config";
 import { DEPOSIT_PERCENTAGE, FULL_PAYMENT_MAX_INSTALLMENT, PAYTR_TEST_MODE } from "@/lib/payments/types";
@@ -48,14 +48,6 @@ export async function POST(request: Request) {
 
   const testMode = PAYTR_TEST_MODE;
 
-  if (!testMode) {
-    const hasActive = await hasActiveNonTestAttempt(reservationId);
-    if (hasActive) {
-      await logPaymentAudit("PAYMENT_ACTIVE_ATTEMPT_BLOCKED", { reservationId, villa: reservation.villa, paymentType });
-      return Response.json({ error: "Bu rezervasyon için zaten aktif bir ödeme denemesi var." }, { status: 409 });
-    }
-  }
-
   const reservationTotalMinor = Math.round(reservation.totalAmount * 100);
   const requestedAmountMinor = paymentType === "deposit"
     ? Math.round((reservationTotalMinor * DEPOSIT_PERCENTAGE) / 100)
@@ -69,6 +61,10 @@ export async function POST(request: Request) {
     }
   }
 
+  // Aynı rezervasyon için eşzamanlı ikinci aktif GERÇEK deneme, migration 0013'ün partial UNIQUE
+  // index'i tarafından D1 seviyesinde engellenir (application-level "önce kontrol et" yerine) -
+  // createPayment() bu durumda null döner. Test denemeleri bu kısıtın dışında (index yalnız
+  // test_mode=0 satırlarını kapsıyor).
   const payment = await createPayment({
     reservationId,
     paymentType,
@@ -78,6 +74,11 @@ export async function POST(request: Request) {
     maxInstallment: paymentType === "deposit" ? 0 : FULL_PAYMENT_MAX_INSTALLMENT,
     testMode,
   });
+
+  if (!payment) {
+    await logPaymentAudit("PAYMENT_ACTIVE_ATTEMPT_BLOCKED", { reservationId, villa: reservation.villa, paymentType });
+    return Response.json({ error: "Bu rezervasyon için zaten aktif bir ödeme denemesi var." }, { status: 409 });
+  }
 
   await logPaymentAudit("PAYMENT_CREATED", {
     paymentId: payment.id,

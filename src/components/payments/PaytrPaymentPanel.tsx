@@ -13,6 +13,7 @@ interface PaymentRow {
   createdAt: string;
   paidAt: string | null;
   testMode: boolean;
+  lastError: string | null;
 }
 
 const TYPE_LABEL: Record<string, string> = { deposit: "%20 Ön Ödeme", full_payment: "Tam Ödeme", balance_payment: "Kalan Bakiye" };
@@ -127,10 +128,17 @@ export default function PaytrPaymentPanel({ reservation, onClose }: { reservatio
             {payments.length === 0 ? (
               <p style={{ fontSize: 10, color: "#8fa4bd", margin: 0 }}>Henüz ödeme kaydı yok.</p>
             ) : payments.map((payment) => (
-              <div key={payment.id} style={{ display: "flex", justifyContent: "space-between", padding: "8px 10px", border: `1px solid ${payment.testMode ? "#a16207" : "#1f3551"}`, borderRadius: 8, background: "#0b1728", fontSize: 10 }}>
-                <span>{payment.testMode ? <b style={{ color: "#fbbf24" }}>TEST · </b> : null}{TYPE_LABEL[payment.paymentType] ?? payment.paymentType}</span>
-                <span style={{ color: payment.status === "paid" ? "#86efac" : payment.status === "failed" ? "#fca5a5" : "#9fb0c5" }}>{payment.testMode && payment.status === "paid" ? "TEST — Başarılı" : (STATUS_LABEL[payment.status] ?? payment.status)}</span>
-                <b>{money.format(payment.requestedAmountMinor / 100)}</b>
+              <div key={payment.id} style={{ padding: "8px 10px", border: `1px solid ${payment.status === "pending" && payment.lastError ? "#dc2626" : payment.testMode ? "#a16207" : "#1f3551"}`, borderRadius: 8, background: "#0b1728", fontSize: 10 }}>
+                <div style={{ display: "flex", justifyContent: "space-between" }}>
+                  <span>{payment.testMode ? <b style={{ color: "#fbbf24" }}>TEST · </b> : null}{TYPE_LABEL[payment.paymentType] ?? payment.paymentType}</span>
+                  <span style={{ color: payment.status === "paid" ? "#86efac" : payment.status === "failed" ? "#fca5a5" : "#9fb0c5" }}>{payment.testMode && payment.status === "paid" ? "TEST — Başarılı" : (STATUS_LABEL[payment.status] ?? payment.status)}</span>
+                  <b>{money.format(payment.requestedAmountMinor / 100)}</b>
+                </div>
+                {payment.status === "pending" && payment.lastError ? (
+                  <div style={{ marginTop: 6, padding: "6px 8px", border: "1px solid #dc2626", borderRadius: 6, background: "#2a0a0a", color: "#fca5a5", fontWeight: 800 }}>
+                    ⚠ TUTAR UYUŞMAZLIĞI — İNCELEME GEREKİYOR: {payment.lastError}
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

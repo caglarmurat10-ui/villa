@@ -67,7 +67,7 @@ function mapRow(row: PaymentRow): Payment {
 }
 
 // guest_email/token kolonları D1'de hâlâ var (0012'den) ama artık burada seçilmiyor/okunmuyor -
-// yeni kod bunları hiç yazmıyor (bkz. markPaymentPending), zamanla hepsi NULL kalacak.
+// yeni kod bunları hiç yazmıyor (bkz. claimPaymentForCheckout), zamanla hepsi NULL kalacak.
 const SELECT_WITH_RESERVATION = `
   SELECT
     p.id, p.reservation_id, p.provider, p.merchant_oid, p.payment_type, p.status, p.currency,
@@ -80,6 +80,10 @@ const SELECT_WITH_RESERVATION = `
 `;
 
 const TERMINAL_STATUSES: PaymentStatus[] = ["paid", "failed", "cancelled"];
+
+function affectedOne(result: { meta?: { changes?: number } }): boolean {
+  return (result.meta?.changes ?? 0) === 1;
+}
 
 export async function getPayment(id: string): Promise<Payment | null> {
   const db = await database();
@@ -99,17 +103,6 @@ export async function listPaymentsForReservation(reservationId: string): Promise
   return result.results.map(mapRow);
 }
 
-// Bir reservation için "aktif" (henüz sonuçlanmamış) bir deneme var mı - yalnız GERÇEK (test_mode=0)
-// denemeler sayılır, test denemeleri bu kontrolün dışında tutulur (aksi halde test sırasında ikinci
-// bir deneme oluşturmak hep engellenir - bkz. AŞAMA raporu madde 8).
-export async function hasActiveNonTestAttempt(reservationId: string): Promise<boolean> {
-  const db = await database();
-  const row = await db.prepare(
-    "SELECT id FROM payments WHERE reservation_id = ? AND test_mode = 0 AND status IN ('created','pending') LIMIT 1",
-  ).bind(reservationId).first();
-  return Boolean(row);
-}
-
 export interface CreatePaymentInput {
   reservationId: string;
   paymentType: PaymentType;
@@ -120,55 +113,74 @@ export interface CreatePaymentInput {
   testMode: boolean;
 }
 
-export async function createPayment(input: CreatePaymentInput): Promise<Payment> {
+// null dönerse: migration 0013'ün partial UNIQUE index'i (reservation_id, yalnız test_mode=0 AND
+// status IN created/pending) ihlal edildi - bu rezervasyon için zaten aktif GERÇEK bir deneme var.
+// Bu artık D1 seviyesinde garanti - "önce SELECT sonra INSERT" application-level kontrolüne
+// güvenilmiyor (iki eşzamanlı admin isteği arasında race'e açıktı).
+export async function createPayment(input: CreatePaymentInput): Promise<Payment | null> {
   const db = await database();
   const id = generatePaymentId();
   const now = new Date().toISOString();
-  await db.prepare(`
-    INSERT INTO payments (
-      id, reservation_id, provider, merchant_oid, payment_type, status, currency,
-      reservation_total_minor, requested_amount_minor, no_installment, max_installment,
-      test_mode, created_at, updated_at
-    ) VALUES (?, ?, 'paytr', ?, ?, 'created', 'TRY', ?, ?, ?, ?, ?, ?, ?)
-  `).bind(
-    id, input.reservationId, id, input.paymentType,
-    input.reservationTotalMinor, input.requestedAmountMinor,
-    input.noInstallment ? 1 : 0, input.maxInstallment,
-    input.testMode ? 1 : 0, now, now,
-  ).run();
+  try {
+    await db.prepare(`
+      INSERT INTO payments (
+        id, reservation_id, provider, merchant_oid, payment_type, status, currency,
+        reservation_total_minor, requested_amount_minor, no_installment, max_installment,
+        test_mode, created_at, updated_at
+      ) VALUES (?, ?, 'paytr', ?, ?, 'created', 'TRY', ?, ?, ?, ?, ?, ?, ?)
+    `).bind(
+      id, input.reservationId, id, input.paymentType,
+      input.reservationTotalMinor, input.requestedAmountMinor,
+      input.noInstallment ? 1 : 0, input.maxInstallment,
+      input.testMode ? 1 : 0, now, now,
+    ).run();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (/UNIQUE constraint/i.test(message)) return null;
+    throw error;
+  }
 
-  const created = await getPayment(id);
-  if (!created) throw new Error("Ödeme kaydı oluşturulamadı.");
-  return created;
+  return getPayment(id);
 }
 
-// Token'ın KENDİSİ D1'e hiç yazılmaz (yalnız PayTR yanıtı -> tarayıcı yanıtı akışında kullanılır) -
-// burada yalnız durum + expiry saklanır.
-export async function markPaymentPending(id: string, expiresAt: string): Promise<void> {
+// PayTR'a dış istek yapmadan ÖNCE çağrılır - tek atomik UPDATE ile "created" durumunu tarayıcının
+// bu isteği için TEK SEFERLİK claim eder. İki eşzamanlı checkout isteği aynı payment'ı claim etmeye
+// çalışırsa yalnız biri affectedOne()===true görür, diğeri false alır ve PayTR'a hiç istek atmaz.
+export async function claimPaymentForCheckout(id: string, provisionalExpiresAt: string): Promise<boolean> {
   const db = await database();
   const now = new Date().toISOString();
-  await db.prepare("UPDATE payments SET token_expires_at = ?, status = 'pending', updated_at = ? WHERE id = ?")
-    .bind(expiresAt, now, id).run();
+  const result = await db.prepare(
+    "UPDATE payments SET status = 'pending', token_expires_at = ?, updated_at = ? WHERE id = ? AND status = 'created'",
+  ).bind(provisionalExpiresAt, now, id).run();
+  return affectedOne(result);
 }
 
-export async function markPaymentFailed(id: string, safeReason: string): Promise<void> {
+// pending -> failed, yalnız hâlâ pending ise (CAS). PayTR isteği başarısız olduğunda claim'i geri
+// almak için kullanılır - callback'in aynı payment'ı bu sırada paid/failed yapmış olma ihtimaline
+// karşı unconditional UPDATE kullanılmaz.
+export async function markPaymentFailedIfPending(id: string, safeReason: string): Promise<boolean> {
   const db = await database();
   const now = new Date().toISOString();
-  await db.prepare(`
-    UPDATE payments SET status = 'failed', last_error = ?, failed_at = ?, updated_at = ? WHERE id = ?
-  `).bind(safeReason, now, now, id).run();
+  const result = await db.prepare(
+    "UPDATE payments SET status = 'failed', last_error = ?, failed_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'",
+  ).bind(safeReason, now, now, id).run();
+  return affectedOne(result);
 }
 
-export async function markPaymentCancelled(id: string): Promise<void> {
+// pending -> cancelled, yalnız hâlâ pending ise (CAS) - lazy expiry ile gerçek bir callback'in aynı
+// anda paid/failed yapması arasındaki yarışta yalnız biri kazanır.
+export async function markPaymentCancelled(id: string): Promise<boolean> {
   const db = await database();
   const now = new Date().toISOString();
-  await db.prepare("UPDATE payments SET status = 'cancelled', updated_at = ? WHERE id = ? AND status = 'pending'")
-    .bind(now, id).run();
+  const result = await db.prepare(
+    "UPDATE payments SET status = 'cancelled', updated_at = ? WHERE id = ? AND status = 'pending'",
+  ).bind(now, id).run();
+  return affectedOne(result);
 }
 
-// pending + token_expires_at, tampon süreden daha eskiyse cancelled'a çevirir (lazy - cron değil).
-// Yalnız 'pending' durumundaki kayıtlara dokunur; zaten terminal (paid/failed/cancelled) bir kayıt
-// asla geriye döndürülmez. Tamponun amacı, sınırda gelen gerçek bir PayTR callback'iyle yarışmamak.
+// pending + token_expires_at, tampon süreden daha eskiyse cancelled'a çevirmeyi DENER (lazy - cron
+// değil). CAS kaybedilirse (ör. tam o sırada gerçek bir callback geldi) mevcut GÜNCEL durum
+// döndürülür - asla kendi "cancelled" varsayımını zorlamaz.
 export async function maybeExpirePayment(payment: Payment): Promise<Payment> {
   if (payment.status !== "pending" || !payment.tokenExpiresAt) return payment;
   const expiresAtMs = Date.parse(payment.tokenExpiresAt);
@@ -181,20 +193,33 @@ export async function maybeExpirePayment(payment: Payment): Promise<Payment> {
   return refreshed ?? payment;
 }
 
-// Yalnız GERÇEK (test_mode=0) ödemede reservations.paid_amount güncellenir - test başarı callback'i
-// gerçek finansı ASLA etkilemez.
-export async function markPaymentPaid(payment: Payment, providerCustomerTotalMinor: number): Promise<void> {
+// pending -> paid, yalnız hâlâ pending ise (CAS). Döndürdüğü true/false, callback'in "kazanan ilk
+// notification" olup olmadığını belirler. Yalnız GERÇEK (test_mode=0) ödemede reservations.paid_amount
+// güncellenir - test başarı callback'i gerçek finansı ASLA etkilemez.
+export async function markPaymentPaidIfPending(payment: Payment, providerCustomerTotalMinor: number): Promise<boolean> {
   const db = await database();
   const now = new Date().toISOString();
-  await db.prepare(`
-    UPDATE payments SET status = 'paid', provider_customer_total_minor = ?, paid_at = ?, updated_at = ? WHERE id = ?
-  `).bind(providerCustomerTotalMinor, now, now, payment.id).run();
-
-  if (payment.testMode) return;
+  const result = await db.prepare(
+    "UPDATE payments SET status = 'paid', provider_customer_total_minor = ?, paid_at = ?, updated_at = ? WHERE id = ? AND status = 'pending'",
+  ).bind(providerCustomerTotalMinor, now, now, payment.id).run();
+  const won = affectedOne(result);
+  if (!won || payment.testMode) return won;
 
   const summary = await computeReservationPaymentSummary(payment.reservationId);
   await db.prepare("UPDATE reservations SET paid_amount = ?, updated_at = ? WHERE id = ?")
     .bind(summary.paidTotalMinor / 100, now, payment.reservationId).run();
+  return true;
+}
+
+// Hash geçerli ama tutar beklenenle uyuşmuyorsa - state DEĞİŞTİRİLMEZ (paid yapılmaz), ama admin
+// panelinde görünür olması için last_error'a açık bir not düşülür. Yalnız hâlâ pending ise yazılır -
+// zaten terminal bir kaydın last_error'ını ezmez.
+export async function flagPaymentAmountMismatch(id: string, note: string): Promise<void> {
+  const db = await database();
+  const now = new Date().toISOString();
+  await db.prepare(
+    "UPDATE payments SET last_error = ?, updated_at = ? WHERE id = ? AND status = 'pending'",
+  ).bind(note, now, id).run();
 }
 
 export interface ReservationPaymentSummary {

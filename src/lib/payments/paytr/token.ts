@@ -4,6 +4,7 @@ import type { PaymentType } from "../types";
 
 const GET_TOKEN_URL = "https://www.paytr.com/odeme/api/get-token";
 const TIMEOUT_LIMIT_MINUTES = 30; // PayTR'ın kendi dokümante ettiği varsayılan - uydurulmadı.
+const FETCH_TIMEOUT_MS = 20_000; // PayTR'ın kendi resmi entegrasyon örneklerindeki bağlantı süresi.
 
 export interface TokenRequestInput {
   merchantOid: string;
@@ -24,11 +25,11 @@ export interface TokenRequestInput {
   testMode: boolean;
 }
 
+// Token'ın kendisi bilerek dönüş tipinde yok - D1'e hiç yazılmıyor (bkz. AŞAMA raporu), yalnız
+// iframe URL'sinin bir parçası olarak kullanılıp atılıyor.
 export interface TokenResult {
   ok: boolean;
-  token?: string;
   iframeUrl?: string;
-  expiresAt?: string;
   error?: string;
 }
 
@@ -97,15 +98,21 @@ export async function requestPaytrToken(input: TokenRequestInput): Promise<Token
     iframe_v2_dark: "0",
   });
 
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   let response: Response;
   try {
     response = await fetch(GET_TOKEN_URL, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: body.toString(),
+      signal: controller.signal,
     });
   } catch {
+    // Timeout/abort dahil - hata mesajı jenerik, secret/PII asla loglanmaz.
     return { ok: false, error: "Ödeme sağlayıcısına bağlanılamadı." };
+  } finally {
+    clearTimeout(timeout);
   }
 
   const data = await response.json().catch(() => null) as { status?: string; token?: string; reason?: string } | null;
@@ -113,11 +120,5 @@ export async function requestPaytrToken(input: TokenRequestInput): Promise<Token
     return { ok: false, error: "Ödeme oturumu başlatılamadı." };
   }
 
-  const expiresAt = new Date(Date.now() + TIMEOUT_LIMIT_MINUTES * 60 * 1000).toISOString();
-  return {
-    ok: true,
-    token: data.token,
-    iframeUrl: `https://www.paytr.com/odeme/guvenli/${data.token}`,
-    expiresAt,
-  };
+  return { ok: true, iframeUrl: `https://www.paytr.com/odeme/guvenli/${data.token}` };
 }
