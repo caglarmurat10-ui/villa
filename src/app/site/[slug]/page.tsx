@@ -12,6 +12,8 @@ import ViewItemTracker from "@/components/analytics/ViewItemTracker";
 import TrackedMapsLink from "@/components/analytics/TrackedMapsLink";
 import TrackedOtaLink from "@/components/analytics/TrackedOtaLink";
 import TrackedSocialLink from "@/components/analytics/TrackedSocialLink";
+import TrackedWhatsappLink from "@/components/analytics/TrackedWhatsappLink";
+import { whatsappLink, WHATSAPP_PHONE_DISPLAY_INTL } from "@/lib/contact";
 import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
 import { listBlockedRanges } from "@/lib/ota/availability";
 import styles from "../site.module.css";
@@ -89,6 +91,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
           latitude: villa.geo.lat,
           longitude: villa.geo.lng,
         },
+        telephone: WHATSAPP_PHONE_DISPLAY_INTL,
         containsPlace: {
           "@type": "Accommodation",
           numberOfBedrooms: villa.quickFacts.bedroomCount,
@@ -154,7 +157,15 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
           <Link href="/" className={styles.brand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></Link>
           <div className={styles.navlinks}><Link href="/">Ana sayfa</Link><a href="#galeri">Villa</a><a href="#konum">Konum</a><a href="#sss">SSS</a><a className={styles.cta} href="#rezervasyon">Müsaitlik</a></div>
         </nav>
-        <div className={styles.detailHeroCopy} id="ana-icerik" tabIndex={-1}><span className={styles.eyebrow}>{villa.label} · PATARA · KAŞ</span><h1 className={styles.title}>{villa.name}</h1><p className={styles.lead}>{villa.description}</p><a className={styles.primary} href="#rezervasyon">Tarih kontrol et</a></div>
+        <div className={styles.detailHeroCopy} id="ana-icerik" tabIndex={-1}>
+          <span className={styles.eyebrow}>{villa.label} · PATARA · KAŞ</span>
+          <h1 className={styles.title}>{villa.name}</h1>
+          <p className={styles.lead}>{villa.description}</p>
+          <div style={{display:"flex",gap:10,flexWrap:"wrap"}}>
+            <a className={styles.primary} href="#rezervasyon">Tarih kontrol et</a>
+            <TrackedWhatsappLink className={styles.secondary} href={whatsappLink(villa.whatsappMessage)} target="_blank" rel="noopener noreferrer" villaId={toVillaId(villa.villa)} villaName={villa.name} ctaLocation="villa_hero">WhatsApp'tan Yaz</TrackedWhatsappLink>
+          </div>
+        </div>
       </section>
 
       <section className={styles.detailIntro}>
@@ -372,6 +383,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
 
       <div className={styles.stickyCta}>
         <a href="#rezervasyon">Tarih kontrol et</a>
+        <TrackedWhatsappLink href={whatsappLink(villa.whatsappMessage)} target="_blank" rel="noopener noreferrer" villaId={toVillaId(villa.villa)} villaName={villa.name} ctaLocation="villa_sticky_cta">WhatsApp</TrackedWhatsappLink>
       </div>
     </main>
   );

@@ -1,5 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getVillaLocations } from "./db";
+import { WHATSAPP_PHONE_DISPLAY_INTL } from "./contact";
 import type { Villa } from "./types";
 
 // Admin "Google Görünürlük" paneli için tek kaynak - hiçbir alan tahmin/uydurma değil, yalnız
@@ -17,9 +18,10 @@ export interface GoogleVisibilitySnapshot {
   reviewRequestUrlConfigured: Record<Villa, boolean>;
   gbpState: GoogleReadinessState;
   reviewAutomationState: GoogleReadinessState;
+  napPhone: string;
 }
 
-// sitemap.ts'teki 5 URL'nin statik aynası - sitemap.ts kendisi de statik/elle yazılmış bir liste
+// sitemap.ts'teki 10 URL'nin statik aynası - sitemap.ts kendisi de statik/elle yazılmış bir liste
 // olduğu için (bkz. SEO audit bulgusu) burada da aynı gerçeği yansıtıyoruz, ayrı bir "gerçek" icat
 // etmiyoruz.
 const SITEMAP_URLS = [
@@ -28,12 +30,18 @@ const SITEMAP_URLS = [
   "https://safiradestan.com/villa-destan",
   "https://safiradestan.com/rezervasyon-kosullari",
   "https://safiradestan.com/rehber",
+  "https://safiradestan.com/rehber/patara",
+  "https://safiradestan.com/rehber/patara-plaji",
+  "https://safiradestan.com/rehber/patara-antik-kenti",
+  "https://safiradestan.com/rehber/kas",
+  "https://safiradestan.com/rehber/kalkan",
 ];
 
 const JSON_LD_PAGES = [
   "/ (WebSite, Organization, FAQPage)",
-  "/villa-safira (VacationRental, BreadcrumbList, FAQPage)",
-  "/villa-destan (VacationRental, BreadcrumbList, FAQPage)",
+  "/villa-safira (VacationRental+telephone, BreadcrumbList, FAQPage)",
+  "/villa-destan (VacationRental+telephone, BreadcrumbList, FAQPage)",
+  "/rehber/* (5 sayfa — BreadcrumbList, WebPage, FAQPage)",
 ];
 
 export async function getGoogleVisibilitySnapshot(): Promise<GoogleVisibilitySnapshot> {
@@ -48,10 +56,12 @@ export async function getGoogleVisibilitySnapshot(): Promise<GoogleVisibilitySna
     Safira: Boolean(env.GOOGLE_REVIEW_REQUEST_URL_SAFIRA),
     Destan: Boolean(env.GOOGLE_REVIEW_REQUEST_URL_DESTAN),
   };
-  // GBP owner/manager erişimi koddan doğrulanamaz - bu her zaman en az WAITING_OWNER_ACCESS'tir,
-  // yalnız kullanıcı bunu manuel doğrulayıp bize API erişimi (OAuth + GBP API approval) sağladığında
-  // GOOGLE_READY'ye geçebilir (bu geçiş de kod değil, insan onayı gerektirir).
-  const gbpState: GoogleReadinessState = "WAITING_OWNER_ACCESS";
+  // Kullanıcı mevcut Safira/Destan GBP profillerinin sahibi olduğunu doğruladı (2026-09-01) - bu
+  // yüzden artık WAITING_OWNER_ACCESS değil, spesifik olarak WAITING_API_ACCESS: hiçbir GBP
+  // OAuth/service-account credential'ı Cloudflare secret'larında yok (doğrulandı, wrangler secret
+  // list ile), bu yüzden kod hiçbir mutation/read API çağrısı yapamaz. GOOGLE_READY'ye geçiş yalnız
+  // gerçek bir GBP API erişimi (OAuth client + onay) sağlandığında mümkün.
+  const gbpState: GoogleReadinessState = "WAITING_API_ACCESS";
   const reviewAutomationState: GoogleReadinessState = placesApiConfigured && placeIdConfigured.Safira && placeIdConfigured.Destan
     ? "WAITING_OWNER_ACCESS" // API key+place ID olsa bile "yorum iste" linki olmadan otomasyon tam değildir
     : "WAITING_API_ACCESS";
@@ -65,5 +75,6 @@ export async function getGoogleVisibilitySnapshot(): Promise<GoogleVisibilitySna
     reviewRequestUrlConfigured,
     gbpState,
     reviewAutomationState,
+    napPhone: WHATSAPP_PHONE_DISPLAY_INTL,
   };
 }

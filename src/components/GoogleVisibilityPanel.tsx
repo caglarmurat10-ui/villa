@@ -51,12 +51,11 @@ export default function GoogleVisibilityPanel({
       <p style={{marginTop:10,fontSize:9,color:"#8fa4bd"}}>Search Console API bağlı değil — index sayısı tahmini olarak gösterilmiyor. GBP owner/manager erişimi koddan doğrulanamaz; aşağıdaki adminler manuel kontrol gerektirir.</p>
 
       <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
-        <strong style={{fontSize:11,color:"#93c5fd"}}>GBP admin checklist (owner tarafından)</strong>
+        <strong style={{fontSize:11,color:"#93c5fd"}}>GBP admin checklist (owner tarafından — Cloudflare secret'larında GBP API credential'ı yok, doğrulandı)</strong>
         <ul style={{margin:"8px 0 0",paddingLeft:18,fontSize:10,color:"#b8c6d8",lineHeight:1.7}}>
-          <li>Safira ve Destan için business.google.com'da profil claimed/verified mi kontrol edin</li>
-          <li>Bu profillerin yöneticisi/owner'ı hangi Google hesabı - erişiminiz var mı doğrulayın</li>
-          <li>Varsa Google Cloud project + Business Profile API onayı durumunu kontrol edin</li>
-          <li>Her villa için GBP panelinden "Yorum iste" linkini alıp bize iletin (tahmin edilemez)</li>
+          <li>business.google.com'da Safira/Destan profillerinde şu bilgilerin GBP ile eşleştiğini kontrol edin: telefon <b>{snapshot.napPhone}</b>, website <code>safiradestan.com/villa-safira</code> / <code>villa-destan</code>, Instagram/Facebook linkleri</li>
+          <li>GBP API kullanmak isterseniz: Google Cloud'da bir proje açıp Business Profile API'yi etkinleştirin, OAuth client credential'ı oluşturun, bize (yalnız isim/talimat olarak) hangi env değişkenlerinin bekleneceğini söyleriz — değerleri asla bizimle paylaşmayın, doğrudan Cloudflare secret olarak girilmeli</li>
+          <li>Her villa için GBP panelinden "Yorum iste" linkini alıp Cloudflare secret olarak girin (GOOGLE_REVIEW_REQUEST_URL_SAFIRA/DESTAN) — link tahmin edilemez</li>
         </ul>
       </div>
 

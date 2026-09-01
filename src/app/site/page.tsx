@@ -10,6 +10,9 @@ import { listBlockedRanges } from "@/lib/ota/availability";
 import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
 import TrackedMapsLink from "@/components/analytics/TrackedMapsLink";
 import TrackedSocialLink from "@/components/analytics/TrackedSocialLink";
+import TrackedWhatsappLink from "@/components/analytics/TrackedWhatsappLink";
+import TrackedPhoneLink from "@/components/analytics/TrackedPhoneLink";
+import { whatsappLink, WHATSAPP_PHONE_INTL, WHATSAPP_PHONE_DISPLAY_TR } from "@/lib/contact";
 import styles from "./site.module.css";
 
 export const dynamic = "force-dynamic";
@@ -317,6 +320,13 @@ export default async function PublicHomePage() {
       <footer className={styles.footer} id="iletisim">
         <div className={styles.footerBrand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></div>
         <div className={styles.footerGrid}>
+          <div>
+            <small>İLETİŞİM</small>
+            <p>
+              <TrackedWhatsappLink href={whatsappLink("Merhaba, Villa Safira ve Villa Destan hakkında bilgi almak istiyorum.")} target="_blank" rel="noopener noreferrer" ctaLocation="homepage_footer">WhatsApp'tan yazın</TrackedWhatsappLink><br />
+              <TrackedPhoneLink href={`tel:+${WHATSAPP_PHONE_INTL}`} ctaLocation="homepage_footer">{WHATSAPP_PHONE_DISPLAY_TR}</TrackedPhoneLink>
+            </p>
+          </div>
           <div>
             <small>KONUM</small>
             <p>
