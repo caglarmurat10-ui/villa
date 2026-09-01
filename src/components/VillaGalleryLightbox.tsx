@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GALLERY_CATEGORIES, type GalleryCategorySlug, type VillaGalleryImage } from "@/lib/villa-content";
 import styles from "./VillaGalleryLightbox.module.css";
 
+const SWIPE_THRESHOLD = 40;
+
 export default function VillaGalleryLightbox({
   images,
   villaName,
@@ -16,6 +18,7 @@ export default function VillaGalleryLightbox({
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const lastTriggerRef = useRef<HTMLButtonElement | null>(null);
+  const touchStartX = useRef<number | null>(null);
 
   const availableCategories = useMemo(
     () => GALLERY_CATEGORIES.filter((category) => images.some((image) => image.categories.includes(category.slug))),
@@ -45,6 +48,20 @@ export default function VillaGalleryLightbox({
   function selectCategory(category: GalleryCategorySlug | "all") {
     setActiveCategory(category);
     setOpenIndex(null);
+  }
+
+  function onTouchStart(event: React.TouchEvent) {
+    touchStartX.current = event.touches[0]?.clientX ?? null;
+  }
+
+  function onTouchEnd(event: React.TouchEvent) {
+    if (touchStartX.current === null) return;
+    const endX = event.changedTouches[0]?.clientX ?? touchStartX.current;
+    const delta = endX - touchStartX.current;
+    touchStartX.current = null;
+    if (Math.abs(delta) < SWIPE_THRESHOLD) return;
+    if (delta > 0) showPrev();
+    else showNext();
   }
 
   useEffect(() => {
@@ -84,6 +101,8 @@ export default function VillaGalleryLightbox({
 
   if (images.length === 0) return null;
 
+  const current = openIndex !== null ? filteredImages[openIndex] : null;
+
   return (
     <>
       {availableCategories.length > 1 && (
@@ -116,27 +135,45 @@ export default function VillaGalleryLightbox({
             type="button"
             key={image.src}
             className={styles.thumb}
+            style={{ aspectRatio: `${image.width} / ${image.height}` }}
             onClick={(event) => openAt(index, event.currentTarget)}
             aria-label={`${villaName} fotoğrafını büyüt: ${image.alt}`}
           >
             <picture>
               <source srcSet={image.webp.replace(/\.webp$/, "-thumb.webp")} type="image/webp" />
-              <img src={image.src.replace(/\.jpg$/, "-thumb.jpg")} alt={image.alt} loading="lazy" width={480} height={320} />
+              <img
+                src={image.src.replace(/\.jpg$/, "-thumb.jpg")}
+                alt={image.alt}
+                loading="lazy"
+                width={image.width}
+                height={image.height}
+              />
             </picture>
           </button>
         ))}
       </div>
 
-      {openIndex !== null && filteredImages[openIndex] && (
-        <div ref={dialogRef} className={styles.overlay} role="dialog" aria-modal="true" aria-label={`${villaName} fotoğraf galerisi`}>
+      {current && (
+        <div
+          ref={dialogRef}
+          className={styles.overlay}
+          role="dialog"
+          aria-modal="true"
+          aria-label={`${villaName} fotoğraf galerisi`}
+          onTouchStart={onTouchStart}
+          onTouchEnd={onTouchEnd}
+        >
           <button ref={closeButtonRef} type="button" className={styles.close} onClick={close} aria-label="Galeriyi kapat">✕</button>
           <button type="button" className={`${styles.nav} ${styles.navPrev}`} onClick={showPrev} aria-label="Önceki fotoğraf">‹</button>
           <picture>
-            <source srcSet={filteredImages[openIndex].webp} type="image/webp" />
-            <img className={styles.fullImage} src={filteredImages[openIndex].src} alt={filteredImages[openIndex].alt} />
+            <source srcSet={current.webp} type="image/webp" />
+            <img className={styles.fullImage} src={current.src} alt={current.alt} width={current.width} height={current.height} />
           </picture>
           <button type="button" className={`${styles.nav} ${styles.navNext}`} onClick={showNext} aria-label="Sonraki fotoğraf">›</button>
-          <div className={styles.caption}>{filteredImages[openIndex].alt} · {openIndex + 1}/{filteredImages.length}</div>
+          <div className={styles.caption}>
+            <span>{current.alt}</span>
+            <span className={styles.counter}>{openIndex! + 1} / {filteredImages.length}</span>
+          </div>
         </div>
       )}
     </>
