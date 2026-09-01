@@ -48,6 +48,10 @@ function isAllowed(url: URL, platform: OtaPlatform): boolean {
   return entry.pathPrefixes.some((prefix) => url.pathname.startsWith(prefix));
 }
 
+export function hasAllowlistedHosts(platform: OtaPlatform): boolean {
+  return ALLOWLIST[platform].hosts.length > 0;
+}
+
 export class SsrfBlockedError extends Error {}
 
 export async function fetchIcsSafely(rawUrl: string, platform: OtaPlatform): Promise<string> {

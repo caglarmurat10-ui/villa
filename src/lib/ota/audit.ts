@@ -4,12 +4,14 @@ import type { ExternalBlockSource } from "./types";
 
 export type OtaAuditAction =
   | "ICAL_FEED_CONNECTED"
+  | "ICAL_FEED_DISCONNECTED"
   | "ICAL_SYNC_SUCCESS"
   | "ICAL_SYNC_FAILED"
   | "EXTERNAL_BLOCK_CREATED"
   | "EXTERNAL_BLOCK_UPDATED"
   | "EXTERNAL_BLOCK_REMOVED"
-  | "BOOKING_CONFLICT_DETECTED";
+  | "BOOKING_CONFLICT_DETECTED"
+  | "OTA_HUB_ACTIVATED";
 
 interface OtaAuditPayload {
   villa: Villa;

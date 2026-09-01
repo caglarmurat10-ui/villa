@@ -29,6 +29,12 @@ export async function setImportUrl(villa: Villa, platform: OtaPlatform, url: str
   await store.put(importUrlKey(villa, platform), url);
 }
 
+// "Bağlantıyı Kaldır" - secret'ı KV'den tamamen siler (yalnız is_enabled=0 yapıp URL'yi bırakmaz).
+export async function deleteImportUrl(villa: Villa, platform: OtaPlatform): Promise<void> {
+  const store = await kv();
+  await store.delete(importUrlKey(villa, platform));
+}
+
 interface ExportTokenRecord {
   villa: Villa;
   excludeSource: OtaPlatform;
