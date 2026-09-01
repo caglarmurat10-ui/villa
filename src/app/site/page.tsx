@@ -3,11 +3,15 @@ import Link from "next/link";
 import PublicBookingWidget from "@/components/PublicBookingWidget";
 import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
 import { VILLAS, FAQ_ITEMS, REGION_INFO, type VillaSlug } from "@/lib/villa-content";
+import { GUIDE_PLACES, GUIDE_CATEGORIES } from "@/lib/region-guide";
+import { getLatestWeather, minutesSince, toPublicReading } from "@/lib/weather";
 import styles from "./site.module.css";
 
 export const dynamic = "force-dynamic";
 
 const ORIGIN = "https://safiradestan.com";
+const GUIDE_TEASER_IDS = ["patara-antik-kenti", "patara-plaji", "kaputas-plaji", "kas-merkez"];
+const GUIDE_TEASER_PLACES = GUIDE_PLACES.filter((place) => GUIDE_TEASER_IDS.includes(place.id));
 const SOCIAL_LINKS = [
   VILLAS["villa-safira"].instagram,
   VILLAS["villa-destan"].instagram,
@@ -91,7 +95,8 @@ const structuredData = {
 };
 
 export default async function PublicHomePage() {
-  const [reservations, prices, locations] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations()]);
+  const [reservations, prices, locations, weatherReading] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), getLatestWeather()]);
+  const weather = weatherReading ? toPublicReading(weatherReading) : null;
   const bookingReservations = reservations.map(({ villa, checkIn, checkOut }) => ({ villa, checkIn, checkOut }));
   const bookingPrices = prices.map(({ villa, startDate, endDate, nightlyRate }) => ({ villa, startDate, endDate, nightlyRate }));
 
@@ -216,11 +221,57 @@ export default async function PublicHomePage() {
         </div>
       </section>
 
+      <section className={styles.weatherBand} id="hava-durumu">
+        <span className={styles.kicker}>PATARA&apos;DA ŞU AN</span>
+        <p className={styles.weatherSubtitle}>Villa Safira ve Villa Destan yakınındaki yerel hava istasyonundan son ölçüm.</p>
+        {weather && weather.freshness !== "stale" ? (
+          <div className={styles.weatherCard}>
+            <div className={styles.weatherMain}>
+              <strong>{Math.round(weather.temperatureC)}°C</strong>
+              {weather.apparentTemperatureC !== null && <span>Hissedilen {Math.round(weather.apparentTemperatureC)}°C</span>}
+            </div>
+            <div className={styles.weatherCompass}>
+              <span className={styles.weatherCompassArrow} style={{ transform: `rotate(${weather.windDirection.degrees}deg)` }} />
+              <small>{weather.windDirection.abbr} · {weather.windDirection.name}</small>
+            </div>
+            <div className={styles.weatherGrid}>
+              <div><small>Nem</small><span>%{Math.round(weather.humidityPct)}</span></div>
+              <div><small>Rüzgar</small><span>{weather.windSpeedKmh !== null ? `${Math.round(weather.windSpeedKmh)} km/s` : "—"}</span></div>
+              <div><small>Ani rüzgar</small><span>{weather.gustSpeedKmh !== null ? `${Math.round(weather.gustSpeedKmh)} km/s` : "—"}</span></div>
+              <div><small>Basınç</small><span>{Math.round(weather.pressureHpa)} hPa</span></div>
+              <div><small>UV</small><span>{weather.uvIndex.toFixed(1)}</span></div>
+              <div><small>Yağış</small><span>{weather.raining ? "Yağmurlu" : weather.precipitationMm !== null ? `${weather.precipitationMm.toFixed(1)} mm` : "—"}</span></div>
+            </div>
+            <p className={styles.weatherMeta}>
+              {weather.freshness === "live"
+                ? `Canlı ölçüm · ${new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" }).format(new Date(weather.observedAt))}`
+                : `Son ölçüm: ${Math.round(minutesSince(weather.observedAt))} dk önce`}
+            </p>
+          </div>
+        ) : (
+          <p className={styles.weatherFallback}>Veri geçici olarak güncellenemiyor.</p>
+        )}
+      </section>
+
       <section className={styles.locationBlock}>
         <span className={styles.kicker}>{REGION_INFO.kicker}</span>
         <h2>{REGION_INFO.title}</h2>
         <p>{REGION_INFO.body}</p>
         <a href="#iletisim">Rezervasyon hakkında konuşalım →</a>
+      </section>
+
+      <section className={styles.section} id="rehber">
+        <div className={styles.editorialHead}><span className={styles.kicker}>BÖLGEYİ KEŞFET</span><h2>Patara &amp;<br />Kaş rehberi</h2><p>Villa Safira ve Villa Destan çevresinde tarih, deniz ve doğa dolu gerçek gezi noktaları.</p></div>
+        <div className={styles.guideTeaserGrid}>
+          {GUIDE_TEASER_PLACES.map((place) => (
+            <div className={styles.guideTeaserCard} key={place.id}>
+              <span className={styles.kicker}>{GUIDE_CATEGORIES.find((c) => c.slug === place.category)?.label}</span>
+              <h3>{place.name}</h3>
+              <p>{place.description}</p>
+            </div>
+          ))}
+        </div>
+        <Link className={styles.experienceLink} href="/rehber">Tüm bölge rehberini incele →</Link>
       </section>
 
       <section className={styles.faq} id="sss">

@@ -10,12 +10,15 @@ const ADMIN_ORIGIN = `https://${ADMIN_HOST}`;
 const LEGACY_ADMIN_ENTRY_PATHS = new Set(["/", "/login"]);
 const PUBLIC_API_PATHS = new Set([
   "/api/public/booking-inquiries",
+  "/api/weather/ingest",
+  "/api/weather/current",
 ]);
 const PUBLIC_ROUTE_MAP = new Map([
   ["/", "/site"],
   ["/villa-safira", "/site/villa-safira"],
   ["/villa-destan", "/site/villa-destan"],
   ["/rezervasyon-kosullari", "/site/rezervasyon-kosullari"],
+  ["/rehber", "/site/rehber"],
 ]);
 const TRANSITION_PATHS = new Set([
   "/api/health",

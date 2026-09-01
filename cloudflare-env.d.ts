@@ -20,6 +20,10 @@ declare global {
     SOCIAL_AUTO_PUBLISH_ENABLED?: string;
     SOCIAL_AUTO_PUBLISH_TIME?: string;
     SOCIAL_AUTO_PUBLISH_LIMIT?: string;
+    WEATHER_INGEST_SECRET?: string;
+    GOOGLE_PLACES_API_KEY?: string;
+    GOOGLE_PLACE_ID_SAFIRA?: string;
+    GOOGLE_PLACE_ID_DESTAN?: string;
   }
 }
 

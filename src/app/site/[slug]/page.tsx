@@ -6,6 +6,7 @@ import VillaGalleryLightbox from "@/components/VillaGalleryLightbox";
 import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
 import { VILLAS, FAQ_ITEMS, REGION_INFO, formatAddress, type VillaSlug } from "@/lib/villa-content";
 import { POLICY_SUMMARY } from "@/lib/reservation-policy";
+import { fetchGoogleReviews } from "@/lib/google-reviews";
 import styles from "../site.module.css";
 
 const ORIGIN = "https://safiradestan.com";
@@ -45,7 +46,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
   const { slug } = await params;
   if (!(slug in villas)) notFound();
   const villa = villas[slug as VillaSlug];
-  const [reservations, prices, locations] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations()]);
+  const [reservations, prices, locations, googleReviews] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), fetchGoogleReviews(villa.villa)]);
   const bookingReservations = reservations.map(({ villa: itemVilla, checkIn, checkOut }) => ({ villa: itemVilla, checkIn, checkOut }));
   const bookingPrices = prices.map(({ villa: itemVilla, startDate, endDate, nightlyRate }) => ({ villa: itemVilla, startDate, endDate, nightlyRate }));
   const mapsUrl = locations[villa.villa];
@@ -91,6 +92,22 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
             .map((item) => ({ "@type": "LocationFeatureSpecification", name: item.title, value: true })),
         ],
         sameAs: [villa.instagram, villa.facebook],
+        ...(googleReviews && googleReviews.reviews.length > 0
+          ? {
+              aggregateRating: {
+                "@type": "AggregateRating",
+                ratingValue: googleReviews.rating,
+                reviewCount: googleReviews.userRatingCount,
+              },
+              review: googleReviews.reviews.map((review) => ({
+                "@type": "Review",
+                reviewRating: { "@type": "Rating", ratingValue: review.rating },
+                author: { "@type": "Person", name: review.author.displayName },
+                reviewBody: review.text,
+                datePublished: review.publishTime || undefined,
+              })),
+            }
+          : {}),
       },
       {
         "@type": "BreadcrumbList",
@@ -204,7 +221,33 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
           <span className={styles.factChip}>Sigara: {POLICY_SUMMARY.smoking}</span>
         </div>
         <Link className={styles.experienceLink} href="/rezervasyon-kosullari">Rezervasyon ve Konaklama Koşullarını İncele →</Link>
+        <Link className={styles.experienceLink} href="/#hava-durumu">Patara’da Şu An: Yerel Hava Durumu →</Link>
       </section>
+
+      {googleReviews && googleReviews.reviews.length > 0 && (
+        <section className={styles.reviewsSection}>
+          <span className={styles.kicker}>MİSAFİRLER NE DİYOR?</span>
+          <div className={styles.reviewsHead}>
+            <strong>{googleReviews.rating.toFixed(1)}</strong>
+            <div>
+              <span>Google puanı</span>
+              <span>{googleReviews.userRatingCount} yorum</span>
+            </div>
+          </div>
+          <div className={styles.reviewsGrid}>
+            {googleReviews.reviews.map((review, index) => (
+              <article className={styles.reviewCard} key={index}>
+                <p>&ldquo;{review.text}&rdquo;</p>
+                <div className={styles.reviewAuthor}>
+                  <span>{review.author.displayName}</span>
+                  {review.relativeDescription && <small>{review.relativeDescription}</small>}
+                </div>
+              </article>
+            ))}
+          </div>
+          <a className={styles.experienceLink} href={googleReviews.googleMapsUri} target="_blank" rel="noopener noreferrer">Google Maps&apos;te Tüm Yorumları Gör →</a>
+        </section>
+      )}
 
       <section className={styles.bookingBand} id="rezervasyon">
         <div className={styles.bookingWrap}>

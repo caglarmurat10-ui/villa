@@ -7,6 +7,8 @@ const PUBLIC_API_PATHS = new Set([
   "/api/health",
   "/api/system/version",
   "/api/public/booking-inquiries",
+  "/api/weather/ingest",
+  "/api/weather/current",
 ]);
 const WORKER_ALLOWED_PATHS = new Set([
   "/api/health",
@@ -20,8 +22,9 @@ const PUBLIC_REWRITES = new Map([
   ["/villa-safira", "/site/villa-safira"],
   ["/villa-destan", "/site/villa-destan"],
   ["/rezervasyon-kosullari", "/site/rezervasyon-kosullari"],
+  ["/rehber", "/site/rehber"],
 ]);
-const PUBLIC_INTERNAL_PATHS = new Set(["/site", "/site/villa-safira", "/site/villa-destan", "/site/rezervasyon-kosullari"]);
+const PUBLIC_INTERNAL_PATHS = new Set(["/site", "/site/villa-safira", "/site/villa-destan", "/site/rezervasyon-kosullari", "/site/rehber"]);
 
 function notFound() {
   return new NextResponse("Not Found", {
