@@ -1,5 +1,21 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
-import { OTA_PLATFORMS, OTA_VILLAS, type OtaConnectionStatus } from "./types";
+import { OTA_PLATFORMS, OTA_VILLAS, type OtaConnectionStatus, type OtaSyncHealth } from "./types";
+
+// Takvim senkronu gerçek-zamanlı bir API değil - bizim cron'umuz 30 dk'da bir, Airbnb'nin kendi
+// import yenilemesi ise (kendi Help Center'ına göre) ~3 saatte bir çalışıyor. Eşikler buna göre:
+// yeşil = son 90 dk (bizim cron'un birkaç turunu kaçırsa bile makul tampon), sarı = son 6 saat
+// (Airbnb'nin kendi gecikmesi + tampon), kırmızı = daha eski veya hiç başarılı olmamış.
+const HEALTH_GREEN_MINUTES = 90;
+const HEALTH_YELLOW_MINUTES = 6 * 60;
+
+function computeHealth(connected: boolean, lastSuccessAt: string | null): OtaSyncHealth {
+  if (!connected) return "pending";
+  if (!lastSuccessAt) return "red";
+  const minutesAgo = (Date.now() - Date.parse(lastSuccessAt)) / 60000;
+  if (minutesAgo <= HEALTH_GREEN_MINUTES) return "green";
+  if (minutesAgo <= HEALTH_YELLOW_MINUTES) return "yellow";
+  return "red";
+}
 
 interface ConnectionRow {
   villa: string;
@@ -38,15 +54,18 @@ export async function listOtaConnectionsStatus(): Promise<OtaConnectionStatus[]>
   for (const villa of OTA_VILLAS) {
     for (const platform of OTA_PLATFORMS) {
       const row = byKey.get(`${villa}:${platform}`);
+      const connected = Boolean(row?.is_enabled);
+      const lastSuccessAt = row?.last_success_at ?? null;
       result.push({
         villa,
         platform,
-        connected: Boolean(row?.is_enabled),
+        connected,
         lastSyncedAt: row?.last_synced_at ?? null,
-        lastSuccessAt: row?.last_success_at ?? null,
+        lastSuccessAt,
         lastError: row?.last_error ?? null,
         activeBlockCount: countFor(villa, platform, "active"),
         conflictCount: countFor(villa, platform, "needs_review"),
+        health: computeHealth(connected, lastSuccessAt),
       });
     }
   }

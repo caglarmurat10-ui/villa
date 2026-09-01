@@ -7,6 +7,8 @@ export type ExternalBlockStatus = "active" | "needs_review" | "removed";
 export const OTA_VILLAS: Villa[] = ["Safira", "Destan"];
 export const OTA_PLATFORMS: OtaPlatform[] = ["airbnb", "booking"];
 
+export type OtaSyncHealth = "pending" | "green" | "yellow" | "red";
+
 export interface OtaConnectionStatus {
   villa: Villa;
   platform: OtaPlatform;
@@ -16,4 +18,13 @@ export interface OtaConnectionStatus {
   lastError: string | null;
   activeBlockCount: number;
   conflictCount: number;
+  health: OtaSyncHealth;
+}
+
+export interface AdminExternalBlock {
+  villa: Villa;
+  source: ExternalBlockSource;
+  startDate: string;
+  endDate: string;
+  status: ExternalBlockStatus;
 }

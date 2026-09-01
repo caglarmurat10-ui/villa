@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from "react";
 import type { Reservation, Villa, VillaLocations } from "@/lib/types";
+import type { AdminExternalBlock } from "@/lib/ota/types";
 
 const villas: Villa[] = ["Safira", "Destan"];
+const SOURCE_LABEL: Record<AdminExternalBlock["source"], string> = { airbnb: "Airbnb", booking: "Booking.com", manual: "Manuel blok" };
 const weekdays = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 
 function isoDate(year: number, month: number, day: number) {
@@ -27,11 +29,12 @@ function guestMessage(item: Reservation, type: "Giriş" | "Çıkış", locations
   return `Merhaba 👋\n\nBizi tercih ettiğiniz için teşekkür ederiz.\n\n🧳 Çıkış saatimiz 10.00’dır.\n\nÇıkış saatinizde villada olacağız ve çıkış işlemlerini birlikte tamamlayacağız.\n\nGüzel anılarla ayrılmanızı diler, sizi yeniden ağırlamaktan memnuniyet duyarız.`;
 }
 
-function VillaMonth({ villa, reservations, year, month }: { villa: Villa; reservations: Reservation[]; year: number; month: number }) {
+function VillaMonth({ villa, reservations, externalBlocks, year, month }: { villa: Villa; reservations: Reservation[]; externalBlocks: AdminExternalBlock[]; year: number; month: number }) {
   const days = new Date(year, month + 1, 0).getDate();
   const offset = (new Date(year, month, 1).getDay() + 6) % 7;
   const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
   const villaRows = reservations.filter((item) => item.villa === villa);
+  const villaBlocks = externalBlocks.filter((item) => item.villa === villa);
 
   return <section className={`villa-month villa-${villa.toLowerCase()}`}>
     <div className="villa-month-title"><div className="villa-calendar-mark">{villa[0]}</div><div><strong>Villa {villa}</strong><span>{villaRows.filter((r) => r.checkIn.slice(0, 7) === `${year}-${String(month + 1).padStart(2, "0")}`).length} giriş</span></div></div>
@@ -43,18 +46,28 @@ function VillaMonth({ villa, reservations, year, month }: { villa: Villa; reserv
         const stays = villaRows.filter((r) => r.checkIn <= date && r.checkOut > date);
         const arrivals = villaRows.filter((r) => r.checkIn === date);
         const departures = villaRows.filter((r) => r.checkOut === date);
-        return <article className={`villa-day ${date === today ? "today" : ""} ${stays.length ? "occupied" : ""}`} key={date}>
+        const blocksToday = villaBlocks.filter((b) => b.startDate <= date && b.endDate > date);
+        return <article className={`villa-day ${date === today ? "today" : ""} ${stays.length || blocksToday.length ? "occupied" : ""}`} key={date}>
           <strong>{day}</strong>
           {arrivals.map((r) => <span className="day-event arrival" key={`a-${r.id}`}>→ {r.guestName}</span>)}
           {stays.filter((r) => !arrivals.some((a) => a.id === r.id)).slice(0, 2).map((r) => <span className="day-event stay" key={`s-${r.id}`}>{r.guestName}</span>)}
           {departures.map((r) => <span className="day-event departure" key={`d-${r.id}`}>← {r.guestName}</span>)}
+          {blocksToday.map((b, index) => (
+            <span
+              className={`day-event ${b.status === "needs_review" ? "conflict" : "external"}`}
+              key={`b-${b.source}-${b.startDate}-${index}`}
+              title={b.status === "needs_review" ? `Çakışma: ${SOURCE_LABEL[b.source]} — bu tarih Airbnb/Booking üzerinden yönetiliyor olabilir, kontrol edin.` : `Bu tarih ${SOURCE_LABEL[b.source]} üzerinden yönetiliyor.`}
+            >
+              {b.status === "needs_review" ? "⚠ " : ""}{SOURCE_LABEL[b.source]}
+            </span>
+          ))}
         </article>;
       })}
     </div>
   </section>;
 }
 
-export default function VillaCalendarWorkspace({ reservations, locations }: { reservations: Reservation[]; locations: VillaLocations }) {
+export default function VillaCalendarWorkspace({ reservations, locations, externalBlocks }: { reservations: Reservation[]; locations: VillaLocations; externalBlocks: AdminExternalBlock[] }) {
   const [cursor, setCursor] = useState(() => new Date());
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
@@ -73,7 +86,7 @@ export default function VillaCalendarWorkspace({ reservations, locations }: { re
       <div className="calendar-month-nav"><button onClick={() => setCursor(new Date(year, month - 1, 1))}>‹</button><strong>{monthTitle}</strong><button onClick={() => setCursor(new Date(year, month + 1, 1))}>›</button></div>
     </header>
 
-    <div className="villa-calendar-pair">{villas.map((villa) => <VillaMonth key={villa} villa={villa} reservations={reservations} year={year} month={month} />)}</div>
+    <div className="villa-calendar-pair">{villas.map((villa) => <VillaMonth key={villa} villa={villa} reservations={reservations} externalBlocks={externalBlocks} year={year} month={month} />)}</div>
 
     <section className="calendar-operations">
       <div className="calendar-operations-head"><div><span className="ops-eyebrow">AYLIK İŞLEM LİSTESİ</span><h2>Giriş ve çıkış aksiyonları</h2></div><b>{events.length} işlem</b></div>

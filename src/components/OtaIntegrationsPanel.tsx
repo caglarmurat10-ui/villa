@@ -1,10 +1,17 @@
 "use client";
 
 import { useState } from "react";
-import type { OtaConnectionStatus, OtaPlatform } from "@/lib/ota/types";
+import type { OtaConnectionStatus, OtaPlatform, OtaSyncHealth } from "@/lib/ota/types";
 import type { Villa } from "@/lib/types";
 
 const PLATFORM_LABEL: Record<OtaPlatform, string> = { airbnb: "AIRBNB", booking: "BOOKING.COM" };
+const HEALTH_LABEL: Record<OtaSyncHealth, string> = {
+  green: "Senkronizasyon güncel",
+  yellow: "Gecikme var",
+  red: "Takvim bağlantısı güncellenemiyor",
+  pending: "Takvim bağlantısı bekleniyor",
+};
+const HEALTH_COLOR: Record<OtaSyncHealth, string> = { green: "#22c55e", yellow: "#f59e0b", red: "#ef4444", pending: "#6b7280" };
 
 function formatTime(value: string | null) {
   if (!value) return "Hiç";
@@ -97,6 +104,10 @@ export default function OtaIntegrationsPanel({ initialConnections }: { initialCo
                         <strong style={{ fontSize: 12 }}>Villa {connection.villa}</strong>
                         <span style={{ marginLeft: 8, padding: "3px 8px", borderRadius: 999, fontSize: 9, fontWeight: 900, background: connection.connected ? "#123522" : "#2a2a2a", color: connection.connected ? "#86efac" : "#c8c8c8" }}>
                           {connection.connected ? "Bağlı" : "Takvim bağlantısı bekleniyor"}
+                        </span>
+                        <span style={{ marginLeft: 8, display: "inline-flex", alignItems: "center", gap: 5, fontSize: 9, fontWeight: 800, color: "#9fb0c5" }}>
+                          <i style={{ width: 8, height: 8, borderRadius: "50%", background: HEALTH_COLOR[connection.health], display: "inline-block" }} />
+                          {HEALTH_LABEL[connection.health]}
                         </span>
                       </div>
                       <div style={{ display: "flex", gap: 6 }}>
