@@ -59,6 +59,7 @@ export interface VillaAddress {
 
 export interface VillaQuickFacts {
   bedroomCount: number;
+  maxGuests: number;
   chips: string[];
   summary: string;
 }
@@ -90,11 +91,12 @@ export function formatAddress(address: VillaAddress): string {
 // Yalnızca doğrulanmış bilgiler: mevcut yayında olan içerik, D1 (facebook_account_metadata,
 // social_accounts) ve işletme sahibinin bildirdiği gerçek fotoğraf envanteri temel alınmıştır.
 //
-// quickFacts (oda/banyo yapısı): işletme sahibi tarafından 2026-09-01'de birebir doğrulandı.
-// Safira: 2 yatak odası, ikisinde de özel banyo+WC+jakuzi, ayrıca 1 ortak WC, 1 salon, 1 mutfak,
-// 1 çamaşır odası. Destan: 3 yatak odası — 2'sinde özel banyo+WC+jakuzi, 1'i iki tek kişilik
-// yataklı ve ortak banyo/WC kullanıyor; ayrıca 1 oturma odası, 1 mutfak. Maksimum misafir
-// kapasitesi ve Destan'ın diğer 2 odasının yatak tipi HENÜZ DOĞRULANMADI — uydurulmadı.
+// quickFacts (oda/banyo/kapasite yapısı): işletme sahibi tarafından 2026-09-01'de birebir doğrulandı.
+// Safira: maks. 5 misafir, 2 yatak odası (1. oda: kral yatak; 2. oda: çift kişilik + tek kişilik
+// yatak), ikisinde de özel banyo+WC+jakuzi, ayrıca 1 ortak WC, 1 salon, 1 mutfak, 1 çamaşır odası.
+// Destan: maks. 6 misafir, 3 yatak odası — 2'si çift kişilik yataklı + özel banyo+WC+jakuzi,
+// 3.'sü iki tek kişilik yataklı ve ortak banyo/WC kullanıyor; ayrıca 1 oturma odası, 1 mutfak.
+// Wi-Fi, havuz ölçüsü, iptal/depozito politikası gibi başka alanlar HENÜZ DOĞRULANMADI — uydurulmadı.
 //
 // address/geo: kullanıcının paylaştığı Google Maps pin linkleri çözümlenerek elde edildi
 // (Destan: maps.app.goo.gl/8zCrgoegzri52ro79, Safira: maps.app.goo.gl/fKBpCQhn5Qneuo5H6),
@@ -119,9 +121,9 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
       { src: "/villas/gallery/safira/safira-havuz-panorama.jpg", webp: "/villas/gallery/safira/safira-havuz-panorama.webp", alt: "Villa Safira havuzu ve çam ormanı manzarası", categories: ["havuz", "manzara-drone"], width: 1800, height: 1200 },
       { src: "/villas/gallery/safira/safira-havuz-aktivite.jpg", webp: "/villas/gallery/safira/safira-havuz-aktivite.webp", alt: "Villa Safira havuz başı foseball ve BBQ aktivite alanı", categories: ["ozel-detaylar", "havuz"], width: 1800, height: 1200 },
       { src: "/villas/gallery/safira/safira-salon-yemek.jpg", webp: "/villas/gallery/safira/safira-salon-yemek.webp", alt: "Villa Safira salon ve yemek alanı", categories: ["salon-ortak"], width: 1800, height: 1200 },
-      { src: "/villas/gallery/safira/safira-yatak-odasi.jpg", webp: "/villas/gallery/safira/safira-yatak-odasi.webp", alt: "Villa Safira 1. yatak odası — özel banyo, WC ve jakuzi", categories: ["yatak-odalari", "ozel-detaylar"], width: 1800, height: 1200 },
-      { src: "/villas/gallery/safira/safira-jakuzili-oda.jpg", webp: "/villas/gallery/safira/safira-jakuzili-oda.webp", alt: "Villa Safira 2. yatak odası — özel banyo, WC ve jakuzi", categories: ["yatak-odalari", "ozel-detaylar"], width: 1800, height: 1200 },
-      { src: "/villas/gallery/safira/safira-yatak-odasi-2.jpg", webp: "/villas/gallery/safira/safira-yatak-odasi-2.webp", alt: "Villa Safira'da bir jakuzi köşesi detayı", categories: ["ozel-detaylar"], width: 1800, height: 1200 },
+      { src: "/villas/gallery/safira/safira-yatak-odasi.jpg", webp: "/villas/gallery/safira/safira-yatak-odasi.webp", alt: "Villa Safira 1. yatak odası — kral yatak, özel banyo, WC ve jakuzi", categories: ["yatak-odalari", "ozel-detaylar"], width: 1800, height: 1200 },
+      { src: "/villas/gallery/safira/safira-yatak-odasi-2.jpg", webp: "/villas/gallery/safira/safira-yatak-odasi-2.webp", alt: "Villa Safira 2. yatak odası — çift kişilik ve tek kişilik yatak, özel banyo, WC ve jakuzi", categories: ["yatak-odalari", "ozel-detaylar"], width: 1800, height: 1200 },
+      { src: "/villas/gallery/safira/safira-jakuzili-oda.jpg", webp: "/villas/gallery/safira/safira-jakuzili-oda.webp", alt: "Villa Safira'da bir jakuzi köşesi detayı", categories: ["ozel-detaylar"], width: 1800, height: 1200 },
       { src: "/villas/gallery/safira/safira-mutfak.jpg", webp: "/villas/gallery/safira/safira-mutfak.webp", alt: "Villa Safira mutfak ve yemek alanı", categories: ["mutfak"], width: 1800, height: 1200 },
       { src: "/villas/gallery/safira/safira-banyo.jpg", webp: "/villas/gallery/safira/safira-banyo.webp", alt: "Villa Safira ortak kullanım WC", categories: ["banyolar"], width: 1800, height: 1200 },
       { src: "/villas/gallery/safira/safira-cocuk-oyun-alani.jpg", webp: "/villas/gallery/safira/safira-cocuk-oyun-alani.webp", alt: "Villa Safira bahçe ve çocuk oyun alanı", categories: ["bahce-yasam", "ozel-detaylar"], width: 1800, height: 1200 },
@@ -144,14 +146,15 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
       { title: "Özel havuz", description: "Villaya özel, doğayla çevrili havuz alanı." },
       { title: "Bahçe ve çocuk oyun alanı", description: "Yeşillik içinde açık hava yaşam alanı ve çocuklar için oyun köşesi." },
       { title: "BBQ alanı", description: "Havuz kenarında açık hava yemek / BBQ imkânı." },
-      { title: "2 jakuzili yatak odası", description: "İki yatak odasının her birinde özel banyo, WC ve jakuzi bulunur." },
+      { title: "2 jakuzili yatak odası", description: "Bir yatak odasında kral yatak, diğerinde çift kişilik ve tek kişilik yatak bulunur; her ikisinde de özel banyo, WC ve jakuzi vardır." },
       { title: "Donanımlı mutfak", description: "Ankastre ocak, fırın ve bulaşık makinesiyle tam donanımlı mutfak." },
       { title: "Salon ve çamaşır odası", description: "Geniş bir salonun yanı sıra ayrı bir çamaşır odası bulunur." },
     ],
     quickFacts: {
       bedroomCount: 2,
-      chips: ["2 Yatak Odası", "2 Jakuzili Oda", "2 Özel Banyo/WC", "Ortak WC", "Salon", "Mutfak", "Çamaşır Odası"],
-      summary: "İki yatak odasının her birinde özel banyo, WC ve jakuzi bulunur; ayrıca ortak kullanım için bir WC vardır.",
+      maxGuests: 5,
+      chips: ["5 Misafir", "2 Yatak Odası", "2 Jakuzili Oda", "2 Özel Banyo/WC", "Kral Yatak", "Çift Kişilik + Tek Kişilik Yatak", "Salon", "Mutfak", "Çamaşır Odası"],
+      summary: "Villa Safira, maksimum 5 misafir kapasitesine sahip iki yatak odalı bir villadır. Bir yatak odasında kral yatak, diğerinde çift kişilik ve tek kişilik yatak bulunur. Her iki yatak odasında da özel banyo, WC ve jakuzi vardır.",
     },
   },
   "villa-destan": {
@@ -168,9 +171,9 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
       { src: "/villas/gallery/destan/destan-aksam-havuz.jpg", webp: "/villas/gallery/destan/destan-aksam-havuz.webp", alt: "Villa Destan akşam dış görünüm ve havuz", categories: ["havuz", "manzara-drone", "bahce-yasam"], width: 1800, height: 1200 },
       { src: "/villas/gallery/destan/destan-gece-havuz.jpg", webp: "/villas/gallery/destan/destan-gece-havuz.webp", alt: "Villa Destan gece havuz ambiyansı", categories: ["havuz", "ozel-detaylar"], width: 1800, height: 1200 },
       { src: "/villas/gallery/destan/destan-salon-yemek.jpg", webp: "/villas/gallery/destan/destan-salon-yemek.webp", alt: "Villa Destan salon ve yemek alanı", categories: ["salon-ortak"], width: 1800, height: 1200 },
-      { src: "/villas/gallery/destan/destan-yatak-odasi-2.jpg", webp: "/villas/gallery/destan/destan-yatak-odasi-2.webp", alt: "Villa Destan 1. yatak odası — iki tek kişilik yatak", categories: ["yatak-odalari"], width: 1800, height: 1200 },
-      { src: "/villas/gallery/destan/destan-jakuzili-yatak-odasi.jpg", webp: "/villas/gallery/destan/destan-jakuzili-yatak-odasi.webp", alt: "Villa Destan 2. yatak odası — özel banyo, WC ve jakuzi", categories: ["yatak-odalari", "ozel-detaylar"], width: 1800, height: 1200 },
-      { src: "/villas/gallery/destan/destan-yatak-odasi-3.jpg", webp: "/villas/gallery/destan/destan-yatak-odasi-3.webp", alt: "Villa Destan 3. yatak odası — özel banyo, WC ve jakuzi", categories: ["yatak-odalari", "ozel-detaylar"], width: 1800, height: 1200 },
+      { src: "/villas/gallery/destan/destan-jakuzili-yatak-odasi.jpg", webp: "/villas/gallery/destan/destan-jakuzili-yatak-odasi.webp", alt: "Villa Destan jakuzili yatak odası 1 — çift kişilik yatak, özel banyo, WC ve jakuzi", categories: ["yatak-odalari", "ozel-detaylar"], width: 1800, height: 1200 },
+      { src: "/villas/gallery/destan/destan-yatak-odasi-3.jpg", webp: "/villas/gallery/destan/destan-yatak-odasi-3.webp", alt: "Villa Destan jakuzili yatak odası 2 — çift kişilik yatak, özel banyo, WC ve jakuzi", categories: ["yatak-odalari", "ozel-detaylar"], width: 1800, height: 1200 },
+      { src: "/villas/gallery/destan/destan-yatak-odasi-2.jpg", webp: "/villas/gallery/destan/destan-yatak-odasi-2.webp", alt: "Villa Destan üçüncü yatak odası — iki tek kişilik yatak, ortak kullanım banyo/WC", categories: ["yatak-odalari"], width: 1800, height: 1200 },
       { src: "/villas/gallery/destan/destan-jakuzi-detay.jpg", webp: "/villas/gallery/destan/destan-jakuzi-detay.webp", alt: "Villa Destan'da bir jakuzi köşesi detayı", categories: ["ozel-detaylar"], width: 1800, height: 1200 },
       { src: "/villas/gallery/destan/destan-mutfak.jpg", webp: "/villas/gallery/destan/destan-mutfak.webp", alt: "Villa Destan mutfak ve yemek alanı", categories: ["mutfak"], width: 1800, height: 1200 },
       { src: "/villas/gallery/destan/destan-banyo.jpg", webp: "/villas/gallery/destan/destan-banyo.webp", alt: "Villa Destan ortak kullanım banyo ve WC", categories: ["banyolar"], width: 1800, height: 1200 },
@@ -193,15 +196,16 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
     highlights: [
       { title: "Özel havuz", description: "Gündüz ve akşam kullanıma açık özel havuz." },
       { title: "Bahçe ve çocuk oyun alanı", description: "Dinlenme için ayrılmış açık hava alanı ve çocuklar için oyun köşesi." },
-      { title: "2 jakuzili yatak odası", description: "Üç yatak odasından ikisinde özel banyo, WC ve jakuzi bulunur." },
-      { title: "İkiz yataklı oda", description: "Diğer yatak odasında iki tek kişilik yatak vardır; ortak banyo ve WC kullanılır." },
+      { title: "2 jakuzili yatak odası", description: "İki yatak odasında çift kişilik yatak, özel banyo, WC ve jakuzi bulunur." },
+      { title: "İkiz yataklı oda", description: "Üçüncü yatak odasında iki tek kişilik yatak vardır; ortak banyo ve WC kullanılır." },
       { title: "Donanımlı mutfak", description: "Ankastre ocak, fırın ve bulaşık makinesiyle tam donanımlı mutfak." },
       { title: "Kuşbakışı / drone görünüm", description: "Villanın genel yerleşimi havadan da belgelenmiştir." },
     ],
     quickFacts: {
       bedroomCount: 3,
-      chips: ["3 Yatak Odası", "2 Jakuzili Oda", "2 Özel Banyo/WC", "1 Ortak Banyo/WC", "2 Tek Kişilik Yatak Bulunan Oda", "Oturma Odası", "Mutfak"],
-      summary: "Üç yatak odasından ikisinde özel banyo, WC ve jakuzi bulunur. Diğer yatak odasında iki tek kişilik yatak vardır ve ortak banyo/WC'ye erişim sağlanır.",
+      maxGuests: 6,
+      chips: ["6 Misafir", "3 Yatak Odası", "2 Jakuzili Oda", "2 Özel Banyo/WC", "Ortak Banyo/WC", "2 Çift Kişilik Yatak", "2 Tek Kişilik Yatak", "Oturma Odası", "Mutfak"],
+      summary: "Villa Destan, maksimum 6 misafir kapasitesine sahip üç yatak odalı bir villadır. İki yatak odasında çift kişilik yatak, özel banyo, WC ve jakuzi bulunur. Üçüncü yatak odasında iki tek kişilik yatak vardır ve ortak kullanım banyo/WC'ye erişim sağlanır.",
     },
   },
 };

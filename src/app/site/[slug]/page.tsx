@@ -76,6 +76,10 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
         containsPlace: {
           "@type": "Accommodation",
           numberOfBedrooms: villa.quickFacts.bedroomCount,
+          occupancy: {
+            "@type": "QuantitativeValue",
+            value: villa.quickFacts.maxGuests,
+          },
         },
         amenityFeature: [
           { "@type": "LocationFeatureSpecification", name: "Özel havuz", value: true },
