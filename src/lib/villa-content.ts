@@ -144,7 +144,7 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
     description: "Patara’nın doğal dokusu içinde, özel havuzunuzdan ve bağımsız yaşam alanınızdan vazgeçmeden sakin ve özgür bir Akdeniz tatili.",
     quote: "Günün hiçbir saatinde acele etmeniz gerekmeyen bir yer.",
     address: {
-      streetAddress: "Gelemiş Mah. Karaağaçlı Boğaz Sk. Kale Mevkii No:60/9",
+      streetAddress: "Gelemiş Mah. Karaağaçlıboğaz Sk. Kale Mevki No:60/9",
       addressLocality: "Kaş",
       addressRegion: "Antalya",
       postalCode: "07976",

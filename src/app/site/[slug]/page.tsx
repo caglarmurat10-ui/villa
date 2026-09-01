@@ -105,7 +105,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
             .filter((item) => item.title !== "Özel havuz")
             .map((item) => ({ "@type": "LocationFeatureSpecification", name: item.title, value: true })),
         ],
-        sameAs: [villa.instagram, villa.facebook],
+        sameAs: [villa.instagram, villa.facebook, villa.airbnbListingUrl, mapsUrl].filter((url): url is string => Boolean(url)),
         ...(googleReviews && googleReviews.reviews.length > 0
           ? {
               aggregateRating: {

@@ -1,7 +1,11 @@
-// GTM/GA4 analytics katmanı — TEK yükleyici: GTM-KFZ62MJG. GA4 (G-0VYXCFEKND) doğrudan gtag.js ile
-// gömülmez, yalnızca GTM container'ı içinden GA4 Configuration tag olarak çalışır (duplicate page_view
-// riski olmasın diye). Bu dosya sadece PUBLIC SITE'ta mount edilir (bkz. layout.tsx isPublicSite) —
-// admin.safiradestan.com ve workers.dev'de hiç çalışmaz.
+// GTM/GA4 analytics katmanı — TEK yükleyici: GTM-KFZ62MJG. GA4 doğrudan gtag.js ile gömülmez,
+// yalnızca GTM container'ı içinden GA4 Configuration tag olarak çalışır (duplicate page_view riski
+// olmasın diye) — bu yüzden gerçek GA4 Measurement ID bu koda hiç yazılmaz/gerekmez. Measurement ID
+// must be verified from the live GA4 Admin → Data Streams → Web screen before being treated as
+// authoritative anywhere (bir önceki not burada uydurulmuş/doğrulanmamış bir ID taşıyordu — GTM
+// container'ının kendi içindeki GA4 tag konfigürasyonu tek doğruluk kaynağıdır, bu dosya değil).
+// Bu dosya sadece PUBLIC SITE'ta mount edilir (bkz. layout.tsx isPublicSite) — admin.safiradestan.com
+// ve workers.dev'de hiç çalışmaz.
 //
 // Google'ın resmi "Consent Mode + GTM-only" deseni kullanılıyor: gtag.js kütüphanesi hiç yüklenmiyor,
 // yalnızca standart gtag() SHIM'i (dataLayer.push(arguments)) consent default/update komutları için

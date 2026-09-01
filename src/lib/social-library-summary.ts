@@ -16,6 +16,35 @@ async function database(): Promise<D1Database> {
 // operasyon tablosundan ve src/lib/social-content-library.ts'teki (JSON tabanlı, farklı/önceki bir
 // içerik kaynağı) socialContentTemplates'ten TAMAMEN bağımsız. Bu yalnız admin panelinde gerçek
 // automation_class dağılımını göstermek için.
+export interface PublishStats {
+  windowDays: number;
+  publishedCount: number;
+  failedCount: number;
+  byPlatform: { platform: string; published: number; failed: number }[];
+}
+
+// Yalnız D1'de gerçekten sahip olduğumuz veri: yayın denemesi/başarı istatistiği. Site trafiği,
+// WhatsApp lead, maps/rehber click gibi metrikler GA4 Data API bağlanmadan ASLA burada gösterilmez
+// (bkz. google-visibility.ts - "Permissions yoksa uydurma data gösterme" kuralı).
+export async function getPublishStats(windowDays: number, todayIso: string): Promise<PublishStats> {
+  const db = await database();
+  const sinceDate = new Date(Date.parse(todayIso) - windowDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const rows = await db.prepare(
+    `SELECT platform,
+       SUM(CASE WHEN status = 'Yayınlandı' AND published_at >= ? THEN 1 ELSE 0 END) as published,
+       SUM(CASE WHEN status = 'Planlandı' AND last_publish_error IS NOT NULL AND last_publish_attempt_at >= ? THEN 1 ELSE 0 END) as failed
+     FROM social_posts
+     GROUP BY platform`,
+  ).bind(sinceDate, sinceDate).all<{ platform: string; published: number; failed: number }>();
+  const byPlatform = (rows.results ?? []).map((r) => ({ platform: r.platform, published: r.published ?? 0, failed: r.failed ?? 0 }));
+  return {
+    windowDays,
+    publishedCount: byPlatform.reduce((sum, r) => sum + r.published, 0),
+    failedCount: byPlatform.reduce((sum, r) => sum + r.failed, 0),
+    byPlatform,
+  };
+}
+
 export async function getContentLibrarySummary(): Promise<ContentLibrarySummary> {
   const db = await database();
   const rows = await db.prepare(

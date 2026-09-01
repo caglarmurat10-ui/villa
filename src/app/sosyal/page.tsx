@@ -10,7 +10,9 @@ import { getMetaDiagnostic } from "@/lib/meta-diagnostics";
 import { listReservations } from "@/lib/db";
 import { findAvailabilityGaps } from "@/lib/social-availability";
 import { listSocialPosts } from "@/lib/social-db";
-import { getContentLibrarySummary } from "@/lib/social-library-summary";
+import { getContentLibrarySummary, getPublishStats } from "@/lib/social-library-summary";
+import { getGoogleVisibilitySnapshot } from "@/lib/google-visibility";
+import GoogleVisibilityPanel from "@/components/GoogleVisibilityPanel";
 import type { Villa } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -37,11 +39,15 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
   const metaConnected = firstParam(params.meta_connected);
   const metaBrand = firstParam(params.meta_brand);
 
-  const [posts, initialAccounts, reservations, contentLibrarySummary] = await Promise.all([
+  const today = istanbulToday();
+  const [posts, initialAccounts, reservations, contentLibrarySummary, googleSnapshot, stats7, stats30] = await Promise.all([
     listSocialPosts(30),
     listMetaAccounts(),
     listReservations(),
     getContentLibrarySummary(),
+    getGoogleVisibilitySnapshot(),
+    getPublishStats(7, today),
+    getPublishStats(30, today),
   ]);
   const { env } = await getCloudflareContext({ async: true });
   const autoPublishEnabled = String(env.SOCIAL_AUTO_PUBLISH_ENABLED ?? "true").toLowerCase() === "true";
@@ -49,7 +55,7 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
   const maintenance = await maintainLegacyInstagramConnections(initialAccounts);
   const accounts = maintenance.refreshed ? await listMetaAccounts() : initialAccounts;
   const diagnostic = await getMetaDiagnostic(accounts);
-  const gaps = findAvailabilityGaps(reservations, istanbulToday());
+  const gaps = findAvailabilityGaps(reservations, today);
   const facebookByVilla = new Map(
     accounts.filter((item) => item.platform === "Facebook").map((item) => [item.villa, item]),
   );
@@ -114,5 +120,6 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
       </a>
     </div>
     <SocialDeferredContent posts={posts} gaps={gaps} />
+    <GoogleVisibilityPanel snapshot={googleSnapshot} stats7={stats7} stats30={stats30} reservations={reservations} todayIso={today} />
   </>;
 }
