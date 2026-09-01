@@ -6,6 +6,7 @@ import { VILLAS, FAQ_ITEMS, REGION_INFO, type VillaSlug } from "@/lib/villa-cont
 import { GUIDE_PLACES, GUIDE_CATEGORIES } from "@/lib/region-guide";
 import { getLatestWeather, minutesSince, toPublicReading } from "@/lib/weather";
 import { toVillaId } from "@/lib/analytics";
+import { listBlockedRanges } from "@/lib/ota/availability";
 import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
 import TrackedMapsLink from "@/components/analytics/TrackedMapsLink";
 import styles from "./site.module.css";
@@ -98,9 +99,12 @@ const structuredData = {
 };
 
 export default async function PublicHomePage() {
-  const [reservations, prices, locations, weatherReading] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), getLatestWeather()]);
+  const [reservations, prices, locations, weatherReading, blockedRanges] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), getLatestWeather(), listBlockedRanges()]);
   const weather = weatherReading ? toPublicReading(weatherReading) : null;
-  const bookingReservations = reservations.map(({ villa, checkIn, checkOut }) => ({ villa, checkIn, checkOut }));
+  const bookingReservations = [
+    ...reservations.map(({ villa, checkIn, checkOut }) => ({ villa, checkIn, checkOut })),
+    ...blockedRanges,
+  ];
   const bookingPrices = prices.map(({ villa, startDate, endDate, nightlyRate }) => ({ villa, startDate, endDate, nightlyRate }));
 
   return (

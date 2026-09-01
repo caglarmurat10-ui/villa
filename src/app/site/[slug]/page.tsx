@@ -11,6 +11,7 @@ import { toVillaId } from "@/lib/analytics";
 import ViewItemTracker from "@/components/analytics/ViewItemTracker";
 import TrackedMapsLink from "@/components/analytics/TrackedMapsLink";
 import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
+import { listBlockedRanges } from "@/lib/ota/availability";
 import styles from "../site.module.css";
 
 const ORIGIN = "https://safiradestan.com";
@@ -50,8 +51,11 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
   const { slug } = await params;
   if (!(slug in villas)) notFound();
   const villa = villas[slug as VillaSlug];
-  const [reservations, prices, locations, googleReviews] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), fetchGoogleReviews(villa.villa)]);
-  const bookingReservations = reservations.map(({ villa: itemVilla, checkIn, checkOut }) => ({ villa: itemVilla, checkIn, checkOut }));
+  const [reservations, prices, locations, googleReviews, blockedRanges] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), fetchGoogleReviews(villa.villa), listBlockedRanges()]);
+  const bookingReservations = [
+    ...reservations.map(({ villa: itemVilla, checkIn, checkOut }) => ({ villa: itemVilla, checkIn, checkOut })),
+    ...blockedRanges,
+  ];
   const bookingPrices = prices.map(({ villa: itemVilla, startDate, endDate, nightlyRate }) => ({ villa: itemVilla, startDate, endDate, nightlyRate }));
   const mapsUrl = locations[villa.villa];
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${villa.geo.lat},${villa.geo.lng}`;

@@ -19,6 +19,7 @@ const items = [
   ["/hesaplama", "Hesaplama", "∑"],
   ["/raporlar", "Raporlar", "▥"],
   ["/sosyal", "Sosyal Medya", "◉"],
+  ["/entegrasyonlar", "Entegrasyonlar", "⇄"],
   ["/ayarlar", "Ayarlar", "⚙"],
 ] as const;
 
