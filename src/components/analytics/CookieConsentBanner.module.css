@@ -1,0 +1,111 @@
+.wrap {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 80;
+  display: flex;
+  justify-content: center;
+  padding: 16px;
+  pointer-events: none;
+}
+
+.panel {
+  pointer-events: auto;
+  width: 100%;
+  max-width: 620px;
+  background: #fbf9f3;
+  border: 1px solid #d6cbb6;
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(19, 32, 25, .18);
+  padding: 22px 24px;
+  font-family: Arial, Helvetica, sans-serif;
+  color: #132019;
+}
+
+.title {
+  display: block;
+  font-size: 13px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+}
+
+.text {
+  margin: 0 0 18px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #655f55;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.primary,
+.secondary {
+  min-height: 42px;
+  padding: 0 20px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+  border: 1px solid #132019;
+  transition: transform .2s ease, background .2s ease;
+}
+
+.primary {
+  background: #132019;
+  color: #fbf9f3;
+}
+
+.secondary {
+  background: transparent;
+  color: #132019;
+}
+
+.primary:hover,
+.secondary:hover { transform: translateY(-1px); }
+
+.link {
+  border: none;
+  background: none;
+  padding: 4px 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #655f55;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #ece5d6;
+}
+
+.row:last-child { border-bottom: none; padding-bottom: 0; }
+
+.row strong { display: block; font-size: 13px; margin-bottom: 4px; }
+.row p { margin: 0; font-size: 12px; color: #655f55; line-height: 1.5; }
+.row input[type="checkbox"] { width: 18px; height: 18px; margin-top: 2px; flex-shrink: 0; }
+
+@media (max-width: 520px) {
+  .wrap { padding: 0; }
+  .panel { max-width: none; border-radius: 14px 14px 0 0; }
+  .actions { flex-direction: column; align-items: stretch; }
+  .primary, .secondary, .link { width: 100%; text-align: center; }
+}
