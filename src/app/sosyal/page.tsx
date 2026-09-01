@@ -1,3 +1,4 @@
+import { getCloudflareContext } from "@opennextjs/cloudflare";
 import MetaConnections from "@/components/MetaConnections";
 import MetaDiagnostics from "@/components/MetaDiagnostics";
 import MetaPublishTestCenter from "@/components/MetaPublishTestCenter";
@@ -40,6 +41,8 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
     listMetaAccounts(),
     listReservations(),
   ]);
+  const { env } = await getCloudflareContext({ async: true });
+  const autoPublishEnabled = String(env.SOCIAL_AUTO_PUBLISH_ENABLED ?? "true").toLowerCase() === "true";
 
   const maintenance = await maintainLegacyInstagramConnections(initialAccounts);
   const accounts = maintenance.refreshed ? await listMetaAccounts() : initialAccounts;
@@ -98,7 +101,7 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
 
     <MetaConnections initialAccounts={accounts} />
     <MetaPublishTestCenter />
-    <SocialPublishHealth posts={posts} />
+    <SocialPublishHealth posts={posts} autoPublishEnabled={autoPublishEnabled} />
     <div style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
       <div style={{marginBottom:10,padding:"10px 13px",border:"1px solid #22c55e55",borderRadius:12,background:"#071b16",color:"#bbf7d0",fontSize:11,fontWeight:700}}>
         ✓ Drive medya otomasyonu aktif · İlk ekranda en yakın 30 sosyal plan gösteriliyor. Ağır içerik kütüphanesi ve takvim tarayıcı tarafında yüklenir; Worker CPU bütçesi korunur.

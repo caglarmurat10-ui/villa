@@ -23,7 +23,7 @@ function todayIstanbul() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
 }
 
-export default function SocialPublishHealth({ posts }: { posts: SocialPost[] }) {
+export default function SocialPublishHealth({ posts, autoPublishEnabled }: { posts: SocialPost[]; autoPublishEnabled: boolean }) {
   const [items, setItems] = useState(posts);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
@@ -86,6 +86,7 @@ export default function SocialPublishHealth({ posts }: { posts: SocialPost[] }) 
       <div style={{display:"flex",justifyContent:"space-between",gap:14,alignItems:"flex-start",flexWrap:"wrap"}}>
         <div><small style={{display:"block",fontSize:9,fontWeight:900,letterSpacing:1.4,color:"#93c5fd"}}>YAYIN MOTORU SAĞLIĞI</small><h2 style={{margin:"5px 0 4px",fontSize:18}}>Instagram + Facebook yayın takibi</h2><p style={{margin:0,color:"#9fb0c5",fontSize:11}}>İnsan onayı korunur; Meta gönderi kimliği, deneme sayısı ve son güvenli hata D1 üzerinde tutulur.</p></div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <span style={{padding:"7px 10px",borderRadius:999,background:autoPublishEnabled?"#123522":"#451a1a",color:autoPublishEnabled?"#86efac":"#fecaca",fontSize:10,fontWeight:900}}>{autoPublishEnabled ? "● Otomatik yayın AÇIK" : "■ Otomatik yayın DURDURULDU"}</span>
           <span style={{padding:"7px 10px",borderRadius:999,background:"#172554",color:"#bfdbfe",fontSize:10,fontWeight:900}}>Yayına hazır {ready.length}</span>
           <span style={{padding:"7px 10px",borderRadius:999,background:"#123522",color:"#86efac",fontSize:10,fontWeight:900}}>Meta ID kayıtlı {publishedTracked.length}</span>
           <span style={{padding:"7px 10px",borderRadius:999,background:failed.length?"#451a1a":"#17263c",color:failed.length?"#fecaca":"#bfdbfe",fontSize:10,fontWeight:900}}>Hatalı {failed.length}</span>
@@ -96,7 +97,7 @@ export default function SocialPublishHealth({ posts }: { posts: SocialPost[] }) 
 
       {readyQueue.length ? <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap",marginBottom:8}}>
-          <div><strong style={{fontSize:11}}>Otomatik yayın açılırsa sırada bekleyen onaylı içerikler</strong><p style={{margin:"3px 0 0",fontSize:9,color:"#8fa4bd"}}>Cron şu anda kapalı tutuluyor. Bugün veya geçmiş tarihli içerikleri topluca insan onayına döndürüp yayın patlamasını önleyebiliriz.</p></div>
+          <div><strong style={{fontSize:11}}>{autoPublishEnabled ? "Otomatik yayın kuyruğu (cron her 15 dakikada çalışıyor)" : "Otomatik yayın açılırsa sırada bekleyen onaylı içerikler"}</strong><p style={{margin:"3px 0 0",fontSize:9,color:"#8fa4bd"}}>{autoPublishEnabled ? "Cron şu anda AÇIK. Bugün veya geçmiş tarihli içerikleri topluca insan onayına döndürüp yayın patlamasını önleyebiliriz." : "Cron şu anda DURDURULDU (SOCIAL_AUTO_PUBLISH_ENABLED=false). Aşağıdaki içerikler yayınlanmıyor, yalnız kuyrukta bekliyor."}</p></div>
           <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
             {dueReady.length ? <button type="button" onClick={pauseDueQueue} disabled={busy !== null} style={{border:"1px solid #f59e0b66",borderRadius:9,padding:"7px 10px",background:"#3a2606",color:"#fde68a",fontSize:9,fontWeight:900,cursor:busy?"wait":"pointer"}}>{busy === "bulk" ? "Durduruluyor…" : `Bugün/gecikmiş ${dueReady.length} içeriği durdur`}</button> : null}
             <span style={{fontSize:9,color:"#fbbf24",fontWeight:900}}>Gösterilen {readyQueue.length}/{ready.length}</span>
