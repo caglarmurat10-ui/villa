@@ -60,6 +60,10 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
   const bookingPrices = prices.map(({ villa: itemVilla, startDate, endDate, nightlyRate }) => ({ villa: itemVilla, startDate, endDate, nightlyRate }));
   const mapsUrl = locations[villa.villa];
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${villa.geo.lat},${villa.geo.lng}`;
+  // Yalnız GERÇEKTEN mevcut olan OTA butonlarını isimlendirir - Booking public URL'si yokken metin
+  // "Airbnb ya da Booking.com" demez (tıklanamayan bir seçenek vaat etmemek için).
+  const otaPlatformNames = [villa.airbnbListingUrl ? "Airbnb" : null, villa.bookingListingUrl ? "Booking.com" : null].filter((name): name is string => Boolean(name));
+  const otaPlatformNamesText = otaPlatformNames.length === 2 ? `${otaPlatformNames[0]} ya da ${otaPlatformNames[1]}` : otaPlatformNames[0];
   const canonical = `${ORIGIN}/${slug}`;
   const structuredData = {
     "@context": "https://schema.org",
@@ -287,7 +291,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
         <section className={styles.reservationOptions}>
           <span className={styles.kicker}>REZERVASYON SEÇENEKLERİ</span>
           <h2>Size uygun rezervasyon yöntemini seçin.</h2>
-          <p>Doğrudan müsaitlik talebi gönderebilir veya rezervasyonunuzu Airbnb ya da Booking.com üzerinden tamamlayabilirsiniz.</p>
+          <p>Doğrudan müsaitlik talebi gönderebilir veya rezervasyonunuzu {otaPlatformNamesText} üzerinden tamamlayabilirsiniz.</p>
           <div className={styles.reservationOptionButtons}>
             <a className={styles.locationActionPrimary} href="#rezervasyon">Müsaitlik Talebi Gönder</a>
             {villa.airbnbListingUrl && (
@@ -319,7 +323,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
               </TrackedOtaLink>
             )}
           </div>
-          <p className={styles.reservationOptionsNote}>Airbnb ve Booking.com üzerinden yapılan rezervasyonlarda ödeme ve rezervasyon işlemleri ilgili platformun koşullarına tabidir.</p>
+          <p className={styles.reservationOptionsNote}>{otaPlatformNames.join(" ve ")} üzerinden yapılan rezervasyonlarda ödeme ve rezervasyon işlemleri ilgili platformun koşullarına tabidir.</p>
         </section>
       )}
 
