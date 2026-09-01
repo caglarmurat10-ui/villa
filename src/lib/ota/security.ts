@@ -2,18 +2,21 @@ import type { OtaPlatform } from "./types";
 
 interface AllowlistEntry {
   hosts: string[];
-  pathPrefixes: string[];
+  pathPattern: RegExp;
 }
 
-// Airbnb: resmi Help Center makalesi (airbnb.com/help/article/99) doğrudan fetch edilip export URL
-// deseni doğrulandı - www.airbnb.com üzerinde /calendar/ical/... .
-// Booking.com: gerçek export host'u DOĞRULANAMADI (partner-help sayfaları fetch'i 403 döndürdü,
-// yalnız arama sonucu snippet'leriyle dolaylı doğrulanabildi) - bu yüzden allowlist BİLEREK BOŞ.
-// Gerçek bir Booking .ics örnek URL'si elimize geçmeden bu platform için hiçbir fetch başarılı olmaz;
-// tahminle bir host eklemek SSRF korumasını değersizleştirir.
+// Airbnb: kullanıcı production'da gerçek export URL'siyle doğruladı - host tam olarak
+// www.airbnb.com, path yalnız /calendar/ical/<rakamsal-listing-id>.ics. Secret export token query
+// string'de (?s=...) taşınır - yalnız host/path kontrol edilir, query hiç karşılaştırılmaz/loglanmaz.
+// www.airbnb.com.tr gibi başka host'lar gerçek örnek doğrulanmadan BİLEREK eklenmedi.
+//
+// Booking.com: kullanıcı production'da gerçek export URL'siyle doğruladı - host tam olarak
+// ical.booking.com, path /v1/export ailesi (secret token query string'de). admin.booking.com,
+// www.booking.com gibi diğer Booking host'ları BİLEREK allowlist'e alınmadı - yalnız gözlenen
+// export host'u.
 const ALLOWLIST: Record<OtaPlatform, AllowlistEntry> = {
-  airbnb: { hosts: ["www.airbnb.com", "airbnb.com"], pathPrefixes: ["/calendar/"] },
-  booking: { hosts: [], pathPrefixes: [] },
+  airbnb: { hosts: ["www.airbnb.com"], pathPattern: /^\/calendar\/ical\/[0-9]+\.ics$/ },
+  booking: { hosts: ["ical.booking.com"], pathPattern: /^\/v1\/export\/?$/ },
 };
 
 const MAX_REDIRECTS = 3;
@@ -45,7 +48,7 @@ function isAllowed(url: URL, platform: OtaPlatform): boolean {
   if (isBlockedHostname(url.hostname)) return false;
   const entry = ALLOWLIST[platform];
   if (!entry.hosts.includes(url.hostname.toLowerCase())) return false;
-  return entry.pathPrefixes.some((prefix) => url.pathname.startsWith(prefix));
+  return entry.pathPattern.test(url.pathname);
 }
 
 export function hasAllowlistedHosts(platform: OtaPlatform): boolean {
@@ -59,12 +62,13 @@ export async function fetchIcsSafely(rawUrl: string, platform: OtaPlatform): Pro
   try {
     current = new URL(rawUrl);
   } catch {
-    throw new SsrfBlockedError("Geçersiz URL.");
+    throw new SsrfBlockedError("URL biçimi geçersiz.");
   }
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
     if (!isAllowed(current, platform)) {
-      throw new SsrfBlockedError(`İzin verilmeyen host/path: ${current.hostname}${current.pathname}`);
+      // Kasıtlı olarak host/path/token içermez - bkz. verify.ts'teki platforma özel kullanıcı mesajı.
+      throw new SsrfBlockedError("Desteklenmeyen host veya path.");
     }
 
     const controller = new AbortController();

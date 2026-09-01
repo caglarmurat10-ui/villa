@@ -608,9 +608,11 @@ async function runSocialCron(controller, env, ctx) {
 
 const OTA_VILLAS = ["Safira", "Destan"];
 const OTA_PLATFORMS = ["airbnb", "booking"];
+// Kullanıcı production'da gerçek export URL'leriyle doğruladı - bkz. src/lib/ota/security.ts'teki
+// aynı ALLOWLIST için detaylı yorum. İki kopya da aynı host/path kuralını taşımalı.
 const OTA_ALLOWLIST = {
-  airbnb: { hosts: ["www.airbnb.com", "airbnb.com"], pathPrefixes: ["/calendar/"] },
-  booking: { hosts: [], pathPrefixes: [] },
+  airbnb: { hosts: ["www.airbnb.com"], pathPattern: /^\/calendar\/ical\/[0-9]+\.ics$/ },
+  booking: { hosts: ["ical.booking.com"], pathPattern: /^\/v1\/export\/?$/ },
 };
 const OTA_PRIVATE_HOSTNAME_PATTERNS = [
   /^localhost$/i, /^127\./, /^0\.0\.0\.0$/, /^10\./, /^192\.168\./,
@@ -626,7 +628,7 @@ function otaIsAllowed(url, platform) {
   if (otaIsBlockedHostname(url.hostname)) return false;
   const entry = OTA_ALLOWLIST[platform];
   if (!entry.hosts.includes(url.hostname.toLowerCase())) return false;
-  return entry.pathPrefixes.some((prefix) => url.pathname.startsWith(prefix));
+  return entry.pathPattern.test(url.pathname);
 }
 
 async function otaFetchIcsSafely(rawUrl, platform) {
@@ -634,11 +636,11 @@ async function otaFetchIcsSafely(rawUrl, platform) {
   try {
     current = new URL(rawUrl);
   } catch {
-    throw new Error("Geçersiz URL.");
+    throw new Error("URL biçimi geçersiz.");
   }
   for (let hop = 0; hop <= 3; hop += 1) {
     if (!otaIsAllowed(current, platform)) {
-      throw new Error(`İzin verilmeyen host/path: ${current.hostname}${current.pathname}`);
+      throw new Error("Desteklenmeyen host veya path.");
     }
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), 10000);

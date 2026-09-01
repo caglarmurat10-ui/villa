@@ -2,8 +2,14 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
 import type { Villa } from "@/lib/types";
 import type { OtaPlatform } from "./types";
-import { fetchIcsSafely, hasAllowlistedHosts, sanitizeErrorMessage } from "./security";
+import { fetchIcsSafely, hasAllowlistedHosts, sanitizeErrorMessage, SsrfBlockedError } from "./security";
 import { parseIcsEvents, type ParsedIcsEvent } from "./ics-parser";
+
+// Kullanıcıya asla full URL/path/token gösterilmez - yalnız platforma özel, güvenli bir mesaj.
+const UNSUPPORTED_FORMAT_MESSAGE: Record<OtaPlatform, string> = {
+  airbnb: "Airbnb takvim bağlantısı biçimi doğrulanamadı.",
+  booking: "Bu Booking.com takvim bağlantısı desteklenen export formatında değil.",
+};
 
 export interface IcsVerifyResult {
   ok: boolean;
@@ -38,13 +44,16 @@ async function countConflicts(db: D1Database, villa: Villa, platform: OtaPlatfor
 // fonksiyon KV/D1'e HİÇBİR ŞEY YAZMAZ (yalnız okuma) - kaydetme kararı çağıran route'a ait.
 export async function verifyIcsUrl(villa: Villa, platform: OtaPlatform, url: string): Promise<IcsVerifyResult> {
   if (!hasAllowlistedHosts(platform)) {
-    return { ok: false, error: "Bu platform için güvenli host allowlist'i henüz yapılandırılmadı - gerçek bir örnek bağlantı doğrulanana kadar bağlanamaz." };
+    return { ok: false, error: `${UNSUPPORTED_FORMAT_MESSAGE[platform]} (platform henüz yapılandırılmadı)` };
   }
 
   let icsText: string;
   try {
     icsText = await fetchIcsSafely(url, platform);
   } catch (error) {
+    if (error instanceof SsrfBlockedError) {
+      return { ok: false, error: UNSUPPORTED_FORMAT_MESSAGE[platform] };
+    }
     const message = error instanceof Error ? error.message : "Bilinmeyen hata";
     return { ok: false, error: sanitizeErrorMessage(message) };
   }
