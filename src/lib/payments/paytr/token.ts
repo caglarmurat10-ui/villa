@@ -31,6 +31,9 @@ export interface TokenResult {
   ok: boolean;
   iframeUrl?: string;
   error?: string;
+  // PayTR'ın kendi döndürdüğü ham "reason" alanı - secret/PII DEĞİL, yalnız admin/D1 last_error
+  // için (bkz. checkout route). Müşteriye gösterilen `error` her zaman jenerik kalır.
+  providerReason?: string;
 }
 
 // UTF-8 güvenli base64 - Türkçe karakterler içeren basket adları için düz btoa() yeterli değil.
@@ -117,7 +120,7 @@ export async function requestPaytrToken(input: TokenRequestInput): Promise<Token
 
   const data = await response.json().catch(() => null) as { status?: string; token?: string; reason?: string } | null;
   if (!data || data.status !== "success" || !data.token) {
-    return { ok: false, error: "Ödeme oturumu başlatılamadı." };
+    return { ok: false, error: "Ödeme oturumu başlatılamadı.", providerReason: data?.reason?.slice(0, 200) };
   }
 
   return { ok: true, iframeUrl: `https://www.paytr.com/odeme/guvenli/${data.token}` };

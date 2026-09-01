@@ -98,7 +98,8 @@ export async function POST(request: Request) {
   if (!result.ok || !result.iframeUrl) {
     // Claim'i geri al - CAS (yalnız hâlâ pending ise), çünkü bu sırada bir callback aynı payment'ı
     // paid/failed yapmış olabilir (mümkün değil normalde, token hiç üretilmediği için, ama savunma).
-    await markPaymentFailedIfPending(paymentId, result.error ?? "Token alınamadı.");
+    // last_error'a PayTR'ın ham "reason"ı yazılır (admin/D1-only) - müşteriye dönen `error` jenerik kalır.
+    await markPaymentFailedIfPending(paymentId, result.providerReason ?? result.error ?? "Token alınamadı.");
     await logPaymentAudit("PAYMENT_TOKEN_FAILED", { paymentId, reservationId: payment.reservationId, villa: payment.villa });
     return Response.json({ ok: false, error: result.error ?? "Ödeme oturumu başlatılamadı." }, { status: 502 });
   }
