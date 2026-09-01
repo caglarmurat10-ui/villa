@@ -19,8 +19,9 @@ const PUBLIC_REWRITES = new Map([
   ["/", "/site"],
   ["/villa-safira", "/site/villa-safira"],
   ["/villa-destan", "/site/villa-destan"],
+  ["/rezervasyon-kosullari", "/site/rezervasyon-kosullari"],
 ]);
-const PUBLIC_INTERNAL_PATHS = new Set(["/site", "/site/villa-safira", "/site/villa-destan"]);
+const PUBLIC_INTERNAL_PATHS = new Set(["/site", "/site/villa-safira", "/site/villa-destan", "/site/rezervasyon-kosullari"]);
 
 function notFound() {
   return new NextResponse("Not Found", {

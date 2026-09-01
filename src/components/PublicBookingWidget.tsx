@@ -269,8 +269,12 @@ export default function PublicBookingWidget({
             <button type="submit" disabled={requestState.kind === "sending" || requestState.kind === "success"}>
               {requestState.kind === "sending" ? "Gönderiliyor…" : requestState.kind === "success" ? "Talep alındı ✓" : "Rezervasyon talebi gönder"}
             </button>
-            <small>Bilgileriniz yalnız rezervasyon talebiniz için kullanılır.</small>
+            <small>Bilgileriniz yalnız rezervasyon talebiniz için kullanılır. Bu bir ön talep kaydıdır, ödeme alınmaz.</small>
           </div>
+
+          <p className={styles.policyLinkRow}>
+            <Link href="/rezervasyon-kosullari" target="_blank" rel="noopener noreferrer">Rezervasyon ve konaklama koşullarını inceleyin ↗</Link>
+          </p>
 
           {requestState.kind !== "idle" && (
             <div className={`${styles.requestStatus} ${requestState.kind === "success" ? styles.requestSuccess : requestState.kind === "error" ? styles.requestError : ""}`} aria-live="polite">

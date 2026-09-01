@@ -15,6 +15,7 @@ const PUBLIC_ROUTE_MAP = new Map([
   ["/", "/site"],
   ["/villa-safira", "/site/villa-safira"],
   ["/villa-destan", "/site/villa-destan"],
+  ["/rezervasyon-kosullari", "/site/rezervasyon-kosullari"],
 ]);
 const TRANSITION_PATHS = new Set([
   "/api/health",

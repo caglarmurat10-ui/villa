@@ -5,6 +5,7 @@ import PublicBookingWidget from "@/components/PublicBookingWidget";
 import VillaGalleryLightbox from "@/components/VillaGalleryLightbox";
 import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
 import { VILLAS, FAQ_ITEMS, REGION_INFO, formatAddress, type VillaSlug } from "@/lib/villa-content";
+import { POLICY_SUMMARY } from "@/lib/reservation-policy";
 import styles from "../site.module.css";
 
 const ORIGIN = "https://safiradestan.com";
@@ -192,6 +193,20 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
         <div><small>03</small><h3>Dönemsel fiyat</h3><p>Tarihinizde fiyat tanımlıysa toplam konaklama bedelini sistem doğrudan hesaplar.</p></div>
       </section>
 
+      <section className={styles.quickFacts}>
+        <span className={styles.kicker}>KONAKLAMA KURALLARI</span>
+        <div className={styles.factChips}>
+          <span className={styles.factChip}>Giriş: {POLICY_SUMMARY.entry}</span>
+          <span className={styles.factChip}>Çıkış: {POLICY_SUMMARY.checkout}</span>
+          <span className={styles.factChip}>Rezervasyon Ön Ödemesi: {POLICY_SUMMARY.deposit}</span>
+          <span className={styles.factChip}>Hasar Güvence Bedeli: {POLICY_SUMMARY.damageDeposit}</span>
+          <span className={styles.factChip}>Evcil Hayvan: {POLICY_SUMMARY.pets}</span>
+          <span className={styles.factChip}>Sigara: {POLICY_SUMMARY.smoking}</span>
+        </div>
+        <p className={styles.policyFootnote}>{POLICY_SUMMARY.petsFootnote}</p>
+        <Link className={styles.experienceLink} href="/rezervasyon-kosullari">Rezervasyon ve Konaklama Koşullarını İncele →</Link>
+      </section>
+
       <section className={styles.bookingBand} id="rezervasyon">
         <div className={styles.bookingWrap}>
           <div className={styles.bookingIntro}><span className={styles.kicker}>{villa.name.toUpperCase()}</span><h2>Tarihinizi<br />kontrol edin.</h2><p>Seçtiğiniz günler yönetim sistemimizdeki rezervasyonlarla karşılaştırılır. Müsaitse doğrudan rezervasyon talebi gönderebilirsiniz.</p></div>
@@ -220,7 +235,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
         </div>
       </section>
 
-      <footer className={styles.footer}><div className={styles.footerBrand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></div><div className={styles.footerBottom}>Patara · Kaş · Antalya <span>safiradestan.com</span></div></footer>
+      <footer className={styles.footer}><div className={styles.footerBrand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></div><div className={styles.footerBottom}><span>Patara · Kaş · Antalya · <Link href="/rezervasyon-kosullari">Rezervasyon ve Konaklama Koşulları</Link></span><span>safiradestan.com</span></div></footer>
 
       <div className={styles.stickyCta}>
         <a href="#rezervasyon">Tarih kontrol et</a>

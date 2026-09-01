@@ -246,7 +246,7 @@ export default async function PublicHomePage() {
               {locations.Destan && <a href={locations.Destan} rel="noopener noreferrer" target="_blank">Villa Destan konumu</a>}
             </p>
           </div>
-          <div><small>REZERVASYON</small><p>Müsaitlik kontrolünü yukarıdaki canlı takvimden yapabilirsiniz.</p></div>
+          <div><small>REZERVASYON</small><p>Müsaitlik kontrolünü yukarıdaki canlı takvimden yapabilirsiniz.<br /><Link href="/rezervasyon-kosullari">Rezervasyon ve Konaklama Koşulları</Link></p></div>
           <div>
             <small>SOSYAL</small>
             <p>

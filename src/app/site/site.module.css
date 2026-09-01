@@ -927,3 +927,80 @@ a.secondary {
   .detailIntro h2 { font-size: 46px; }
   .nextVilla { padding: 94px 22px; }
 }
+
+/* Rezervasyon ve Konaklama Koşulları */
+.policyHead {
+  background: var(--ink);
+  color: #fff;
+}
+.policyHeadCopy {
+  width: min(90vw, 900px);
+  margin: 0 auto;
+  padding: 56px 0 88px;
+}
+.policyTitle {
+  margin: 0 0 22px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: clamp(38px, 5.4vw, 60px);
+  line-height: 1.05;
+  letter-spacing: -.03em;
+  text-wrap: balance;
+}
+.policySummary {
+  width: min(90vw, 900px);
+  margin: 0 auto;
+  padding: 40px 0 8px;
+}
+.policyFootnote {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+.policyBody {
+  width: min(90vw, 900px);
+  margin: 0 auto;
+  padding: 44px 0 88px;
+}
+.policySection {
+  padding: 30px 0;
+  border-top: 1px solid #d6cbb6;
+}
+.policySection:first-child { border-top: none; }
+.policySection h2 {
+  margin: 0 0 14px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: 23px;
+}
+.policySection p {
+  margin: 0 0 12px;
+  line-height: 1.75;
+  color: #4a453c;
+  font-size: 15px;
+}
+.policySection p:last-child { margin-bottom: 0; }
+.policyCta {
+  width: min(90vw, 900px);
+  margin: 0 auto;
+  padding: 0 0 96px;
+  text-align: center;
+}
+.policyCta > p { margin: 0 0 20px; color: var(--muted); }
+.policyCtaLinks {
+  display: flex;
+  gap: 24px;
+  justify-content: center;
+  flex-wrap: wrap;
+  font-weight: 800;
+  font-size: 14px;
+}
+.policyCtaLinks a { text-decoration: none; border-bottom: 1px solid currentColor; padding-bottom: 3px; }
+
+@media (max-width: 900px) {
+  .policyHeadCopy { width: calc(100% - 44px); padding: 40px 0 64px; }
+  .policySummary,
+  .policyBody,
+  .policyCta { width: calc(100% - 44px); }
+  .policyBody { padding: 32px 0 64px; }
+}
