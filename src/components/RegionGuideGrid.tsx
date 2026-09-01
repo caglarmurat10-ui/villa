@@ -47,7 +47,7 @@ export default function RegionGuideGrid() {
           return (
             <article className={styles.card} key={place.id}>
               <span className={`${styles.badge} ${styles[`badge_${place.category}`]}`}>{categoryLabel}</span>
-              <h3>{place.name}</h3>
+              <h2>{place.name}</h2>
               <p>{place.description}</p>
               <a href={guideMapsUrl(place.mapsQuery)} target="_blank" rel="noopener noreferrer">Haritada Aç ↗</a>
             </article>
