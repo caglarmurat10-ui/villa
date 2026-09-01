@@ -478,6 +478,105 @@ a.secondary {
 .footerGrid small { font-size: 9px; letter-spacing: .18em; color: rgba(255, 255, 255, .46); }
 .footerGrid p { font-size: 14px; line-height: 1.6; color: rgba(255, 255, 255, .8); }
 .footerGrid p a { display: inline-block; padding: 5px 0; }
+
+/* Konum & Ulaşım — villa detay sayfası */
+.locationDetail {
+  width: min(90vw, 1200px);
+  margin: auto;
+  padding: 0 0 122px;
+}
+.locationDetail .kicker { color: #6b6459; margin-bottom: 20px; }
+.locationDetail h2 {
+  margin: 0 0 40px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: clamp(40px, 4.4vw, 58px);
+  line-height: 1;
+  letter-spacing: -.03em;
+}
+.locationCard {
+  display: grid;
+  grid-template-columns: 1.1fr .9fr;
+  gap: 0;
+  border: 1px solid #d6cbb6;
+  background: var(--paper);
+}
+.locationInfo { padding: 44px; }
+.locationInfo h3 { margin: 0 0 14px; font-family: Georgia, 'Times New Roman', serif; font-size: 27px; font-weight: 400; }
+.locationAddress { margin: 0 0 22px; font-size: 15px; line-height: 1.6; color: var(--ink); }
+.locationAddress b { display: block; font-size: 10px; letter-spacing: .16em; font-weight: 800; color: #8a7f6c; margin-bottom: 6px; }
+.locationRegionText { margin: 0 0 30px; font-size: 13px; line-height: 1.75; color: var(--muted); }
+.locationActions { display: flex; gap: 12px; flex-wrap: wrap; }
+.locationActions a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 46px;
+  padding: 0 20px;
+  border-radius: 99px;
+  text-decoration: none;
+  font-size: 12px;
+  font-weight: 800;
+}
+.locationActionPrimary { background: var(--ink); color: #fff; }
+.locationActionPrimary:hover { background: #223b30; }
+.locationActionSecondary { border: 1px solid var(--ink); color: var(--ink); }
+.locationActionSecondary:hover { background: rgba(19, 32, 25, .06); }
+.locationVisual {
+  position: relative;
+  min-height: 320px;
+  background: var(--sand);
+  display: flex;
+  align-items: flex-end;
+  padding: 26px;
+  color: #fff;
+}
+.locationVisual::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(19, 32, 25, .05), transparent 55%),
+    linear-gradient(155deg, #2c4636 0%, #17281f 100%);
+}
+.locationVisual span {
+  position: relative;
+  z-index: 1;
+  font-size: 11px;
+  letter-spacing: .1em;
+  opacity: .86;
+}
+
+/* Konum — anasayfa */
+.homeLocation {
+  width: min(90vw, 1300px);
+  margin: auto;
+  padding: 0 0 122px;
+}
+.homeLocation .kicker { color: #6b6459; margin-bottom: 20px; }
+.homeLocation h2 {
+  margin: 0 0 44px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: clamp(40px, 4.4vw, 58px);
+  line-height: 1;
+  letter-spacing: -.03em;
+}
+.homeLocationGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+.homeLocationCard {
+  display: block;
+  padding: 32px;
+  border: 1px solid #d6cbb6;
+  background: var(--paper);
+  text-decoration: none;
+  color: var(--ink);
+  transition: border-color .2s ease, transform .2s ease;
+}
+.homeLocationCard:hover { border-color: var(--gold); transform: translateY(-2px); }
+.homeLocationCard small { font-size: 9px; letter-spacing: .18em; color: #8a7f6c; }
+.homeLocationCard h3 { margin: 10px 0 10px; font-family: Georgia, 'Times New Roman', serif; font-size: 26px; font-weight: 400; }
+.homeLocationCard p { margin: 0 0 18px; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.homeLocationCard em { font-style: normal; font-size: 12px; font-weight: 800; border-bottom: 1px solid currentColor; padding-bottom: 3px; }
 .footerBottom {
   display: flex;
   justify-content: space-between;
@@ -695,6 +794,15 @@ a.secondary {
   .faq { width: calc(100% - 44px); padding-bottom: 86px; }
   .faq h2 { font-size: clamp(38px, 10vw, 52px); }
   .faqItem summary { font-size: 17px; }
+
+  .locationDetail { width: calc(100% - 44px); padding-bottom: 86px; }
+  .locationCard { grid-template-columns: 1fr; }
+  .locationInfo { padding: 30px 22px; }
+  .locationVisual { min-height: 200px; order: -1; }
+  .locationActions a { flex: 1 1 auto; }
+
+  .homeLocation { width: calc(100% - 44px); padding-bottom: 86px; }
+  .homeLocationGrid { grid-template-columns: 1fr; gap: 18px; }
 }
 
 @media (max-width: 520px) {

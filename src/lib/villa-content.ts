@@ -18,6 +18,19 @@ export interface VillaGalleryImage {
   alt: string;
 }
 
+export interface VillaGeo {
+  lat: number;
+  lng: number;
+}
+
+export interface VillaAddress {
+  streetAddress: string;
+  addressLocality: string;
+  addressRegion: string;
+  postalCode: string;
+  addressCountry: string;
+}
+
 export interface VillaContent {
   slug: VillaSlug;
   villa: Villa;
@@ -33,12 +46,24 @@ export interface VillaContent {
   description: string;
   quote: string;
   highlights: VillaHighlight[];
+  address: VillaAddress;
+  geo: VillaGeo;
+}
+
+export function formatAddress(address: VillaAddress): string {
+  return `${address.streetAddress}, ${address.postalCode} ${address.addressLocality} / ${address.addressRegion}`;
 }
 
 // Yalnızca doğrulanmış bilgiler: mevcut yayında olan içerik, D1 (facebook_account_metadata,
 // social_accounts) ve işletme sahibinin bildirdiği gerçek fotoğraf envanteri temel alınmıştır.
 // Yatak/banyo sayısı, maksimum kapasite, check-in/out saatleri gibi doğrulanmamış özellikler
 // eklenmemiştir — bkz. C:\villa-agent-state\remaining.md.
+//
+// address/geo: kullanıcının paylaştığı Google Maps pin linkleri çözümlenerek elde edildi
+// (Destan: maps.app.goo.gl/8zCrgoegzri52ro79, Safira: maps.app.goo.gl/fKBpCQhn5Qneuo5H6),
+// posta kodu (07976, Gelemiş Mah., Kaş) bağımsız kaynaklarla (postakodlari.org, cybo.com,
+// bölgedeki gerçek bir işletmenin iletişim bilgisi) çapraz doğrulandı. Aynı Maps linkleri
+// settings.location_safira/location_destan'a da yazıldı (tek kaynak — bkz. getVillaLocations()).
 export const VILLAS: Record<VillaSlug, VillaContent> = {
   "villa-safira": {
     slug: "villa-safira",
@@ -66,6 +91,14 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
     facebook: "https://www.facebook.com/105073114600720",
     description: "Patara’nın doğal dokusu içinde, özel havuzunuzdan ve bağımsız yaşam alanınızdan vazgeçmeden sakin ve özgür bir Akdeniz tatili.",
     quote: "Günün hiçbir saatinde acele etmeniz gerekmeyen bir yer.",
+    address: {
+      streetAddress: "Gelemiş Mah. Karaağaçlı Boğaz Sk. Kale Mevkii No:60/9",
+      addressLocality: "Kaş",
+      addressRegion: "Antalya",
+      postalCode: "07976",
+      addressCountry: "TR",
+    },
+    geo: { lat: 36.282113, lng: 29.325177 },
     highlights: [
       { title: "Özel havuz", description: "Villaya özel, doğayla çevrili havuz alanı." },
       { title: "Bahçe ve çocuk oyun alanı", description: "Yeşillik içinde açık hava yaşam alanı ve çocuklar için oyun köşesi." },
@@ -96,6 +129,14 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
     facebook: "https://www.facebook.com/1309122082284129",
     description: "Patara, Kaş’ta özel havuzu, geniş yaşam alanları ve güçlü iç mekân detaylarıyla kendi ritminizde, mahremiyet odaklı bir villa tatili.",
     quote: "Dışarı çıkmak istemeyeceğiniz kadar size ait.",
+    address: {
+      streetAddress: "Gelemiş Mah. Cumhuriyet Cad. No:30",
+      addressLocality: "Kaş",
+      addressRegion: "Antalya",
+      postalCode: "07976",
+      addressCountry: "TR",
+    },
+    geo: { lat: 36.277823, lng: 29.320156 },
     highlights: [
       { title: "Özel havuz", description: "Gündüz ve akşam kullanıma açık özel havuz." },
       { title: "Bahçe", description: "Dinlenme için ayrılmış açık hava alanı." },
@@ -132,6 +173,6 @@ export const FAQ_ITEMS: VillaFaq[] = [
 export const REGION_INFO = {
   kicker: "PATARA · KAŞ · ANTALYA",
   title: "Patara’da özel havuzlu villa tatili.",
-  body: "Villa Safira ve Villa Destan, Antalya’nın Kaş ilçesine bağlı Patara bölgesinde yer alır. Patara; uzun kumsalı, antik kenti ve Likya kültürüyle bilinen, Kaş merkezine yakın bir tatil bölgesidir. Bölgeye ulaşım genellikle Dalaman veya Antalya havalimanları üzerinden sağlanır.",
-  note: "Gizlilik nedeniyle villaların tam adresi bu sayfada paylaşılmaz. Rezervasyon talebiniz onaylandığında konum ve ulaşım bilgileri doğrudan sizinle paylaşılır.",
+  body: "Villa Safira ve Villa Destan, Antalya’nın Kaş ilçesine bağlı Gelemiş Mahallesi’nde (Patara) yer alır. Patara; uzun kumsalı, antik kenti ve Likya kültürüyle bilinen, Kaş merkezine yakın bir tatil bölgesidir. Bölgeye ulaşım genellikle Dalaman veya Antalya havalimanları üzerinden sağlanır.",
+  note: "Rezervasyon talebiniz onaylandığında ulaşım için ek yönlendirme de ekibimizden alabilirsiniz.",
 };

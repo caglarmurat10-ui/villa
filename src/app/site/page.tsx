@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import PublicBookingWidget from "@/components/PublicBookingWidget";
-import { listPriceRanges, listReservations } from "@/lib/db";
+import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
 import { VILLAS, FAQ_ITEMS, REGION_INFO } from "@/lib/villa-content";
 import styles from "./site.module.css";
 
@@ -64,7 +64,7 @@ const structuredData = {
 };
 
 export default async function PublicHomePage() {
-  const [reservations, prices] = await Promise.all([listReservations(), listPriceRanges()]);
+  const [reservations, prices, locations] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations()]);
   const bookingReservations = reservations.map(({ villa, checkIn, checkOut }) => ({ villa, checkIn, checkOut }));
   const bookingPrices = prices.map(({ villa, startDate, endDate, nightlyRate }) => ({ villa, startDate, endDate, nightlyRate }));
 
@@ -81,6 +81,7 @@ export default async function PublicHomePage() {
             <a href="#villalar">Villalar</a>
             <a href="#musaitlik">Müsaitlik</a>
             <a href="#deneyim">Deneyim</a>
+            <a href="#konum">Konum</a>
             <a href="#sss">SSS</a>
             <a href="#iletisim" className={styles.cta}>İletişim</a>
           </div>
@@ -124,6 +125,26 @@ export default async function PublicHomePage() {
         <div className={styles.experienceCopy}><span className={styles.kicker}>DOĞRUDAN KONAKLAMA</span><h2>Arada kimse yok.<br />Tatiliniz bize emanet.</h2><p>Rezervasyon takvimi, dönemsel fiyatlar ve villa bilgileri aynı yönetim altyapısından gelir. Böylece gördüğünüz bilgiyle bizim gördüğümüz bilgi aynı kalır.</p><div className={styles.points}><div><b>01</b><span>Canlı müsaitlik</span></div><div><b>02</b><span>Doğrudan iletişim</span></div><div><b>03</b><span>Şeffaf fiyat</span></div></div></div>
       </section>
 
+      <section className={styles.homeLocation} id="konum">
+        <span className={styles.kicker}>KONUM</span>
+        <h2>İki villa, Patara’nın kalbinde.</h2>
+        <div className={styles.homeLocationGrid}>
+          {(["villa-safira", "villa-destan"] as const).map((slug) => {
+            const villa = VILLAS[slug];
+            const mapsUrl = locations[villa.villa];
+            if (!mapsUrl) return null;
+            return (
+              <a key={slug} className={styles.homeLocationCard} href={mapsUrl} target="_blank" rel="noopener noreferrer">
+                <small>{villa.address.addressLocality} · {villa.address.addressRegion}</small>
+                <h3>{villa.name}</h3>
+                <p>{villa.address.streetAddress}</p>
+                <em>Haritada Gör →</em>
+              </a>
+            );
+          })}
+        </div>
+      </section>
+
       <section className={styles.locationBlock}>
         <span className={styles.kicker}>{REGION_INFO.kicker}</span>
         <h2>{REGION_INFO.title}</h2>
@@ -145,7 +166,15 @@ export default async function PublicHomePage() {
       <footer className={styles.footer} id="iletisim">
         <div className={styles.footerBrand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></div>
         <div className={styles.footerGrid}>
-          <div><small>KONUM</small><p>Patara · Kaş · Antalya</p></div>
+          <div>
+            <small>KONUM</small>
+            <p>
+              Patara · Kaş · Antalya<br />
+              {locations.Safira && <a href={locations.Safira} rel="noopener noreferrer" target="_blank">Villa Safira konumu</a>}
+              {locations.Safira && locations.Destan && <br />}
+              {locations.Destan && <a href={locations.Destan} rel="noopener noreferrer" target="_blank">Villa Destan konumu</a>}
+            </p>
+          </div>
           <div><small>REZERVASYON</small><p>Müsaitlik kontrolünü yukarıdaki canlı takvimden yapabilirsiniz.</p></div>
           <div>
             <small>SOSYAL</small>

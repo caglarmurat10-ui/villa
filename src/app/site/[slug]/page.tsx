@@ -3,8 +3,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import PublicBookingWidget from "@/components/PublicBookingWidget";
 import VillaGalleryLightbox from "@/components/VillaGalleryLightbox";
-import { listPriceRanges, listReservations } from "@/lib/db";
-import { VILLAS, FAQ_ITEMS, REGION_INFO, type VillaSlug } from "@/lib/villa-content";
+import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
+import { VILLAS, FAQ_ITEMS, REGION_INFO, formatAddress, type VillaSlug } from "@/lib/villa-content";
 import styles from "../site.module.css";
 
 const ORIGIN = "https://safiradestan.com";
@@ -44,9 +44,11 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
   const { slug } = await params;
   if (!(slug in villas)) notFound();
   const villa = villas[slug as VillaSlug];
-  const [reservations, prices] = await Promise.all([listReservations(), listPriceRanges()]);
+  const [reservations, prices, locations] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations()]);
   const bookingReservations = reservations.map(({ villa: itemVilla, checkIn, checkOut }) => ({ villa: itemVilla, checkIn, checkOut }));
   const bookingPrices = prices.map(({ villa: itemVilla, startDate, endDate, nightlyRate }) => ({ villa: itemVilla, startDate, endDate, nightlyRate }));
+  const mapsUrl = locations[villa.villa];
+  const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${villa.geo.lat},${villa.geo.lng}`;
   const canonical = `${ORIGIN}/${slug}`;
   const structuredData = {
     "@context": "https://schema.org",
@@ -60,9 +62,16 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
         image: [`${ORIGIN}${villa.cover}`, `${ORIGIN}${villa.secondary}`],
         address: {
           "@type": "PostalAddress",
-          addressLocality: "Patara, Kaş",
-          addressRegion: "Antalya",
-          addressCountry: "TR",
+          streetAddress: villa.address.streetAddress,
+          addressLocality: villa.address.addressLocality,
+          addressRegion: villa.address.addressRegion,
+          postalCode: villa.address.postalCode,
+          addressCountry: villa.address.addressCountry,
+        },
+        geo: {
+          "@type": "GeoCoordinates",
+          latitude: villa.geo.lat,
+          longitude: villa.geo.lng,
         },
         amenityFeature: [
           { "@type": "LocationFeatureSpecification", name: "Özel havuz", value: true },
@@ -93,7 +102,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
         <div className={styles.heroShade} />
         <nav className={styles.nav} aria-label="Villa menüsü">
           <Link href="/" className={styles.brand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></Link>
-          <div className={styles.navlinks}><Link href="/">Ana sayfa</Link><a href="#galeri">Villa</a><a href="#sss">SSS</a><a className={styles.cta} href="#rezervasyon">Müsaitlik</a></div>
+          <div className={styles.navlinks}><Link href="/">Ana sayfa</Link><a href="#galeri">Villa</a><a href="#konum">Konum</a><a href="#sss">SSS</a><a className={styles.cta} href="#rezervasyon">Müsaitlik</a></div>
         </nav>
         <div className={styles.detailHeroCopy} id="ana-icerik" tabIndex={-1}><span className={styles.eyebrow}>{villa.label} · PATARA · KAŞ</span><h1 className={styles.title}>{villa.name}</h1><p className={styles.lead}>{villa.description}</p><a className={styles.primary} href="#rezervasyon">Tarih kontrol et</a></div>
       </section>
@@ -138,11 +147,23 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
         </div>
       </section>
 
-      <section className={styles.locationBlock}>
-        <span className={styles.kicker}>{REGION_INFO.kicker}</span>
-        <h2>{REGION_INFO.title}</h2>
-        <p>{REGION_INFO.body}</p>
-        <p style={{ fontSize: 13 }}>{REGION_INFO.note}</p>
+      <section className={styles.locationDetail} id="konum">
+        <span className={styles.kicker}>KONUM & ULAŞIM</span>
+        <h2>{villa.name} nerede?</h2>
+        <div className={styles.locationCard}>
+          <div className={styles.locationInfo}>
+            <h3>{villa.name}</h3>
+            <p className={styles.locationAddress}><b>Açık adres</b>{formatAddress(villa.address)}</p>
+            <p className={styles.locationRegionText}>{REGION_INFO.body}</p>
+            <div className={styles.locationActions}>
+              {mapsUrl && <a className={styles.locationActionPrimary} href={mapsUrl} target="_blank" rel="noopener noreferrer">Google Maps’te Aç</a>}
+              <a className={styles.locationActionSecondary} href={directionsUrl} target="_blank" rel="noopener noreferrer">Yol Tarifi Al</a>
+            </div>
+          </div>
+          <div className={styles.locationVisual} aria-hidden="true">
+            <span>{villa.address.addressLocality} · {villa.address.addressRegion}</span>
+          </div>
+        </div>
       </section>
 
       <section className={styles.faq} id="sss">
