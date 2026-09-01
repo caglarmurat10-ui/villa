@@ -120,8 +120,8 @@ export default function VillaGalleryLightbox({
             aria-label={`${villaName} fotoğrafını büyüt: ${image.alt}`}
           >
             <picture>
-              <source srcSet={image.webp} type="image/webp" />
-              <img src={image.src} alt={image.alt} loading="lazy" width={480} height={320} />
+              <source srcSet={image.webp.replace(/\.webp$/, "-thumb.webp")} type="image/webp" />
+              <img src={image.src.replace(/\.jpg$/, "-thumb.jpg")} alt={image.alt} loading="lazy" width={480} height={320} />
             </picture>
           </button>
         ))}
