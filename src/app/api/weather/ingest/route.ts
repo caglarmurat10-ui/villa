@@ -8,15 +8,20 @@ export const dynamic = "force-dynamic";
 const MAX_BODY_BYTES = 4096;
 const MIN_INGEST_GAP_MS = 5000;
 
+// Birim alanları ZORUNLU: kaynağın birimini kodda varsaymak yerine her payload'da açıkça
+// beyan ettiriyoruz (toKmh/toMm bu beyana göre dönüştürür, asla tahmin etmez).
 const schema = z.object({
   temperature: z.number().min(-50).max(60),
   humidity: z.number().min(0).max(100),
   pressure: z.number().min(800).max(1100),
   dew_point: z.number().min(-50).max(60),
   wind_speed: z.number().min(0).max(300),
+  wind_speed_unit: z.enum(["m/s", "km/h", "mph", "kn"]),
   gust_speed: z.number().min(0).max(400),
+  gust_speed_unit: z.enum(["m/s", "km/h", "mph", "kn"]),
   wind_direction: z.number().min(0).max(360),
   precipitation: z.number().min(0).max(2000),
+  precipitation_unit: z.enum(["mm", "in"]),
   raining: z.boolean(),
   uv_index: z.number().min(0).max(20),
   illumination: z.number().min(0).max(300000).optional(),
@@ -86,9 +91,12 @@ export async function POST(request: NextRequest) {
     pressure: parsed.data.pressure,
     dewPoint: parsed.data.dew_point,
     windSpeed: parsed.data.wind_speed,
+    windSpeedUnit: parsed.data.wind_speed_unit,
     gustSpeed: parsed.data.gust_speed,
+    gustSpeedUnit: parsed.data.gust_speed_unit,
     windDirection: parsed.data.wind_direction,
     precipitation: parsed.data.precipitation,
+    precipitationUnit: parsed.data.precipitation_unit,
     raining: parsed.data.raining,
     uvIndex: parsed.data.uv_index,
     illumination: parsed.data.illumination,
