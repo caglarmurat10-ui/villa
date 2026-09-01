@@ -117,10 +117,6 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
         <figure className={styles.gallerySide}><img src={villa.secondary} alt={villa.secondaryAlt} loading="lazy" /></figure>
       </section>
 
-      <section className={styles.section} style={{ paddingTop: 0 }}>
-        <VillaGalleryLightbox images={villa.gallery} villaName={villa.name} />
-      </section>
-
       <section className={styles.highlights}>
         <span className={styles.kicker}>ÖNE ÇIKANLAR</span>
         <h2>{villa.name}’da sizi bekleyenler</h2>
@@ -134,17 +130,8 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
         </div>
       </section>
 
-      <section className={styles.detailFeatures}>
-        <div><small>01</small><h3>Özel havuz ve bağımsız alan</h3><p>Villa ve dış yaşam alanları, Patara’daki tatilinizi kendi programınızla yaşayabilmeniz için bağımsız bir deneyim sunar.</p></div>
-        <div><small>02</small><h3>Canlı müsaitlik</h3><p>Müsaitlik, yönetim panelindeki gerçek rezervasyon kayıtları üzerinden kontrol edilir.</p></div>
-        <div><small>03</small><h3>Dönemsel fiyat</h3><p>Tarihinizde fiyat tanımlıysa toplam konaklama bedelini sistem doğrudan hesaplar.</p></div>
-      </section>
-
-      <section className={styles.bookingBand} id="rezervasyon">
-        <div className={styles.bookingWrap}>
-          <div className={styles.bookingIntro}><span className={styles.kicker}>{villa.name.toUpperCase()}</span><h2>Tarihinizi<br />kontrol edin.</h2><p>Seçtiğiniz günler yönetim sistemimizdeki rezervasyonlarla karşılaştırılır. Müsaitse doğrudan rezervasyon talebi gönderebilirsiniz.</p></div>
-          <PublicBookingWidget reservations={bookingReservations} prices={bookingPrices} initialVilla={villa.villa} />
-        </div>
+      <section className={styles.section} style={{ paddingTop: 0 }}>
+        <VillaGalleryLightbox images={villa.gallery} villaName={villa.name} />
       </section>
 
       <section className={styles.locationDetail} id="konum">
@@ -163,6 +150,19 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
           <div className={styles.locationVisual} aria-hidden="true" style={{ backgroundImage: `url(${villa.cover})` }}>
             <span>{villa.address.addressLocality} · {villa.address.addressRegion}</span>
           </div>
+        </div>
+      </section>
+
+      <section className={styles.detailFeatures}>
+        <div><small>01</small><h3>Özel havuz ve bağımsız alan</h3><p>Villa ve dış yaşam alanları, Patara’daki tatilinizi kendi programınızla yaşayabilmeniz için bağımsız bir deneyim sunar.</p></div>
+        <div><small>02</small><h3>Canlı müsaitlik</h3><p>Müsaitlik, yönetim panelindeki gerçek rezervasyon kayıtları üzerinden kontrol edilir.</p></div>
+        <div><small>03</small><h3>Dönemsel fiyat</h3><p>Tarihinizde fiyat tanımlıysa toplam konaklama bedelini sistem doğrudan hesaplar.</p></div>
+      </section>
+
+      <section className={styles.bookingBand} id="rezervasyon">
+        <div className={styles.bookingWrap}>
+          <div className={styles.bookingIntro}><span className={styles.kicker}>{villa.name.toUpperCase()}</span><h2>Tarihinizi<br />kontrol edin.</h2><p>Seçtiğiniz günler yönetim sistemimizdeki rezervasyonlarla karşılaştırılır. Müsaitse doğrudan rezervasyon talebi gönderebilirsiniz.</p></div>
+          <PublicBookingWidget reservations={bookingReservations} prices={bookingPrices} initialVilla={villa.villa} />
         </div>
       </section>
 
@@ -188,6 +188,10 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
       </section>
 
       <footer className={styles.footer}><div className={styles.footerBrand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></div><div className={styles.footerBottom}>Patara · Kaş · Antalya <span>safiradestan.com</span></div></footer>
+
+      <div className={styles.stickyCta}>
+        <a href="#rezervasyon">Tarih kontrol et</a>
+      </div>
     </main>
   );
 }

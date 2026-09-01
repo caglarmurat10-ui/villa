@@ -39,6 +39,8 @@ export const metadata: Metadata = {
 const MEDIA = {
   safiraHero: VILLAS["villa-safira"].cover,
   destanHero: VILLAS["villa-destan"].cover,
+  safiraExperience: VILLAS["villa-safira"].secondary,
+  safiraExperienceAlt: VILLAS["villa-safira"].secondaryAlt,
   destanExperience: VILLAS["villa-destan"].secondary,
   destanExperienceAlt: VILLAS["villa-destan"].secondaryAlt,
 } as const;
@@ -121,8 +123,23 @@ export default async function PublicHomePage() {
       </section>
 
       <section className={styles.experience} id="deneyim">
+        <div className={styles.experiencePhoto}><img src={MEDIA.safiraExperience} alt={MEDIA.safiraExperienceAlt} loading="lazy" /></div>
+        <div className={styles.experienceCopy}>
+          <span className={styles.kicker}>VILLA SAFİRA</span>
+          <h2>Doğayla çevrili,<br />gün ışığı dolu bir kaçış.</h2>
+          <p>Çam ormanına yaslanan bahçesi ve genişleyen havuz manzarasıyla Villa Safira, günü yavaşlatan sakin ve aydınlık bir Patara tatili sunar.</p>
+          <Link className={styles.experienceLink} href="/villa-safira">Villa Safira’yı keşfet →</Link>
+        </div>
+      </section>
+
+      <section className={`${styles.experience} ${styles.experienceReverse}`}>
+        <div className={styles.experienceCopy}>
+          <span className={styles.kicker}>VILLA DESTAN</span>
+          <h2>Akşamlar için tasarlanmış,<br />karakterli bir mekân.</h2>
+          <p>İki katlı mimarisi ve havuzundaki akşam atmosferiyle Villa Destan, gün batımından sonra da özenle devam eden bir konaklama deneyimi sunar.</p>
+          <Link className={styles.experienceLink} href="/villa-destan">Villa Destan’ı keşfet →</Link>
+        </div>
         <div className={styles.experiencePhoto}><img src={MEDIA.destanExperience} alt={MEDIA.destanExperienceAlt} loading="lazy" /></div>
-        <div className={styles.experienceCopy}><span className={styles.kicker}>DOĞRUDAN KONAKLAMA</span><h2>Arada kimse yok.<br />Tatiliniz bize emanet.</h2><p>Rezervasyon takvimi, dönemsel fiyatlar ve villa bilgileri aynı yönetim altyapısından gelir. Böylece gördüğünüz bilgiyle bizim gördüğümüz bilgi aynı kalır.</p><div className={styles.points}><div><b>01</b><span>Canlı müsaitlik</span></div><div><b>02</b><span>Doğrudan iletişim</span></div><div><b>03</b><span>Şeffaf fiyat</span></div></div></div>
       </section>
 
       <section className={styles.homeLocation} id="konum">
@@ -135,10 +152,13 @@ export default async function PublicHomePage() {
             if (!mapsUrl) return null;
             return (
               <a key={slug} className={styles.homeLocationCard} href={mapsUrl} target="_blank" rel="noopener noreferrer">
-                <small>{villa.address.addressLocality} · {villa.address.addressRegion}</small>
-                <h3>{villa.name}</h3>
-                <p>{villa.address.streetAddress}</p>
-                <em>Haritada Gör →</em>
+                <div className={styles.homeLocationPhoto}><img src={villa.cover} alt="" loading="lazy" /></div>
+                <div className={styles.homeLocationBody}>
+                  <small>{villa.address.addressLocality} · {villa.address.addressRegion}</small>
+                  <h3>{villa.name}</h3>
+                  <p>{villa.address.streetAddress}</p>
+                  <em>Haritada Gör →</em>
+                </div>
               </a>
             );
           })}
