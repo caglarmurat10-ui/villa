@@ -38,9 +38,9 @@ export const metadata: Metadata = {
 
 const MEDIA = {
   safiraHero: VILLAS["villa-safira"].cover,
-  safiraAlt: VILLAS["villa-safira"].secondary,
   destanHero: VILLAS["villa-destan"].cover,
-  destanSuite: VILLAS["villa-destan"].secondary,
+  destanExperience: VILLAS["villa-destan"].secondary,
+  destanExperienceAlt: VILLAS["villa-destan"].secondaryAlt,
 } as const;
 
 const structuredData = {
@@ -121,7 +121,7 @@ export default async function PublicHomePage() {
       </section>
 
       <section className={styles.experience} id="deneyim">
-        <div className={styles.experiencePhoto}><img src={MEDIA.destanSuite} alt="Villa Destan yatak odası, jakuzi ve iç mekân" loading="lazy" /></div>
+        <div className={styles.experiencePhoto}><img src={MEDIA.destanExperience} alt={MEDIA.destanExperienceAlt} loading="lazy" /></div>
         <div className={styles.experienceCopy}><span className={styles.kicker}>DOĞRUDAN KONAKLAMA</span><h2>Arada kimse yok.<br />Tatiliniz bize emanet.</h2><p>Rezervasyon takvimi, dönemsel fiyatlar ve villa bilgileri aynı yönetim altyapısından gelir. Böylece gördüğünüz bilgiyle bizim gördüğümüz bilgi aynı kalır.</p><div className={styles.points}><div><b>01</b><span>Canlı müsaitlik</span></div><div><b>02</b><span>Doğrudan iletişim</span></div><div><b>03</b><span>Şeffaf fiyat</span></div></div></div>
       </section>
 

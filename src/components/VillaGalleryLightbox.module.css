@@ -1,3 +1,37 @@
+.filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 18px;
+}
+
+.filterChip {
+  border: 1px solid #d8cdb8;
+  background: #fff;
+  color: #544c40;
+  border-radius: 999px;
+  padding: 10px 18px;
+  min-height: 40px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  cursor: pointer;
+  transition: background .2s ease, color .2s ease, border-color .2s ease;
+}
+
+.filterChip:hover { border-color: #b99b68; }
+
+.filterChip:focus-visible {
+  outline: 2px solid #b99b68;
+  outline-offset: 2px;
+}
+
+.filterChipActive {
+  background: #2f2a22;
+  border-color: #2f2a22;
+  color: #fff;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
@@ -95,6 +129,8 @@
 }
 
 @media (max-width: 700px) {
+  .filterBar { gap: 6px; margin-bottom: 14px; }
+  .filterChip { padding: 9px 14px; font-size: 12.5px; }
   .grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .nav { width: 42px; height: 42px; font-size: 20px; }
   .navPrev { left: 8px; }

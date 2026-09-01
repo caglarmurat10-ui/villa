@@ -121,12 +121,6 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
         <VillaGalleryLightbox images={villa.gallery} villaName={villa.name} />
       </section>
 
-      <section className={styles.detailFeatures}>
-        <div><small>01</small><h3>Özel havuz ve bağımsız alan</h3><p>Villa ve dış yaşam alanları, Patara’daki tatilinizi kendi programınızla yaşayabilmeniz için bağımsız bir deneyim sunar.</p></div>
-        <div><small>02</small><h3>Canlı müsaitlik</h3><p>Müsaitlik, yönetim panelindeki gerçek rezervasyon kayıtları üzerinden kontrol edilir.</p></div>
-        <div><small>03</small><h3>Dönemsel fiyat</h3><p>Tarihinizde fiyat tanımlıysa toplam konaklama bedelini sistem doğrudan hesaplar.</p></div>
-      </section>
-
       <section className={styles.highlights}>
         <span className={styles.kicker}>ÖNE ÇIKANLAR</span>
         <h2>{villa.name}’da sizi bekleyenler</h2>
@@ -138,6 +132,12 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
             </div>
           ))}
         </div>
+      </section>
+
+      <section className={styles.detailFeatures}>
+        <div><small>01</small><h3>Özel havuz ve bağımsız alan</h3><p>Villa ve dış yaşam alanları, Patara’daki tatilinizi kendi programınızla yaşayabilmeniz için bağımsız bir deneyim sunar.</p></div>
+        <div><small>02</small><h3>Canlı müsaitlik</h3><p>Müsaitlik, yönetim panelindeki gerçek rezervasyon kayıtları üzerinden kontrol edilir.</p></div>
+        <div><small>03</small><h3>Dönemsel fiyat</h3><p>Tarihinizde fiyat tanımlıysa toplam konaklama bedelini sistem doğrudan hesaplar.</p></div>
       </section>
 
       <section className={styles.bookingBand} id="rezervasyon">
@@ -160,7 +160,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
               <a className={styles.locationActionSecondary} href={directionsUrl} target="_blank" rel="noopener noreferrer">Yol Tarifi Al</a>
             </div>
           </div>
-          <div className={styles.locationVisual} aria-hidden="true">
+          <div className={styles.locationVisual} aria-hidden="true" style={{ backgroundImage: `url(${villa.cover})` }}>
             <span>{villa.address.addressLocality} · {villa.address.addressRegion}</span>
           </div>
         </div>

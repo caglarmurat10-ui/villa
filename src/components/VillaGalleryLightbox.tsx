@@ -1,7 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { VillaGalleryImage } from "@/lib/villa-content";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { GALLERY_CATEGORIES, type GalleryCategorySlug, type VillaGalleryImage } from "@/lib/villa-content";
 import styles from "./VillaGalleryLightbox.module.css";
 
 export default function VillaGalleryLightbox({
@@ -11,24 +11,40 @@ export default function VillaGalleryLightbox({
   images: VillaGalleryImage[];
   villaName: string;
 }) {
+  const [activeCategory, setActiveCategory] = useState<GalleryCategorySlug | "all">("all");
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   const lastTriggerRef = useRef<HTMLButtonElement | null>(null);
 
+  const availableCategories = useMemo(
+    () => GALLERY_CATEGORIES.filter((category) => images.some((image) => image.categories.includes(category.slug))),
+    [images],
+  );
+
+  const filteredImages = useMemo(
+    () => (activeCategory === "all" ? images : images.filter((image) => image.categories.includes(activeCategory))),
+    [images, activeCategory],
+  );
+
   const close = useCallback(() => setOpenIndex(null), []);
   const showPrev = useCallback(
-    () => setOpenIndex((current) => (current === null ? null : (current - 1 + images.length) % images.length)),
-    [images.length],
+    () => setOpenIndex((current) => (current === null ? null : (current - 1 + filteredImages.length) % filteredImages.length)),
+    [filteredImages.length],
   );
   const showNext = useCallback(
-    () => setOpenIndex((current) => (current === null ? null : (current + 1) % images.length)),
-    [images.length],
+    () => setOpenIndex((current) => (current === null ? null : (current + 1) % filteredImages.length)),
+    [filteredImages.length],
   );
 
   function openAt(index: number, trigger: HTMLButtonElement) {
     lastTriggerRef.current = trigger;
     setOpenIndex(index);
+  }
+
+  function selectCategory(category: GalleryCategorySlug | "all") {
+    setActiveCategory(category);
+    setOpenIndex(null);
   }
 
   useEffect(() => {
@@ -70,8 +86,32 @@ export default function VillaGalleryLightbox({
 
   return (
     <>
+      {availableCategories.length > 1 && (
+        <div className={styles.filterBar} role="group" aria-label={`${villaName} galeri filtresi`}>
+          <button
+            type="button"
+            className={`${styles.filterChip} ${activeCategory === "all" ? styles.filterChipActive : ""}`}
+            onClick={() => selectCategory("all")}
+            aria-pressed={activeCategory === "all"}
+          >
+            Tümü
+          </button>
+          {availableCategories.map((category) => (
+            <button
+              key={category.slug}
+              type="button"
+              className={`${styles.filterChip} ${activeCategory === category.slug ? styles.filterChipActive : ""}`}
+              onClick={() => selectCategory(category.slug)}
+              aria-pressed={activeCategory === category.slug}
+            >
+              {category.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       <div className={styles.grid}>
-        {images.map((image, index) => (
+        {filteredImages.map((image, index) => (
           <button
             type="button"
             key={image.src}
@@ -87,16 +127,16 @@ export default function VillaGalleryLightbox({
         ))}
       </div>
 
-      {openIndex !== null && (
+      {openIndex !== null && filteredImages[openIndex] && (
         <div ref={dialogRef} className={styles.overlay} role="dialog" aria-modal="true" aria-label={`${villaName} fotoğraf galerisi`}>
           <button ref={closeButtonRef} type="button" className={styles.close} onClick={close} aria-label="Galeriyi kapat">✕</button>
           <button type="button" className={`${styles.nav} ${styles.navPrev}`} onClick={showPrev} aria-label="Önceki fotoğraf">‹</button>
           <picture>
-            <source srcSet={images[openIndex].webp} type="image/webp" />
-            <img className={styles.fullImage} src={images[openIndex].src} alt={images[openIndex].alt} />
+            <source srcSet={filteredImages[openIndex].webp} type="image/webp" />
+            <img className={styles.fullImage} src={filteredImages[openIndex].src} alt={filteredImages[openIndex].alt} />
           </picture>
           <button type="button" className={`${styles.nav} ${styles.navNext}`} onClick={showNext} aria-label="Sonraki fotoğraf">›</button>
-          <div className={styles.caption}>{images[openIndex].alt} · {openIndex + 1}/{images.length}</div>
+          <div className={styles.caption}>{filteredImages[openIndex].alt} · {openIndex + 1}/{filteredImages.length}</div>
         </div>
       )}
     </>

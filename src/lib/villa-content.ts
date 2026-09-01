@@ -12,10 +12,21 @@ export interface VillaFaq {
   answer: string;
 }
 
+export type GalleryCategorySlug = "havuz" | "dis-mekan" | "odalar" | "salon" | "manzara";
+
+export const GALLERY_CATEGORIES: { slug: GalleryCategorySlug; label: string }[] = [
+  { slug: "havuz", label: "Havuz" },
+  { slug: "dis-mekan", label: "Dış Mekan" },
+  { slug: "manzara", label: "Manzara" },
+  { slug: "salon", label: "Salon" },
+  { slug: "odalar", label: "Odalar" },
+];
+
 export interface VillaGalleryImage {
   src: string;
   webp: string;
   alt: string;
+  categories: GalleryCategorySlug[];
 }
 
 export interface VillaGeo {
@@ -72,20 +83,21 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
     label: "VILLA 01",
     cover: "/villas/safira-hero-20260830.jpg",
     coverAlt: "Villa Safira Patara Kaş dış görünüm ve özel havuz",
-    secondary: "/villas/safira-alt-20260830.jpg",
-    secondaryAlt: "Villa Safira yaşam alanı ve villa detayları",
+    secondary: "/villas/gallery/safira/safira-havuz-doga.jpg",
+    secondaryAlt: "Villa Safira havuzundan Patara vadisine bakan doğa manzarası",
     gallery: [
-      { src: "/villas/gallery/safira/safira-havuz-genel-manzara.jpg", webp: "/villas/gallery/safira/safira-havuz-genel-manzara.webp", alt: "Villa Safira özel havuz ve genel dış görünüm" },
-      { src: "/villas/gallery/safira/safira-havuz-kusbakisi.jpg", webp: "/villas/gallery/safira/safira-havuz-kusbakisi.webp", alt: "Villa Safira kuşbakışı genel görünüm" },
-      { src: "/villas/gallery/safira/safira-havuz-doga.jpg", webp: "/villas/gallery/safira/safira-havuz-doga.webp", alt: "Villa Safira havuz ve doğa manzarası" },
-      { src: "/villas/gallery/safira/safira-havuz-genis-aci.jpg", webp: "/villas/gallery/safira/safira-havuz-genis-aci.webp", alt: "Villa Safira havuz geniş açı görünüm" },
-      { src: "/villas/gallery/safira/safira-havuz-aktivite.jpg", webp: "/villas/gallery/safira/safira-havuz-aktivite.webp", alt: "Villa Safira havuz başı aktivite" },
-      { src: "/villas/gallery/safira/safira-salon-yemek.jpg", webp: "/villas/gallery/safira/safira-salon-yemek.webp", alt: "Villa Safira salon ve yemek alanı" },
-      { src: "/villas/gallery/safira/safira-yatak-odasi.jpg", webp: "/villas/gallery/safira/safira-yatak-odasi.webp", alt: "Villa Safira yatak odası" },
-      { src: "/villas/gallery/safira/safira-jakuzili-oda.jpg", webp: "/villas/gallery/safira/safira-jakuzili-oda.webp", alt: "Villa Safira jakuzili oda" },
-      { src: "/villas/gallery/safira/safira-cocuk-oyun-alani.jpg", webp: "/villas/gallery/safira/safira-cocuk-oyun-alani.webp", alt: "Villa Safira bahçe ve çocuk oyun alanı" },
-      { src: "/villas/gallery/safira/safira-bbq-havuz.jpg", webp: "/villas/gallery/safira/safira-bbq-havuz.webp", alt: "Villa Safira BBQ ve havuz alanı" },
-      { src: "/villas/gallery/safira/safira-havuzbasi.jpg", webp: "/villas/gallery/safira/safira-havuzbasi.webp", alt: "Villa Safira havuz başı yaşam alanı" },
+      { src: "/villas/gallery/safira/safira-havuz-genel-manzara.jpg", webp: "/villas/gallery/safira/safira-havuz-genel-manzara.webp", alt: "Villa Safira özel havuz ve genel dış görünüm", categories: ["havuz", "dis-mekan"] },
+      { src: "/villas/gallery/safira/safira-havuz-kusbakisi.jpg", webp: "/villas/gallery/safira/safira-havuz-kusbakisi.webp", alt: "Villa Safira kuşbakışı genel görünüm", categories: ["dis-mekan"] },
+      { src: "/villas/gallery/safira/safira-havuz-doga.jpg", webp: "/villas/gallery/safira/safira-havuz-doga.webp", alt: "Villa Safira havuz ve doğa manzarası", categories: ["havuz", "manzara"] },
+      { src: "/villas/gallery/safira/safira-havuz-genis-aci.jpg", webp: "/villas/gallery/safira/safira-havuz-genis-aci.webp", alt: "Villa Safira havuz geniş açı görünüm", categories: ["havuz", "manzara"] },
+      { src: "/villas/gallery/safira/safira-havuz-panorama.jpg", webp: "/villas/gallery/safira/safira-havuz-panorama.webp", alt: "Villa Safira havuzu ve çam ormanı manzarası", categories: ["havuz", "manzara"] },
+      { src: "/villas/gallery/safira/safira-havuz-aktivite.jpg", webp: "/villas/gallery/safira/safira-havuz-aktivite.webp", alt: "Villa Safira havuz başı aktivite", categories: ["havuz"] },
+      { src: "/villas/gallery/safira/safira-salon-yemek.jpg", webp: "/villas/gallery/safira/safira-salon-yemek.webp", alt: "Villa Safira salon ve yemek alanı", categories: ["salon"] },
+      { src: "/villas/gallery/safira/safira-yatak-odasi.jpg", webp: "/villas/gallery/safira/safira-yatak-odasi.webp", alt: "Villa Safira yatak odası", categories: ["odalar"] },
+      { src: "/villas/gallery/safira/safira-jakuzili-oda.jpg", webp: "/villas/gallery/safira/safira-jakuzili-oda.webp", alt: "Villa Safira jakuzili oda", categories: ["odalar"] },
+      { src: "/villas/gallery/safira/safira-cocuk-oyun-alani.jpg", webp: "/villas/gallery/safira/safira-cocuk-oyun-alani.webp", alt: "Villa Safira bahçe ve çocuk oyun alanı", categories: ["dis-mekan"] },
+      { src: "/villas/gallery/safira/safira-bbq-havuz.jpg", webp: "/villas/gallery/safira/safira-bbq-havuz.webp", alt: "Villa Safira BBQ ve havuz alanı", categories: ["dis-mekan", "havuz"] },
+      { src: "/villas/gallery/safira/safira-havuzbasi.jpg", webp: "/villas/gallery/safira/safira-havuzbasi.webp", alt: "Villa Safira havuz başı yaşam alanı", categories: ["havuz"] },
     ],
     instagram: "https://www.instagram.com/villasafirapatara/",
     facebook: "https://www.facebook.com/105073114600720",
@@ -114,16 +126,16 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
     label: "VILLA 02",
     cover: "/villas/destan-hero-20260830.jpg",
     coverAlt: "Villa Destan Patara Kaş özel havuz ve bahçe görünümü",
-    secondary: "/villas/destan-suite-20260830.jpg",
-    secondaryAlt: "Villa Destan yatak odası, jakuzi ve iç mekân",
+    secondary: "/villas/gallery/destan/destan-aksam-havuz.jpg",
+    secondaryAlt: "Villa Destan havuzunda akşam atmosferi",
     gallery: [
-      { src: "/villas/gallery/destan/destan-drone-genel-gorunum.jpg", webp: "/villas/gallery/destan/destan-drone-genel-gorunum.webp", alt: "Villa Destan kuşbakışı drone görünümü" },
-      { src: "/villas/gallery/destan/destan-aksam-havuz.jpg", webp: "/villas/gallery/destan/destan-aksam-havuz.webp", alt: "Villa Destan akşam dış görünüm ve havuz" },
-      { src: "/villas/gallery/destan/destan-gece-havuz.jpg", webp: "/villas/gallery/destan/destan-gece-havuz.webp", alt: "Villa Destan gece havuz ambiyansı" },
-      { src: "/villas/gallery/destan/destan-salon-yemek.jpg", webp: "/villas/gallery/destan/destan-salon-yemek.webp", alt: "Villa Destan salon ve yemek alanı" },
-      { src: "/villas/gallery/destan/destan-jakuzili-yatak-odasi.jpg", webp: "/villas/gallery/destan/destan-jakuzili-yatak-odasi.webp", alt: "Villa Destan jakuzili yatak odası" },
-      { src: "/villas/gallery/destan/destan-havuzbasi.jpg", webp: "/villas/gallery/destan/destan-havuzbasi.webp", alt: "Villa Destan havuz başı yaşam alanı" },
-      { src: "/villas/gallery/destan/destan-bahce-dinlenme.jpg", webp: "/villas/gallery/destan/destan-bahce-dinlenme.webp", alt: "Villa Destan bahçe ve dinlenme alanı" },
+      { src: "/villas/gallery/destan/destan-drone-genel-gorunum.jpg", webp: "/villas/gallery/destan/destan-drone-genel-gorunum.webp", alt: "Villa Destan kuşbakışı drone görünümü", categories: ["dis-mekan"] },
+      { src: "/villas/gallery/destan/destan-aksam-havuz.jpg", webp: "/villas/gallery/destan/destan-aksam-havuz.webp", alt: "Villa Destan akşam dış görünüm ve havuz", categories: ["havuz", "manzara"] },
+      { src: "/villas/gallery/destan/destan-gece-havuz.jpg", webp: "/villas/gallery/destan/destan-gece-havuz.webp", alt: "Villa Destan gece havuz ambiyansı", categories: ["havuz", "manzara"] },
+      { src: "/villas/gallery/destan/destan-salon-yemek.jpg", webp: "/villas/gallery/destan/destan-salon-yemek.webp", alt: "Villa Destan salon ve yemek alanı", categories: ["salon"] },
+      { src: "/villas/gallery/destan/destan-jakuzili-yatak-odasi.jpg", webp: "/villas/gallery/destan/destan-jakuzili-yatak-odasi.webp", alt: "Villa Destan jakuzili yatak odası", categories: ["odalar"] },
+      { src: "/villas/gallery/destan/destan-havuzbasi.jpg", webp: "/villas/gallery/destan/destan-havuzbasi.webp", alt: "Villa Destan havuz başı yaşam alanı", categories: ["havuz"] },
+      { src: "/villas/gallery/destan/destan-bahce-dinlenme.jpg", webp: "/villas/gallery/destan/destan-bahce-dinlenme.webp", alt: "Villa Destan bahçe ve dinlenme alanı", categories: ["dis-mekan"] },
     ],
     instagram: "https://www.instagram.com/villadestanpatara/",
     facebook: "https://www.facebook.com/1309122082284129",

@@ -525,7 +525,7 @@ a.secondary {
 .locationVisual {
   position: relative;
   min-height: 320px;
-  background: var(--sand);
+  background: var(--sand) center / cover no-repeat;
   display: flex;
   align-items: flex-end;
   padding: 26px;
@@ -536,8 +536,8 @@ a.secondary {
   position: absolute;
   inset: 0;
   background:
-    radial-gradient(circle at 30% 30%, rgba(19, 32, 25, .05), transparent 55%),
-    linear-gradient(155deg, #2c4636 0%, #17281f 100%);
+    radial-gradient(circle at 30% 30%, rgba(19, 32, 25, .12), transparent 55%),
+    linear-gradient(155deg, rgba(44, 70, 54, .82) 0%, rgba(15, 23, 18, .9) 100%);
 }
 .locationVisual span {
   position: relative;
