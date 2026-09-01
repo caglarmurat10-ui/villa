@@ -168,6 +168,9 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
       summary: "Villa Safira, maksimum 5 misafir kapasitesine sahip iki yatak odalı bir villadır. Bir yatak odasında kral yatak, diğerinde çift kişilik ve tek kişilik yatak bulunur. Her iki yatak odasında da özel banyo, WC ve jakuzi vardır.",
     },
     whatsappMessage: "Merhaba, Villa Safira için müsaitlik ve fiyat bilgisi almak istiyorum.",
+    // Kullanıcı tarafından 2026-09-01'de doğrulandı - public rezervasyon CTA linki (OTA takvim
+    // senkronundaki gizli ICS export URL'siyle karıştırılmamalı, bu tamamen ayrı/public bir link).
+    airbnbListingUrl: "https://www.airbnb.com/rooms/48761834",
   },
   "villa-destan": {
     slug: "villa-destan",
@@ -222,6 +225,9 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
       summary: "Villa Destan, maksimum 6 misafir kapasitesine sahip üç yatak odalı bir villadır. İki yatak odasında çift kişilik yatak, özel banyo, WC ve jakuzi bulunur. Üçüncü yatak odasında iki tek kişilik yatak vardır ve ortak kullanım banyo/WC'ye erişim sağlanır.",
     },
     whatsappMessage: "Merhaba, Villa Destan için müsaitlik ve fiyat bilgisi almak istiyorum.",
+    // Kullanıcı tarafından 2026-09-01'de doğrulandı - public rezervasyon CTA linki (OTA takvim
+    // senkronundaki gizli ICS export URL'siyle karıştırılmamalı, bu tamamen ayrı/public bir link).
+    airbnbListingUrl: "https://www.airbnb.com/rooms/51842201",
   },
 };
 
