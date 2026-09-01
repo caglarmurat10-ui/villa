@@ -22,15 +22,17 @@
     "SOCIAL_AUTO_PUBLISH_TIME": "12:00",
     "SOCIAL_AUTO_PUBLISH_LIMIT": "2"
   },
+  // NOT: PAYTR_MERCHANT_ID/KEY/SALT bilerek "required" listesine EKLENMEDİ - bu liste wrangler'da
+  // salt bir uyarı değil, sağlanmadan deploy'u tamamen ENGELLEYEN sert bir kapı (canlı test edildi:
+  // deploy "required secrets have not been set" hatasıyla durdu). PayTR entegrasyonu tasarım gereği
+  // bu üç secret olmadan da deploy edilebilir/dormant kalabilir olmalı - o yüzden bu liste değişmedi.
+  // Gerçek secret isimleri src/lib/payments/paytr/config.ts'te ve final raporda dokümante edilmiştir.
   "secrets": {
     "required": [
       "META_APP_SECRET",
       "FACEBOOK_APP_SECRET",
       "ADMIN_PASSWORD",
-      "ADMIN_SESSION_SECRET",
-      "PAYTR_MERCHANT_ID",
-      "PAYTR_MERCHANT_KEY",
-      "PAYTR_MERCHANT_SALT"
+      "ADMIN_SESSION_SECRET"
     ]
   },
   "kv_namespaces": [
