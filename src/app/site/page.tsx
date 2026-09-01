@@ -14,6 +14,7 @@ import styles from "./site.module.css";
 export const dynamic = "force-dynamic";
 
 const ORIGIN = "https://safiradestan.com";
+const HAS_OTA_LISTINGS = Object.values(VILLAS).some((villa) => villa.airbnbListingUrl || villa.bookingListingUrl);
 const GUIDE_TEASER_IDS = ["patara-antik-kenti", "patara-plaji", "kaputas-plaji", "kas-merkez"];
 const GUIDE_TEASER_PLACES = GUIDE_PLACES.filter((place) => GUIDE_TEASER_IDS.includes(place.id));
 const SOCIAL_LINKS = [
@@ -183,6 +184,7 @@ export default async function PublicHomePage() {
             <div className={styles.storyMeta}><div><small>VILLA 02</small><h3>Villa Destan</h3></div><p>Özel havuzu ve güçlü yaşam alanlarıyla mahremiyet odaklı bir kaçış.</p></div>
           </Link>
         </div>
+        {HAS_OTA_LISTINGS && <p className={styles.otaTrustNote}>Doğrudan veya tercih ettiğiniz rezervasyon platformu üzerinden.</p>}
       </section>
 
       <section className={styles.experience} id="deneyim">

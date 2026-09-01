@@ -10,6 +10,7 @@ import { fetchGoogleReviews } from "@/lib/google-reviews";
 import { toVillaId } from "@/lib/analytics";
 import ViewItemTracker from "@/components/analytics/ViewItemTracker";
 import TrackedMapsLink from "@/components/analytics/TrackedMapsLink";
+import TrackedOtaLink from "@/components/analytics/TrackedOtaLink";
 import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
 import { listBlockedRanges } from "@/lib/ota/availability";
 import styles from "../site.module.css";
@@ -279,6 +280,46 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
             ))}
           </div>
           <a className={styles.experienceLink} href={googleReviews.googleMapsUri} target="_blank" rel="noopener noreferrer">Google Maps&apos;te Tüm Yorumları Gör →</a>
+        </section>
+      )}
+
+      {(villa.airbnbListingUrl || villa.bookingListingUrl) && (
+        <section className={styles.reservationOptions}>
+          <span className={styles.kicker}>REZERVASYON SEÇENEKLERİ</span>
+          <h2>Size uygun rezervasyon yöntemini seçin.</h2>
+          <p>Doğrudan müsaitlik talebi gönderebilir veya rezervasyonunuzu Airbnb ya da Booking.com üzerinden tamamlayabilirsiniz.</p>
+          <div className={styles.reservationOptionButtons}>
+            <a className={styles.locationActionPrimary} href="#rezervasyon">Müsaitlik Talebi Gönder</a>
+            {villa.airbnbListingUrl && (
+              <TrackedOtaLink
+                className={styles.locationActionSecondary}
+                href={villa.airbnbListingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                channel="airbnb"
+                villaId={toVillaId(villa.villa)}
+                villaName={villa.name}
+                ctaLocation="reservation_options"
+              >
+                Airbnb&apos;de Rezervasyon Yap
+              </TrackedOtaLink>
+            )}
+            {villa.bookingListingUrl && (
+              <TrackedOtaLink
+                className={styles.locationActionSecondary}
+                href={villa.bookingListingUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                channel="booking"
+                villaId={toVillaId(villa.villa)}
+                villaName={villa.name}
+                ctaLocation="reservation_options"
+              >
+                Booking.com&apos;da Rezervasyon Yap
+              </TrackedOtaLink>
+            )}
+          </div>
+          <p className={styles.reservationOptionsNote}>Airbnb ve Booking.com üzerinden yapılan rezervasyonlarda ödeme ve rezervasyon işlemleri ilgili platformun koşullarına tabidir.</p>
         </section>
       )}
 

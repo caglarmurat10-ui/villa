@@ -151,3 +151,11 @@ export function trackGalleryInteraction(params: { villa_id: VillaId; gallery_cat
 export function trackGuidePlaceClick(params: { place_id: string; place_name: string; place_category: string }) {
   pushEvent("guide_place_click", { ...params, action: "open_maps" });
 }
+
+export type OtaBookingChannel = "airbnb" | "booking";
+
+// generate_lead PRIMARY key event olarak kalır - bu event'ler key event DEĞİL, yalnız analiz için.
+export function trackOtaBookingClick(channel: OtaBookingChannel, ref: VillaRef, ctaLocation: string) {
+  const eventName = channel === "airbnb" ? "airbnb_booking_click" : "booking_booking_click";
+  pushEvent(eventName, { ...ref, cta_location: ctaLocation, booking_channel: channel });
+}

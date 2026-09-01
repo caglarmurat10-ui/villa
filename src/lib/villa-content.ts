@@ -85,6 +85,12 @@ export interface VillaContent {
   whatsappMessage: string;
   address: VillaAddress;
   geo: VillaGeo;
+  // Airbnb/Booking.com PUBLIC listing URL'leri (rezervasyon sayfası, gizli takvim-sync URL'si
+  // DEĞİL). Gerçek, doğrulanmış public URL gelene kadar bilerek tanımsız bırakılır - Booking
+  // Property ID'si (Safira 8492080, Destan 8491940) tek başına gerçek public listing URL'sini
+  // türetmeye yetmez (slug kısmı tahmin edilemez), o yüzden buradan uydurulmadı.
+  airbnbListingUrl?: string;
+  bookingListingUrl?: string;
 }
 
 export function formatAddress(address: VillaAddress): string {

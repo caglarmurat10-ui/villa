@@ -755,6 +755,23 @@ a.secondary {
 }
 .quickFacts > p { max-width: 780px; margin: 0; line-height: 1.7; color: #675f54; font-size: 15px; }
 
+.reservationOptions {
+  width: min(90vw, 900px);
+  margin: auto;
+  padding: 0 0 76px;
+}
+.reservationOptions .kicker { display: block; color: #6b6459; margin-bottom: 14px; }
+.reservationOptions h2 {
+  margin: 0 0 14px;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 400;
+  font-size: clamp(26px, 3vw, 34px);
+}
+.reservationOptions > p { max-width: 640px; margin: 0 0 24px; line-height: 1.7; color: #675f54; font-size: 15px; }
+.reservationOptionButtons { display: flex; flex-wrap: wrap; gap: 12px; }
+.reservationOptionsNote { margin: 18px 0 0; font-size: 12px; line-height: 1.6; color: #8a7f6c; max-width: 640px; }
+.otaTrustNote { margin: 28px 0 0; text-align: center; font-size: 13px; color: #8a7f6c; }
+
 .gallery {
   width: min(94vw, 1500px);
   margin: auto;
@@ -1008,6 +1025,10 @@ a.secondary {
   .weatherGrid { grid-template-columns: 1fr 1fr; }
   .reviewsSection { width: calc(100% - 44px); padding-bottom: 86px; }
   .reviewsGrid { grid-template-columns: 1fr; gap: 18px; }
+
+  .reservationOptions { width: calc(100% - 44px); padding-bottom: 60px; }
+  .reservationOptionButtons { flex-direction: column; align-items: stretch; }
+  .reservationOptionButtons a { width: 100%; }
 
   .faq { width: calc(100% - 44px); padding-bottom: 86px; }
   .faq h2 { font-size: clamp(38px, 10vw, 52px); }
