@@ -48,6 +48,8 @@
   border: none;
   padding: 0;
   cursor: zoom-in;
+  content-visibility: auto;
+  contain-intrinsic-size: 480px 320px;
 }
 
 .thumb img {

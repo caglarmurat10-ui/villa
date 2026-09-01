@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PublicBookingWidget from "@/components/PublicBookingWidget";
 import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
-import { VILLAS, FAQ_ITEMS, REGION_INFO } from "@/lib/villa-content";
+import { VILLAS, FAQ_ITEMS, REGION_INFO, type VillaSlug } from "@/lib/villa-content";
 import styles from "./site.module.css";
 
 export const dynamic = "force-dynamic";
@@ -36,13 +36,38 @@ export const metadata: Metadata = {
   },
 };
 
+function findGalleryImage(slug: VillaSlug, src: string) {
+  const image = VILLAS[slug].gallery.find((item) => item.src === src);
+  if (!image) throw new Error(`Gallery image not found: ${slug} ${src}`);
+  return image;
+}
+
+const safiraHeroImage = findGalleryImage("villa-safira", "/villas/gallery/safira/safira-havuz-doga.jpg");
+const destanHeroImage = findGalleryImage("villa-destan", "/villas/gallery/destan/destan-aksam-havuz.jpg");
+const safiraExperienceImage = findGalleryImage("villa-safira", "/villas/gallery/safira/safira-havuz-genis-aci.jpg");
+const destanExperienceImage = findGalleryImage("villa-destan", "/villas/gallery/destan/destan-gece-havuz.jpg");
+
+function heroVariants(base: string) {
+  return {
+    jpgSm: `${base}-hero-sm.jpg`,
+    jpgLg: `${base}-hero-lg.jpg`,
+    webpSm: `${base}-hero-sm.webp`,
+    webpLg: `${base}-hero-lg.webp`,
+  };
+}
+
+const safiraHeroVariants = heroVariants("/villas/gallery/safira/safira-havuz-doga");
+const destanHeroVariants = heroVariants("/villas/gallery/destan/destan-aksam-havuz");
+
 const MEDIA = {
-  safiraHero: VILLAS["villa-safira"].cover,
-  destanHero: VILLAS["villa-destan"].cover,
-  safiraExperience: VILLAS["villa-safira"].secondary,
-  safiraExperienceAlt: VILLAS["villa-safira"].secondaryAlt,
-  destanExperience: VILLAS["villa-destan"].secondary,
-  destanExperienceAlt: VILLAS["villa-destan"].secondaryAlt,
+  safiraHero: safiraHeroVariants,
+  safiraHeroAlt: safiraHeroImage.alt,
+  destanHero: destanHeroVariants,
+  destanHeroAlt: destanHeroImage.alt,
+  safiraExperience: safiraExperienceImage.src,
+  safiraExperienceAlt: safiraExperienceImage.alt,
+  destanExperience: destanExperienceImage.src,
+  destanExperienceAlt: destanExperienceImage.alt,
 } as const;
 
 const structuredData = {
@@ -75,7 +100,21 @@ export default async function PublicHomePage() {
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       <a href="#ana-icerik" className={styles.skipLink}>İçeriğe atla</a>
       <section className={styles.hero}>
-        <img className={styles.heroImage} src={MEDIA.safiraHero} alt="Patara Kaş Villa Safira özel havuzu ve dış yaşam alanı" fetchPriority="high" />
+        <picture>
+          <source
+            type="image/webp"
+            srcSet={`${MEDIA.safiraHero.webpSm} 640w, ${MEDIA.safiraHero.webpLg} 1600w`}
+            sizes="100vw"
+          />
+          <img
+            className={styles.heroImage}
+            src={MEDIA.safiraHero.jpgLg}
+            srcSet={`${MEDIA.safiraHero.jpgSm} 640w, ${MEDIA.safiraHero.jpgLg} 1600w`}
+            sizes="100vw"
+            alt={MEDIA.safiraHeroAlt}
+            fetchPriority="high"
+          />
+        </picture>
         <div className={styles.heroShade} />
         <nav className={styles.nav} aria-label="Ana menü">
           <Link href="/" className={styles.brand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></Link>
@@ -112,11 +151,23 @@ export default async function PublicHomePage() {
         <div className={styles.editorialHead}><span className={styles.kicker}>PATARA VİLLA KİRALAMA</span><h2>Hangisi sizin<br />tatiliniz?</h2><p>Villa Safira ve Villa Destan’ı gerçek fotoğraflarıyla keşfedin; Patara’da özel havuzlu villa tatili için size en uygun seçeneği bulun.</p></div>
         <div className={styles.villaGrid}>
           <Link className={styles.villaStory} href="/villa-safira">
-            <div className={styles.storyImage}><img src={MEDIA.safiraHero} alt="Villa Safira Patara Kaş dış görünüm ve özel havuz" loading="lazy" /><span>Safira&apos;yı keşfet ↗</span></div>
+            <div className={styles.storyImage}>
+              <picture>
+                <source type="image/webp" srcSet={`${MEDIA.safiraHero.webpSm} 640w, ${MEDIA.safiraHero.webpLg} 1600w`} sizes="(max-width: 900px) 90vw, 45vw" />
+                <img src={MEDIA.safiraHero.jpgLg} srcSet={`${MEDIA.safiraHero.jpgSm} 640w, ${MEDIA.safiraHero.jpgLg} 1600w`} sizes="(max-width: 900px) 90vw, 45vw" alt={MEDIA.safiraHeroAlt} loading="lazy" />
+              </picture>
+              <span>Safira&apos;yı keşfet ↗</span>
+            </div>
             <div className={styles.storyMeta}><div><small>VILLA 01</small><h3>Villa Safira</h3></div><p>Doğayla çevrili, ferah ve özel havuzlu bir Patara villa tatili.</p></div>
           </Link>
           <Link className={`${styles.villaStory} ${styles.storyOffset}`} href="/villa-destan">
-            <div className={styles.storyImage}><img src={MEDIA.destanHero} alt="Villa Destan Patara Kaş özel havuz ve bahçe görünümü" loading="lazy" /><span>Destan&apos;ı keşfet ↗</span></div>
+            <div className={styles.storyImage}>
+              <picture>
+                <source type="image/webp" srcSet={`${MEDIA.destanHero.webpSm} 640w, ${MEDIA.destanHero.webpLg} 1600w`} sizes="(max-width: 900px) 90vw, 45vw" />
+                <img src={MEDIA.destanHero.jpgLg} srcSet={`${MEDIA.destanHero.jpgSm} 640w, ${MEDIA.destanHero.jpgLg} 1600w`} sizes="(max-width: 900px) 90vw, 45vw" alt={MEDIA.destanHeroAlt} loading="lazy" />
+              </picture>
+              <span>Destan&apos;ı keşfet ↗</span>
+            </div>
             <div className={styles.storyMeta}><div><small>VILLA 02</small><h3>Villa Destan</h3></div><p>Özel havuzu ve güçlü yaşam alanlarıyla mahremiyet odaklı bir kaçış.</p></div>
           </Link>
         </div>

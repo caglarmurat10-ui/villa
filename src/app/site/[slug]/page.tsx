@@ -114,7 +114,22 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
 
       <section className={styles.gallery} id="galeri">
         <figure className={styles.galleryMain}><img src={villa.cover} alt={villa.coverAlt} loading="eager" /></figure>
-        <figure className={styles.gallerySide}><img src={villa.secondary} alt={villa.secondaryAlt} loading="lazy" /></figure>
+        <figure className={styles.gallerySide}>
+          <picture>
+            <source
+              type="image/webp"
+              srcSet={`${villa.secondary.replace(/\.jpg$/, "-hero-sm.webp")} 640w, ${villa.secondary.replace(/\.jpg$/, "-hero-lg.webp")} 1600w`}
+              sizes="(max-width: 900px) 90vw, 32vw"
+            />
+            <img
+              src={villa.secondary.replace(/\.jpg$/, "-hero-lg.jpg")}
+              srcSet={`${villa.secondary.replace(/\.jpg$/, "-hero-sm.jpg")} 640w, ${villa.secondary.replace(/\.jpg$/, "-hero-lg.jpg")} 1600w`}
+              sizes="(max-width: 900px) 90vw, 32vw"
+              alt={villa.secondaryAlt}
+              loading="lazy"
+            />
+          </picture>
+        </figure>
       </section>
 
       <section className={styles.highlights}>
