@@ -60,6 +60,8 @@ export interface VillaAddress {
 export interface VillaQuickFacts {
   bedroomCount: number;
   maxGuests: number;
+  poolSize: string;
+  poolDepth: string;
   chips: string[];
   summary: string;
 }
@@ -80,6 +82,7 @@ export interface VillaContent {
   quote: string;
   highlights: VillaHighlight[];
   quickFacts: VillaQuickFacts;
+  whatsappMessage: string;
   address: VillaAddress;
   geo: VillaGeo;
 }
@@ -153,9 +156,12 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
     quickFacts: {
       bedroomCount: 2,
       maxGuests: 5,
-      chips: ["5 Misafir", "2 Yatak Odası", "2 Jakuzili Oda", "2 Özel Banyo/WC", "Kral Yatak", "Çift Kişilik + Tek Kişilik Yatak", "Salon", "Mutfak", "Çamaşır Odası"],
+      poolSize: "8 x 3.5 m",
+      poolDepth: "1.50 m",
+      chips: ["5 Misafir", "2 Yatak Odası", "2 Jakuzili Oda", "2 Özel Banyo/WC", "Kral Yatak", "Çift Kişilik + Tek Kişilik Yatak", "Havuz 8 x 3.5 m", "1.50 m Derinlik", "Wi-Fi", "Salon", "Mutfak", "Çamaşır Odası"],
       summary: "Villa Safira, maksimum 5 misafir kapasitesine sahip iki yatak odalı bir villadır. Bir yatak odasında kral yatak, diğerinde çift kişilik ve tek kişilik yatak bulunur. Her iki yatak odasında da özel banyo, WC ve jakuzi vardır.",
     },
+    whatsappMessage: "Merhaba, Villa Safira için müsaitlik ve fiyat bilgisi almak istiyorum.",
   },
   "villa-destan": {
     slug: "villa-destan",
@@ -204,9 +210,12 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
     quickFacts: {
       bedroomCount: 3,
       maxGuests: 6,
-      chips: ["6 Misafir", "3 Yatak Odası", "2 Jakuzili Oda", "2 Özel Banyo/WC", "Ortak Banyo/WC", "2 Çift Kişilik Yatak", "2 Tek Kişilik Yatak", "Oturma Odası", "Mutfak"],
+      poolSize: "11 x 4 m",
+      poolDepth: "1.50 m",
+      chips: ["6 Misafir", "3 Yatak Odası", "2 Jakuzili Oda", "2 Özel Banyo/WC", "Ortak Banyo/WC", "2 Çift Kişilik Yatak", "2 Tek Kişilik Yatak", "Havuz 11 x 4 m", "1.50 m Derinlik", "Wi-Fi", "Çamaşır Makinesi", "Oturma Odası", "Mutfak"],
       summary: "Villa Destan, maksimum 6 misafir kapasitesine sahip üç yatak odalı bir villadır. İki yatak odasında çift kişilik yatak, özel banyo, WC ve jakuzi bulunur. Üçüncü yatak odasında iki tek kişilik yatak vardır ve ortak kullanım banyo/WC'ye erişim sağlanır.",
     },
+    whatsappMessage: "Merhaba, Villa Destan için müsaitlik ve fiyat bilgisi almak istiyorum.",
   },
 };
 
