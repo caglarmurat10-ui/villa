@@ -203,7 +203,6 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
           <span className={styles.factChip}>Evcil Hayvan: {POLICY_SUMMARY.pets}</span>
           <span className={styles.factChip}>Sigara: {POLICY_SUMMARY.smoking}</span>
         </div>
-        <p className={styles.policyFootnote}>{POLICY_SUMMARY.petsFootnote}</p>
         <Link className={styles.experienceLink} href="/rezervasyon-kosullari">Rezervasyon ve Konaklama Koşullarını İncele →</Link>
       </section>
 

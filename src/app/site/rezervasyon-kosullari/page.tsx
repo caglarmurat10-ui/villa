@@ -43,7 +43,6 @@ export default function ReservationPolicyPage() {
           <span className={styles.factChip}>Evcil Hayvan: {POLICY_SUMMARY.pets}</span>
           <span className={styles.factChip}>Sigara: {POLICY_SUMMARY.smoking}</span>
         </div>
-        <p className={styles.policyFootnote}>{POLICY_SUMMARY.petsFootnote}</p>
       </section>
 
       <section className={styles.policyBody}>
