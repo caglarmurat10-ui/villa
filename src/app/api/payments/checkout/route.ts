@@ -46,10 +46,19 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: message }, { status: 409 });
   }
 
+  // Kaynak-doğruluk YALNIZ D1'deki payments.test_mode - istemciden gelen hiçbir alan (query/body)
+  // bu kontrolü etkilemez. PAYTR_TEST_MODE=false olduğunda GERÇEK ödemeler için bu guard'ın hiçbir
+  // dalı atlanmaz - bypass yalnız test_mode=1 kaydına bağlıdır, global bir env/flag değil.
   const conflict = await hasPaymentTimeConflict(payment.villa, payment.checkIn, payment.checkOut, payment.reservationId);
   if (conflict) {
-    await logPaymentAudit("PAYMENT_CONFLICT_BLOCKED", { paymentId, reservationId: payment.reservationId, villa: payment.villa });
-    return Response.json({ ok: false, error: "Bu tarihler için müsaitlik durumu değişti. Lütfen bizimle iletişime geçin." }, { status: 409 });
+    if (!payment.testMode) {
+      await logPaymentAudit("PAYMENT_CONFLICT_BLOCKED", { paymentId, reservationId: payment.reservationId, villa: payment.villa });
+      return Response.json({ ok: false, error: "Bu tarihler için müsaitlik durumu değişti. Lütfen bizimle iletişime geçin." }, { status: 409 });
+    }
+    // Yalnız test payment - PayTR sağlayıcı bağlantısını uçtan uca test edebilmek için müsaitlik
+    // çakışması testi engellemez. Gerçek finansı hiçbir zaman etkilemez (testMode=true zaten
+    // markPaymentPaidIfPending'de reservations.paid_amount güncellemesini atlıyor).
+    await logPaymentAudit("PAYMENT_TEST_CONFLICT_BYPASSED", { paymentId, reservationId: payment.reservationId, villa: payment.villa });
   }
 
   // Cloudflare Worker arkasında gerçek public trafik her zaman bu header'ı taşır - müşterinin
