@@ -73,6 +73,10 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
           latitude: villa.geo.lat,
           longitude: villa.geo.lng,
         },
+        containsPlace: {
+          "@type": "Accommodation",
+          numberOfBedrooms: villa.quickFacts.bedroomCount,
+        },
         amenityFeature: [
           { "@type": "LocationFeatureSpecification", name: "Özel havuz", value: true },
           { "@type": "LocationFeatureSpecification", name: "Doğrudan rezervasyon", value: true },
@@ -110,6 +114,16 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
       <section className={styles.detailIntro}>
         <div><span className={styles.kicker}>PATARA ÖZEL HAVUZLU VİLLA</span><h2>{villa.quote}</h2></div>
         <p>Burada tatilin merkezi villanın kendisi. Sabahınızı özel havuz başında başlatın, Patara ve Kaş’ı kendi temponuzda keşfedin, günün sonunda tekrar tamamen size ait olan alana dönün.</p>
+      </section>
+
+      <section className={styles.quickFacts}>
+        <span className={styles.kicker}>VILLA ÖZELLİKLERİ</span>
+        <div className={styles.factChips}>
+          {villa.quickFacts.chips.map((chip) => (
+            <span className={styles.factChip} key={chip}>{chip}</span>
+          ))}
+        </div>
+        <p>{villa.quickFacts.summary}</p>
       </section>
 
       <section className={styles.gallery} id="galeri">
