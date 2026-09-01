@@ -2,12 +2,15 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
 import type { Villa } from "@/lib/types";
 import type { OtaPlatform } from "./types";
-import { fetchIcsSafely, hasAllowlistedHosts, sanitizeErrorMessage, SsrfBlockedError } from "./security";
+import { fetchIcsSafelyStaged, hasAllowlistedHosts, StagedFetchError, type OtaVerifyStage } from "./security";
 import { parseIcsEvents, type ParsedIcsEvent } from "./ics-parser";
 
-// Kullanıcıya asla full URL/path/token gösterilmez - yalnız platforma özel, güvenli bir mesaj.
+// Kullanıcıya asla full URL/path/token gösterilmez - yalnız platforma özel, güvenli bir mesaj +
+// hangi aşamada başarısız olduğu (stage). Bu, Airbnb gibi allowlist'i "doğru" görünen ama gerçek
+// URL'de yine de başarısız olan durumlarda, secret hiçbir şey açığa çıkarmadan teşhis koymayı
+// sağlar - hangi aşamanın başarısız olduğu güvenlidir, URL'nin kendisi değildir.
 const UNSUPPORTED_FORMAT_MESSAGE: Record<OtaPlatform, string> = {
-  airbnb: "Airbnb takvim bağlantısı biçimi doğrulanamadı.",
+  airbnb: "Airbnb takvim bağlantısı doğrulanamadı.",
   booking: "Bu Booking.com takvim bağlantısı desteklenen export formatında değil.",
 };
 
@@ -17,7 +20,8 @@ export interface IcsVerifyResult {
   earliestDate?: string | null;
   latestDate?: string | null;
   conflictCount?: number;
-  error?: string;
+  stage?: OtaVerifyStage;
+  message?: string;
 }
 
 async function database(): Promise<D1Database> {
@@ -40,29 +44,35 @@ async function countConflicts(db: D1Database, villa: Villa, platform: OtaPlatfor
 }
 
 // Gerçek fetch + gerçek parse + gerçek çakışma sayımı - hiçbir sahte/varsayılan sonuç üretmez.
-// Ham ICS metnini veya URL'yi ASLA loglamaz ya da döndürmez - yalnız sayısal özet döner. Bu
-// fonksiyon KV/D1'e HİÇBİR ŞEY YAZMAZ (yalnız okuma) - kaydetme kararı çağıran route'a ait.
+// Ham ICS metnini, URL'yi veya query/token'ı ASLA loglamaz ya da döndürmez - yalnız sayısal özet
+// + (başarısızlıkta) hangi aşamada durduğu döner. Bu fonksiyon KV/D1'e HİÇBİR ŞEY YAZMAZ (yalnız
+// okuma) - kaydetme kararı çağıran route'a ait.
 export async function verifyIcsUrl(villa: Villa, platform: OtaPlatform, url: string): Promise<IcsVerifyResult> {
   if (!hasAllowlistedHosts(platform)) {
-    return { ok: false, error: `${UNSUPPORTED_FORMAT_MESSAGE[platform]} (platform henüz yapılandırılmadı)` };
+    return { ok: false, stage: "initial-url-validation", message: `${UNSUPPORTED_FORMAT_MESSAGE[platform]} (platform henüz yapılandırılmadı)` };
   }
 
   let icsText: string;
   try {
-    icsText = await fetchIcsSafely(url, platform);
+    icsText = await fetchIcsSafelyStaged(url, platform);
   } catch (error) {
-    if (error instanceof SsrfBlockedError) {
-      return { ok: false, error: UNSUPPORTED_FORMAT_MESSAGE[platform] };
+    if (error instanceof StagedFetchError) {
+      return { ok: false, stage: error.stage, message: UNSUPPORTED_FORMAT_MESSAGE[platform] };
     }
-    const message = error instanceof Error ? error.message : "Bilinmeyen hata";
-    return { ok: false, error: sanitizeErrorMessage(message) };
+    return { ok: false, stage: "fetch", message: UNSUPPORTED_FORMAT_MESSAGE[platform] };
   }
 
   if (!icsText.includes("BEGIN:VCALENDAR")) {
-    return { ok: false, error: "Geçerli bir ICS/VCALENDAR formatı değil." };
+    return { ok: false, stage: "ics-content-validation", message: "Geçerli bir ICS/VCALENDAR formatı değil." };
   }
 
-  const events = parseIcsEvents(icsText);
+  let events: ParsedIcsEvent[];
+  try {
+    events = parseIcsEvents(icsText);
+  } catch {
+    return { ok: false, stage: "ics-parse", message: "Takvim içeriği ayrıştırılamadı." };
+  }
+
   const dates = events.flatMap((event) => [event.startDate, event.endDate]).sort();
   const db = await database();
   const conflictCount = await countConflicts(db, villa, platform, events);

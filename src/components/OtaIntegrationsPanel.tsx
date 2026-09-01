@@ -126,7 +126,10 @@ export default function OtaIntegrationsPanel({
         body: JSON.stringify({ villa, platform, icsUrl: form.url.trim() }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok || !data.ok) throw new Error(data.error ?? "Doğrulama başarısız.");
+      if (!response.ok || !data.ok) {
+        const stageNote = data.stage ? ` (aşama: ${data.stage})` : "";
+        throw new Error(`${data.message ?? "Doğrulama başarısız."}${stageNote}`);
+      }
       setForm(key, {
         verifying: false,
         preview: { eventCount: data.eventCount, earliestDate: data.earliestDate, latestDate: data.latestDate, conflictCount: data.conflictCount },

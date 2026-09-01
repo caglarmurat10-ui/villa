@@ -24,7 +24,7 @@ export async function POST(request: Request) {
 
   const verify = await verifyIcsUrl(villa, platform, icsUrl);
   if (!verify.ok) {
-    return Response.json({ connected: false, error: verify.error }, { status: 422 });
+    return Response.json({ connected: false, stage: verify.stage, error: verify.message }, { status: 422 });
   }
 
   const { env } = await getCloudflareContext({ async: true });

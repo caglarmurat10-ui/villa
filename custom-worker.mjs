@@ -611,7 +611,7 @@ const OTA_PLATFORMS = ["airbnb", "booking"];
 // Kullanıcı production'da gerçek export URL'leriyle doğruladı - bkz. src/lib/ota/security.ts'teki
 // aynı ALLOWLIST için detaylı yorum. İki kopya da aynı host/path kuralını taşımalı.
 const OTA_ALLOWLIST = {
-  airbnb: { hosts: ["www.airbnb.com"], pathPattern: /^\/calendar\/ical\/[0-9]+\.ics$/ },
+  airbnb: { hosts: ["www.airbnb.com", "www.airbnb.com.tr"], pathPattern: /^\/calendar\/ical\/[0-9]+\.ics$/ },
   booking: { hosts: ["ical.booking.com"], pathPattern: /^\/v1\/export\/?$/ },
 };
 const OTA_PRIVATE_HOSTNAME_PATTERNS = [
