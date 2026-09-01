@@ -1,0 +1,123 @@
+import type { OtaPlatform } from "./types";
+
+interface AllowlistEntry {
+  hosts: string[];
+  pathPrefixes: string[];
+}
+
+// Airbnb: resmi Help Center makalesi (airbnb.com/help/article/99) doğrudan fetch edilip export URL
+// deseni doğrulandı - www.airbnb.com üzerinde /calendar/ical/... .
+// Booking.com: gerçek export host'u DOĞRULANAMADI (partner-help sayfaları fetch'i 403 döndürdü,
+// yalnız arama sonucu snippet'leriyle dolaylı doğrulanabildi) - bu yüzden allowlist BİLEREK BOŞ.
+// Gerçek bir Booking .ics örnek URL'si elimize geçmeden bu platform için hiçbir fetch başarılı olmaz;
+// tahminle bir host eklemek SSRF korumasını değersizleştirir.
+const ALLOWLIST: Record<OtaPlatform, AllowlistEntry> = {
+  airbnb: { hosts: ["www.airbnb.com", "airbnb.com"], pathPrefixes: ["/calendar/"] },
+  booking: { hosts: [], pathPrefixes: [] },
+};
+
+const MAX_REDIRECTS = 3;
+const FETCH_TIMEOUT_MS = 10_000;
+const MAX_BODY_BYTES = 512 * 1024;
+
+// Savunma derinliği katmanı: Cloudflare Workers'ın kendi ağ katmanı zaten RFC1918/loopback/
+// link-local hedeflere outbound fetch'i platform seviyesinde engeller - host/path allowlist'i
+// birincil kontrolümüz, bu desen kontrolü ek bir katman.
+const PRIVATE_HOSTNAME_PATTERNS = [
+  /^localhost$/i,
+  /^127\./,
+  /^0\.0\.0\.0$/,
+  /^10\./,
+  /^192\.168\./,
+  /^172\.(1[6-9]|2\d|3[0-1])\./,
+  /^169\.254\./,
+  /^\[?::1\]?$/,
+  /\.internal$/i,
+  /^metadata\.google\.internal$/i,
+];
+
+function isBlockedHostname(hostname: string): boolean {
+  return PRIVATE_HOSTNAME_PATTERNS.some((pattern) => pattern.test(hostname));
+}
+
+function isAllowed(url: URL, platform: OtaPlatform): boolean {
+  if (url.protocol !== "https:") return false;
+  if (isBlockedHostname(url.hostname)) return false;
+  const entry = ALLOWLIST[platform];
+  if (!entry.hosts.includes(url.hostname.toLowerCase())) return false;
+  return entry.pathPrefixes.some((prefix) => url.pathname.startsWith(prefix));
+}
+
+export class SsrfBlockedError extends Error {}
+
+export async function fetchIcsSafely(rawUrl: string, platform: OtaPlatform): Promise<string> {
+  let current: URL;
+  try {
+    current = new URL(rawUrl);
+  } catch {
+    throw new SsrfBlockedError("Geçersiz URL.");
+  }
+
+  for (let hop = 0; hop <= MAX_REDIRECTS; hop += 1) {
+    if (!isAllowed(current, platform)) {
+      throw new SsrfBlockedError(`İzin verilmeyen host/path: ${current.hostname}${current.pathname}`);
+    }
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+    let response: Response;
+    try {
+      response = await fetch(current.toString(), {
+        redirect: "manual",
+        signal: controller.signal,
+        headers: { "User-Agent": "SafiraDestanVillas-CalendarSync/1.0" },
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location) throw new Error("Redirect location eksik.");
+      current = new URL(location, current);
+      continue;
+    }
+
+    if (!response.ok) {
+      throw new Error(`ICS fetch başarısız: HTTP ${response.status}`);
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) return await response.text();
+
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        total += value.byteLength;
+        if (total > MAX_BODY_BYTES) {
+          await reader.cancel();
+          throw new Error("ICS yanıtı beklenenden büyük.");
+        }
+        chunks.push(value);
+      }
+    }
+    const merged = new Uint8Array(total);
+    let offset = 0;
+    for (const chunk of chunks) {
+      merged.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    return new TextDecoder().decode(merged);
+  }
+
+  throw new Error("Çok fazla redirect.");
+}
+
+// Hata mesajlarını D1/audit_log'a yazmadan önce URL query-string'lerini (secret token taşıyabilir)
+// temizler.
+export function sanitizeErrorMessage(message: string): string {
+  return message.replace(/(https?:\/\/[^\s?]+)\?[^\s]*/gi, "$1?[redacted]").slice(0, 500);
+}

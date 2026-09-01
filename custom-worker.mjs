@@ -13,6 +13,9 @@ const PUBLIC_API_PATHS = new Set([
   "/api/weather/ingest",
   "/api/weather/current",
 ]);
+// Dinamik token segmenti taşıyan public API yolları (Set ile tam eşleşmiyor, prefix ile kontrol
+// edilir) - şu an yalnız OTA export feed'i: /api/calendar/export/<opaque-token>.ics
+const PUBLIC_API_PATH_PREFIXES = ["/api/calendar/export/"];
 const PUBLIC_ROUTE_MAP = new Map([
   ["/", "/site"],
   ["/villa-safira", "/site/villa-safira"],
@@ -121,7 +124,8 @@ function routeRequest(request) {
 
   if (PUBLIC_HOSTS.has(host)) {
     if (url.pathname.startsWith("/api/")) {
-      return PUBLIC_API_PATHS.has(url.pathname)
+      const allowed = PUBLIC_API_PATHS.has(url.pathname) || PUBLIC_API_PATH_PREFIXES.some((prefix) => url.pathname.startsWith(prefix));
+      return allowed
         ? { request }
         : { response: new Response("Not Found", { status: 404 }) };
     }
@@ -594,6 +598,210 @@ async function runSocialCron(controller, env, ctx) {
   }
 }
 
+// ============ OTA (Airbnb/Booking) takvim senkronu ============
+// NOT: Bu mantık src/lib/ota/*.ts'nin BİLİNÇLİ, bağımsız bir aynası. custom-worker.mjs Next.js'in
+// "@/" path alias'larını çözemez (nextWorker zaten derlenmiş OpenNext çıktısı, TS kaynağı değil) -
+// bu yüzden cron tarafı burada saf JS olarak yeniden yazıldı, tıpkı runSocialCron'un src/lib/
+// social-db.ts yerine D1'i doğrudan sorgulaması gibi (mevcut, önceden var olan bir desen).
+// SSRF allowlist'ini DEĞİŞTİRİRSEN src/lib/ota/security.ts'i de güncelle (ve tersi) - iki kopya da
+// aynı kalmalı.
+
+const OTA_VILLAS = ["Safira", "Destan"];
+const OTA_PLATFORMS = ["airbnb", "booking"];
+const OTA_ALLOWLIST = {
+  airbnb: { hosts: ["www.airbnb.com", "airbnb.com"], pathPrefixes: ["/calendar/"] },
+  booking: { hosts: [], pathPrefixes: [] },
+};
+const OTA_PRIVATE_HOSTNAME_PATTERNS = [
+  /^localhost$/i, /^127\./, /^0\.0\.0\.0$/, /^10\./, /^192\.168\./,
+  /^172\.(1[6-9]|2\d|3[0-1])\./, /^169\.254\./, /^\[?::1\]?$/, /\.internal$/i, /^metadata\.google\.internal$/i,
+];
+
+function otaIsBlockedHostname(hostname) {
+  return OTA_PRIVATE_HOSTNAME_PATTERNS.some((pattern) => pattern.test(hostname));
+}
+
+function otaIsAllowed(url, platform) {
+  if (url.protocol !== "https:") return false;
+  if (otaIsBlockedHostname(url.hostname)) return false;
+  const entry = OTA_ALLOWLIST[platform];
+  if (!entry.hosts.includes(url.hostname.toLowerCase())) return false;
+  return entry.pathPrefixes.some((prefix) => url.pathname.startsWith(prefix));
+}
+
+async function otaFetchIcsSafely(rawUrl, platform) {
+  let current;
+  try {
+    current = new URL(rawUrl);
+  } catch {
+    throw new Error("Geçersiz URL.");
+  }
+  for (let hop = 0; hop <= 3; hop += 1) {
+    if (!otaIsAllowed(current, platform)) {
+      throw new Error(`İzin verilmeyen host/path: ${current.hostname}${current.pathname}`);
+    }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    let response;
+    try {
+      response = await fetch(current.toString(), {
+        redirect: "manual",
+        signal: controller.signal,
+        headers: { "User-Agent": "SafiraDestanVillas-CalendarSync/1.0" },
+      });
+    } finally {
+      clearTimeout(timeout);
+    }
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get("location");
+      if (!location) throw new Error("Redirect location eksik.");
+      current = new URL(location, current);
+      continue;
+    }
+    if (!response.ok) throw new Error(`ICS fetch başarısız: HTTP ${response.status}`);
+    const text = await response.text();
+    if (text.length > 512 * 1024) throw new Error("ICS yanıtı beklenenden büyük.");
+    return text;
+  }
+  throw new Error("Çok fazla redirect.");
+}
+
+function otaUnfoldIcs(text) {
+  const rawLines = text.split(/\r\n|\n|\r/);
+  const lines = [];
+  for (const line of rawLines) {
+    if ((line.startsWith(" ") || line.startsWith("\t")) && lines.length > 0) {
+      lines[lines.length - 1] += line.slice(1);
+    } else {
+      lines.push(line);
+    }
+  }
+  return lines;
+}
+
+function otaParseDateValue(raw) {
+  const digits = raw.replace(/[^0-9]/g, "");
+  if (digits.length < 8) return null;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}-${digits.slice(6, 8)}`;
+}
+
+function otaParseIcsEvents(icsText) {
+  const lines = otaUnfoldIcs(icsText);
+  const events = [];
+  let inEvent = false, uid = null, start = null, end = null;
+  for (const line of lines) {
+    if (line === "BEGIN:VEVENT") { inEvent = true; uid = null; start = null; end = null; continue; }
+    if (line === "END:VEVENT") {
+      if (inEvent && uid && start && end) events.push({ uid, startDate: start, endDate: end });
+      inEvent = false;
+      continue;
+    }
+    if (!inEvent) continue;
+    const sep = line.indexOf(":");
+    if (sep === -1) continue;
+    const key = line.slice(0, sep).split(";")[0].toUpperCase();
+    const value = line.slice(sep + 1);
+    if (key === "UID") uid = value.trim();
+    else if (key === "DTSTART") start = otaParseDateValue(value);
+    else if (key === "DTEND") end = otaParseDateValue(value);
+  }
+  return events;
+}
+
+function otaSanitizeError(message) {
+  return String(message).replace(/(https?:\/\/[^\s?]+)\?[^\s]*/gi, "$1?[redacted]").slice(0, 500);
+}
+
+async function otaLogAudit(env, action, payload) {
+  await env.DB.prepare("INSERT INTO audit_log (entity_id, action, payload, created_at) VALUES (?, ?, ?, ?)")
+    .bind(payload.villa, action, JSON.stringify(payload), new Date().toISOString()).run();
+}
+
+async function otaSyncOneConnection(env, villa, platform) {
+  const connRow = await env.DB.prepare("SELECT is_enabled FROM ota_connections WHERE villa = ? AND platform = ?").bind(villa, platform).first();
+  if (!connRow || !connRow.is_enabled) return;
+
+  const importUrl = await env.OTA_PRIVATE.get(`import-url:${villa}:${platform}`);
+  if (!importUrl) return;
+
+  const now = new Date().toISOString();
+  let icsText;
+  try {
+    icsText = await otaFetchIcsSafely(importUrl, platform);
+  } catch (error) {
+    const message = otaSanitizeError(error instanceof Error ? error.message : String(error));
+    await env.DB.prepare("UPDATE ota_connections SET last_synced_at = ?, last_error = ?, updated_at = ? WHERE villa = ? AND platform = ?")
+      .bind(now, message, now, villa, platform).run();
+    await otaLogAudit(env, "ICAL_SYNC_FAILED", { villa, source: platform, error: message });
+    return;
+  }
+
+  const events = otaParseIcsEvents(icsText);
+  const seenUids = new Set();
+
+  for (const event of events) {
+    seenUids.add(event.uid);
+    const existing = await env.DB.prepare(
+      "SELECT id, start_date, end_date, status FROM external_blocks WHERE villa = ? AND source = ? AND external_uid = ?"
+    ).bind(villa, platform, event.uid).first();
+
+    const directConflict = await env.DB.prepare(
+      "SELECT id FROM reservations WHERE villa = ? AND deleted_at IS NULL AND check_in < ? AND check_out > ? LIMIT 1"
+    ).bind(villa, event.endDate, event.startDate).first();
+    const otherOtaConflict = await env.DB.prepare(
+      "SELECT id FROM external_blocks WHERE villa = ? AND source != ? AND status IN ('active','needs_review') AND start_date < ? AND end_date > ? LIMIT 1"
+    ).bind(villa, platform, event.endDate, event.startDate).first();
+    const nextStatus = directConflict || otherOtaConflict ? "needs_review" : "active";
+
+    if (!existing) {
+      await env.DB.prepare(`
+        INSERT INTO external_blocks (id, villa, source, external_uid, start_date, end_date, status, last_synced_at, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(crypto.randomUUID(), villa, platform, event.uid, event.startDate, event.endDate, nextStatus, now, now, now).run();
+      await otaLogAudit(env, "EXTERNAL_BLOCK_CREATED", { villa, source: platform, startDate: event.startDate, endDate: event.endDate });
+      if (nextStatus === "needs_review") await otaLogAudit(env, "BOOKING_CONFLICT_DETECTED", { villa, source: platform, startDate: event.startDate, endDate: event.endDate });
+    } else {
+      const changed = existing.start_date !== event.startDate || existing.end_date !== event.endDate || existing.status !== nextStatus;
+      if (changed) {
+        await env.DB.prepare("UPDATE external_blocks SET start_date = ?, end_date = ?, status = ?, last_synced_at = ?, updated_at = ? WHERE id = ?")
+          .bind(event.startDate, event.endDate, nextStatus, now, now, existing.id).run();
+        await otaLogAudit(env, "EXTERNAL_BLOCK_UPDATED", { villa, source: platform, startDate: event.startDate, endDate: event.endDate });
+        if (nextStatus === "needs_review" && existing.status !== "needs_review") {
+          await otaLogAudit(env, "BOOKING_CONFLICT_DETECTED", { villa, source: platform, startDate: event.startDate, endDate: event.endDate });
+        }
+      } else {
+        await env.DB.prepare("UPDATE external_blocks SET last_synced_at = ? WHERE id = ?").bind(now, existing.id).run();
+      }
+    }
+  }
+
+  const staleRows = await env.DB.prepare(
+    "SELECT id, external_uid FROM external_blocks WHERE villa = ? AND source = ? AND status IN ('active','needs_review')"
+  ).bind(villa, platform).all();
+  for (const row of staleRows.results) {
+    if (!seenUids.has(row.external_uid)) {
+      await env.DB.prepare("UPDATE external_blocks SET status = 'removed', updated_at = ? WHERE id = ?").bind(now, row.id).run();
+      await otaLogAudit(env, "EXTERNAL_BLOCK_REMOVED", { villa, source: platform });
+    }
+  }
+
+  await env.DB.prepare("UPDATE ota_connections SET last_synced_at = ?, last_success_at = ?, last_error = NULL, updated_at = ? WHERE villa = ? AND platform = ?")
+    .bind(now, now, now, villa, platform).run();
+  await otaLogAudit(env, "ICAL_SYNC_SUCCESS", { villa, source: platform, count: events.length });
+}
+
+async function runOtaCron(env) {
+  for (const villa of OTA_VILLAS) {
+    for (const platform of OTA_PLATFORMS) {
+      try {
+        await otaSyncOneConnection(env, villa, platform);
+      } catch (error) {
+        console.error(`[OTA Cron] ${villa}/${platform} beklenmeyen hata: ${safeCronError(error)}`);
+      }
+    }
+  }
+}
+
 export default {
   async fetch(request, env, ctx) {
     const authResponse = await adminAuthGate(request, env);
@@ -606,6 +814,10 @@ export default {
 
   async scheduled(controller, env, ctx) {
     if (typeof controller.noRetry === "function") controller.noRetry();
+    if (controller.cron === "*/30 * * * *") {
+      await runOtaCron(env);
+      return;
+    }
     await runSocialCron(controller, env, ctx);
   },
 };

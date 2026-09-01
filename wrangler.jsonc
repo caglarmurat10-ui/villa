@@ -31,7 +31,8 @@
     ]
   },
   "kv_namespaces": [
-    { "binding": "META_PRIVATE" }
+    { "binding": "META_PRIVATE" },
+    { "binding": "OTA_PRIVATE", "id": "9d1b206b16604753996c73a218773802" }
   ],
   "d1_databases": [
     { "binding": "DB", "database_name": "villa-yonetim", "database_id": "fa8fc6ec-9cc5-4c92-ba04-b23f2a9b8106" }
@@ -40,7 +41,7 @@
     "binding": "CF_VERSION_METADATA"
   },
   "triggers": {
-    "crons": ["*/15 * * * *"]
+    "crons": ["*/15 * * * *", "*/30 * * * *"]
   },
   "observability": { "enabled": true }
 }

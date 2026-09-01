@@ -5,6 +5,7 @@ declare global {
     DB: D1Database;
     ASSETS: Fetcher;
     META_PRIVATE: KVNamespace;
+    OTA_PRIVATE: KVNamespace;
     CF_VERSION_METADATA?: {
       id: string;
       tag?: string;

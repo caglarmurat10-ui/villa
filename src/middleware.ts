@@ -10,6 +10,8 @@ const PUBLIC_API_PATHS = new Set([
   "/api/weather/ingest",
   "/api/weather/current",
 ]);
+// Dinamik token segmenti taşıyan public API yolları - şu an yalnız OTA export feed'i.
+const PUBLIC_API_PATH_PREFIXES = ["/api/calendar/export/"];
 const WORKER_ALLOWED_PATHS = new Set([
   "/api/health",
   "/api/system/version",
@@ -53,7 +55,8 @@ export function middleware(request: NextRequest) {
   }
 
   if (pathname.startsWith("/api/")) {
-    return PUBLIC_API_PATHS.has(pathname) ? NextResponse.next() : notFound();
+    const allowed = PUBLIC_API_PATHS.has(pathname) || PUBLIC_API_PATH_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+    return allowed ? NextResponse.next() : notFound();
   }
 
   if (pathname === "/manifest.webmanifest") {
