@@ -42,6 +42,13 @@ export async function POST(request: Request) {
   if (post.platform !== "Instagram") return Response.json({ error: "Bu endpoint yalnızca Instagram paylaşımları içindir." }, { status: 400 });
   if (post.status !== "Planlandı") return Response.json({ error: "Bu paylaşım daha önce yayınlanmış." }, { status: 409 });
   if (post.approvalStatus !== "Onaylandı") return Response.json({ error: "Instagram yayını için önce insan onayı verilmelidir." }, { status: 409 });
+  // HARD GATE: Destan Instagram'ın Business Portfolio ownership sorunu çözülmedi - hem otomatik
+  // cron hem manuel "Şimdi yayınla" için, Graph API'ye hiçbir istek gitmeden burada durur. Cron
+  // tarafı aynı gate'i custom-worker.mjs'in duePosts() sorgusunda ayrıca uyguluyor (bu satırın cron
+  // tarafından hiç seçilmemesi için); bu ikinci katman, endpoint'in doğrudan çağrılmasına karşı.
+  if (post.villa === "Destan") {
+    return Response.json({ error: "Villa Destan Instagram hesabı için bağlantı/sahiplik sorunu çözülene kadar yayın devre dışı bırakıldı." }, { status: 409 });
+  }
 
   const allowedOrigins = [new URL(request.url).origin, "https://villa-yonetim.caglarmurat10.workers.dev"];
   let media: SocialPostMediaItem[] = await listSocialPostMedia(post.id);

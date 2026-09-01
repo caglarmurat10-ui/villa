@@ -36,6 +36,9 @@ export interface SocialPost {
   platform: SocialPlatform;
   contentType: SocialContentType;
   scheduledDate: string;
+  // HH:MM (Europe/Istanbul), yalnız aynı gün içindeki içerikleri farklı saatlere yaymak için -
+  // boşsa cron SOCIAL_AUTO_PUBLISH_TIME'a düşer (bkz. custom-worker.mjs duePosts()).
+  scheduledTime?: string | null;
   caption: string;
   // Legacy sosyal kayıtlarında bu alanlar henüz bulunmayabilir.
   mediaUrl?: string;

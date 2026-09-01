@@ -525,9 +525,16 @@ async function duePosts(env, scheduledAt) {
   const publishTime = safeTime(env.SOCIAL_AUTO_PUBLISH_TIME);
   const limit = safeLimit(env.SOCIAL_AUTO_PUBLISH_LIMIT);
   const cooldownBefore = new Date(scheduledAt.getTime() - RETRY_COOLDOWN_MS).toISOString();
+  // HARD GATE: Destan Instagram'ın Business Portfolio ownership sorunu çözülene kadar cron bu
+  // satırları seçemez - Graph API'ye hiçbir istek gitmeden burada eleniyor. DB'de connected
+  // görünmesi (social_accounts satırı, token_expires_at) bu gate'i etkilemez; yalnız villa+platform
+  // kombinasyonuna bakılır. Manuel "Şimdi yayınla" için aynı gate /api/meta/instagram/publish
+  // route'unda ayrıca uygulanıyor (iki bağımsız katman - src/lib/social-availability.ts değil, bu
+  // tamamen ayrı bir iş kuralı).
   const commonFilter = `status = 'Planlandı'
       AND approval_status = 'Onaylandı'
       AND platform IN ('Instagram', 'Facebook')
+      AND NOT (villa = 'Destan' AND platform = 'Instagram')
       AND (
         (platform = 'Instagram' AND content_type IN ('Gönderi', 'Hikâye', 'Reels'))
         OR (platform = 'Facebook' AND content_type IN ('Gönderi', 'Reels'))
@@ -539,14 +546,21 @@ async function duePosts(env, scheduledAt) {
       AND COALESCE(publish_attempt_count, 0) < ?
       AND (last_publish_attempt_at IS NULL OR last_publish_attempt_at <= ?)`;
 
-  const dateClause = clock.time < publishTime ? "scheduled_date < ?" : "scheduled_date <= ?";
+  // Satır kendi scheduled_time'ını taşıyorsa (Europe/Istanbul HH:MM) global SOCIAL_AUTO_PUBLISH_TIME
+  // yerine o kullanılır - aynı gün içindeki farklı içerikleri farklı saatlere yayarak "hepsi aynı anda
+  // due olur, cron art arda tikte hepsini boşaltır" content-patlaması riskini engeller. scheduled_time
+  // NULL ise (eski satırlar) eski davranış (tek global saat) aynen korunur.
+  const dateClause = `(
+    scheduled_date < ?
+    OR (scheduled_date = ? AND ? >= COALESCE(NULLIF(trim(scheduled_time), ''), ?))
+  )`;
   const result = await env.DB.prepare(`SELECT id, villa, platform, content_type, scheduled_date, publish_attempt_count
     FROM social_posts
     WHERE ${commonFilter}
       AND ${dateClause}
-    ORDER BY scheduled_date ASC, COALESCE(approved_at, created_at) ASC
+    ORDER BY scheduled_date ASC, COALESCE(scheduled_time, '99:99') ASC, COALESCE(approved_at, created_at) ASC
     LIMIT ?`)
-    .bind(MAX_ATTEMPTS, cooldownBefore, clock.date, limit)
+    .bind(MAX_ATTEMPTS, cooldownBefore, clock.date, clock.date, clock.time, publishTime, limit)
     .all();
 
   return result.results ?? [];

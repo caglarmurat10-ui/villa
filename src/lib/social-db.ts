@@ -9,6 +9,7 @@ type SocialPostRow = {
   platform: SocialPost["platform"];
   content_type: SocialPost["contentType"];
   scheduled_date: string;
+  scheduled_time?: string | null;
   caption: string;
   media_url?: string | null;
   status: SocialPostStatus;
@@ -47,6 +48,7 @@ function mapRow(row: SocialPostRow): SocialPost {
     platform: row.platform,
     contentType: row.content_type,
     scheduledDate: row.scheduled_date,
+    scheduledTime: row.scheduled_time ?? null,
     caption: row.caption,
     mediaUrl: row.media_url ?? "",
     status: row.status,
