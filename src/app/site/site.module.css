@@ -504,7 +504,7 @@ a.secondary {
 .locationInfo { padding: 44px; }
 .locationInfo h3 { margin: 0 0 14px; font-family: Georgia, 'Times New Roman', serif; font-size: 27px; font-weight: 400; }
 .locationAddress { margin: 0 0 22px; font-size: 15px; line-height: 1.6; color: var(--ink); }
-.locationAddress b { display: block; font-size: 10px; letter-spacing: .16em; font-weight: 800; color: #8a7f6c; margin-bottom: 6px; }
+.locationAddress b { display: block; font-size: 10px; letter-spacing: .16em; font-weight: 800; color: #6b6152; margin-bottom: 6px; }
 .locationRegionText { margin: 0 0 30px; font-size: 13px; line-height: 1.75; color: var(--muted); }
 .locationActions { display: flex; gap: 12px; flex-wrap: wrap; }
 .locationActions a {
@@ -573,7 +573,7 @@ a.secondary {
   transition: border-color .2s ease, transform .2s ease;
 }
 .homeLocationCard:hover { border-color: var(--gold); transform: translateY(-2px); }
-.homeLocationCard small { font-size: 9px; letter-spacing: .18em; color: #8a7f6c; }
+.homeLocationCard small { font-size: 9px; letter-spacing: .18em; color: #6b6152; }
 .homeLocationCard h3 { margin: 10px 0 10px; font-family: Georgia, 'Times New Roman', serif; font-size: 26px; font-weight: 400; }
 .homeLocationCard p { margin: 0 0 18px; font-size: 13px; line-height: 1.6; color: var(--muted); }
 .homeLocationCard em { font-style: normal; font-size: 12px; font-weight: 800; border-bottom: 1px solid currentColor; padding-bottom: 3px; }
