@@ -40,7 +40,10 @@ const ADMIN_MIN_PASSWORD_LENGTH = 12;
 const ADMIN_MIN_SESSION_SECRET_LENGTH = 32;
 const ADMIN_MIN_NEW_PASSWORD_LENGTH = 14;
 const ADMIN_MAX_NEW_PASSWORD_LENGTH = 256;
-const ADMIN_PBKDF2_ITERATIONS = 210000;
+// Cloudflare Workers' WebCrypto PBKDF2 implementation rejects iteration counts above 100000
+// (NotSupportedError at runtime) even though it silently succeeds in local wrangler dev/preview.
+// 100000 is the platform ceiling, so it's used here rather than a higher "ideal" value.
+const ADMIN_PBKDF2_ITERATIONS = 100000;
 const ADMIN_PBKDF2_HASH_BITS = 256;
 const ADMIN_BOOTSTRAP_CREDENTIAL_VERSION = 0;
 const ADMIN_RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
@@ -348,35 +351,40 @@ async function handleAdminLogin(request, env) {
     return jsonResponse({ error: "Yönetim girişi geçici olarak kullanılamıyor." }, 503);
   }
 
-  const ip = clientIp(request);
-  if (await isAuthRateLimited(env, ip, "LOGIN")) {
-    return jsonResponse({ error: "Çok fazla başarısız deneme. Lütfen birkaç dakika sonra tekrar deneyin." }, 429);
-  }
+  try {
+    const ip = clientIp(request);
+    if (await isAuthRateLimited(env, ip, "LOGIN")) {
+      return jsonResponse({ error: "Çok fazla başarısız deneme. Lütfen birkaç dakika sonra tekrar deneyin." }, 429);
+    }
 
-  const payload = await request.json().catch(() => null);
-  const password = typeof payload?.password === "string" ? payload.password : "";
-  if (password.length < ADMIN_MIN_PASSWORD_LENGTH || password.length > 256) {
-    await recordAuthFailure(env, ip, "LOGIN");
-    await authDelay(ADMIN_RATE_LIMIT_DELAY_MS);
-    return jsonResponse({ error: "Parola hatalı." }, 401);
-  }
+    const payload = await request.json().catch(() => null);
+    const password = typeof payload?.password === "string" ? payload.password : "";
+    if (password.length < ADMIN_MIN_PASSWORD_LENGTH || password.length > 256) {
+      await recordAuthFailure(env, ip, "LOGIN");
+      await authDelay(ADMIN_RATE_LIMIT_DELAY_MS);
+      return jsonResponse({ error: "Parola hatalı." }, 401);
+    }
 
-  const credential = await getAdminCredential(env);
-  const matches = await credential.verify(password);
-  if (!matches) {
-    await recordAuthFailure(env, ip, "LOGIN");
-    await authDelay(ADMIN_RATE_LIMIT_DELAY_MS);
-    return jsonResponse({ error: "Parola hatalı." }, 401);
-  }
+    const credential = await getAdminCredential(env);
+    const matches = await credential.verify(password);
+    if (!matches) {
+      await recordAuthFailure(env, ip, "LOGIN");
+      await authDelay(ADMIN_RATE_LIMIT_DELAY_MS);
+      return jsonResponse({ error: "Parola hatalı." }, 401);
+    }
 
-  const session = await createAdminSession(env.ADMIN_SESSION_SECRET, credential.credentialVersion);
-  return jsonResponse(
-    { ok: true, expiresIn: ADMIN_SESSION_TTL_SECONDS },
-    200,
-    {
-      "Set-Cookie": `${ADMIN_SESSION_COOKIE}=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${ADMIN_SESSION_TTL_SECONDS}`,
-    },
-  );
+    const session = await createAdminSession(env.ADMIN_SESSION_SECRET, credential.credentialVersion);
+    return jsonResponse(
+      { ok: true, expiresIn: ADMIN_SESSION_TTL_SECONDS },
+      200,
+      {
+        "Set-Cookie": `${ADMIN_SESSION_COOKIE}=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${ADMIN_SESSION_TTL_SECONDS}`,
+      },
+    );
+  } catch (error) {
+    console.error(`[Admin Auth] login failed: ${error instanceof Error ? error.message : "unknown error"}`);
+    return jsonResponse({ error: "Giriş yapılamadı. Lütfen tekrar deneyin." }, 500);
+  }
 }
 
 function handleAdminLogout(request) {
@@ -409,62 +417,67 @@ async function handleChangePassword(request, env) {
     return jsonResponse({ error: "Yönetim girişi geçici olarak kullanılamıyor." }, 503);
   }
 
-  const authenticated = await verifyAdminSession(request, env);
-  if (!authenticated) {
-    return jsonResponse({ error: "Yönetim oturumu gerekli." }, 401);
+  try {
+    const authenticated = await verifyAdminSession(request, env);
+    if (!authenticated) {
+      return jsonResponse({ error: "Yönetim oturumu gerekli." }, 401);
+    }
+
+    const ip = clientIp(request);
+    if (await isAuthRateLimited(env, ip, "CHANGE_PASSWORD")) {
+      return jsonResponse({ error: "Çok fazla deneme. Lütfen birkaç dakika sonra tekrar deneyin." }, 429);
+    }
+
+    const payload = await request.json().catch(() => null);
+    const currentPassword = typeof payload?.currentPassword === "string" ? payload.currentPassword : "";
+    const newPassword = typeof payload?.newPassword === "string" ? payload.newPassword : "";
+
+    const credential = await getAdminCredential(env);
+    const currentValid = currentPassword.length > 0 && await credential.verify(currentPassword);
+    if (!currentValid) {
+      await recordAuthFailure(env, ip, "CHANGE_PASSWORD");
+      await authDelay(ADMIN_RATE_LIMIT_DELAY_MS);
+      return jsonResponse({ error: "Mevcut parola hatalı." }, 401);
+    }
+
+    if (newPassword.length < ADMIN_MIN_NEW_PASSWORD_LENGTH || newPassword.length > ADMIN_MAX_NEW_PASSWORD_LENGTH) {
+      return jsonResponse({ error: `Yeni parola ${ADMIN_MIN_NEW_PASSWORD_LENGTH}-${ADMIN_MAX_NEW_PASSWORD_LENGTH} karakter arasında olmalı.` }, 400);
+    }
+
+    if (await credential.verify(newPassword)) {
+      return jsonResponse({ error: "Yeni parola mevcut parolayla aynı olamaz." }, 400);
+    }
+
+    const { hash, salt, iterations } = await hashNewPassword(newPassword);
+    const now = new Date().toISOString();
+    const nextVersion = credential.credentialVersion + 1;
+
+    await env.DB.batch([
+      env.DB.prepare(`INSERT INTO admin_auth_state (id, password_hash, password_salt, password_iterations, credential_version, updated_at)
+        VALUES (1, ?, ?, ?, ?, ?)
+        ON CONFLICT(id) DO UPDATE SET
+          password_hash = excluded.password_hash,
+          password_salt = excluded.password_salt,
+          password_iterations = excluded.password_iterations,
+          credential_version = excluded.credential_version,
+          updated_at = excluded.updated_at`)
+        .bind(hash, salt, iterations, nextVersion, now),
+      env.DB.prepare("INSERT INTO audit_log (entity_id, action, payload, created_at) VALUES ('admin', 'ADMIN_PASSWORD_CHANGED', ?, ?)")
+        .bind(JSON.stringify({ credentialVersion: nextVersion }), now),
+    ]);
+
+    const session = await createAdminSession(env.ADMIN_SESSION_SECRET, nextVersion);
+    return jsonResponse(
+      { ok: true },
+      200,
+      {
+        "Set-Cookie": `${ADMIN_SESSION_COOKIE}=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${ADMIN_SESSION_TTL_SECONDS}`,
+      },
+    );
+  } catch (error) {
+    console.error(`[Admin Auth] change-password failed: ${error instanceof Error ? error.message : "unknown error"}`);
+    return jsonResponse({ error: "Parola değiştirilemedi. Lütfen tekrar deneyin." }, 500);
   }
-
-  const ip = clientIp(request);
-  if (await isAuthRateLimited(env, ip, "CHANGE_PASSWORD")) {
-    return jsonResponse({ error: "Çok fazla deneme. Lütfen birkaç dakika sonra tekrar deneyin." }, 429);
-  }
-
-  const payload = await request.json().catch(() => null);
-  const currentPassword = typeof payload?.currentPassword === "string" ? payload.currentPassword : "";
-  const newPassword = typeof payload?.newPassword === "string" ? payload.newPassword : "";
-
-  const credential = await getAdminCredential(env);
-  const currentValid = currentPassword.length > 0 && await credential.verify(currentPassword);
-  if (!currentValid) {
-    await recordAuthFailure(env, ip, "CHANGE_PASSWORD");
-    await authDelay(ADMIN_RATE_LIMIT_DELAY_MS);
-    return jsonResponse({ error: "Mevcut parola hatalı." }, 401);
-  }
-
-  if (newPassword.length < ADMIN_MIN_NEW_PASSWORD_LENGTH || newPassword.length > ADMIN_MAX_NEW_PASSWORD_LENGTH) {
-    return jsonResponse({ error: `Yeni parola ${ADMIN_MIN_NEW_PASSWORD_LENGTH}-${ADMIN_MAX_NEW_PASSWORD_LENGTH} karakter arasında olmalı.` }, 400);
-  }
-
-  if (await credential.verify(newPassword)) {
-    return jsonResponse({ error: "Yeni parola mevcut parolayla aynı olamaz." }, 400);
-  }
-
-  const { hash, salt, iterations } = await hashNewPassword(newPassword);
-  const now = new Date().toISOString();
-  const nextVersion = credential.credentialVersion + 1;
-
-  await env.DB.batch([
-    env.DB.prepare(`INSERT INTO admin_auth_state (id, password_hash, password_salt, password_iterations, credential_version, updated_at)
-      VALUES (1, ?, ?, ?, ?, ?)
-      ON CONFLICT(id) DO UPDATE SET
-        password_hash = excluded.password_hash,
-        password_salt = excluded.password_salt,
-        password_iterations = excluded.password_iterations,
-        credential_version = excluded.credential_version,
-        updated_at = excluded.updated_at`)
-      .bind(hash, salt, iterations, nextVersion, now),
-    env.DB.prepare("INSERT INTO audit_log (entity_id, action, payload, created_at) VALUES ('admin', 'ADMIN_PASSWORD_CHANGED', ?, ?)")
-      .bind(JSON.stringify({ credentialVersion: nextVersion }), now),
-  ]);
-
-  const session = await createAdminSession(env.ADMIN_SESSION_SECRET, nextVersion);
-  return jsonResponse(
-    { ok: true },
-    200,
-    {
-      "Set-Cookie": `${ADMIN_SESSION_COOKIE}=${session}; Path=/; HttpOnly; Secure; SameSite=Lax; Max-Age=${ADMIN_SESSION_TTL_SECONDS}`,
-    },
-  );
 }
 
 async function adminAuthGate(request, env) {
