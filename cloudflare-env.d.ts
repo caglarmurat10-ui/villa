@@ -25,6 +25,9 @@ declare global {
     GOOGLE_PLACES_API_KEY?: string;
     GOOGLE_PLACE_ID_SAFIRA?: string;
     GOOGLE_PLACE_ID_DESTAN?: string;
+    PAYTR_MERCHANT_ID?: string;
+    PAYTR_MERCHANT_KEY?: string;
+    PAYTR_MERCHANT_SALT?: string;
   }
 }
 

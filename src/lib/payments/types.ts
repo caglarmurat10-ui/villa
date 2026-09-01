@@ -1,0 +1,51 @@
+import type { Villa } from "@/lib/types";
+
+// Provider-independent model - yalnız PayTR bu turda uygulanıyor ama şema/tipler başka bir
+// provider'a bağlı değil.
+export type PaymentProvider = "paytr";
+export type PaymentType = "deposit" | "full_payment" | "balance_payment";
+export type PaymentStatus = "created" | "pending" | "paid" | "failed" | "cancelled" | "refunded" | "partial_refund";
+
+export interface Payment {
+  id: string;
+  reservationId: string;
+  provider: PaymentProvider;
+  merchantOid: string;
+  paymentType: PaymentType;
+  status: PaymentStatus;
+  currency: "TRY";
+  // reservation_total: rezervasyonun canonical fiyatı (oluşturma anında snapshot). requested_amount:
+  // PayTR'dan istediğimiz tutar (deposit ya da full). provider_customer_total: PayTR'ın notification'da
+  // bildirdiği gerçek tahsilat (taksit/vade farkıyla requested_amount'tan yüksek olabilir - reservation
+  // fiyatını ASLA değiştirmez). provider_fee/merchant_net: PayTR bunları güvenilir şekilde vermiyor,
+  // tahmin edilmez, NULL kalır.
+  reservationTotalMinor: number;
+  requestedAmountMinor: number;
+  providerCustomerTotalMinor: number | null;
+  providerFeeMinor: number | null;
+  merchantNetMinor: number | null;
+  guestEmail: string | null;
+  noInstallment: boolean;
+  maxInstallment: number;
+  token: string | null;
+  tokenExpiresAt: string | null;
+  testMode: boolean;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+  paidAt: string | null;
+  failedAt: string | null;
+  villa: Villa;
+  checkIn: string;
+  checkOut: string;
+}
+
+// PayTR panelinde kullanıcının kendisinin ayarladığı gerçek üst sınır - tahmin edilmiş bir sayı
+// değil (bkz. AŞAMA raporları). Deposit her zaman tek çekim.
+export const FULL_PAYMENT_MAX_INSTALLMENT = 6;
+export const DEPOSIT_PERCENTAGE = 20; // reservation-policy.ts'teki POLICY_SUMMARY.deposit ("%20") ile senkron olmalı.
+
+// Bilinçli, kod-seviyesi güvenlik kilidi: gerçek PayTR credentials tanımlansa BİLE bu turda hep
+// test_mode=1 gönderilir. Canlıya geçiş yalnızca bu sabiti değiştiren AYRI bir kod değişikliği +
+// deploy + kullanıcının açık onayıyla olur - bir ortam değişkeni yanlışlıkla canlıyı açamaz.
+export const PAYTR_TEST_MODE = true;

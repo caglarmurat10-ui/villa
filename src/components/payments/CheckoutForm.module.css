@@ -1,0 +1,31 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 420px;
+}
+.form label { display: flex; flex-direction: column; gap: 6px; font-size: 12px; font-weight: 800; color: #6b6459; }
+.form input {
+  padding: 12px 14px;
+  border: 1px solid #d6cbb6;
+  border-radius: 8px;
+  background: #fbf9f3;
+  color: #132019;
+  font-size: 14px;
+}
+.form button {
+  min-height: 50px;
+  border: none;
+  border-radius: 99px;
+  background: #132019;
+  color: #fbf9f3;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.form button:disabled { opacity: .6; cursor: wait; }
+.error { color: #b3261e; font-size: 12px; margin: 0; }
+.trustNote { margin: 4px 0 0; font-size: 11px; line-height: 1.6; color: #8a7f6c; }
+
+.iframeWrap { width: 100%; max-width: 480px; }
+.loadingNote { font-size: 12px; color: #8a7f6c; margin: 0 0 10px; }

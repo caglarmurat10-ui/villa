@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { PriceRange, Reservation, Villa, VillaLocations } from "@/lib/types";
+import PaytrPaymentPanel from "@/components/payments/PaytrPaymentPanel";
 
 type View = "dashboard" | "calendar" | "messages" | "cleaning" | "reports" | "calculator" | "settings";
 type MessageType = "Giriş" | "Çıkış";
@@ -82,6 +83,7 @@ export default function Dashboard({ initialReservations, initialCommission, init
   const [view, setView] = useState<View>("dashboard");
   const [message, setMessage] = useState("");
   const [editing, setEditing] = useState<Reservation | null>(null);
+  const [paytrReservation, setPaytrReservation] = useState<Reservation | null>(null);
   const [commission, setCommission] = useState(initialCommission);
   const [prices, setPrices] = useState(initialPrices);
   const [locations, setLocations] = useState(initialLocations);
@@ -137,10 +139,11 @@ export default function Dashboard({ initialReservations, initialCommission, init
       <Operations reservations={visible} />
       <div className="record-tabs"><button className={recordFilter === "active" ? "active" : ""} onClick={() => setRecordFilter("active")}>Aktif ({visible.filter((r)=>r.checkOut>=today).length})</button><button className={recordFilter === "completed" ? "active" : ""} onClick={() => setRecordFilter("completed")}>Tamamlanan ({visible.filter((r)=>r.checkOut<today).length})</button></div>
       {message ? <p className="message dashboard-message">{message}</p> : null}
-      <div className="layout"><ReservationList reservations={visible.filter((r)=>recordFilter === "active" ? r.checkOut>=today : r.checkOut<today)} remove={remove} edit={setEditing} payment={updatePayment} />
+      <div className="layout"><ReservationList reservations={visible.filter((r)=>recordFilter === "active" ? r.checkOut>=today : r.checkOut<today)} remove={remove} edit={setEditing} payment={updatePayment} payTr={setPaytrReservation} />
         <ReservationForm key={editing?.id??"new"} editing={editing} onCancel={() => setEditing(null)} onSaved={async () => { setEditing(null); await refresh(); }} />
       </div>
     </>}
+    {paytrReservation ? <PaytrPaymentPanel reservation={paytrReservation} onClose={() => setPaytrReservation(null)} /> : null}
     {view === "calendar" && <CalendarView reservations={visible} />}
     {view === "messages" && <MessagesView reservations={active} locations={locations} openSettings={() => setView("settings")} />}
     {view === "cleaning" && <CleaningView reservations={reservations} />}
@@ -170,9 +173,9 @@ function MovementAlerts({ reminders, locations, openMessages }: { reminders: Mov
     </article>)}</div>}
   </section>;
 }
-function ReservationList({ reservations, remove, edit, payment }: { reservations: Reservation[]; remove: (id: string) => void; edit: (item: Reservation) => void; payment: (item: Reservation) => void }) {
+function ReservationList({ reservations, remove, edit, payment, payTr }: { reservations: Reservation[]; remove: (id: string) => void; edit: (item: Reservation) => void; payment: (item: Reservation) => void; payTr: (item: Reservation) => void }) {
   return <section className="panel list-panel"><div className="panel-title"><div><span className="eyebrow">REZERVASYONLAR</span><h2>Konaklama listesi</h2></div><b>{reservations.length} kayıt</b></div><div className="reservation-list">
-    {reservations.length === 0 ? <div className="empty">Bu bölümde rezervasyon yok.</div> : reservations.map((r) => <article className="reservation" key={r.id}><div className={`villa-dot ${r.villa.toLowerCase()}`}>{r.villa[0]}</div><div className="guest"><strong>{r.guestName}</strong><span>{r.villa} · {r.channel}</span>{r.phone ? <span className="phone-line">☎ {r.phone}</span> : null}</div><div className="dates"><strong>{formatDate(r.checkIn)} → {formatDate(r.checkOut)}</strong><span>{nights(r.checkIn, r.checkOut)} gece</span></div><div className="amount"><strong>{money.format(r.totalAmount)}</strong><span className={r.totalAmount-r.paidAmount>0?"due":"paid"}>{r.totalAmount-r.paidAmount>0?`Kalan ${money.format(r.totalAmount-r.paidAmount)}`:"Ödendi ✓"}</span></div><div className="row-actions">{r.phone ? <a className="whatsapp-shortcut" href={whatsappUrl(r.phone, `Merhaba, ${r.villa} Villa rezervasyonunuzla ilgili size ulaşıyoruz.`)} target="_blank" rel="noreferrer">WhatsApp</a> : null}<button onClick={()=>edit(r)}>Düzenle</button><button onClick={()=>payment(r)}>Ödeme</button><button className="delete" onClick={() => remove(r.id)}>Sil</button></div></article>)}
+    {reservations.length === 0 ? <div className="empty">Bu bölümde rezervasyon yok.</div> : reservations.map((r) => <article className="reservation" key={r.id}><div className={`villa-dot ${r.villa.toLowerCase()}`}>{r.villa[0]}</div><div className="guest"><strong>{r.guestName}</strong><span>{r.villa} · {r.channel}</span>{r.phone ? <span className="phone-line">☎ {r.phone}</span> : null}</div><div className="dates"><strong>{formatDate(r.checkIn)} → {formatDate(r.checkOut)}</strong><span>{nights(r.checkIn, r.checkOut)} gece</span></div><div className="amount"><strong>{money.format(r.totalAmount)}</strong><span className={r.totalAmount-r.paidAmount>0?"due":"paid"}>{r.totalAmount-r.paidAmount>0?`Kalan ${money.format(r.totalAmount-r.paidAmount)}`:"Ödendi ✓"}</span></div><div className="row-actions">{r.phone ? <a className="whatsapp-shortcut" href={whatsappUrl(r.phone, `Merhaba, ${r.villa} Villa rezervasyonunuzla ilgili size ulaşıyoruz.`)} target="_blank" rel="noreferrer">WhatsApp</a> : null}<button onClick={()=>edit(r)}>Düzenle</button><button onClick={()=>payment(r)}>Ödeme</button><button onClick={()=>payTr(r)}>PayTR</button><button className="delete" onClick={() => remove(r.id)}>Sil</button></div></article>)}
   </div></section>;
 }
 function ReservationForm({ editing, onCancel, onSaved }: { editing: Reservation | null; onCancel: () => void; onSaved: () => Promise<void> }) {

@@ -27,7 +27,10 @@
       "META_APP_SECRET",
       "FACEBOOK_APP_SECRET",
       "ADMIN_PASSWORD",
-      "ADMIN_SESSION_SECRET"
+      "ADMIN_SESSION_SECRET",
+      "PAYTR_MERCHANT_ID",
+      "PAYTR_MERCHANT_KEY",
+      "PAYTR_MERCHANT_SALT"
     ]
   },
   "kv_namespaces": [

@@ -159,3 +159,15 @@ export function trackOtaBookingClick(channel: OtaBookingChannel, ref: VillaRef, 
   const eventName = channel === "airbnb" ? "airbnb_booking_click" : "booking_booking_click";
   pushEvent(eventName, { ...ref, cta_location: ctaLocation, booking_channel: channel });
 }
+
+export type PaymentTypeAnalytics = "deposit" | "full_payment";
+
+// PayTR ödeme akışı event'leri - merchant_oid/e-posta/telefon/kart bilgisi ASLA gönderilmez.
+// Key event değil, generate_lead tek primary olarak kalır.
+export function trackBeginCheckout(ref: VillaRef, paymentType: PaymentTypeAnalytics) {
+  pushEvent("begin_checkout", { ...ref, payment_type: paymentType, payment_provider: "paytr" });
+}
+
+export function trackPaymentResult(success: boolean, ref: VillaRef, paymentType: PaymentTypeAnalytics) {
+  pushEvent(success ? "payment_success" : "payment_failed", { ...ref, payment_type: paymentType, payment_provider: "paytr" });
+}

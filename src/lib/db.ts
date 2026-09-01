@@ -96,7 +96,7 @@ async function ensureSocialPostsTable(db: D1Database) {
   ]);
 }
 
-async function findReservation(id: string): Promise<Reservation | null> {
+export async function findReservation(id: string): Promise<Reservation | null> {
   const db = await database();
   const row = await db.prepare("SELECT * FROM reservations WHERE id = ? AND deleted_at IS NULL").bind(id).first<ReservationRow>();
   return row ? mapRow(row) : null;

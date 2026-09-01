@@ -12,6 +12,8 @@ const PUBLIC_API_PATHS = new Set([
   "/api/public/booking-inquiries",
   "/api/weather/ingest",
   "/api/weather/current",
+  "/api/payments/checkout",
+  "/api/payments/paytr/callback",
 ]);
 // Dinamik token segmenti taşıyan public API yolları (Set ile tam eşleşmiyor, prefix ile kontrol
 // edilir) - şu an yalnız OTA export feed'i: /api/calendar/export/<opaque-token>.ics
@@ -23,6 +25,9 @@ const PUBLIC_ROUTE_MAP = new Map([
   ["/rezervasyon-kosullari", "/site/rezervasyon-kosullari"],
   ["/rehber", "/site/rehber"],
 ]);
+// /odeme/[paymentId](/basarili|/basarisiz) - src/app/odeme/... altında zaten gerçek route, rewrite
+// gerekmez, yalnız geçişe izin verilir (PayTR checkout/callback sayfaları - dinamik segment).
+const PUBLIC_PASSTHROUGH_PREFIXES = ["/odeme/"];
 const TRANSITION_PATHS = new Set([
   "/api/health",
   "/api/system/version",
@@ -131,6 +136,8 @@ function routeRequest(request) {
     }
 
     if (publicAssetPath(url.pathname)) return { request };
+
+    if (PUBLIC_PASSTHROUGH_PREFIXES.some((prefix) => url.pathname.startsWith(prefix))) return { request };
 
     const target = PUBLIC_ROUTE_MAP.get(url.pathname);
     if (!target) return { response: new Response("Not Found", { status: 404 }) };
