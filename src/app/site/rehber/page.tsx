@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { VILLAS } from "@/lib/villa-content";
+import { REGION_GUIDE_PAGES, REGION_GUIDE_PAGE_SLUGS } from "@/lib/region-guide-pages";
 import RegionGuideGrid from "@/components/RegionGuideGrid";
 import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
 import styles from "../site.module.css";
@@ -8,11 +9,16 @@ import styles from "../site.module.css";
 const ORIGIN = "https://safiradestan.com";
 const CANONICAL = `${ORIGIN}/rehber`;
 
+const TITLE = "Patara & Kaş Bölge Rehberi | Safira & Destan Villas";
+const DESCRIPTION = "Patara Antik Kenti, Patara Plajı, Kaputaş Plajı, Xanthos, Saklıkent Kanyonu, Kaş ve Kalkan — Villa Safira ve Villa Destan çevresinde gezilecek gerçek yerler.";
+
 export const metadata: Metadata = {
-  title: "Patara & Kaş Bölge Rehberi | Safira & Destan Villas",
-  description: "Patara Antik Kenti, Patara Plajı, Kaputaş Plajı, Xanthos, Saklıkent Kanyonu, Kaş ve Kalkan — Villa Safira ve Villa Destan çevresinde gezilecek gerçek yerler.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: CANONICAL },
   robots: { index: true, follow: true },
+  openGraph: { title: TITLE, description: DESCRIPTION, url: CANONICAL, type: "website" },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 
 export default function RegionGuidePage() {
@@ -36,6 +42,12 @@ export default function RegionGuidePage() {
       </section>
 
       <section className={styles.policyBody}>
+        <h2>Detaylı rehberler</h2>
+        <ul>
+          {REGION_GUIDE_PAGE_SLUGS.map((slug) => (
+            <li key={slug}><Link href={`/rehber/${slug}`}>{REGION_GUIDE_PAGES[slug].title.split(" — ")[0]} →</Link></li>
+          ))}
+        </ul>
         <RegionGuideGrid />
       </section>
 

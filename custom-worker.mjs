@@ -18,12 +18,18 @@ const PUBLIC_API_PATHS = new Set([
 // Dinamik token segmenti taşıyan public API yolları (Set ile tam eşleşmiyor, prefix ile kontrol
 // edilir) - şu an yalnız OTA export feed'i: /api/calendar/export/<opaque-token>.ics
 const PUBLIC_API_PATH_PREFIXES = ["/api/calendar/export/"];
+// /rehber alt sayfaları - src/lib/region-guide-pages.ts'teki REGION_GUIDE_PAGE_SLUGS ve
+// src/middleware.ts'teki REGION_GUIDE_SLUGS ile birebir aynı kalmalı (üç bağımsız kopya - custom-worker.mjs
+// Next.js "@/" alias'larını çözemediği için middleware.ts'i import edemez, bkz. dosyanın başındaki
+// genel NOT).
+const REGION_GUIDE_SLUGS = ["patara", "patara-plaji", "patara-antik-kenti", "kas", "kalkan"];
 const PUBLIC_ROUTE_MAP = new Map([
   ["/", "/site"],
   ["/villa-safira", "/site/villa-safira"],
   ["/villa-destan", "/site/villa-destan"],
   ["/rezervasyon-kosullari", "/site/rezervasyon-kosullari"],
   ["/rehber", "/site/rehber"],
+  ...REGION_GUIDE_SLUGS.map((slug) => [`/rehber/${slug}`, `/site/rehber/${slug}`]),
 ]);
 // /odeme/[paymentId](/basarili|/basarisiz) - src/app/odeme/... altında zaten gerçek route, rewrite
 // gerekmez, yalnız geçişe izin verilir (PayTR checkout/callback sayfaları - dinamik segment).

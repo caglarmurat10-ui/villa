@@ -359,7 +359,9 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
         <span className={styles.kicker}>DİĞER SEÇENEK</span>
         <h2>İki karakter.<br />Aynı özen.</h2>
         <Link href={slug === "villa-safira" ? "/villa-destan" : "/villa-safira"}>{slug === "villa-safira" ? "Villa Destan’ı" : "Villa Safira’yı"} keşfet →</Link>
-        <Link href="/rehber">Patara ve Kaş bölge rehberini keşfet →</Link>
+        <Link href="/rehber/patara">Patara rehberini keşfet →</Link>
+        <Link href="/rehber/patara-plaji">Patara Plajı hakkında →</Link>
+        <Link href="/rehber">Tüm bölge rehberini keşfet →</Link>
         <div className={styles.socialRow}>
           <TrackedSocialLink platform="instagram" villaId={toVillaId(villa.villa)} ctaLocation="villa_page_social_row" href={villa.instagram} rel="me noopener noreferrer">{villa.name} Instagram →</TrackedSocialLink>
           <TrackedSocialLink platform="facebook" villaId={toVillaId(villa.villa)} ctaLocation="villa_page_social_row" href={villa.facebook} rel="me noopener noreferrer">{villa.name} Facebook →</TrackedSocialLink>

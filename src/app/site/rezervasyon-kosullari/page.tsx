@@ -8,11 +8,16 @@ import styles from "../site.module.css";
 const ORIGIN = "https://safiradestan.com";
 const CANONICAL = `${ORIGIN}/rezervasyon-kosullari`;
 
+const TITLE = "Rezervasyon ve Konaklama Koşulları | Safira & Destan Villas";
+const DESCRIPTION = "Villa Safira ve Villa Destan için rezervasyon ön ödemesi, iptal ve iade, hasar güvence bedeli, giriş/çıkış ve konaklama koşulları.";
+
 export const metadata: Metadata = {
-  title: "Rezervasyon ve Konaklama Koşulları | Safira & Destan Villas",
-  description: "Villa Safira ve Villa Destan için rezervasyon ön ödemesi, iptal ve iade, hasar güvence bedeli, giriş/çıkış ve konaklama koşulları.",
+  title: TITLE,
+  description: DESCRIPTION,
   alternates: { canonical: CANONICAL },
   robots: { index: true, follow: true },
+  openGraph: { title: TITLE, description: DESCRIPTION, url: CANONICAL, type: "website" },
+  twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
 };
 
 export default function ReservationPolicyPage() {
