@@ -9,6 +9,7 @@ import { toVillaId } from "@/lib/analytics";
 import { listBlockedRanges } from "@/lib/ota/availability";
 import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
 import TrackedMapsLink from "@/components/analytics/TrackedMapsLink";
+import TrackedSocialLink from "@/components/analytics/TrackedSocialLink";
 import styles from "./site.module.css";
 
 export const dynamic = "force-dynamic";
@@ -95,6 +96,15 @@ const structuredData = {
       name: "Safira & Destan Villas",
       url: ORIGIN,
       sameAs: SOCIAL_LINKS,
+    },
+    {
+      "@type": "FAQPage",
+      "@id": `${ORIGIN}/#faq`,
+      mainEntity: FAQ_ITEMS.map((item) => ({
+        "@type": "Question",
+        name: item.question,
+        acceptedAnswer: { "@type": "Answer", text: item.answer },
+      })),
     },
   ],
 };
@@ -320,10 +330,10 @@ export default async function PublicHomePage() {
           <div>
             <small>SOSYAL</small>
             <p>
-              <a href={VILLAS["villa-safira"].instagram} rel="me noopener noreferrer">Villa Safira Instagram</a><br />
-              <a href={VILLAS["villa-safira"].facebook} rel="me noopener noreferrer">Villa Safira Facebook</a><br />
-              <a href={VILLAS["villa-destan"].instagram} rel="me noopener noreferrer">Villa Destan Instagram</a><br />
-              <a href={VILLAS["villa-destan"].facebook} rel="me noopener noreferrer">Villa Destan Facebook</a>
+              <TrackedSocialLink platform="instagram" villaId="safira" ctaLocation="homepage_footer" href={VILLAS["villa-safira"].instagram} rel="me noopener noreferrer">Villa Safira Instagram</TrackedSocialLink><br />
+              <TrackedSocialLink platform="facebook" villaId="safira" ctaLocation="homepage_footer" href={VILLAS["villa-safira"].facebook} rel="me noopener noreferrer">Villa Safira Facebook</TrackedSocialLink><br />
+              <TrackedSocialLink platform="instagram" villaId="destan" ctaLocation="homepage_footer" href={VILLAS["villa-destan"].instagram} rel="me noopener noreferrer">Villa Destan Instagram</TrackedSocialLink><br />
+              <TrackedSocialLink platform="facebook" villaId="destan" ctaLocation="homepage_footer" href={VILLAS["villa-destan"].facebook} rel="me noopener noreferrer">Villa Destan Facebook</TrackedSocialLink>
             </p>
           </div>
         </div>

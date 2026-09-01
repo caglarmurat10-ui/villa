@@ -11,3 +11,4 @@ npm-debug.log*
 *.tsbuildinfo
 .dev.vars*
 !.dev.vars.example
+imports/

@@ -160,6 +160,15 @@ export function trackOtaBookingClick(channel: OtaBookingChannel, ref: VillaRef, 
   pushEvent(eventName, { ...ref, cta_location: ctaLocation, booking_channel: channel });
 }
 
+export type SocialPlatformAnalytics = "instagram" | "facebook";
+
+// Villa sayfaları/footer'daki düz Instagram/Facebook linkleri şimdiye kadar tamamen ölçümsüzdü.
+// PII yok - yalnız hangi villa/CTA konumundan hangi platforma tıklandığı.
+export function trackSocialProfileClick(platform: SocialPlatformAnalytics, ref: Partial<VillaRef>, ctaLocation: string) {
+  const eventName = platform === "instagram" ? "instagram_click" : "facebook_click";
+  pushEvent(eventName, { ...ref, cta_location: ctaLocation, social_platform: platform });
+}
+
 export type PaymentTypeAnalytics = "deposit" | "full_payment";
 
 // PayTR ödeme akışı event'leri - merchant_oid/e-posta/telefon/kart/ad/adres bilgisi ASLA gönderilmez.

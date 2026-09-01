@@ -11,6 +11,7 @@ import { toVillaId } from "@/lib/analytics";
 import ViewItemTracker from "@/components/analytics/ViewItemTracker";
 import TrackedMapsLink from "@/components/analytics/TrackedMapsLink";
 import TrackedOtaLink from "@/components/analytics/TrackedOtaLink";
+import TrackedSocialLink from "@/components/analytics/TrackedSocialLink";
 import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
 import { listBlockedRanges } from "@/lib/ota/availability";
 import styles from "../site.module.css";
@@ -128,6 +129,15 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
           { "@type": "ListItem", position: 1, name: "Ana sayfa", item: ORIGIN },
           { "@type": "ListItem", position: 2, name: villa.name, item: canonical },
         ],
+      },
+      {
+        "@type": "FAQPage",
+        "@id": `${canonical}#faq`,
+        mainEntity: FAQ_ITEMS.map((item) => ({
+          "@type": "Question",
+          name: item.question,
+          acceptedAnswer: { "@type": "Answer", text: item.answer },
+        })),
       },
     ],
   };
@@ -349,9 +359,10 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
         <span className={styles.kicker}>DİĞER SEÇENEK</span>
         <h2>İki karakter.<br />Aynı özen.</h2>
         <Link href={slug === "villa-safira" ? "/villa-destan" : "/villa-safira"}>{slug === "villa-safira" ? "Villa Destan’ı" : "Villa Safira’yı"} keşfet →</Link>
+        <Link href="/rehber">Patara ve Kaş bölge rehberini keşfet →</Link>
         <div className={styles.socialRow}>
-          <a href={villa.instagram} rel="me noopener noreferrer">{villa.name} Instagram →</a>
-          <a href={villa.facebook} rel="me noopener noreferrer">{villa.name} Facebook →</a>
+          <TrackedSocialLink platform="instagram" villaId={toVillaId(villa.villa)} ctaLocation="villa_page_social_row" href={villa.instagram} rel="me noopener noreferrer">{villa.name} Instagram →</TrackedSocialLink>
+          <TrackedSocialLink platform="facebook" villaId={toVillaId(villa.villa)} ctaLocation="villa_page_social_row" href={villa.facebook} rel="me noopener noreferrer">{villa.name} Facebook →</TrackedSocialLink>
         </div>
       </section>
 
