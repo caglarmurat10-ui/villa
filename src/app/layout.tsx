@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from "next";
 import { headers } from "next/headers";
+import Script from "next/script";
 import NavigationBridge from "@/components/NavigationBridge";
 import OperationsTopNav from "@/components/OperationsTopNav";
+import CookieConsentBanner from "@/components/analytics/CookieConsentBanner";
+import { CONSENT_STORAGE_KEY, GTM_ID } from "@/lib/analytics";
 import "./globals.css";
 import "./social.css";
 import "./social-approval.css";
@@ -20,6 +23,43 @@ import "./booking-inquiries.css";
 
 const PUBLIC_HOSTS = new Set(["safiradestan.com", "www.safiradestan.com"]);
 const PUBLIC_ORIGIN = "https://safiradestan.com";
+
+// Google'ın resmi "Consent Mode + GTM-only" deseni: gtag.js kütüphanesi hiç yüklenmiyor, yalnızca
+// standart gtag() shim'i (dataLayer.push(arguments)) consent default/update komutları için var - GTM
+// bu formatı gtag.js olmadan da tanır. Bu script GTM yüklenmeden ÖNCE (beforeInteractive) çalışmalı.
+// CONSENT_STORAGE_KEY burada literal string olarak gömülür çünkü bu script modül yüklenmeden önce
+// çalışıyor - src/lib/analytics.ts'teki CONSENT_STORAGE_KEY ile senkron tutulmalı.
+const CONSENT_DEFAULT_SCRIPT = `
+(function () {
+  try {
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { window.dataLayer.push(arguments); }
+    var stored = null;
+    try { stored = JSON.parse(window.localStorage.getItem(${JSON.stringify(CONSENT_STORAGE_KEY)}) || "null"); } catch (e) {}
+    gtag("consent", "default", {
+      analytics_storage: "denied",
+      ad_storage: "denied",
+      ad_user_data: "denied",
+      ad_personalization: "denied"
+    });
+    if (stored && stored.analytics === true) {
+      gtag("consent", "update", { analytics_storage: "granted" });
+    }
+    window.dataLayer.push({ "gtm.start": new Date().getTime(), event: "gtm.start" });
+  } catch (e) {}
+})();
+`;
+
+// Standart GTM yükleme snippet'i - gtm.js dosyasını async olarak ekler (TBT/LCP'yi bloklamaz).
+const GTM_LOADER_SCRIPT = `
+(function (w, d, s, l, i) {
+  w[l] = w[l] || [];
+  var f = d.getElementsByTagName(s)[0], j = d.createElement(s), dl = l != "dataLayer" ? "&l=" + l : "";
+  j.async = true;
+  j.src = "https://www.googletagmanager.com/gtm.js?id=" + i + dl;
+  f.parentNode.insertBefore(j, f);
+})(window, document, "script", "dataLayer", ${JSON.stringify(GTM_ID)});
+`;
 
 export async function generateMetadata(): Promise<Metadata> {
   const requestHeaders = await headers();
@@ -112,9 +152,29 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
   return (
     <html lang="tr">
       <body>
+        {isPublicSite && (
+          <>
+            <Script id="ga-consent-default" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: CONSENT_DEFAULT_SCRIPT }} />
+            <noscript>
+              <iframe
+                src={`https://www.googletagmanager.com/ns.html?id=${GTM_ID}`}
+                height="0"
+                width="0"
+                style={{ display: "none", visibility: "hidden" }}
+                title="Google Tag Manager"
+              />
+            </noscript>
+          </>
+        )}
         {!isPublicSite && <NavigationBridge />}
         {!isPublicSite && <OperationsTopNav />}
         {children}
+        {isPublicSite && (
+          <>
+            <Script id="gtm-loader" strategy="afterInteractive" dangerouslySetInnerHTML={{ __html: GTM_LOADER_SCRIPT }} />
+            <CookieConsentBanner />
+          </>
+        )}
       </body>
     </html>
   );

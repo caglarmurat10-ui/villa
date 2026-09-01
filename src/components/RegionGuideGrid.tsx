@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { GUIDE_CATEGORIES, GUIDE_PLACES, guideMapsUrl, type GuideCategorySlug } from "@/lib/region-guide";
+import { trackGuidePlaceClick } from "@/lib/analytics";
 import styles from "./RegionGuideGrid.module.css";
 
 export default function RegionGuideGrid() {
@@ -49,7 +50,14 @@ export default function RegionGuideGrid() {
               <span className={`${styles.badge} ${styles[`badge_${place.category}`]}`}>{categoryLabel}</span>
               <h2>{place.name}</h2>
               <p>{place.description}</p>
-              <a href={guideMapsUrl(place.mapsQuery)} target="_blank" rel="noopener noreferrer">Haritada Aç ↗</a>
+              <a
+                href={guideMapsUrl(place.mapsQuery)}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={() => trackGuidePlaceClick({ place_id: place.id, place_name: place.name, place_category: place.category })}
+              >
+                Haritada Aç ↗
+              </a>
             </article>
           );
         })}

@@ -7,6 +7,10 @@ import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
 import { VILLAS, FAQ_ITEMS, REGION_INFO, formatAddress, type VillaSlug } from "@/lib/villa-content";
 import { POLICY_SUMMARY } from "@/lib/reservation-policy";
 import { fetchGoogleReviews } from "@/lib/google-reviews";
+import { toVillaId } from "@/lib/analytics";
+import ViewItemTracker from "@/components/analytics/ViewItemTracker";
+import TrackedMapsLink from "@/components/analytics/TrackedMapsLink";
+import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
 import styles from "../site.module.css";
 
 const ORIGIN = "https://safiradestan.com";
@@ -122,6 +126,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
   return (
     <main className={styles.page}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+      <ViewItemTracker villaId={toVillaId(villa.villa)} villaName={villa.name} />
       <a href="#ana-icerik" className={styles.skipLink}>İçeriğe atla</a>
       <section className={`${styles.hero} ${styles.detailHero}`}>
         <img className={styles.heroImage} src={villa.cover} alt={villa.coverAlt} fetchPriority="high" />
@@ -182,7 +187,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
       </section>
 
       <section className={styles.section} style={{ paddingTop: 0 }}>
-        <VillaGalleryLightbox images={villa.gallery} villaName={villa.name} />
+        <VillaGalleryLightbox images={villa.gallery} villaName={villa.name} villaId={toVillaId(villa.villa)} />
       </section>
 
       <section className={styles.locationDetail} id="konum">
@@ -194,8 +199,32 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
             <p className={styles.locationAddress}><b>Açık adres</b>{formatAddress(villa.address)}</p>
             <p className={styles.locationRegionText}>{REGION_INFO.body}</p>
             <div className={styles.locationActions}>
-              {mapsUrl && <a className={styles.locationActionPrimary} href={mapsUrl} target="_blank" rel="noopener noreferrer">Google Maps’te Aç</a>}
-              <a className={styles.locationActionSecondary} href={directionsUrl} target="_blank" rel="noopener noreferrer">Yol Tarifi Al</a>
+              {mapsUrl && (
+                <TrackedMapsLink
+                  className={styles.locationActionPrimary}
+                  href={mapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  villaId={toVillaId(villa.villa)}
+                  villaName={villa.name}
+                  ctaLocation="villa_location_card"
+                  mapAction="open_maps"
+                >
+                  Google Maps’te Aç
+                </TrackedMapsLink>
+              )}
+              <TrackedMapsLink
+                className={styles.locationActionSecondary}
+                href={directionsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                villaId={toVillaId(villa.villa)}
+                villaName={villa.name}
+                ctaLocation="villa_location_card"
+                mapAction="directions"
+              >
+                Yol Tarifi Al
+              </TrackedMapsLink>
             </div>
           </div>
           <div className={styles.locationVisual} aria-hidden="true" style={{ backgroundImage: `url(${villa.cover})` }}>
@@ -277,7 +306,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
         </div>
       </section>
 
-      <footer className={styles.footer}><div className={styles.footerBrand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></div><div className={styles.footerBottom}><span>Patara · Kaş · Antalya · <Link href="/rezervasyon-kosullari">Rezervasyon ve Konaklama Koşulları</Link></span><span>safiradestan.com</span></div></footer>
+      <footer className={styles.footer}><div className={styles.footerBrand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></div><div className={styles.footerBottom}><span>Patara · Kaş · Antalya · <Link href="/rezervasyon-kosullari">Rezervasyon ve Konaklama Koşulları</Link></span><span>safiradestan.com</span><CookiePreferencesButton className={styles.footerCookieBtn} /></div></footer>
 
       <div className={styles.stickyCta}>
         <a href="#rezervasyon">Tarih kontrol et</a>

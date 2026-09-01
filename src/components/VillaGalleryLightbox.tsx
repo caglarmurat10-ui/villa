@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { GALLERY_CATEGORIES, type GalleryCategorySlug, type VillaGalleryImage } from "@/lib/villa-content";
+import { trackGalleryInteraction, type VillaId } from "@/lib/analytics";
 import styles from "./VillaGalleryLightbox.module.css";
 
 const SWIPE_THRESHOLD = 40;
@@ -9,9 +10,11 @@ const SWIPE_THRESHOLD = 40;
 export default function VillaGalleryLightbox({
   images,
   villaName,
+  villaId,
 }: {
   images: VillaGalleryImage[];
   villaName: string;
+  villaId: VillaId;
 }) {
   const [activeCategory, setActiveCategory] = useState<GalleryCategorySlug | "all">("all");
   const [openIndex, setOpenIndex] = useState<number | null>(null);
@@ -136,7 +139,10 @@ export default function VillaGalleryLightbox({
             key={image.src}
             className={styles.thumb}
             style={{ aspectRatio: `${image.width} / ${image.height}` }}
-            onClick={(event) => openAt(index, event.currentTarget)}
+            onClick={(event) => {
+              openAt(index, event.currentTarget);
+              trackGalleryInteraction({ villa_id: villaId, gallery_category: image.categories[0] });
+            }}
             aria-label={`${villaName} fotoğrafını büyüt: ${image.alt}`}
           >
             <picture>

@@ -5,6 +5,9 @@ import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
 import { VILLAS, FAQ_ITEMS, REGION_INFO, type VillaSlug } from "@/lib/villa-content";
 import { GUIDE_PLACES, GUIDE_CATEGORIES } from "@/lib/region-guide";
 import { getLatestWeather, minutesSince, toPublicReading } from "@/lib/weather";
+import { toVillaId } from "@/lib/analytics";
+import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
+import TrackedMapsLink from "@/components/analytics/TrackedMapsLink";
 import styles from "./site.module.css";
 
 export const dynamic = "force-dynamic";
@@ -207,7 +210,17 @@ export default async function PublicHomePage() {
             const mapsUrl = locations[villa.villa];
             if (!mapsUrl) return null;
             return (
-              <a key={slug} className={styles.homeLocationCard} href={mapsUrl} target="_blank" rel="noopener noreferrer">
+              <TrackedMapsLink
+                key={slug}
+                className={styles.homeLocationCard}
+                href={mapsUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                villaId={toVillaId(villa.villa)}
+                villaName={villa.name}
+                ctaLocation="home_location_card"
+                mapAction="open_maps"
+              >
                 <div className={styles.homeLocationPhoto}><img src={villa.cover} alt="" loading="lazy" /></div>
                 <div className={styles.homeLocationBody}>
                   <small>{villa.address.addressLocality} · {villa.address.addressRegion}</small>
@@ -215,7 +228,7 @@ export default async function PublicHomePage() {
                   <p>{villa.address.streetAddress}</p>
                   <em>Haritada Gör →</em>
                 </div>
-              </a>
+              </TrackedMapsLink>
             );
           })}
         </div>
@@ -308,7 +321,10 @@ export default async function PublicHomePage() {
             </p>
           </div>
         </div>
-        <div className={styles.footerBottom}>Safira & Destan Villas <span>Patara’da size ait bir tatil.</span></div>
+        <div className={styles.footerBottom}>
+          Safira & Destan Villas <span>Patara’da size ait bir tatil.</span>
+          <CookiePreferencesButton className={styles.footerCookieBtn} />
+        </div>
       </footer>
     </main>
   );

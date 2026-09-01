@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import type { PriceRange, Reservation, Villa } from "@/lib/types";
+import { toVillaId, trackCheckAvailability, trackGenerateLead } from "@/lib/analytics";
 import VillaAvailabilityCalendar from "./VillaAvailabilityCalendar";
 import styles from "./PublicBookingWidget.module.css";
 
@@ -165,6 +166,7 @@ export default function PublicBookingWidget({
         kind: "success",
         message: data.message ?? "Rezervasyon talebiniz alındı. En kısa sürede sizinle iletişime geçeceğiz.",
       });
+      trackGenerateLead({ villa_id: toVillaId(villa), villa_name: `Villa ${villa}` }, "booking_widget_form");
     } catch (error) {
       setRequestState({
         kind: "error",
@@ -206,6 +208,9 @@ export default function PublicBookingWidget({
           setCheckIn(nextCheckIn);
           setCheckOut(nextCheckOut);
           resetRequestFeedback();
+          if (nextCheckIn && nextCheckOut) {
+            trackCheckAvailability({ villa_id: toVillaId(villa), villa_name: `Villa ${villa}` });
+          }
         }}
       />
 

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { VILLAS } from "@/lib/villa-content";
 import RegionGuideGrid from "@/components/RegionGuideGrid";
+import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
 import styles from "../site.module.css";
 
 const ORIGIN = "https://safiradestan.com";
@@ -48,7 +49,7 @@ export default function RegionGuidePage() {
 
       <footer className={styles.footer}>
         <div className={styles.footerBrand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></div>
-        <div className={styles.footerBottom}><span>{VILLAS["villa-safira"].address.addressLocality} · {VILLAS["villa-safira"].address.addressRegion}</span><span>safiradestan.com</span></div>
+        <div className={styles.footerBottom}><span>{VILLAS["villa-safira"].address.addressLocality} · {VILLAS["villa-safira"].address.addressRegion}</span><span>safiradestan.com</span><CookiePreferencesButton className={styles.footerCookieBtn} /></div>
       </footer>
     </main>
   );
