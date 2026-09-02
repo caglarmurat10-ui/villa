@@ -240,7 +240,7 @@ export default async function PublicHomePage() {
                 ctaLocation="home_location_card"
                 mapAction="open_maps"
               >
-                <div className={styles.homeLocationPhoto}><img src={villa.cover} alt="" loading="lazy" /></div>
+                <div className={styles.homeLocationPhoto}><img src={villa.cover} alt={villa.coverAlt} loading="lazy" /></div>
                 <div className={styles.homeLocationBody}>
                   <small>{villa.address.addressLocality} · {villa.address.addressRegion}</small>
                   <h3>{villa.name}</h3>
