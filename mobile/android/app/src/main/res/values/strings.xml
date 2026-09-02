@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Villa Yönetim</string>
+    <string name="title_activity_main">Villa Yönetim</string>
+    <string name="package_name">com.safiradestan.villayonetim</string>
+    <string name="custom_url_scheme">com.safiradestan.villayonetim</string>
+</resources>
