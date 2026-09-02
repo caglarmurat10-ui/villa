@@ -30,11 +30,12 @@ export interface BlockedRange {
   checkOut: string;
 }
 
-// active + needs_review ikisi de public takvimde "müsait değil" gösterilir - needs_review zaten
-// potansiyel bir çakışma olduğu için gösterilmemesi daha yanlış olurdu. Kaynak (airbnb/booking/
-// manual) BİLEREK dönmüyor - public tarafa hiçbir zaman sızmamalı, yalnız {villa, checkIn, checkOut}
-// - mevcut reservation listesiyle birebir aynı şekle sahip, PublicBookingWidget/
-// VillaAvailabilityCalendar hiç değişmeden bu satırları da normal bir rezervasyon gibi işler.
+// Public takvim yalnız doğrulanmış active OTA bloklarını "müsait değil" sayar.
+// needs_review kayıtları admin takviminde görünmeye devam eder ancak doğrulanmamış/şüpheli veri
+// müşteriye kesin doluluk gibi yansıtılmaz. Kaynak (airbnb/booking/manual) BİLEREK dönmüyor -
+// public tarafa hiçbir zaman sızmamalı, yalnız {villa, checkIn, checkOut}; mevcut reservation
+// listesiyle birebir aynı şekle sahip, PublicBookingWidget/VillaAvailabilityCalendar bu satırları
+// normal bir rezervasyon gibi işler.
 // OTA okuması başarısız olursa public villa sayfası yine gerçek yönetim rezervasyonlarıyla açılır;
 // hata loglanır ve OTA blokları geçici olarak boş kabul edilir.
 export async function listBlockedRanges(): Promise<BlockedRange[]> {
@@ -42,7 +43,7 @@ export async function listBlockedRanges(): Promise<BlockedRange[]> {
     const { env } = await getCloudflareContext({ async: true });
     const db: D1Database = env.DB;
     const result = await db.prepare(
-      "SELECT villa, start_date, end_date FROM external_blocks WHERE status IN ('active','needs_review')",
+      "SELECT villa, start_date, end_date FROM external_blocks WHERE status = 'active'",
     ).all<{ villa: Villa; start_date: string; end_date: string }>();
     return result.results.map((row) => ({ villa: row.villa, checkIn: row.start_date, checkOut: row.end_date }));
   } catch (error) {
