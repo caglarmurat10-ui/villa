@@ -44,13 +44,21 @@ export async function makeInstagramState(villa: Villa, nonce: string) {
   return `${payload}.${Array.from(signature).map((b) => b.toString(16).padStart(2, "0")).join("")}`;
 }
 
+// Sabit zamanli string karsilastirma - OAuth state imza dogrulamasi icin `===` yerine.
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i += 1) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 export async function verifyInstagramState(state: string) {
   const parts = state.split(".");
   if (parts.length !== 3) return null;
   const [villa, nonce, signature] = parts;
   if (villa !== "Safira" && villa !== "Destan") return null;
   const expected = await makeInstagramState(villa, nonce);
-  if (expected !== state || !/^[a-f0-9]{64}$/.test(signature)) return null;
+  if (!timingSafeEqual(expected, state) || !/^[a-f0-9]{64}$/.test(signature)) return null;
   return { villa: villa as Villa, nonce };
 }
 

@@ -1,4 +1,4 @@
-import { hmacSha256Base64 } from "../crypto";
+import { hmacSha256Base64, timingSafeEqual } from "../crypto";
 import { getPaytrCredentials } from "./config";
 
 export interface PaytrNotification {
@@ -47,5 +47,5 @@ export async function verifyNotificationHash(notification: PaytrNotification): P
   if (!credentials) return false;
   const hashStr = `${notification.merchantOid}${credentials.merchantSalt}${notification.status}${notification.totalAmountMinor}`;
   const expected = await hmacSha256Base64(credentials.merchantKey, hashStr);
-  return expected === notification.hash;
+  return timingSafeEqual(expected, notification.hash);
 }
