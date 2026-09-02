@@ -1,18 +1,26 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import type { Reservation, Villa, VillaLocations } from "@/lib/types";
 import type { AdminExternalBlock } from "@/lib/ota/types";
 
 const villas: Villa[] = ["Safira", "Destan"];
 const SOURCE_LABEL: Record<AdminExternalBlock["source"], string> = { airbnb: "Airbnb", booking: "Booking.com", manual: "Manuel blok" };
 const weekdays = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
+const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
 
 function isoDate(year: number, month: number, day: number) {
   return `${year}-${String(month + 1).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
 }
 function trDate(value: string) {
   return new Intl.DateTimeFormat("tr-TR", { day: "numeric", month: "long", weekday: "short" }).format(new Date(`${value}T12:00:00`));
+}
+function nights(start: string, end: string) {
+  return Math.max(0, Math.round((Date.parse(end) - Date.parse(start)) / 86400000));
+}
+function todayIstanbul() {
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
 }
 function normalizePhone(value: string) {
   const digits = value.replace(/\D/g, "");
@@ -29,10 +37,66 @@ function guestMessage(item: Reservation, type: "Giriş" | "Çıkış", locations
   return `Merhaba 👋\n\nBizi tercih ettiğiniz için teşekkür ederiz.\n\n🧳 Çıkış saatimiz 10.00’dır.\n\nÇıkış saatinizde villada olacağız ve çıkış işlemlerini birlikte tamamlayacağız.\n\nGüzel anılarla ayrılmanızı diler, sizi yeniden ağırlamaktan memnuniyet duyarız.`;
 }
 
-function VillaMonth({ villa, reservations, externalBlocks, year, month }: { villa: Villa; reservations: Reservation[]; externalBlocks: AdminExternalBlock[]; year: number; month: number }) {
+type Selection = { kind: "reservation"; reservation: Reservation } | { kind: "block"; block: AdminExternalBlock; villa: Villa };
+
+function DetailSheet({ selection, locations, onClose }: { selection: Selection; locations: VillaLocations; onClose: () => void }) {
+  const today = todayIstanbul();
+
+  if (selection.kind === "reservation") {
+    const r = selection.reservation;
+    const remaining = r.totalAmount - r.paidAmount;
+    return <div className="calendar-sheet-backdrop" onClick={onClose}>
+      <div className="calendar-sheet" onClick={(event) => event.stopPropagation()}>
+        <div className="calendar-sheet-head">
+          <div><small>REZERVASYON</small><h2>Villa {r.villa} · {r.guestName}</h2></div>
+          <button type="button" className="calendar-sheet-close" onClick={onClose} aria-label="Kapat">✕</button>
+        </div>
+        <div className="calendar-sheet-grid">
+          <div>Villa<br /><b>{r.villa}</b></div>
+          <div>Kaynak<br /><b>{r.channel}</b></div>
+          <div>Misafir<br /><b>{r.guestName}</b></div>
+          <div>Giriş<br /><b>{trDate(r.checkIn)}</b></div>
+          <div>Çıkış<br /><b>{trDate(r.checkOut)}</b></div>
+          <div>Gece<br /><b>{nights(r.checkIn, r.checkOut)}</b></div>
+          <div>Durum<br /><b>{r.checkOut >= today ? "Aktif" : "Tamamlandı"}</b></div>
+          <div>Ödeme<br /><b style={{ color: remaining > 0 ? "#fbbf24" : "#86efac" }}>{money.format(r.paidAmount)} / {money.format(r.totalAmount)}</b></div>
+        </div>
+        {r.notes ? <div className="calendar-sheet-notes"><small>Not</small><p>{r.notes}</p></div> : null}
+        <div className="calendar-sheet-actions">
+          {normalizePhone(r.phone) ? <a className="ops-button secondary" href={whatsappUrl(r.phone, guestMessage(r, r.checkIn >= today ? "Giriş" : "Çıkış", locations))} target="_blank" rel="noreferrer">WhatsApp&apos;ta aç</a> : null}
+          <Link className="ops-button" href="/rezervasyonlar">Rezervasyon Detayı</Link>
+        </div>
+      </div>
+    </div>;
+  }
+
+  const b = selection.block;
+  return <div className="calendar-sheet-backdrop" onClick={onClose}>
+    <div className="calendar-sheet" onClick={(event) => event.stopPropagation()}>
+      <div className="calendar-sheet-head">
+        <div><small>DIŞ KAYNAK</small><h2>Villa {selection.villa} · {SOURCE_LABEL[b.source]}</h2></div>
+        <button type="button" className="calendar-sheet-close" onClick={onClose} aria-label="Kapat">✕</button>
+      </div>
+      <div className="calendar-sheet-grid">
+        <div>Villa<br /><b>{selection.villa}</b></div>
+        <div>Kaynak<br /><b>{SOURCE_LABEL[b.source]}</b></div>
+        <div>Başlangıç<br /><b>{trDate(b.startDate)}</b></div>
+        <div>Bitiş<br /><b>{trDate(b.endDate)}</b></div>
+        <div>Durum<br /><b style={{ color: b.status === "needs_review" ? "#fca5a5" : "#86efac" }}>{b.status === "needs_review" ? "⚠ Kontrol gerekli" : "Aktif"}</b></div>
+      </div>
+      <div className="calendar-sheet-notes">
+        <p>{b.status === "needs_review"
+          ? `Bu tarih aralığı ${SOURCE_LABEL[b.source]} üzerinden yönetiliyor olabilir ve sistemdeki bir kayıtla çakışıyor - kontrol edin.`
+          : `Bu tarih aralığı ${SOURCE_LABEL[b.source]} üzerinden yönetiliyor; sistem içinde ayrı bir rezervasyon kaydı yok.`}</p>
+      </div>
+    </div>
+  </div>;
+}
+
+function VillaMonth({ villa, reservations, externalBlocks, year, month, onSelect }: { villa: Villa; reservations: Reservation[]; externalBlocks: AdminExternalBlock[]; year: number; month: number; onSelect: (selection: Selection) => void }) {
   const days = new Date(year, month + 1, 0).getDate();
   const offset = (new Date(year, month, 1).getDay() + 6) % 7;
-  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
+  const today = todayIstanbul();
   const villaRows = reservations.filter((item) => item.villa === villa);
   const villaBlocks = externalBlocks.filter((item) => item.villa === villa);
 
@@ -43,24 +107,57 @@ function VillaMonth({ villa, reservations, externalBlocks, year, month }: { vill
       {Array.from({ length: offset }, (_, index) => <span className="villa-empty-day" key={`empty-${index}`} />)}
       {Array.from({ length: days }, (_, index) => index + 1).map((day) => {
         const date = isoDate(year, month, day);
-        const stays = villaRows.filter((r) => r.checkIn <= date && r.checkOut > date);
-        const arrivals = villaRows.filter((r) => r.checkIn === date);
-        const departures = villaRows.filter((r) => r.checkOut === date);
-        const blocksToday = villaBlocks.filter((b) => b.startDate <= date && b.endDate > date);
-        return <article className={`villa-day ${date === today ? "today" : ""} ${stays.length || blocksToday.length ? "occupied" : ""}`} key={date}>
+        const arrival = villaRows.find((r) => r.checkIn === date);
+        const departure = villaRows.find((r) => r.checkOut === date);
+        const stay = !arrival && !departure ? villaRows.find((r) => r.checkIn < date && r.checkOut > date) : undefined;
+        const block = villaBlocks.find((b) => b.startDate <= date && b.endDate > date);
+        const needsReview = block?.status === "needs_review";
+        const turnover = Boolean(arrival && departure);
+        const occupied = Boolean(arrival || departure || stay || block);
+
+        const cellClass = `villa-day ${date === today ? "today" : ""} ${occupied ? "occupied" : ""} ${turnover ? "turnover" : ""}`;
+
+        if (turnover) {
+          return <article className={cellClass} key={date}>
+            <strong>{day}</strong>
+            <div className="day-turnover">
+              <button type="button" className="day-half day-half-out" onClick={() => onSelect({ kind: "reservation", reservation: departure! })} aria-label={`Çıkış: ${departure!.guestName}`} />
+              <button type="button" className="day-half day-half-in" onClick={() => onSelect({ kind: "reservation", reservation: arrival! })} aria-label={`Giriş: ${arrival!.guestName}`} />
+            </div>
+            {needsReview ? <button type="button" className="day-review-flag" onClick={() => onSelect({ kind: "block", block: block!, villa })} aria-label="Kontrol gerekli">⚠</button> : null}
+          </article>;
+        }
+
+        const reservationEvent = arrival ?? departure ?? stay;
+        const primary: Selection | null = reservationEvent
+          ? { kind: "reservation", reservation: reservationEvent }
+          : block
+            ? { kind: "block", block, villa }
+            : null;
+        // needsReview bir dış kaynak bloğuna ait olabilir - o gün AYRICA bir rezervasyon da varsa
+        // (primary = rezervasyon olur) uyarı rozeti yine de ayrı, kendi tıklamasıyla blok detayını
+        // açan bağımsız bir eleman olarak gösterilmeli - aksi halde çakışma sessizce kaybolur.
+        const warnIsSeparate = needsReview && primary?.kind !== "block";
+
+        const bandClass = arrival ? "band-in" : departure ? "band-out" : stay ? "band-stay" : block ? (needsReview ? "band-warn" : "band-block") : "";
+
+        return <article
+          className={`${cellClass} ${bandClass}`}
+          key={date}
+          onClick={primary ? () => onSelect(primary) : undefined}
+          role={primary ? "button" : undefined}
+          tabIndex={primary ? 0 : undefined}
+          onKeyDown={primary ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(primary); } } : undefined}
+        >
           <strong>{day}</strong>
-          {arrivals.map((r) => <span className="day-event arrival" key={`a-${r.id}`}>→ {r.guestName}</span>)}
-          {stays.filter((r) => !arrivals.some((a) => a.id === r.id)).slice(0, 2).map((r) => <span className="day-event stay" key={`s-${r.id}`}>{r.guestName}</span>)}
-          {departures.map((r) => <span className="day-event departure" key={`d-${r.id}`}>← {r.guestName}</span>)}
-          {blocksToday.map((b, index) => (
-            <span
-              className={`day-event ${b.status === "needs_review" ? "conflict" : "external"}`}
-              key={`b-${b.source}-${b.startDate}-${index}`}
-              title={b.status === "needs_review" ? `Çakışma: ${SOURCE_LABEL[b.source]} — bu tarih Airbnb/Booking üzerinden yönetiliyor olabilir, kontrol edin.` : `Bu tarih ${SOURCE_LABEL[b.source]} üzerinden yönetiliyor.`}
-            >
-              {b.status === "needs_review" ? "⚠ " : ""}{SOURCE_LABEL[b.source]}
-            </span>
-          ))}
+          {needsReview ? <span
+            className="day-review-flag"
+            role="button"
+            tabIndex={0}
+            aria-label="Kontrol gerekli"
+            onClick={(event) => { if (warnIsSeparate) { event.stopPropagation(); onSelect({ kind: "block", block: block!, villa }); } }}
+            onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && warnIsSeparate) { event.stopPropagation(); event.preventDefault(); onSelect({ kind: "block", block: block!, villa }); } }}
+          >⚠</span> : null}
         </article>;
       })}
     </div>
@@ -69,6 +166,7 @@ function VillaMonth({ villa, reservations, externalBlocks, year, month }: { vill
 
 export default function VillaCalendarWorkspace({ reservations, locations, externalBlocks }: { reservations: Reservation[]; locations: VillaLocations; externalBlocks: AdminExternalBlock[] }) {
   const [cursor, setCursor] = useState(() => new Date());
+  const [selection, setSelection] = useState<Selection | null>(null);
   const year = cursor.getFullYear();
   const month = cursor.getMonth();
   const monthTitle = new Intl.DateTimeFormat("tr-TR", { month: "long", year: "numeric" }).format(cursor);
@@ -82,11 +180,18 @@ export default function VillaCalendarWorkspace({ reservations, locations, extern
 
   return <div className="villa-calendar-workspace">
     <header className="calendar-workspace-head">
-      <div><span className="ops-eyebrow">AYRI VİLLA TAKVİMLERİ</span><h1>Takvim ve günlük işlemler</h1><p>Safira ve Destan birbirinden ayrıdır; doluluk, giriş ve çıkışlar aynı ay içinde karşılaştırılır ama karışmaz.</p></div>
+      <div><span className="ops-eyebrow">AYRI VİLLA TAKVİMLERİ</span><h1>Takvim ve günlük işlemler</h1><p>Safira ve Destan birbirinden ayrıdır; doluluk, giriş ve çıkışlar aynı ay içinde karşılaştırılır ama karışmaz. Bir güne tıklayarak detayları görün.</p></div>
       <div className="calendar-month-nav"><button onClick={() => setCursor(new Date(year, month - 1, 1))}>‹</button><strong>{monthTitle}</strong><button onClick={() => setCursor(new Date(year, month + 1, 1))}>›</button></div>
     </header>
 
-    <div className="villa-calendar-pair">{villas.map((villa) => <VillaMonth key={villa} villa={villa} reservations={reservations} externalBlocks={externalBlocks} year={year} month={month} />)}</div>
+    <div className="calendar-legend">
+      <span><i className="legend-dot legend-in" />Giriş</span>
+      <span><i className="legend-dot legend-out" />Çıkış</span>
+      <span><i className="legend-dot legend-stay" />Konaklama</span>
+      <span><i className="legend-dot legend-warn" />⚠ Kontrol gerekli</span>
+    </div>
+
+    <div className="villa-calendar-pair">{villas.map((villa) => <VillaMonth key={villa} villa={villa} reservations={reservations} externalBlocks={externalBlocks} year={year} month={month} onSelect={setSelection} />)}</div>
 
     <section className="calendar-operations">
       <div className="calendar-operations-head"><div><span className="ops-eyebrow">AYLIK İŞLEM LİSTESİ</span><h2>Giriş ve çıkış aksiyonları</h2></div><b>{events.length} işlem</b></div>
@@ -96,9 +201,11 @@ export default function VillaCalendarWorkspace({ reservations, locations, extern
         return <article key={`${item.id}-${event.type}`} className={`calendar-operation ${event.type === "Giriş" ? "arrival" : "departure"}`}>
           <div className="calendar-operation-date"><strong>{trDate(event.date)}</strong><span>{event.type}</span></div>
           <div className="calendar-operation-guest"><b>Villa {item.villa}</b><strong>{item.guestName}</strong><span>{item.phone || "WhatsApp numarası yok"}</span></div>
-          <div className="calendar-operation-actions">{disabled ? <span className="operation-warning">{!item.phone ? "Numara eksik" : "Konum eksik"}</span> : <a href={whatsappUrl(item.phone, guestMessage(item, event.type, locations))} target="_blank" rel="noreferrer">WhatsApp'ta aç</a>}</div>
+          <div className="calendar-operation-actions">{disabled ? <span className="operation-warning">{!item.phone ? "Numara eksik" : "Konum eksik"}</span> : <a href={whatsappUrl(item.phone, guestMessage(item, event.type, locations))} target="_blank" rel="noreferrer">WhatsApp&apos;ta aç</a>}</div>
         </article>;
       })}</div>}
     </section>
+
+    {selection ? <DetailSheet selection={selection} locations={locations} onClose={() => setSelection(null)} /> : null}
   </div>;
 }

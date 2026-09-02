@@ -1,22 +1,29 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useSyncExternalStore } from "react";
+
+function subscribe(callback: () => void) {
+  window.addEventListener("online", callback);
+  window.addEventListener("offline", callback);
+  return () => {
+    window.removeEventListener("online", callback);
+    window.removeEventListener("offline", callback);
+  };
+}
+function getSnapshot() {
+  return navigator.onLine;
+}
+// Sunucuda navigator yok - her zaman "online" varsayılır, ilk client render'ı bununla eşleşir
+// (useSyncExternalStore hydration mismatch'i bu şekilde engeller); gerçek durum mount sonrası
+// senkronize olur.
+function getServerSnapshot() {
+  return true;
+}
 
 // Kritik mutation (rezervasyon/ödeme) için hiçbir offline queue YOK - yalnız durumu dürüstçe
 // bildirir. navigator.onLine + online/offline event'leri; service worker gerekmez.
 export default function OfflineBanner() {
-  const [online, setOnline] = useState(() => (typeof navigator === "undefined" ? true : navigator.onLine));
-
-  useEffect(() => {
-    const goOnline = () => setOnline(true);
-    const goOffline = () => setOnline(false);
-    window.addEventListener("online", goOnline);
-    window.addEventListener("offline", goOffline);
-    return () => {
-      window.removeEventListener("online", goOnline);
-      window.removeEventListener("offline", goOffline);
-    };
-  }, []);
+  const online = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   if (online) return null;
 
