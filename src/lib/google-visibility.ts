@@ -1,6 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getVillaLocations } from "./db";
 import { WHATSAPP_PHONE_DISPLAY_INTL } from "./contact";
+import { getSearchConsoleProbe, type SearchConsoleSummary } from "./google-search-console";
 import type { Villa } from "./types";
 
 // Admin "Google Görünürlük" paneli için tek kaynak - hiçbir alan tahmin/uydurma değil, yalnız
@@ -19,15 +20,14 @@ export interface GoogleVisibilitySnapshot {
   oauthClientConfigured: boolean;
   gbpState: GoogleReadinessState;
   searchConsoleState: GoogleReadinessState;
+  searchConsole: SearchConsoleSummary | null;
+  searchConsoleError: string | null;
   ga4State: GoogleReadinessState;
   reviewLinksState: GoogleReadinessState;
   reviewAutomationState: GoogleReadinessState;
   napPhone: string;
 }
 
-// sitemap.ts'teki 10 URL'nin statik aynası - sitemap.ts kendisi de statik/elle yazılmış bir liste
-// olduğu için (bkz. SEO audit bulgusu) burada da aynı gerçeği yansıtıyoruz, ayrı bir "gerçek" icat
-// etmiyoruz.
 const SITEMAP_URLS = [
   "https://safiradestan.com/",
   "https://safiradestan.com/villa-safira",
@@ -50,7 +50,12 @@ const JSON_LD_PAGES = [
 
 export async function getGoogleVisibilitySnapshot(): Promise<GoogleVisibilitySnapshot> {
   const { env } = await getCloudflareContext({ async: true });
-  const locations = await getVillaLocations();
+  const oauthClientConfigured = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+  const [locations, searchConsoleProbe] = await Promise.all([
+    getVillaLocations(),
+    getSearchConsoleProbe(),
+  ]);
+
   const placesApiConfigured = Boolean(env.GOOGLE_PLACES_API_KEY);
   const placeIdConfigured: Record<Villa, boolean> = {
     Safira: Boolean(env.GOOGLE_PLACE_ID_SAFIRA),
@@ -60,26 +65,23 @@ export async function getGoogleVisibilitySnapshot(): Promise<GoogleVisibilitySna
     Safira: Boolean(env.GOOGLE_REVIEW_REQUEST_URL_SAFIRA),
     Destan: Boolean(env.GOOGLE_REVIEW_REQUEST_URL_DESTAN),
   };
-  // Kullanıcı mevcut Safira/Destan GBP profillerinin sahibi olduğunu doğruladı (2026-09-01) - bu
-  // yüzden artık WAITING_OWNER_ACCESS değil, spesifik olarak WAITING_API_ACCESS. GOOGLE_READY'ye
-  // geçiş yalnız gerçek bir GBP API erişimi (OAuth client + proje erişim onayı + başarılı API probe)
-  // sağlandığında mümkün.
+
+  // GBP hazır sayılmaz: OAuth tokenının varlığı tek başına yeterli değildir. Google Cloud proje
+  // erişim onayı ve gerçek Business Profile API probe'u daha sonra ayrıca doğrulanacaktır.
   const gbpState: GoogleReadinessState = "WAITING_API_ACCESS";
   const reviewAutomationState: GoogleReadinessState = placesApiConfigured && placeIdConfigured.Safira && placeIdConfigured.Destan
-    ? "WAITING_OWNER_ACCESS" // API key+place ID olsa bile "yorum iste" linki olmadan otomasyon tam değildir
+    ? "WAITING_OWNER_ACCESS"
     : "WAITING_API_ACCESS";
 
-  // Search Console/GA4 aynı Google OAuth client'ını (GOOGLE_CLIENT_ID/SECRET) kullanır. OAuth
-  // akışı hazır (src/app/api/admin/google/oauth/{start,callback}); GOOGLE_PRIVATE KV'de gerçek bir
-  // connection kaydı varsa (kullanıcı OAuth akışını gerçekten tamamladıysa) GOOGLE_READY.
-  const oauthClientConfigured = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
-  const searchConsoleConnected = oauthClientConfigured && env.GOOGLE_PRIVATE
-    ? Boolean(await env.GOOGLE_PRIVATE.get("connection:search_console"))
-    : false;
+  // Search Console GOOGLE_READY yalnız canlı API probe başarılıysa olur. Böylece KV'de token var
+  // ama API kapalı/property yetkisi yok gibi durumlar yanlışlıkla "Bağlı" görünmez.
+  const searchConsoleState: GoogleReadinessState = searchConsoleProbe.ready ? "GOOGLE_READY" : "WAITING_API_ACCESS";
+
+  // GA4 için şimdilik OAuth bağlantı kaydı readiness göstergesidir. Bir sonraki adımda Data API
+  // property discovery + gerçek runReport probe'u ile aynı şekilde canlı doğrulamaya geçirilecek.
   const ga4Connected = oauthClientConfigured && env.GOOGLE_PRIVATE
     ? Boolean(await env.GOOGLE_PRIVATE.get("connection:ga4"))
     : false;
-  const searchConsoleState: GoogleReadinessState = searchConsoleConnected ? "GOOGLE_READY" : "WAITING_API_ACCESS";
   const ga4State: GoogleReadinessState = ga4Connected ? "GOOGLE_READY" : "WAITING_API_ACCESS";
   const reviewLinksState: GoogleReadinessState = reviewRequestUrlConfigured.Safira && reviewRequestUrlConfigured.Destan
     ? "GOOGLE_READY"
@@ -95,6 +97,8 @@ export async function getGoogleVisibilitySnapshot(): Promise<GoogleVisibilitySna
     oauthClientConfigured,
     gbpState,
     searchConsoleState,
+    searchConsole: searchConsoleProbe.data,
+    searchConsoleError: searchConsoleProbe.error,
     ga4State,
     reviewLinksState,
     reviewAutomationState,
