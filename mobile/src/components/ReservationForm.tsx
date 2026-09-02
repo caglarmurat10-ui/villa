@@ -4,7 +4,6 @@ import { api, ApiError } from "../api/client";
 export interface ReservationFormValues {
   villa: "Safira" | "Destan";
   guestName: string;
-  phone: string;
   checkIn: string;
   checkOut: string;
   channel: "Doğrudan" | "Booking" | "Airbnb" | "Diğer";
@@ -15,7 +14,7 @@ export interface ReservationFormValues {
 interface Quote { total: number; nights: number; averageRate: number }
 
 const EMPTY: ReservationFormValues = {
-  villa: "Safira", guestName: "", phone: "", checkIn: "", checkOut: "",
+  villa: "Safira", guestName: "", checkIn: "", checkOut: "",
   channel: "Doğrudan", paidAmount: "0", notes: "",
 };
 
@@ -82,7 +81,6 @@ export function ReservationForm({
         ))}
       </div>
       <input className="input" placeholder="Misafir adı" required value={form.guestName} onChange={(e) => setForm({ ...form, guestName: e.target.value })} />
-      <input className="input" placeholder="WhatsApp numarası" value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
       <div style={{ display: "flex", gap: 8 }}>
         <input className="input" type="date" required value={form.checkIn} onChange={(e) => setForm({ ...form, checkIn: e.target.value })} aria-label="Giriş" />
         <input className="input" type="date" required value={form.checkOut} onChange={(e) => setForm({ ...form, checkOut: e.target.value })} aria-label="Çıkış" />

@@ -10,7 +10,7 @@ export function NewReservationScreen() {
     const result = await api.post<{ reservation: { id: string } }>("/reservations", {
       villa: values.villa,
       guestName: values.guestName,
-      phone: values.phone,
+      phone: "", // telefon yeni rezervasyon formunda yok - Mesajlar ekranında elle girilir
       checkIn: values.checkIn,
       checkOut: values.checkOut,
       channel: values.channel,

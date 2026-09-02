@@ -1,106 +1,98 @@
-import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
-import { TopBar, Skeleton, ErrorState, EmptyState } from "../components/common";
-import { useApi } from "../lib/useApi";
+import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { TopBar } from "../components/common";
 import { normalizeWhatsAppNumber, whatsappTemplateFor } from "../lib/messageTemplates";
 import { openWhatsApp } from "../lib/deeplinks";
-import { todayISO } from "../lib/calendarMonth";
 
-interface Reservation {
-  id: string; villa: "Safira" | "Destan"; guestName: string; phone: string;
-  checkIn: string; checkOut: string; channel: string;
-}
+type Villa = "Safira" | "Destan";
+type MessageKind = "confirmation" | "location" | "checkout" | "review";
 
-type TimeFilter = "" | "today" | "tomorrow";
+const BUTTONS: { kind: MessageKind; label: string }[] = [
+  { kind: "confirmation", label: "Rezervasyon Onayı" },
+  { kind: "location", label: "Giriş & Konum" },
+  { kind: "checkout", label: "Çıkış" },
+  { kind: "review", label: "Yorum İsteme" },
+];
 
-function tomorrowISO(): string {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+function isValidWhatsAppNumber(normalized: string): boolean {
+  return /^90\d{10}$/.test(normalized);
 }
 
 export function MessagesScreen() {
-  const [villa, setVilla] = useState<"" | "Safira" | "Destan">("");
-  const [time, setTime] = useState<TimeFilter>("");
-  const query = villa ? `?villa=${villa}` : "";
-  const { data, loading, error, reload } = useApi<{ reservations: Reservation[] }>(`/reservations${query}`, [villa]);
+  const [searchParams] = useSearchParams();
+  const villaParam = searchParams.get("villa");
+  const typeParam = searchParams.get("type") as MessageKind | null;
 
-  const today = todayISO();
-  const tomorrow = tomorrowISO();
+  // Numara yalnız bu ekranın state'inde tutulur - DB'ye, reservation'a, localStorage'a,
+  // analytics'e veya loga hiç yazılmaz.
+  const [phone, setPhone] = useState("");
+  const [villa, setVilla] = useState<"" | Villa>(villaParam === "Safira" || villaParam === "Destan" ? villaParam : "");
+  const [error, setError] = useState<string | null>(null);
 
-  const filtered = useMemo(() => {
-    if (!data) return [];
-    // "Tümü" yalnız aktif rezervasyonları gösterir - geçmiş (checkOut < today) hariç.
-    const active = data.reservations.filter((r) => r.checkOut >= today);
-    // Operasyonel sıralama: önce tarih, aynı tarihte Çıkış Giriş'ten önce gelir.
-    const sorted = [...active].sort((a, b) => {
-      const eventA = a.checkIn >= today ? { date: a.checkIn, isCheckout: false } : { date: a.checkOut, isCheckout: true };
-      const eventB = b.checkIn >= today ? { date: b.checkIn, isCheckout: false } : { date: b.checkOut, isCheckout: true };
-      if (eventA.date !== eventB.date) return eventA.date.localeCompare(eventB.date);
-      if (eventA.isCheckout !== eventB.isCheckout) return eventA.isCheckout ? -1 : 1;
-      return a.guestName.localeCompare(b.guestName);
-    });
-    if (time === "today") return sorted.filter((r) => r.checkIn === today || r.checkOut === today);
-    if (time === "tomorrow") return sorted.filter((r) => r.checkIn === tomorrow || r.checkOut === tomorrow);
-    return sorted;
-  }, [data, time, today, tomorrow]);
-
-  async function send(reservation: Reservation, kind: "confirmation" | "location" | "checkout" | "review") {
-    const message = whatsappTemplateFor(kind, reservation);
-    await openWhatsApp(`https://wa.me/${normalizeWhatsAppNumber(reservation.phone)}?text=${encodeURIComponent(message)}`);
+  async function send(kind: MessageKind) {
+    setError(null);
+    if (!villa) {
+      setError("Önce villa seçin.");
+      return;
+    }
+    const normalized = normalizeWhatsAppNumber(phone);
+    if (!isValidWhatsAppNumber(normalized)) {
+      setError("Geçerli bir WhatsApp numarası girin.");
+      return;
+    }
+    const message = whatsappTemplateFor(kind, { villa });
+    await openWhatsApp(`https://wa.me/${normalized}?text=${encodeURIComponent(message)}`);
   }
 
   return (
     <div>
       <TopBar title="Mesajlar" />
       <div className="app-content">
-        <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-          {(["", "Safira", "Destan"] as const).map((v) => (
-            <button key={v || "all"} className="btn" style={{ flex: 1, background: villa === v ? "#d5aa58" : undefined, color: villa === v ? "#1a1408" : undefined }} onClick={() => setVilla(v)}>
-              {v || "Tümü"}
-            </button>
-          ))}
-        </div>
+        <div className="section-heading" style={{ marginTop: 0 }}>WhatsApp Numarası</div>
         <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
-          {([["", "Tümü"], ["today", "Bugün"], ["tomorrow", "Yarın"]] as const).map(([v, label]) => (
-            <button key={v || "time-all"} className="btn" style={{ flex: 1, fontSize: 12, background: time === v ? "#d5aa58" : undefined, color: time === v ? "#1a1408" : undefined }} onClick={() => setTime(v)}>
-              {label}
+          <input
+            className="input"
+            style={{ flex: 1 }}
+            placeholder="05xx xxx xx xx"
+            inputMode="tel"
+            value={phone}
+            onChange={(e) => { setPhone(e.target.value); setError(null); }}
+          />
+          {phone && (
+            <button type="button" className="btn" style={{ minHeight: 44, padding: "0 12px" }} onClick={() => { setPhone(""); setError(null); }}>
+              Temizle
+            </button>
+          )}
+        </div>
+
+        <div className="section-heading">Villa</div>
+        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+          {(["Safira", "Destan"] as const).map((v) => (
+            <button key={v} type="button" className="btn" style={{ flex: 1, background: villa === v ? "#d5aa58" : undefined, color: villa === v ? "#1a1408" : undefined }} onClick={() => setVilla(v)}>
+              Villa {v}
             </button>
           ))}
         </div>
 
-        {loading && <Skeleton count={4} />}
-        {error && <ErrorState text={error} onRetry={reload} />}
-        {data && filtered.length === 0 && <EmptyState text="Bu filtrede rezervasyon yok." />}
+        {error && <div style={{ color: "#fca5a5", fontSize: 12, marginBottom: 10 }}>{error}</div>}
 
-        {filtered.map((r) => (
-          <div className="card" key={r.id}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
-              <div>
-                <b>{r.guestName}</b>
-                <div style={{ fontSize: 11, color: "#9fb0c5" }}>Villa {r.villa} · {r.channel}</div>
-              </div>
-              <Link to={`/rezervasyonlar/${r.id}`} style={{ fontSize: 11, color: "#93c5fd" }}>Detay →</Link>
-            </div>
-            <div style={{ fontSize: 12, marginTop: 6 }}>{r.checkIn} → {r.checkOut}</div>
-            {r.phone ? (
-              <>
-                <div style={{ fontSize: 11, color: "#9fb0c5", marginTop: 6 }}>{r.phone}</div>
-                <div style={{ display: "grid", gap: 6, gridTemplateColumns: "1fr 1fr", marginTop: 10 }}>
-                  <button className="btn" style={{ fontSize: 12 }} onClick={() => send(r, "confirmation")}>Rezervasyon Onayı</button>
-                  <button className="btn" style={{ fontSize: 12 }} onClick={() => send(r, "location")}>Giriş &amp; Konum</button>
-                  <button className="btn" style={{ fontSize: 12 }} onClick={() => send(r, "checkout")}>Çıkış</button>
-                  <button className="btn" style={{ fontSize: 12 }} onClick={() => send(r, "review")}>Yorum İsteme</button>
-                </div>
-              </>
-            ) : (
-              <div style={{ fontSize: 11, color: "#6b7787", marginTop: 8 }}>Numara yok</div>
-            )}
-          </div>
-        ))}
-        {filtered.length > 0 && (
-          <p style={{ fontSize: 10, color: "#6b7787", marginTop: 4 }}>WhatsApp açılır, mesaj hazır gelir — göndermek için siz onaylarsınız. Otomatik gönderim yapılmaz.</p>
-        )}
+        <div className="section-heading">Mesaj Gönder</div>
+        <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr" }}>
+          {BUTTONS.map((b) => (
+            <button
+              key={b.kind}
+              type="button"
+              className="btn"
+              style={{ minHeight: 52, fontSize: 13, borderColor: typeParam === b.kind ? "#d5aa58" : undefined }}
+              onClick={() => send(b.kind)}
+            >
+              {b.label}
+            </button>
+          ))}
+        </div>
+        <p style={{ fontSize: 10, color: "#6b7787", marginTop: 12 }}>
+          WhatsApp açılır, mesaj hazır gelir — göndermek için siz onaylarsınız. Otomatik gönderim yapılmaz. Numara hiçbir yere kaydedilmez.
+        </p>
       </div>
     </div>
   );

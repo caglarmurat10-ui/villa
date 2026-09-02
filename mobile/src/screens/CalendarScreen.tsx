@@ -1,9 +1,8 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { TopBar, Skeleton, ErrorState } from "../components/common";
 import { BottomSheet } from "../components/BottomSheet";
 import { useApi } from "../lib/useApi";
-import { openWhatsApp, openPhone } from "../lib/deeplinks";
-import { normalizeWhatsAppNumber } from "../lib/messageTemplates";
 import {
   buildMonthGrid, monthLabel, weekdayLabels, addMonths, currentCursor, todayISO, isNightOccupied,
   type MonthCursor,
@@ -56,11 +55,6 @@ export function CalendarScreen() {
   }
 
   const selectedEntries = selectedDate ? entriesForDate(selectedDate) : [];
-
-  async function sendWhatsApp(entry: CalendarEntry) {
-    if (!entry.phone) return;
-    await openWhatsApp(`https://wa.me/${normalizeWhatsAppNumber(entry.phone)}`);
-  }
 
   return (
     <div>
@@ -173,11 +167,8 @@ export function CalendarScreen() {
               )}
               {entry.guestName && <div style={{ fontSize: 13, marginTop: 8 }}>{entry.guestName}</div>}
               {entry.notes && <div style={{ fontSize: 12, color: "#9fb0c5", marginTop: 6 }}>{entry.notes}</div>}
-              {entry.phone && (
-                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                  <button className="btn" style={{ flex: 1 }} onClick={() => sendWhatsApp(entry)}>WhatsApp Aç</button>
-                  <button className="btn" style={{ flex: 1 }} onClick={() => openPhone(normalizeWhatsAppNumber(entry.phone!))}>Ara</button>
-                </div>
+              {entry.confidence === "confirmed" && (
+                <Link to={`/mesajlar?villa=${entry.villa}`} className="btn btn-block" style={{ marginTop: 10, textAlign: "center" }}>💬 Mesaj Hazırla</Link>
               )}
               {entry.id && (
                 <a className="list-item" href={`#/rezervasyonlar/${entry.id}`} style={{ display: "block", marginTop: 10, fontSize: 12, color: "#93c5fd" }}>

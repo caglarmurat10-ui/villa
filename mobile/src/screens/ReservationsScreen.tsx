@@ -3,8 +3,6 @@ import { Link } from "react-router-dom";
 import { TopBar, Skeleton, ErrorState, EmptyState } from "../components/common";
 import { useApi } from "../lib/useApi";
 import { todayISO } from "../lib/calendarMonth";
-import { normalizeWhatsAppNumber } from "../lib/messageTemplates";
-import { openWhatsApp } from "../lib/deeplinks";
 
 interface Reservation {
   id: string; villa: "Safira" | "Destan"; guestName: string; phone: string;
@@ -42,15 +40,11 @@ export function ReservationsScreen() {
 
   const hasDateFilter = checkInFrom || checkOutTo;
 
-  async function quickWhatsApp(r: Reservation) {
-    await openWhatsApp(`https://wa.me/${normalizeWhatsAppNumber(r.phone)}`);
-  }
-
   return (
     <div>
       <TopBar title="Rezervasyonlar" right={<Link to="/rezervasyonlar/yeni" className="btn btn-primary" style={{ minHeight: 36, padding: "0 12px", fontSize: 12 }}>+ Yeni</Link>} />
       <div className="app-content">
-        <input className="input" placeholder="Misafir adı veya telefon ara…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: 10 }} />
+        <input className="input" placeholder="Misafir adı ara…" value={search} onChange={(e) => setSearch(e.target.value)} style={{ marginBottom: 10 }} />
 
         <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
           {(["", "Safira", "Destan"] as const).map((v) => (
@@ -96,9 +90,7 @@ export function ReservationsScreen() {
               <div style={{ fontSize: 12, marginTop: 4 }}>{r.paidAmount.toLocaleString("tr-TR")}₺ / {r.totalAmount.toLocaleString("tr-TR")}₺ ödendi</div>
             </Link>
             <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-              <button className="btn" style={{ flex: 1, fontSize: 11, minHeight: 36 }} disabled={!r.phone} onClick={() => quickWhatsApp(r)}>
-                {r.phone ? "WhatsApp" : "Numara yok"}
-              </button>
+              <Link to={`/mesajlar?villa=${r.villa}`} className="btn" style={{ flex: 1, fontSize: 11, minHeight: 36, textAlign: "center" }}>Mesaj</Link>
               <Link to={`/rezervasyonlar/${r.id}/duzenle`} className="btn" style={{ flex: 1, fontSize: 11, minHeight: 36, textAlign: "center" }}>Düzenle</Link>
               <Link to={`/rezervasyonlar/${r.id}`} className="btn" style={{ flex: 1, fontSize: 11, minHeight: 36, textAlign: "center" }}>Detay</Link>
             </div>

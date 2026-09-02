@@ -19,7 +19,8 @@ export function EditReservationScreen() {
     await api.put(`/reservations/${id}`, {
       villa: values.villa,
       guestName: values.guestName,
-      phone: values.phone,
+      // Telefon alanı formda yok - mevcut (varsa legacy) değeri olduğu gibi koru, sil me.
+      phone: data?.reservation.phone ?? "",
       checkIn: values.checkIn,
       checkOut: values.checkOut,
       channel: values.channel,
@@ -41,7 +42,6 @@ export function EditReservationScreen() {
             initial={{
               villa: data.reservation.villa,
               guestName: data.reservation.guestName,
-              phone: data.reservation.phone,
               checkIn: data.reservation.checkIn,
               checkOut: data.reservation.checkOut,
               channel: data.reservation.channel,

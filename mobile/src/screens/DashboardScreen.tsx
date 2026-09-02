@@ -1,8 +1,6 @@
 import { Link } from "react-router-dom";
 import { TopBar, Skeleton, ErrorState, Badge } from "../components/common";
 import { useApi } from "../lib/useApi";
-import { normalizeWhatsAppNumber, whatsappTemplateFor } from "../lib/messageTemplates";
-import { openWhatsApp } from "../lib/deeplinks";
 
 interface DashboardData {
   today: string;
@@ -27,10 +25,6 @@ const QUICK_ACTIONS = [
 
 function GuestActionCard({ r, kind }: { r: ReservationLite; kind: "location" | "checkout" }) {
   const remaining = r.totalAmount - r.paidAmount;
-  async function send() {
-    const message = whatsappTemplateFor(kind, { villa: r.villa as "Safira" | "Destan" });
-    await openWhatsApp(`https://wa.me/${normalizeWhatsAppNumber(r.phone)}?text=${encodeURIComponent(message)}`);
-  }
   return (
     <div className="card">
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
@@ -39,7 +33,7 @@ function GuestActionCard({ r, kind }: { r: ReservationLite; kind: "location" | "
           <div style={{ fontSize: 11, color: "#9fb0c5" }}>Villa {r.villa} · {r.checkIn} → {r.checkOut}</div>
           {remaining > 0 && <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 2 }}>Kalan: {remaining.toLocaleString("tr-TR")}₺</div>}
         </div>
-        {r.phone && <button className="btn" style={{ fontSize: 12, minHeight: 36 }} onClick={send}>WhatsApp</button>}
+        <Link to={`/mesajlar?villa=${r.villa}&type=${kind}`} className="btn" style={{ fontSize: 12, minHeight: 36 }}>Mesaj Hazırla</Link>
       </div>
     </div>
   );
