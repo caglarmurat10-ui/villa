@@ -67,6 +67,7 @@ export default function GoogleVisibilityPanel({
   const searchConsoleConnected = snapshot.searchConsoleState === "GOOGLE_READY";
   const ga4Connected = snapshot.ga4State === "GOOGLE_READY";
   const sc = snapshot.searchConsole;
+  const ga = snapshot.ga4;
 
   return <section style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
     <div style={{border:"1px solid #334b69",borderRadius:16,background:"#081522",padding:16,color:"#eef6ff"}}>
@@ -117,6 +118,22 @@ export default function GoogleVisibilityPanel({
         {snapshot.searchConsoleError}
       </div> : null}
 
+      {ga ? <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
+        <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"baseline",flexWrap:"wrap"}}>
+          <strong style={{fontSize:11,color:"#86efac"}}>GA4 · canlı Data API</strong>
+          <small style={{fontSize:9,color:"#8fa4bd"}}>{ga.defaultUri} · Property {ga.propertyId} · {ga.measurementId || "measurement ID yok"}</small>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8,marginTop:8}}>
+          {box("Aktif kullanıcı", formatNumber(ga.activeUsers), "#86efac")}
+          {box("Oturum", formatNumber(ga.sessions))}
+          {box("Sayfa görüntüleme", formatNumber(ga.views))}
+          {box("Etkileşimli oturum", formatNumber(ga.engagedSessions))}
+        </div>
+        <small style={{display:"block",marginTop:7,fontSize:9,color:"#8fa4bd"}}>Son 28 tamamlanmış gün · {ga.propertyDisplayName} · {ga.streamDisplayName}</small>
+      </div> : snapshot.ga4Error ? <div style={{marginTop:12,padding:"10px 12px",border:"1px solid #a1620755",borderRadius:10,background:"#241a06",color:"#fbbf24",fontSize:10}}>
+        {snapshot.ga4Error}
+      </div> : null}
+
       <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
         <strong style={{fontSize:11,color:"#93c5fd"}}>Gerçek yapılandırma KPI&apos;ları</strong>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:8,marginTop:8}}>
@@ -149,7 +166,7 @@ export default function GoogleVisibilityPanel({
       </details>
 
       <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
-        <strong style={{fontSize:11,color:"#93c5fd"}}>Yayın istatistiği (D1 kaynaklı — site trafiği/lead için GA4 Data API gerekir)</strong>
+        <strong style={{fontSize:11,color:"#93c5fd"}}>Yayın istatistiği (D1 kaynaklı)</strong>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8,marginTop:8}}>
           {box("Son 7 gün yayınlanan", stats7.publishedCount, "#86efac")}
           {box("Son 7 gün hatalı", stats7.failedCount, stats7.failedCount > 0 ? "#fca5a5" : "#86efac")}
