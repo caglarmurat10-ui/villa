@@ -54,6 +54,19 @@ const ADMIN_PUBLIC_PATHS = new Set([
 ]);
 const ADMIN_SESSION_COOKIE = "__Host-villa_admin_session";
 const ADMIN_SESSION_TTL_SECONDS = 12 * 60 * 60;
+// Mobil (Capacitor Android/iOS) bearer-token oturumu - web'in cookie oturumundan bağımsız, aynı
+// ADMIN_PASSWORD credential'ını doğrular. Web'den daha uzun TTL (30 gün) - telefonda her açılışta
+// yeniden parola girmek istenmiyor; biyometrik kilit zaten cihaz üzerindeki ikinci katman.
+const MOBILE_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+const MOBILE_LOGIN_API = "/api/mobile/v1/auth/login";
+const MOBILE_LOGOUT_API = "/api/mobile/v1/auth/logout";
+// Capacitor'ın varsayılan WebView origin'leri (Android: https://localhost, iOS: capacitor://localhost)
+// + yerel geliştirme. "*" KULLANILMIYOR - yalnız bu tam eşleşen origin'lere CORS izni verilir.
+const MOBILE_ALLOWED_ORIGINS = new Set([
+  "https://localhost",
+  "capacitor://localhost",
+  "http://localhost",
+]);
 const ADMIN_MIN_PASSWORD_LENGTH = 12;
 const ADMIN_MIN_SESSION_SECRET_LENGTH = 32;
 const ADMIN_MIN_NEW_PASSWORD_LENGTH = 14;
@@ -526,6 +539,157 @@ async function adminAuthGate(request, env) {
   return Response.redirect(loginUrl.toString(), 303);
 }
 
+// ============ Mobil (Capacitor) bearer-token auth ============
+
+function mobileCorsHeaders(request) {
+  const origin = request.headers.get("origin") ?? "";
+  if (!MOBILE_ALLOWED_ORIGINS.has(origin)) return {};
+  return {
+    "Access-Control-Allow-Origin": origin,
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, DELETE, OPTIONS",
+    "Access-Control-Allow-Headers": "Authorization, Content-Type",
+    "Access-Control-Max-Age": "600",
+    Vary: "Origin",
+  };
+}
+
+function withMobileCors(response, request) {
+  const cors = mobileCorsHeaders(request);
+  if (Object.keys(cors).length === 0) return response;
+  const headers = new Headers(response.headers);
+  for (const [key, value] of Object.entries(cors)) headers.set(key, value);
+  return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+}
+
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest("SHA-256", TEXT_ENCODER.encode(value));
+  return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
+function bearerToken(request) {
+  const header = request.headers.get("authorization") ?? "";
+  return header.startsWith("Bearer ") ? header.slice(7).trim() : "";
+}
+
+async function verifyMobileBearer(request, env) {
+  const token = bearerToken(request);
+  if (!token || token.length < 32) return false;
+  try {
+    const tokenHash = await sha256Hex(token);
+    const now = new Date().toISOString();
+    const row = await env.DB.prepare(
+      "SELECT id, credential_version FROM mobile_sessions WHERE token_hash = ? AND revoked_at IS NULL AND expires_at > ?",
+    ).bind(tokenHash, now).first();
+    if (!row) return false;
+
+    const credential = await getAdminCredential(env);
+    if (row.credential_version !== credential.credentialVersion) return false;
+
+    // last_seen_at güncellemesi cevabı bloklamaz - "en iyi çaba" (best-effort), başarısız olursa
+    // auth sonucunu etkilemez.
+    env.DB.prepare("UPDATE mobile_sessions SET last_seen_at = ? WHERE id = ?").bind(now, row.id).run().catch(() => {});
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function handleMobileLogin(request, env) {
+  if (request.method !== "POST") {
+    return jsonResponse({ error: "Method Not Allowed" }, 405, { Allow: "POST" });
+  }
+  if (!adminAuthConfigured(env)) {
+    console.error("[Mobile Auth] Required secrets are missing or too short.");
+    return jsonResponse({ error: "Giriş şu anda kullanılamıyor." }, 503);
+  }
+
+  try {
+    const ip = clientIp(request);
+    if (await isAuthRateLimited(env, ip, "MOBILE_LOGIN")) {
+      return jsonResponse({ error: "Çok fazla başarısız deneme. Lütfen birkaç dakika sonra tekrar deneyin." }, 429);
+    }
+
+    const payload = await request.json().catch(() => null);
+    const password = typeof payload?.password === "string" ? payload.password : "";
+    const deviceLabel = typeof payload?.deviceLabel === "string" ? payload.deviceLabel.slice(0, 80) : null;
+    if (password.length < ADMIN_MIN_PASSWORD_LENGTH || password.length > 256) {
+      await recordAuthFailure(env, ip, "MOBILE_LOGIN");
+      await authDelay(ADMIN_RATE_LIMIT_DELAY_MS);
+      return jsonResponse({ error: "Parola hatalı." }, 401);
+    }
+
+    const credential = await getAdminCredential(env);
+    const matches = await credential.verify(password);
+    if (!matches) {
+      await recordAuthFailure(env, ip, "MOBILE_LOGIN");
+      await authDelay(ADMIN_RATE_LIMIT_DELAY_MS);
+      return jsonResponse({ error: "Parola hatalı." }, 401);
+    }
+
+    const rawToken = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
+    const tokenHash = await sha256Hex(rawToken);
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const expiresAt = new Date(now.getTime() + MOBILE_SESSION_TTL_SECONDS * 1000).toISOString();
+    const id = crypto.randomUUID();
+
+    await env.DB.prepare(
+      `INSERT INTO mobile_sessions (id, token_hash, credential_version, device_label, created_at, expires_at, last_seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(id, tokenHash, credential.credentialVersion, deviceLabel, nowIso, expiresAt, nowIso).run();
+
+    return jsonResponse({ ok: true, token: rawToken, expiresIn: MOBILE_SESSION_TTL_SECONDS });
+  } catch (error) {
+    console.error(`[Mobile Auth] login failed: ${error instanceof Error ? error.message : "unknown error"}`);
+    return jsonResponse({ error: "Giriş yapılamadı. Lütfen tekrar deneyin." }, 500);
+  }
+}
+
+async function handleMobileLogout(request, env) {
+  if (request.method !== "POST") {
+    return jsonResponse({ error: "Method Not Allowed" }, 405, { Allow: "POST" });
+  }
+  const token = bearerToken(request);
+  if (token) {
+    try {
+      const tokenHash = await sha256Hex(token);
+      await env.DB.prepare("UPDATE mobile_sessions SET revoked_at = ? WHERE token_hash = ? AND revoked_at IS NULL")
+        .bind(new Date().toISOString(), tokenHash).run();
+    } catch (error) {
+      console.error(`[Mobile Auth] logout failed: ${error instanceof Error ? error.message : "unknown error"}`);
+    }
+  }
+  return jsonResponse({ ok: true });
+}
+
+async function mobileAuthGate(request, env) {
+  const url = new URL(request.url);
+  if (url.hostname.toLowerCase() !== ADMIN_HOST) return null;
+  if (!url.pathname.startsWith("/api/mobile/v1/")) return null;
+
+  if (request.method === "OPTIONS") {
+    return withMobileCors(new Response(null, { status: 204 }), request);
+  }
+  if (url.pathname === MOBILE_LOGIN_API) {
+    return withMobileCors(await handleMobileLogin(request, env), request);
+  }
+  if (url.pathname === "/api/mobile/v1/health") {
+    // Auth öncesi bağlantı kontrolü için bilerek public - hiçbir hassas veri döndürmez.
+    return withMobileCors(jsonResponse({ ok: true, service: "villa-yonetim" }), request);
+  }
+  if (url.pathname === MOBILE_LOGOUT_API) {
+    const authenticated = await verifyMobileBearer(request, env);
+    if (!authenticated) return withMobileCors(jsonResponse({ error: "Oturum gerekli." }, 401), request);
+    return withMobileCors(await handleMobileLogout(request, env), request);
+  }
+
+  const authenticated = await verifyMobileBearer(request, env);
+  if (!authenticated) {
+    return withMobileCors(jsonResponse({ error: "Oturum gerekli veya süresi dolmuş." }, 401), request);
+  }
+  return null;
+}
+
 async function duePosts(env, scheduledAt) {
   const clock = istanbulClock(scheduledAt);
   const publishTime = safeTime(env.SOCIAL_AUTO_PUBLISH_TIME);
@@ -833,6 +997,20 @@ async function runOtaCron(env) {
 
 export default {
   async fetch(request, env, ctx) {
+    const url = new URL(request.url);
+    // Mobil (/api/mobile/v1/*) tamamen ayrı bir kapı - web'in cookie tabanlı adminAuthGate'inden
+    // hiç geçmez (mobilin cookie'si yok, geçseydi 401 alırdı). Bearer doğrulaması burada, CORS
+    // yalnız bu path grubuna uygulanır - geri kalan admin API yüzeyi hiç değişmedi.
+    if (url.hostname.toLowerCase() === ADMIN_HOST && url.pathname.startsWith("/api/mobile/v1/")) {
+      const mobileResponse = await mobileAuthGate(request, env);
+      if (mobileResponse) return mobileResponse;
+
+      const routed = routeRequest(request);
+      if (routed.response) return routed.response;
+      const response = await nextWorker.fetch(routed.request, env, ctx);
+      return withMobileCors(response, request);
+    }
+
     const authResponse = await adminAuthGate(request, env);
     if (authResponse) return authResponse;
 

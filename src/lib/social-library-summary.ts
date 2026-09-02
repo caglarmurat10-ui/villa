@@ -45,6 +45,26 @@ export async function getPublishStats(windowDays: number, todayIso: string): Pro
   };
 }
 
+export interface PostAutomationClass {
+  postId: string;
+  automationClass: "AUTO_SAFE" | "REVIEW_REQUIRED" | "BLOCKED" | null;
+}
+
+// social_posts.id -> automation_class eşlemesi (promoted_post_id üzerinden). Mobil sosyal ekranının
+// her postta AUTO_SAFE/REVIEW_REQUIRED/BLOCKED rozetini göstermesi için - social_posts'un kendisi bu
+// alanı taşımıyor, yalnız content_library'de var.
+export async function getPostAutomationClasses(): Promise<Record<string, PostAutomationClass["automationClass"]>> {
+  const db = await database();
+  const rows = await db.prepare(
+    "SELECT promoted_post_id, automation_class FROM social_content_library WHERE promoted_post_id IS NOT NULL",
+  ).all<{ promoted_post_id: string; automation_class: string }>();
+  const map: Record<string, PostAutomationClass["automationClass"]> = {};
+  for (const row of rows.results ?? []) {
+    map[row.promoted_post_id] = row.automation_class as PostAutomationClass["automationClass"];
+  }
+  return map;
+}
+
 export async function getContentLibrarySummary(): Promise<ContentLibrarySummary> {
   const db = await database();
   const rows = await db.prepare(
