@@ -4,7 +4,7 @@ const items = [
   { to: "/", label: "Ana Sayfa", icon: "🏠", end: true },
   { to: "/rezervasyonlar", label: "Rezervasyonlar", icon: "📋" },
   { to: "/takvim", label: "Takvim", icon: "📅" },
-  { to: "/sosyal", label: "Sosyal", icon: "📣" },
+  { to: "/mesajlar", label: "Mesajlar", icon: "💬" },
   { to: "/daha-fazla", label: "Daha Fazla", icon: "⋯" },
 ];
 

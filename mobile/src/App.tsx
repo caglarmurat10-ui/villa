@@ -8,7 +8,9 @@ import { DashboardScreen } from "./screens/DashboardScreen";
 import { ReservationsScreen } from "./screens/ReservationsScreen";
 import { ReservationDetailScreen } from "./screens/ReservationDetailScreen";
 import { NewReservationScreen } from "./screens/NewReservationScreen";
+import { EditReservationScreen } from "./screens/EditReservationScreen";
 import { CalendarScreen } from "./screens/CalendarScreen";
+import { MessagesScreen } from "./screens/MessagesScreen";
 import { SocialScreen } from "./screens/SocialScreen";
 import { VillasScreen } from "./screens/VillasScreen";
 import { GoogleVisibilityScreen } from "./screens/GoogleVisibilityScreen";
@@ -25,7 +27,9 @@ function AuthedShell() {
         <Route path="/rezervasyonlar" element={<ReservationsScreen />} />
         <Route path="/rezervasyonlar/yeni" element={<NewReservationScreen />} />
         <Route path="/rezervasyonlar/:id" element={<ReservationDetailScreen />} />
+        <Route path="/rezervasyonlar/:id/duzenle" element={<EditReservationScreen />} />
         <Route path="/takvim" element={<CalendarScreen />} />
+        <Route path="/mesajlar" element={<MessagesScreen />} />
         <Route path="/sosyal" element={<SocialScreen />} />
         <Route path="/daha-fazla" element={<MoreScreen />} />
         <Route path="/villalar" element={<VillasScreen />} />

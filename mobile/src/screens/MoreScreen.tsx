@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { TopBar } from "../components/common";
 
 const items = [
+  { to: "/sosyal", label: "Sosyal Medya", icon: "📣" },
   { to: "/villalar", label: "Villalar", icon: "🏡" },
   { to: "/google-gorunurluk", label: "Google Görünürlük", icon: "🔍" },
   { to: "/ayarlar", label: "Ayarlar", icon: "⚙️" },
