@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export async function GET(request: Request) {
   const { env } = await getCloudflareContext({ async: true });
   const url = new URL(request.url);
-  const redirectBack = new URL("/google-gorunurluk", url.origin);
+  const redirectBack = new URL("/sosyal", url.origin);
 
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_PRIVATE) {
     redirectBack.searchParams.set("google_oauth", "not_configured");
