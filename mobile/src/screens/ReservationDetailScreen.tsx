@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import { TopBar, Skeleton, ErrorState } from "../components/common";
+import { BottomSheet } from "../components/BottomSheet";
 import { useApi } from "../lib/useApi";
 import { api, ApiError } from "../api/client";
 import { normalizeWhatsAppNumber, whatsappTemplateFor } from "../lib/messageTemplates";
-import { openWhatsApp } from "../lib/deeplinks";
+import { openWhatsApp, openPhone } from "../lib/deeplinks";
 
 interface Reservation {
   id: string; villa: "Safira" | "Destan"; guestName: string; phone: string;
@@ -18,6 +19,10 @@ export function ReservationDetailScreen() {
   const { data, loading, error, reload } = useApi<{ reservation: Reservation }>(`/reservations/${id}`);
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [paymentOpen, setPaymentOpen] = useState(false);
+  const [paidInput, setPaidInput] = useState("");
+  const [paymentSaving, setPaymentSaving] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
   async function cancelReservation() {
     if (!confirm("Bu rezervasyonu iptal etmek istediğinize emin misiniz?")) return;
@@ -38,6 +43,27 @@ export function ReservationDetailScreen() {
     await openWhatsApp(`https://wa.me/${normalizeWhatsAppNumber(data.reservation.phone)}?text=${encodeURIComponent(message)}`);
   }
 
+  function openPaymentSheet() {
+    if (!data) return;
+    setPaidInput(String(data.reservation.paidAmount));
+    setPaymentError(null);
+    setPaymentOpen(true);
+  }
+
+  async function savePayment() {
+    setPaymentSaving(true);
+    setPaymentError(null);
+    try {
+      await api.patch(`/reservations/${id}`, { paidAmount: Number(paidInput) || 0 });
+      setPaymentOpen(false);
+      await reload();
+    } catch (err) {
+      setPaymentError(err instanceof ApiError ? err.message : "Güncellenemedi.");
+    } finally {
+      setPaymentSaving(false);
+    }
+  }
+
   return (
     <div>
       <TopBar title="Rezervasyon Detayı" />
@@ -55,13 +81,24 @@ export function ReservationDetailScreen() {
               {data.reservation.notes && <div style={{ marginTop: 10, fontSize: 12, color: "#9fb0c5" }}>{data.reservation.notes}</div>}
             </div>
 
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, margin: "14px 0" }}>
+              <Link to={`/rezervasyonlar/${id}/duzenle`} className="btn" style={{ textAlign: "center" }}>✏️ Düzenle</Link>
+              <button className="btn" onClick={openPaymentSheet}>💳 Ödeme Güncelle</button>
+              {data.reservation.phone ? (
+                <button className="btn" onClick={() => openPhone(normalizeWhatsAppNumber(data.reservation.phone))}>📞 Ara</button>
+              ) : <div />}
+              {data.reservation.phone ? (
+                <button className="btn" onClick={() => sendWhatsApp("confirmation")}>💬 WhatsApp</button>
+              ) : <div />}
+            </div>
+
             {data.reservation.phone && (
               <>
-                <div className="section-heading">WhatsApp Mesajları — Gönderim İçin Onay Gerekir</div>
+                <div className="section-heading">Mesaj Şablonları — Gönderim İçin Onay Gerekir</div>
                 <div style={{ display: "grid", gap: 8, gridTemplateColumns: "1fr 1fr" }}>
                   <button className="btn" onClick={() => sendWhatsApp("confirmation")}>Rezervasyon Onayı</button>
-                  <button className="btn" onClick={() => sendWhatsApp("location")}>Konum + Giriş</button>
-                  <button className="btn" onClick={() => sendWhatsApp("checkout")}>Çıkış Bilgisi</button>
+                  <button className="btn" onClick={() => sendWhatsApp("location")}>Giriş &amp; Konum</button>
+                  <button className="btn" onClick={() => sendWhatsApp("checkout")}>Çıkış</button>
                   <button className="btn" onClick={() => sendWhatsApp("review")}>Yorum İsteme</button>
                 </div>
                 <p style={{ fontSize: 10, color: "#6b7787", marginTop: 8 }}>WhatsApp açılır, mesaj hazır gelir — göndermek için siz onaylarsınız. Otomatik gönderim yapılmaz.</p>
@@ -75,6 +112,21 @@ export function ReservationDetailScreen() {
           </>
         )}
       </div>
+
+      <BottomSheet open={paymentOpen} onClose={() => setPaymentOpen(false)} title="Ödeme Güncelle">
+        {data && (
+          <>
+            <p style={{ fontSize: 13, margin: "0 0 4px" }}>Toplam: <b>{data.reservation.totalAmount.toLocaleString("tr-TR")}₺</b></p>
+            <p style={{ fontSize: 13, margin: "0 0 4px" }}>Alınan: <b>{Number(paidInput || 0).toLocaleString("tr-TR")}₺</b></p>
+            <p style={{ fontSize: 13, margin: "0 0 14px" }}>Kalan: <b>{Math.max(0, data.reservation.totalAmount - (Number(paidInput) || 0)).toLocaleString("tr-TR")}₺</b></p>
+            <input className="input" type="number" min={0} placeholder="Alınan toplam ödeme (₺)" value={paidInput} onChange={(e) => setPaidInput(e.target.value)} />
+            {paymentError && <div style={{ color: "#fca5a5", fontSize: 12, marginTop: 8 }}>{paymentError}</div>}
+            <button className="btn btn-primary btn-block" style={{ marginTop: 12 }} onClick={savePayment} disabled={paymentSaving}>
+              {paymentSaving ? "Kaydediliyor…" : "Kaydet"}
+            </button>
+          </>
+        )}
+      </BottomSheet>
     </div>
   );
 }
