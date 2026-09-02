@@ -15,10 +15,10 @@ export function MoreScreen() {
       <div className="app-content">
         {items.map((item) => (
           <Link className="list-item" to={item.to} key={item.to}>
-            <div className="card" style={{ display: "flex", alignItems: "center", gap: 12 }}>
-              <span style={{ fontSize: 22 }}>{item.icon}</span>
-              <b>{item.label}</b>
-              <span style={{ marginLeft: "auto", color: "#9fb0c5" }}>→</span>
+            <div className="card" style={{ display: "flex", alignItems: "center", gap: 14, minHeight: 56 }}>
+              <span style={{ fontSize: 24 }}>{item.icon}</span>
+              <b style={{ fontSize: 15 }}>{item.label}</b>
+              <span style={{ marginLeft: "auto", color: "#9fb0c5", fontSize: 18 }}>→</span>
             </div>
           </Link>
         ))}

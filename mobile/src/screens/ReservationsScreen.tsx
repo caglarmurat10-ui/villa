@@ -83,16 +83,16 @@ export function ReservationsScreen() {
           <div className="card" key={r.id}>
             <Link className="list-item" to={`/rezervasyonlar/${r.id}`}>
               <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <b>{r.guestName}</b>
-                <span style={{ fontSize: 11, color: "#9fb0c5" }}>Villa {r.villa}</span>
+                <b style={{ fontSize: 15 }}>{r.guestName}</b>
+                <span style={{ fontSize: 12, color: "#9fb0c5" }}>Villa {r.villa}</span>
               </div>
-              <div style={{ fontSize: 12, color: "#9fb0c5", marginTop: 4 }}>{r.checkIn} → {r.checkOut} · {r.channel}</div>
-              <div style={{ fontSize: 12, marginTop: 4 }}>{r.paidAmount.toLocaleString("tr-TR")}₺ / {r.totalAmount.toLocaleString("tr-TR")}₺ ödendi</div>
+              <div style={{ fontSize: 13, color: "#9fb0c5", marginTop: 5 }}>{r.checkIn} → {r.checkOut} · {r.channel}</div>
+              <div style={{ fontSize: 13, marginTop: 5 }}>{r.paidAmount.toLocaleString("tr-TR")}₺ / {r.totalAmount.toLocaleString("tr-TR")}₺ ödendi</div>
             </Link>
-            <div style={{ display: "flex", gap: 6, marginTop: 10 }}>
-              <Link to={`/mesajlar?villa=${r.villa}`} className="btn" style={{ flex: 1, fontSize: 11, minHeight: 36, textAlign: "center" }}>Mesaj</Link>
-              <Link to={`/rezervasyonlar/${r.id}/duzenle`} className="btn" style={{ flex: 1, fontSize: 11, minHeight: 36, textAlign: "center" }}>Düzenle</Link>
-              <Link to={`/rezervasyonlar/${r.id}`} className="btn" style={{ flex: 1, fontSize: 11, minHeight: 36, textAlign: "center" }}>Detay</Link>
+            <div style={{ display: "flex", gap: 6, marginTop: 12 }}>
+              <Link to={`/rezervasyonlar/${r.id}`} className="btn" style={{ flex: 1, fontSize: 12, minHeight: 40, textAlign: "center" }}>Detay</Link>
+              <Link to={`/rezervasyonlar/${r.id}/duzenle`} className="btn" style={{ flex: 1, fontSize: 12, minHeight: 40, textAlign: "center" }}>Düzenle</Link>
+              <Link to={`/mesajlar?villa=${r.villa}`} className="btn" style={{ flex: 1, fontSize: 12, minHeight: 40, textAlign: "center" }}>Mesaj</Link>
             </div>
           </div>
         ))}

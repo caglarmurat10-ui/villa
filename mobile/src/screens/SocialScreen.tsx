@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { TopBar, Skeleton, ErrorState, EmptyState } from "../components/common";
+import { Skeleton, ErrorState, EmptyState } from "../components/common";
 import { BottomSheet } from "../components/BottomSheet";
 import { useApi } from "../lib/useApi";
 
@@ -76,18 +76,21 @@ export function SocialScreen() {
 
   return (
     <div>
-      <TopBar title="Sosyal Medya" />
-      <div className="app-content">
-        <div style={{ display: "grid", gridTemplateColumns: summary.failed > 0 ? "1fr 1fr 1fr 1fr" : "1fr 1fr 1fr", gap: 8, marginBottom: 14 }}>
-          <div className="stat-box"><div className="value" style={{ fontSize: 18 }}>{summary.planned}</div><div className="label">Planlanan</div></div>
-          <div className="stat-box"><div className="value" style={{ fontSize: 18 }}>{summary.pendingApproval}</div><div className="label">Kontrol Bekleyen</div></div>
-          <div className="stat-box"><div className="value" style={{ fontSize: 18 }}>{summary.published}</div><div className="label">Yayınlanan</div></div>
-          {summary.failed > 0 && (
-            <div className="stat-box" style={{ borderColor: "#7f1d1d" }}><div className="value" style={{ fontSize: 18, color: "#fca5a5" }}>{summary.failed}</div><div className="label" style={{ color: "#fca5a5" }}>Başarısız</div></div>
-          )}
+      <div className="app-content" style={{ paddingTop: "calc(20px + var(--safe-top))" }}>
+        <div className="hero">
+          <div className="hero-eyebrow" style={{ fontSize: 19 }}>Sosyal Medya Merkezi</div>
+          <div className="hero-subtitle">Villa Safira ve Villa Destan paylaşım durumu</div>
+          <div className="hero-stats" style={{ gridTemplateColumns: summary.failed > 0 ? "repeat(4, 1fr)" : "repeat(3, 1fr)" }}>
+            <div className="hero-stat"><div className="value">{summary.planned}</div><div className="label">Planlanan</div></div>
+            <div className="hero-stat"><div className="value">{summary.pendingApproval}</div><div className="label">Kontrol Bekleyen</div></div>
+            <div className="hero-stat"><div className="value">{summary.published}</div><div className="label">Yayınlanan</div></div>
+            {summary.failed > 0 && (
+              <div className="hero-stat" style={{ borderColor: "#7f1d1d" }}><div className="value" style={{ color: "#fca5a5" }}>{summary.failed}</div><div className="label" style={{ color: "#fca5a5" }}>Başarısız</div></div>
+            )}
+          </div>
         </div>
 
-        <div className="card" style={{ borderColor: "#a16207" }}>
+        <div className="card" style={{ borderColor: "#a16207", marginTop: 4 }}>
           <div className="card-title" style={{ color: "#fbbf24" }}>DESTAN INSTAGRAM</div>
           <p style={{ fontSize: 13, margin: "6px 0 2px" }}>Bağlantı sorunu nedeniyle yayın kapalı.</p>
           <p style={{ fontSize: 11, color: "#9fb0c5", margin: 0 }}>Facebook yayını etkilenmiyor.</p>
@@ -130,15 +133,15 @@ export function SocialScreen() {
             >
               <div className="card" style={{ padding: 0, overflow: "hidden" }}>
                 <MediaPreview url={post.mediaUrl} isVideo={post.contentType === "Reels"} />
-                <div style={{ padding: 12 }}>
-                  <div style={{ fontSize: 12, fontWeight: 800 }}>Villa {post.villa} · {post.platform}</div>
-                  <div style={{ fontSize: 11, color: "#9fb0c5", marginTop: 2 }}>{post.contentType}</div>
-                  <div style={{ fontSize: 11, color: "#9fb0c5", marginTop: 2 }}>
+                <div style={{ padding: 14 }}>
+                  <div style={{ fontSize: 14, fontWeight: 800 }}>Villa {post.villa} · {post.platform}</div>
+                  <div style={{ fontSize: 12, color: "#9fb0c5", marginTop: 3 }}>{post.contentType}</div>
+                  <div style={{ fontSize: 12, color: "#9fb0c5", marginTop: 2 }}>
                     {formatDate(post.scheduledDate)}{post.scheduledTime ? ` · ${post.scheduledTime}` : ""}
                   </div>
-                  <span className="badge" style={{ marginTop: 8, background: TONE_BG[main.tone], color: TONE_COLOR[main.tone] }}>{main.label}</span>
+                  <span className="badge" style={{ marginTop: 10, background: TONE_BG[main.tone], color: TONE_COLOR[main.tone] }}>{main.label}</span>
                   <p style={{
-                    fontSize: 12, color: "#b8c6d8", margin: "8px 0 0",
+                    fontSize: 13, color: "#b8c6d8", margin: "10px 0 0",
                     display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
                   }}>{post.caption}</p>
                 </div>

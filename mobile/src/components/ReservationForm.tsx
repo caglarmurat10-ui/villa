@@ -72,7 +72,7 @@ export function ReservationForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+    <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 12 }}>
       <div style={{ display: "flex", gap: 8 }}>
         {(["Safira", "Destan"] as const).map((v) => (
           <button key={v} type="button" className="btn" style={{ flex: 1, background: form.villa === v ? "#d5aa58" : undefined, color: form.villa === v ? "#1a1408" : undefined }} onClick={() => setForm({ ...form, villa: v })}>
@@ -101,7 +101,7 @@ export function ReservationForm({
       <input className="input" type="number" min={0} placeholder="Alınan ödeme (₺)" value={form.paidAmount} onChange={(e) => setForm({ ...form, paidAmount: e.target.value })} />
       <textarea className="input" placeholder="Not" rows={3} style={{ minHeight: 80, paddingTop: 10 }} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} />
       {error && <div style={{ color: "#fca5a5", fontSize: 12 }}>{error}</div>}
-      <button className="btn btn-primary btn-block" type="submit" disabled={saving || !quote}>{saving ? "Kaydediliyor…" : submitLabel}</button>
+      <button className="btn btn-primary btn-block btn-hero" type="submit" disabled={saving || !quote} style={{ marginTop: 6 }}>{saving ? "Kaydediliyor…" : submitLabel}</button>
     </form>
   );
 }
