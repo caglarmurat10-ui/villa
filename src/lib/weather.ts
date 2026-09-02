@@ -52,14 +52,19 @@ async function kv() {
 }
 
 export async function getLatestWeather(): Promise<WeatherReading | null> {
-  const store = await kv();
-  const raw = await store.get(KV_KEY);
-  if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as WeatherReading;
-    if (typeof parsed.observedAt !== "string" || typeof parsed.temperature !== "number") return null;
-    return parsed;
-  } catch {
+    const store = await kv();
+    const raw = await store.get(KV_KEY);
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw) as WeatherReading;
+      if (typeof parsed.observedAt !== "string" || typeof parsed.temperature !== "number") return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  } catch (error) {
+    console.error(`[Weather] latest reading unavailable: ${error instanceof Error ? error.message : "unknown"}`);
     return null;
   }
 }
