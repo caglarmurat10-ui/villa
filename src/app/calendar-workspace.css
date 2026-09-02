@@ -1,22 +1,22 @@
 .villa-calendar-workspace{max-width:1440px;margin:0 auto;padding:22px 20px 70px;color:#e5edf7}.calendar-workspace-head{display:flex;justify-content:space-between;gap:18px;align-items:flex-end;margin-bottom:18px}.calendar-workspace-head h1{margin:4px 0 5px;font-size:30px}.calendar-workspace-head p{margin:0;color:#9fb0c5;max-width:760px}.calendar-month-nav{display:flex;align-items:center;gap:10px;padding:8px;border:1px solid #29405e;border-radius:12px;background:#0a1727}.calendar-month-nav button{width:36px;height:36px;border:0;border-radius:9px;background:#17263c;color:#fff;font-size:22px;cursor:pointer}.calendar-month-nav strong{min-width:150px;text-align:center;text-transform:capitalize}.villa-calendar-pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}.villa-month{border:1px solid #29405e;border-radius:18px;background:#081522;padding:14px}.villa-month-title{display:flex;align-items:center;gap:10px;margin-bottom:12px}.villa-calendar-mark{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;font-weight:900;background:#1d4ed8;color:#fff}.villa-destan .villa-calendar-mark{background:#7c3aed}.villa-month-title strong,.villa-month-title span{display:block}.villa-month-title span{font-size:10px;color:#94a3b8;margin-top:2px}.villa-calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:5px}.villa-weekday{text-align:center;font-size:9px;color:#7f94ae;padding:5px 0}.villa-empty-day{min-height:58px}.calendar-operations{margin-top:18px;border:1px solid #29405e;border-radius:18px;background:#081522;padding:16px}.calendar-operations-head{display:flex;justify-content:space-between;align-items:end;margin-bottom:12px}.calendar-operations-head h2{margin:4px 0 0}.calendar-operations-head>b{padding:6px 10px;border-radius:999px;background:#17263c;color:#bfdbfe;font-size:10px}.calendar-operation-list{display:grid;gap:8px}.calendar-operation{display:grid;grid-template-columns:180px 1fr auto;gap:12px;align-items:center;padding:12px;border:1px solid #1f3551;border-radius:12px;background:#0b1728}.calendar-operation.arrival{border-left:4px solid #10b981}.calendar-operation.departure{border-left:4px solid #ef4444}.calendar-operation-date strong,.calendar-operation-date span,.calendar-operation-guest b,.calendar-operation-guest strong,.calendar-operation-guest span{display:block}.calendar-operation-date span{margin-top:3px;font-size:10px;color:#94a3b8}.calendar-operation-guest b{font-size:9px;color:#93c5fd}.calendar-operation-guest strong{margin-top:2px}.calendar-operation-guest span{font-size:10px;color:#94a3b8;margin-top:2px}.calendar-operation-actions a{display:inline-flex;padding:9px 12px;border-radius:9px;background:#16a34a;color:#fff;text-decoration:none;font-size:10px;font-weight:900}.operation-warning{font-size:10px;color:#fbbf24}.ops-eyebrow{display:block;color:#8b5cf6;font-size:10px;letter-spacing:1.6px;font-weight:900}
 
 /* Sadeleştirilmiş gün hücresi: gün numarası + KISA METİN etiket ("→ Giriş"/"← Çıkış"/"Dolu"/"⚠ Kontrol") + renkli bant - kaynak/misafir/telefon metni gride hiç girmiyor, tıklayınca detay sheet'inde gösteriliyor. Renk TEK BAŞINA anlam taşımıyor, her zaman metinle birlikte. */
-.villa-day{position:relative;min-height:64px;border:1px solid #1d3048;border-radius:10px;background:#0b1728;padding:6px}
-.villa-day>strong{font-size:10px;color:#9fb0c5}
+.villa-day{position:relative;min-height:64px;border:1px solid #1d3048;border-radius:10px;background:#101f38;padding:6px}
+.villa-day>strong{font-size:10px;color:#e7edf5}
 .villa-day.today{outline:2px solid #f59e0b}
-.villa-day.occupied{background:#10203a}
+.villa-day.occupied{background:#17294a}
 .day-label{display:block;margin-top:4px;font-size:10px;font-weight:900;line-height:1.25;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .villa-day.band-in,.villa-day.band-out,.villa-day.band-stay,.villa-day.band-block,.villa-day.band-warn{cursor:pointer;border:0;text-align:left;width:100%;font:inherit;color:inherit;padding:6px}
-.villa-day.band-in{background:#0c2a20}
-.villa-day.band-in .day-label{color:#6ee7b7}
-.villa-day.band-out{background:#2a1414}
-.villa-day.band-out .day-label{color:#fca5a5}
-.villa-day.band-stay{background:#0f2038}
-.villa-day.band-stay .day-label{color:#93c5fd}
-.villa-day.band-block{background:#1e1608}
-.villa-day.band-block .day-label{color:#fbbf24}
-.villa-day.band-warn{background:#2a1010}
-.villa-day.band-warn .day-label{color:#fca5a5}
+.villa-day.band-in{background:#12563c}
+.villa-day.band-in .day-label{color:#baf7d9}
+.villa-day.band-out{background:#5c2a21}
+.villa-day.band-out .day-label{color:#ffc2b2}
+.villa-day.band-stay{background:#193c6e}
+.villa-day.band-stay .day-label{color:#d7e9ff}
+.villa-day.band-block{background:#5c420f}
+.villa-day.band-block .day-label{color:#ffdd8a}
+.villa-day.band-warn{background:#672424}
+.villa-day.band-warn .day-label{color:#ffc2b2}
 .villa-day.band-in:focus-visible,.villa-day.band-out:focus-visible,.villa-day.band-stay:focus-visible,.villa-day.band-block:focus-visible,.villa-day.band-warn:focus-visible{outline:2px solid #93c5fd}
 /* Ardışık rezervasyon günlerinin akış hissi: giriş hücresinin solu, çıkış hücresinin sağı yuvarlak; aradaki konaklama günleri düz/bağlantılı görünür - grid yapısı (hücreler, gap) değişmiyor, yalnız köşe yarıçapı. */
 .villa-day.day-role-arrival{border-radius:10px 4px 4px 10px}
@@ -28,11 +28,11 @@
 .villa-day.turnover>strong{position:absolute;top:5px;left:8px;z-index:2;text-shadow:0 1px 3px rgba(0,0,0,.8)}
 .day-turnover{display:flex;flex-direction:column;height:100%;min-height:64px}
 .day-half{flex:1;border:0;padding:0 4px;cursor:pointer;font:inherit;display:flex;align-items:center;justify-content:flex-end;font-size:9px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.day-half-out{background:#2a1414;border-bottom:1px solid #1d3048;color:#fca5a5;justify-content:flex-start;padding-top:16px}
-.day-half-in{background:#0c2a20;color:#6ee7b7}
+.day-half-out{background:#5c2a21;border-bottom:1px solid #1d3048;color:#ffc2b2;justify-content:flex-start;padding-top:16px}
+.day-half-in{background:#12563c;color:#baf7d9}
 .day-half:focus-visible{outline:2px solid #93c5fd;outline-offset:-2px}
 
-.day-review-flag{position:absolute;top:3px;right:3px;z-index:3;border:0;background:#450a0a;color:#fca5a5;font-size:9px;line-height:1;padding:2px 3px;border-radius:5px;cursor:pointer}
+.day-review-flag{position:absolute;top:3px;right:3px;z-index:3;border:0;background:#672424;color:#ffc2b2;font-size:9px;line-height:1;padding:2px 3px;border-radius:5px;cursor:pointer}
 
 .calendar-legend{display:flex;flex-wrap:wrap;gap:14px;margin-bottom:12px;font-size:10px;color:#9fb0c5}
 .calendar-legend span{display:inline-flex;align-items:center;gap:5px}
