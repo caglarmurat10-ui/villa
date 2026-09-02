@@ -46,6 +46,10 @@ function oauthButton(label: string, scope: "search_console" | "ga4", connected: 
     : <span style={style} aria-disabled="true">{text}</span>;
 }
 
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(value);
+}
+
 export default function GoogleVisibilityPanel({
   snapshot,
   stats7,
@@ -62,6 +66,7 @@ export default function GoogleVisibilityPanel({
   const reviewEligible = reservationsEligibleForReviewRequest(reservations, todayIso);
   const searchConsoleConnected = snapshot.searchConsoleState === "GOOGLE_READY";
   const ga4Connected = snapshot.ga4State === "GOOGLE_READY";
+  const sc = snapshot.searchConsole;
 
   return <section style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
     <div style={{border:"1px solid #334b69",borderRadius:16,background:"#081522",padding:16,color:"#eef6ff"}}>
@@ -88,8 +93,32 @@ export default function GoogleVisibilityPanel({
         </div>
       </div>
 
+      {sc ? <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
+        <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"baseline",flexWrap:"wrap"}}>
+          <strong style={{fontSize:11,color:"#86efac"}}>Search Console · canlı API</strong>
+          <small style={{fontSize:9,color:"#8fa4bd"}}>{sc.siteUrl} · {sc.startDate} → {sc.endDate}</small>
+        </div>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8,marginTop:8}}>
+          {box("Google tıklaması", formatNumber(sc.clicks), "#86efac")}
+          {box("Gösterim", formatNumber(sc.impressions))}
+          {box("CTR", `${(sc.ctr * 100).toFixed(1)}%`)}
+          {box("Ort. konum", sc.position ? sc.position.toFixed(1) : "—")}
+        </div>
+        {sc.topQueries.length > 0 ? <div style={{marginTop:9,padding:"9px 10px",border:"1px solid #1f5f3b",borderRadius:9,background:"#071b16"}}>
+          <b style={{fontSize:10,color:"#bbf7d0"}}>En çok tıklanan sorgular</b>
+          <div style={{display:"grid",gap:4,marginTop:6}}>
+            {sc.topQueries.map((item) => <div key={item.query} style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:9,color:"#a7d8b8"}}>
+              <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.query}</span>
+              <span style={{flexShrink:0}}>{formatNumber(item.clicks)} tık · {formatNumber(item.impressions)} gösterim</span>
+            </div>)}
+          </div>
+        </div> : null}
+      </div> : snapshot.searchConsoleError ? <div style={{marginTop:12,padding:"10px 12px",border:"1px solid #a1620755",borderRadius:10,background:"#241a06",color:"#fbbf24",fontSize:10}}>
+        {snapshot.searchConsoleError}
+      </div> : null}
+
       <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
-        <strong style={{fontSize:11,color:"#93c5fd"}}>Gerçek KPI&apos;lar</strong>
+        <strong style={{fontSize:11,color:"#93c5fd"}}>Gerçek yapılandırma KPI&apos;ları</strong>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:8,marginTop:8}}>
           {box("Sitemap URL sayısı", snapshot.sitemapUrls.length)}
           {box("JSON-LD sayfa sayısı", snapshot.jsonLdPages.length)}
