@@ -2,6 +2,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getVillaLocations } from "./db";
 import { WHATSAPP_PHONE_DISPLAY_INTL } from "./contact";
 import { getSearchConsoleProbe, type SearchConsoleSummary } from "./google-search-console";
+import { getGa4Probe, type Ga4Summary } from "./google-analytics";
 import type { Villa } from "./types";
 
 // Admin "Google Görünürlük" paneli için tek kaynak - hiçbir alan tahmin/uydurma değil, yalnız
@@ -23,6 +24,8 @@ export interface GoogleVisibilitySnapshot {
   searchConsole: SearchConsoleSummary | null;
   searchConsoleError: string | null;
   ga4State: GoogleReadinessState;
+  ga4: Ga4Summary | null;
+  ga4Error: string | null;
   reviewLinksState: GoogleReadinessState;
   reviewAutomationState: GoogleReadinessState;
   napPhone: string;
@@ -51,9 +54,10 @@ const JSON_LD_PAGES = [
 export async function getGoogleVisibilitySnapshot(): Promise<GoogleVisibilitySnapshot> {
   const { env } = await getCloudflareContext({ async: true });
   const oauthClientConfigured = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
-  const [locations, searchConsoleProbe] = await Promise.all([
+  const [locations, searchConsoleProbe, ga4Probe] = await Promise.all([
     getVillaLocations(),
     getSearchConsoleProbe(),
+    getGa4Probe(),
   ]);
 
   const placesApiConfigured = Boolean(env.GOOGLE_PLACES_API_KEY);
@@ -73,16 +77,11 @@ export async function getGoogleVisibilitySnapshot(): Promise<GoogleVisibilitySna
     ? "WAITING_OWNER_ACCESS"
     : "WAITING_API_ACCESS";
 
-  // Search Console GOOGLE_READY yalnız canlı API probe başarılıysa olur. Böylece KV'de token var
-  // ama API kapalı/property yetkisi yok gibi durumlar yanlışlıkla "Bağlı" görünmez.
+  // Search Console ve GA4 GOOGLE_READY yalnız canlı API probe başarılıysa olur. Böylece KV'de
+  // refresh token var ama ilgili API kapalı/property-stream yetkisi yok gibi durumlar yanlışlıkla
+  // "Bağlı" görünmez.
   const searchConsoleState: GoogleReadinessState = searchConsoleProbe.ready ? "GOOGLE_READY" : "WAITING_API_ACCESS";
-
-  // GA4 için şimdilik OAuth bağlantı kaydı readiness göstergesidir. Bir sonraki adımda Data API
-  // property discovery + gerçek runReport probe'u ile aynı şekilde canlı doğrulamaya geçirilecek.
-  const ga4Connected = oauthClientConfigured && env.GOOGLE_PRIVATE
-    ? Boolean(await env.GOOGLE_PRIVATE.get("connection:ga4"))
-    : false;
-  const ga4State: GoogleReadinessState = ga4Connected ? "GOOGLE_READY" : "WAITING_API_ACCESS";
+  const ga4State: GoogleReadinessState = ga4Probe.ready ? "GOOGLE_READY" : "WAITING_API_ACCESS";
   const reviewLinksState: GoogleReadinessState = reviewRequestUrlConfigured.Safira && reviewRequestUrlConfigured.Destan
     ? "GOOGLE_READY"
     : "WAITING_API_ACCESS";
@@ -100,6 +99,8 @@ export async function getGoogleVisibilitySnapshot(): Promise<GoogleVisibilitySna
     searchConsole: searchConsoleProbe.data,
     searchConsoleError: searchConsoleProbe.error,
     ga4State,
+    ga4: ga4Probe.data,
+    ga4Error: ga4Probe.error,
     reviewLinksState,
     reviewAutomationState,
     napPhone: WHATSAPP_PHONE_DISPLAY_INTL,
