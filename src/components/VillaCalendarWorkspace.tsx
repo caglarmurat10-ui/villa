@@ -111,7 +111,13 @@ function VillaMonth({ villa, reservations, externalBlocks, year, month, onSelect
         const departure = villaRows.find((r) => r.checkOut === date);
         const stay = !arrival && !departure ? villaRows.find((r) => r.checkIn < date && r.checkOut > date) : undefined;
         const block = villaBlocks.find((b) => b.startDate <= date && b.endDate > date);
-        const needsReview = block?.status === "needs_review";
+        // Bir dış kaynak kaydı haftalar/aylar sürebilir (gerçek OTA senkron aralığı) - needs_review'i
+        // o aralığın HER gününde tekrar tekrar göstermek "aynı kaydı" onlarca kez uyarı gibi göstermek
+        // olur ve gerçekten dikkat gerektiren kaydı gürültüye gömer. Bir kayıt yalnız kendi
+        // BAŞLANGIÇ gününde işaretlenir - business verisi (status) değişmiyor, yalnız TEKRARLANAN
+        // görüntüleme kaldırılıyor.
+        const isBlockStart = block ? block.startDate === date : false;
+        const needsReview = block?.status === "needs_review" && isBlockStart;
         const turnover = Boolean(arrival && departure);
         const occupied = Boolean(arrival || departure || stay || block);
 
@@ -121,8 +127,8 @@ function VillaMonth({ villa, reservations, externalBlocks, year, month, onSelect
           return <article className={cellClass} key={date}>
             <strong>{day}</strong>
             <div className="day-turnover">
-              <button type="button" className="day-half day-half-out" onClick={() => onSelect({ kind: "reservation", reservation: departure! })} aria-label={`Çıkış: ${departure!.guestName}`} />
-              <button type="button" className="day-half day-half-in" onClick={() => onSelect({ kind: "reservation", reservation: arrival! })} aria-label={`Giriş: ${arrival!.guestName}`} />
+              <button type="button" className="day-half day-half-out" onClick={() => onSelect({ kind: "reservation", reservation: departure! })} aria-label={`Çıkış: ${departure!.guestName}`}>← Çıkış</button>
+              <button type="button" className="day-half day-half-in" onClick={() => onSelect({ kind: "reservation", reservation: arrival! })} aria-label={`Giriş: ${arrival!.guestName}`}>→ Giriş</button>
             </div>
             {needsReview ? <button type="button" className="day-review-flag" onClick={() => onSelect({ kind: "block", block: block!, villa })} aria-label="Kontrol gerekli">⚠</button> : null}
           </article>;
@@ -136,13 +142,17 @@ function VillaMonth({ villa, reservations, externalBlocks, year, month, onSelect
             : null;
         // needsReview bir dış kaynak bloğuna ait olabilir - o gün AYRICA bir rezervasyon da varsa
         // (primary = rezervasyon olur) uyarı rozeti yine de ayrı, kendi tıklamasıyla blok detayını
-        // açan bağımsız bir eleman olarak gösterilmeli - aksi halde çakışma sessizce kaybolur.
+        // açan bağımsız bir eleman olarak gösterilmeli - aksi halde çakışma sessizce kaybolur. Blok
+        // TEK BAŞINA (rezervasyon yokken) primary olduğunda ise ⚠ zaten hücrenin ana etiketinde
+        // ("⚠ Kontrol") görünüyor - ayrı bir rozet TEKRAR göstermek gürültü/abartı olur.
         const warnIsSeparate = needsReview && primary?.kind !== "block";
 
-        const bandClass = arrival ? "band-in" : departure ? "band-out" : stay ? "band-stay" : block ? (needsReview ? "band-warn" : "band-block") : "";
+        const role = arrival ? "arrival" : departure ? "departure" : stay ? "stay" : block ? "block" : "";
+        const bandClass = role ? `band-${arrival ? "in" : departure ? "out" : stay ? "stay" : needsReview ? "warn" : "block"}` : "";
+        const label = arrival ? "→ Giriş" : departure ? "← Çıkış" : stay ? "Dolu" : block ? (needsReview ? "⚠ Kontrol" : "Dolu") : "";
 
         return <article
-          className={`${cellClass} ${bandClass}`}
+          className={`${cellClass} ${bandClass} ${role ? `day-role-${role}` : ""}`}
           key={date}
           onClick={primary ? () => onSelect(primary) : undefined}
           role={primary ? "button" : undefined}
@@ -150,13 +160,14 @@ function VillaMonth({ villa, reservations, externalBlocks, year, month, onSelect
           onKeyDown={primary ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onSelect(primary); } } : undefined}
         >
           <strong>{day}</strong>
-          {needsReview ? <span
+          {label ? <span className="day-label">{label}</span> : null}
+          {warnIsSeparate ? <span
             className="day-review-flag"
             role="button"
             tabIndex={0}
             aria-label="Kontrol gerekli"
-            onClick={(event) => { if (warnIsSeparate) { event.stopPropagation(); onSelect({ kind: "block", block: block!, villa }); } }}
-            onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && warnIsSeparate) { event.stopPropagation(); event.preventDefault(); onSelect({ kind: "block", block: block!, villa }); } }}
+            onClick={(event) => { event.stopPropagation(); onSelect({ kind: "block", block: block!, villa }); }}
+            onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.stopPropagation(); event.preventDefault(); onSelect({ kind: "block", block: block!, villa }); } }}
           >⚠</span> : null}
         </article>;
       })}
