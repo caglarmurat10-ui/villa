@@ -9,10 +9,7 @@ const STATE_COLOR: Record<string, string> = {
   WAITING_OWNER_ACCESS: "#fbbf24",
   WAITING_API_ACCESS: "#fbbf24",
 };
-// 4 ana durum kartı için ikon: Bağlı / Erişim bekliyor. Bu üründe hiçbir zaman "✗ Hata" durumu
-// üretilmiyor çünkü kod hiçbir Google API çağrısı yapamadığı sürece hata da oluşamaz - yalnız
-// "henüz bağlı değil" var. Gerçek bir API çağrısı hata dönerse (ör. token süresi dolmuş) bu ayrıca
-// ele alınmalı; şimdilik iki durumlu.
+
 function statusIcon(state: string) {
   return state === "GOOGLE_READY" ? "✓ Bağlı" : "⚠ Erişim bekliyor";
 }
@@ -29,6 +26,26 @@ function statusCard(label: string, state: string) {
   </div>;
 }
 
+function oauthButton(label: string, scope: "search_console" | "ga4", connected: boolean, enabled: boolean) {
+  const href = enabled ? `/api/admin/google/oauth/start?scope=${scope}` : undefined;
+  const text = connected ? `${label} bağlantısını yenile` : `${label} bağla`;
+  const style = {
+    display: "inline-block",
+    padding: "10px 13px",
+    borderRadius: 10,
+    background: enabled ? "#2563eb" : "#263547",
+    color: enabled ? "#fff" : "#7f91a8",
+    fontSize: 11,
+    fontWeight: 900,
+    textDecoration: "none",
+    cursor: enabled ? "pointer" : "not-allowed",
+  } as const;
+
+  return href
+    ? <a href={href} style={style}>{text}</a>
+    : <span style={style} aria-disabled="true">{text}</span>;
+}
+
 export default function GoogleVisibilityPanel({
   snapshot,
   stats7,
@@ -43,6 +60,8 @@ export default function GoogleVisibilityPanel({
   todayIso: string;
 }) {
   const reviewEligible = reservationsEligibleForReviewRequest(reservations, todayIso);
+  const searchConsoleConnected = snapshot.searchConsoleState === "GOOGLE_READY";
+  const ga4Connected = snapshot.ga4State === "GOOGLE_READY";
 
   return <section style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
     <div style={{border:"1px solid #334b69",borderRadius:16,background:"#081522",padding:16,color:"#eef6ff"}}>
@@ -56,7 +75,18 @@ export default function GoogleVisibilityPanel({
         {statusCard("Yorum Linkleri", snapshot.reviewLinksState)}
       </div>
 
-      <p style={{marginTop:10,fontSize:9,color:"#8fa4bd"}}>Search Console/GA4 için OAuth akışı hazır ama Google Cloud client credential&apos;ı (GOOGLE_CLIENT_ID/SECRET) henüz Cloudflare secret olarak girilmedi. GBP owner/manager erişimi koddan doğrulanamaz; aşağıdaki adminler manuel kontrol gerektirir.</p>
+      <div style={{marginTop:12,padding:"12px",border:"1px solid #203954",borderRadius:12,background:"#071321"}}>
+        <strong style={{display:"block",fontSize:11,color:"#93c5fd"}}>Google OAuth bağlantıları</strong>
+        <p style={{margin:"5px 0 10px",fontSize:10,color:"#9fb0c5",lineHeight:1.5}}>
+          {snapshot.oauthClientConfigured
+            ? "Google Cloud OAuth client yapılandırılmış. Aşağıdaki düğmeler Search Console ve GA4 için güvenli yetkilendirme akışını başlatır; refresh token yalnız GOOGLE_PRIVATE KV içinde tutulur."
+            : "Önce GOOGLE_CLIENT_ID ve GOOGLE_CLIENT_SECRET Cloudflare Worker secret olarak girilmeli. Credential değerleri repoya, D1'e veya tarayıcıya yazılmaz."}
+        </p>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {oauthButton("Search Console", "search_console", searchConsoleConnected, snapshot.oauthClientConfigured)}
+          {oauthButton("GA4", "ga4", ga4Connected, snapshot.oauthClientConfigured)}
+        </div>
+      </div>
 
       <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
         <strong style={{fontSize:11,color:"#93c5fd"}}>Gerçek KPI&apos;lar</strong>
@@ -69,11 +99,11 @@ export default function GoogleVisibilityPanel({
       </div>
 
       <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
-        <strong style={{fontSize:11,color:"#93c5fd"}}>GBP admin checklist (owner tarafından — Cloudflare secret&apos;larında GBP API credential&apos;ı yok, doğrulandı)</strong>
+        <strong style={{fontSize:11,color:"#93c5fd"}}>GBP admin checklist</strong>
         <ul style={{margin:"8px 0 0",paddingLeft:18,fontSize:10,color:"#b8c6d8",lineHeight:1.7}}>
           <li>business.google.com&apos;da Safira/Destan profillerinde şu bilgilerin GBP ile eşleştiğini kontrol edin: telefon <b>{snapshot.napPhone}</b>, website <code>safiradestan.com/villa-safira</code> / <code>villa-destan</code>, Instagram/Facebook linkleri</li>
-          <li>GBP API kullanmak isterseniz: Google Cloud&apos;da bir proje açıp Business Profile API&apos;yi etkinleştirin, OAuth client credential&apos;ı oluşturun, bize (yalnız isim/talimat olarak) hangi env değişkenlerinin bekleneceğini söyleriz — değerleri asla bizimle paylaşmayın, doğrudan Cloudflare secret olarak girilmeli</li>
-          <li>Her villa için GBP panelinden &quot;Yorum iste&quot; linkini alıp Cloudflare secret olarak girin (GOOGLE_REVIEW_REQUEST_URL_SAFIRA/DESTAN) — link tahmin edilemez</li>
+          <li>GBP API erişimi ayrıca Google Cloud proje erişim onayı gerektirir. OAuth bağlantısı tek başına Business Profile durumunu GOOGLE_READY yapmaz; başarılı gerçek API probe gerekir.</li>
+          <li>Her villa için GBP panelinden &quot;Yorum iste&quot; linkini alıp Cloudflare secret olarak girin (GOOGLE_REVIEW_REQUEST_URL_SAFIRA/DESTAN) — link tahmin edilmez.</li>
         </ul>
       </div>
 
@@ -90,7 +120,7 @@ export default function GoogleVisibilityPanel({
       </details>
 
       <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
-        <strong style={{fontSize:11,color:"#93c5fd"}}>Yayın istatistiği (D1 kaynaklı — site trafiği/lead için GA4 Data API gerekir, burada yok)</strong>
+        <strong style={{fontSize:11,color:"#93c5fd"}}>Yayın istatistiği (D1 kaynaklı — site trafiği/lead için GA4 Data API gerekir)</strong>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8,marginTop:8}}>
           {box("Son 7 gün yayınlanan", stats7.publishedCount, "#86efac")}
           {box("Son 7 gün hatalı", stats7.failedCount, stats7.failedCount > 0 ? "#fca5a5" : "#86efac")}
@@ -107,9 +137,6 @@ export default function GoogleVisibilityPanel({
           <div style={{display:"grid",gap:6,marginTop:8}}>
             {reviewEligible.map((r) => {
               const configured = snapshot.reviewRequestUrlConfigured[r.villa];
-              // reviewUrl değeri burada bilerek null - gerçek URL yalnız sunucu env'inde, admin
-              // panelinde asla gösterilmez/tahmin edilmez; configured=true olduğunda personel gerçek
-              // linki kendi tarafında (env/GBP panelinden) alıp bu şablonu tamamlar.
               const message = configured ? getReviewRequestMessage(r.villa, r.guestName, "[GBP yorum linki]") : null;
               return <div key={r.id} style={{padding:"8px 10px",border:`1px solid ${configured?"#1f5f3b":"#a16207"}`,borderRadius:9,background:configured?"#071b16":"#241a06",fontSize:10}}>
                 <b>{r.guestName} · Villa {r.villa}</b> · çıkış {r.checkOut}
