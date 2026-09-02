@@ -55,11 +55,17 @@ const ADMIN_PUBLIC_PATHS = new Set([
 const ADMIN_SESSION_COOKIE = "__Host-villa_admin_session";
 const ADMIN_SESSION_TTL_SECONDS = 12 * 60 * 60;
 // Mobil (Capacitor Android/iOS) bearer-token oturumu - web'in cookie oturumundan bağımsız, aynı
-// ADMIN_PASSWORD credential'ını doğrular. Web'den daha uzun TTL (30 gün) - telefonda her açılışta
-// yeniden parola girmek istenmiyor; biyometrik kilit zaten cihaz üzerindeki ikinci katman.
-const MOBILE_SESSION_TTL_SECONDS = 30 * 24 * 60 * 60;
+// ADMIN_PASSWORD credential'ını doğrular. Web'den çok daha uzun TTL (270 gün, 180-365 aralığında)
+// - mobil artık trusted-device pairing ile eşleşiyor, günlük kullanımda yeniden eşleştirme
+// istenmiyor; biyometrik kilit zaten cihaz üzerindeki ikinci katman, server her zaman revoke edebilir.
+const MOBILE_SESSION_TTL_SECONDS = 270 * 24 * 60 * 60;
 const MOBILE_LOGIN_API = "/api/mobile/v1/auth/login";
 const MOBILE_LOGOUT_API = "/api/mobile/v1/auth/logout";
+// Eşleştirme kodu: 10 dakika geçerli, tek kullanımlık, yalnız SHA-256 hash D1'de tutulur
+// (bkz. migrations/0017_mobile_pairing_codes.sql, src/app/api/admin/mobile-pairing/route.ts).
+// Kod üretimi admin cookie auth'u ile korunan o route'ta yapılır - bu dosya yalnız tüketim
+// (pairing) tarafını yönetir.
+const MOBILE_PAIR_API = "/api/mobile/v1/auth/pair";
 // Capacitor'ın varsayılan WebView origin'leri (Android: https://localhost, iOS: capacitor://localhost)
 // + yerel geliştirme. "*" KULLANILMIYOR - yalnız bu tam eşleşen origin'lere CORS izni verilir.
 const MOBILE_ALLOWED_ORIGINS = new Set([
@@ -645,6 +651,64 @@ async function handleMobileLogin(request, env) {
   }
 }
 
+// Şifresiz cihaz eşleştirme: kullanıcı admin panelinden ürettiği tek kullanımlık 6 haneli kodu
+// bir kez girer, karşılığında normal login ile birebir aynı opaque mobile_sessions token'ı alır.
+// ADMIN_PASSWORD'a hiç ihtiyaç yok - kodun kendisi zaten admin oturumu doğrulanmış bir kullanıcı
+// tarafından üretildiği için credential'ın yerini alıyor.
+async function handleMobilePair(request, env) {
+  if (request.method !== "POST") {
+    return jsonResponse({ error: "Method Not Allowed" }, 405, { Allow: "POST" });
+  }
+  try {
+    const ip = clientIp(request);
+    if (await isAuthRateLimited(env, ip, "MOBILE_PAIR")) {
+      return jsonResponse({ error: "Çok fazla başarısız deneme. Lütfen birkaç dakika sonra tekrar deneyin." }, 429);
+    }
+
+    const payload = await request.json().catch(() => null);
+    const code = typeof payload?.code === "string" ? payload.code.replace(/\D/g, "") : "";
+    const deviceLabel = typeof payload?.deviceLabel === "string" ? payload.deviceLabel.slice(0, 80) : null;
+    if (code.length !== 6) {
+      await recordAuthFailure(env, ip, "MOBILE_PAIR");
+      await authDelay(ADMIN_RATE_LIMIT_DELAY_MS);
+      return jsonResponse({ error: "Geçersiz kod." }, 401);
+    }
+
+    const codeHash = await sha256Hex(code);
+    const now = new Date();
+    const nowIso = now.toISOString();
+    const row = await env.DB.prepare(
+      "SELECT id FROM mobile_pairing_codes WHERE code_hash = ? AND used_at IS NULL AND expires_at > ?",
+    ).bind(codeHash, nowIso).first();
+
+    if (!row) {
+      await recordAuthFailure(env, ip, "MOBILE_PAIR");
+      await authDelay(ADMIN_RATE_LIMIT_DELAY_MS);
+      return jsonResponse({ error: "Kod geçersiz veya süresi dolmuş." }, 401);
+    }
+
+    // Tek kullanımlık: eşleştirme başarılı olsa da olmasa da bu kod satırı artık tekrar
+    // kullanılamaz hale getirilir (used_at set) - başarısız devam eden akış bile kodu tüketir.
+    await env.DB.prepare("UPDATE mobile_pairing_codes SET used_at = ? WHERE id = ?").bind(nowIso, row.id).run();
+
+    const credential = await getAdminCredential(env);
+    const rawToken = base64UrlEncode(crypto.getRandomValues(new Uint8Array(32)));
+    const tokenHash = await sha256Hex(rawToken);
+    const expiresAt = new Date(now.getTime() + MOBILE_SESSION_TTL_SECONDS * 1000).toISOString();
+    const sessionId = crypto.randomUUID();
+
+    await env.DB.prepare(
+      `INSERT INTO mobile_sessions (id, token_hash, credential_version, device_label, created_at, expires_at, last_seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(sessionId, tokenHash, credential.credentialVersion, deviceLabel, nowIso, expiresAt, nowIso).run();
+
+    return jsonResponse({ ok: true, token: rawToken, expiresIn: MOBILE_SESSION_TTL_SECONDS });
+  } catch (error) {
+    console.error(`[Mobile Auth] pair failed: ${error instanceof Error ? error.message : "unknown error"}`);
+    return jsonResponse({ error: "Eşleştirme başarısız. Lütfen tekrar deneyin." }, 500);
+  }
+}
+
 async function handleMobileLogout(request, env) {
   if (request.method !== "POST") {
     return jsonResponse({ error: "Method Not Allowed" }, 405, { Allow: "POST" });
@@ -672,6 +736,9 @@ async function mobileAuthGate(request, env) {
   }
   if (url.pathname === MOBILE_LOGIN_API) {
     return withMobileCors(await handleMobileLogin(request, env), request);
+  }
+  if (url.pathname === MOBILE_PAIR_API) {
+    return withMobileCors(await handleMobilePair(request, env), request);
   }
   if (url.pathname === "/api/mobile/v1/health") {
     // Auth öncesi bağlantı kontrolü için bilerek public - hiçbir hassas veri döndürmez.
