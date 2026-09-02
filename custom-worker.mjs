@@ -9,6 +9,8 @@ const ADMIN_HOST = "admin.safiradestan.com";
 const ADMIN_ORIGIN = `https://${ADMIN_HOST}`;
 const LEGACY_ADMIN_ENTRY_PATHS = new Set(["/", "/login"]);
 const PUBLIC_API_PATHS = new Set([
+  "/api/health",
+  "/api/system/version",
   "/api/public/booking-inquiries",
   "/api/weather/ingest",
   "/api/weather/current",
