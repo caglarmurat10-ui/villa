@@ -6,6 +6,7 @@ import { getImportUrl } from "./kv";
 import { fetchIcsSafely, sanitizeErrorMessage } from "./security";
 import { parseIcsEvents } from "./ics-parser";
 import { logOtaAudit } from "./audit";
+import { isAnomalousBlockDuration } from "./anomaly";
 
 async function database(): Promise<D1Database> {
   const { env } = await getCloudflareContext({ async: true });
@@ -99,7 +100,8 @@ export async function syncOneConnection(villa: Villa, platform: OtaPlatform): Pr
 
     const directConflict = await hasDirectReservationConflict(db, villa, event.startDate, event.endDate);
     const otherOtaConflict = await hasOtherSourceConflict(db, villa, platform, event.startDate, event.endDate);
-    const nextStatus = directConflict || otherOtaConflict ? "needs_review" : "active";
+    const anomalousDuration = isAnomalousBlockDuration(event.startDate, event.endDate);
+    const nextStatus = directConflict || otherOtaConflict || anomalousDuration ? "needs_review" : "active";
 
     if (!existing) {
       await db.prepare(`
@@ -107,7 +109,9 @@ export async function syncOneConnection(villa: Villa, platform: OtaPlatform): Pr
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `).bind(crypto.randomUUID(), villa, platform, event.uid, event.startDate, event.endDate, nextStatus, now, now, now).run();
       await logOtaAudit("EXTERNAL_BLOCK_CREATED", { villa, source: platform, startDate: event.startDate, endDate: event.endDate });
-      if (nextStatus === "needs_review") {
+      if (anomalousDuration) {
+        await logOtaAudit("ANOMALOUS_BLOCK_DETECTED", { villa, source: platform, startDate: event.startDate, endDate: event.endDate });
+      } else if (nextStatus === "needs_review") {
         await logOtaAudit("BOOKING_CONFLICT_DETECTED", { villa, source: platform, startDate: event.startDate, endDate: event.endDate });
       }
     } else {
@@ -117,7 +121,9 @@ export async function syncOneConnection(villa: Villa, platform: OtaPlatform): Pr
           UPDATE external_blocks SET start_date = ?, end_date = ?, status = ?, last_synced_at = ?, updated_at = ? WHERE id = ?
         `).bind(event.startDate, event.endDate, nextStatus, now, now, existing.id).run();
         await logOtaAudit("EXTERNAL_BLOCK_UPDATED", { villa, source: platform, startDate: event.startDate, endDate: event.endDate });
-        if (nextStatus === "needs_review" && existing.status !== "needs_review") {
+        if (anomalousDuration) {
+          await logOtaAudit("ANOMALOUS_BLOCK_DETECTED", { villa, source: platform, startDate: event.startDate, endDate: event.endDate });
+        } else if (nextStatus === "needs_review" && existing.status !== "needs_review") {
           await logOtaAudit("BOOKING_CONFLICT_DETECTED", { villa, source: platform, startDate: event.startDate, endDate: event.endDate });
         }
       } else {

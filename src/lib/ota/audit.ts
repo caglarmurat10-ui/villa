@@ -11,6 +11,7 @@ export type OtaAuditAction =
   | "EXTERNAL_BLOCK_UPDATED"
   | "EXTERNAL_BLOCK_REMOVED"
   | "BOOKING_CONFLICT_DETECTED"
+  | "ANOMALOUS_BLOCK_DETECTED"
   | "OTA_HUB_ACTIVATED";
 
 interface OtaAuditPayload {

@@ -49,7 +49,9 @@ export function parseIcsEvents(icsText: string): ParsedIcsEvent[] {
       continue;
     }
     if (line === "END:VEVENT") {
-      if (inEvent && uid && start && end) {
+      // end <= start yapisal olarak anlamsiz (sifir/negatif sureli blok) - needs_review'e bile
+      // dusurulmez, sessizce atlanir; blockDurationDays ile ayni karsilastirmayi kullanir.
+      if (inEvent && uid && start && end && end > start) {
         events.push({ uid, startDate: start, endDate: end });
       }
       inEvent = false;
