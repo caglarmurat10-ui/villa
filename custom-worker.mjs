@@ -808,10 +808,18 @@ async function publishThroughApp(post, env, ctx) {
   const endpoint = post.platform === "Instagram"
     ? "/api/meta/instagram/publish"
     : "/api/meta/facebook/publish";
+  const targetUrl = `${baseUrl}${endpoint}`;
 
-  const response = await nextWorker.fetch(new Request(`${baseUrl}${endpoint}`, {
+  // KRİTİK: nextWorker.fetch() burada gerçek bir ağ isteği değil, doğrudan in-process çağrı -
+  // bu yüzden hiçbir alt katman otomatik "Host" header'ı eklemiyor. src/middleware.ts yönlendirme
+  // kararını TAMAMEN request.headers.get("host")'a göre veriyor (URL'in kendi host'una değil);
+  // Host header'ı yoksa middleware boş string'i hiçbir bilinen host'a (ADMIN_HOSTS/PUBLIC_HOSTS/
+  // workers.dev/local) eşleştiremeyip sessizce 404 döndürüyor - gerçek /api/meta/*/publish route'una
+  // hiç ulaşılmıyor. 2026-08-30'dan beri otomatik yayının hiçbir iz bırakmadan (D1'e attempt/hata
+  // yazılmadan) sessizce başarısız olmasının kök nedeni buydu - route'un kendisi hiç çalışmıyordu.
+  const response = await nextWorker.fetch(new Request(targetUrl, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", Host: new URL(targetUrl).host },
     body: JSON.stringify({ postId: post.id }),
   }), env, ctx);
 
