@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import Script from "next/script";
 import NavigationBridge from "@/components/NavigationBridge";
 import OperationsTopNav from "@/components/OperationsTopNav";
+import OfflineBanner from "@/components/OfflineBanner";
 import CookieConsentBanner from "@/components/analytics/CookieConsentBanner";
 import { CONSENT_STORAGE_KEY, GTM_ID } from "@/lib/analytics";
 import "./globals.css";
@@ -167,6 +168,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           </>
         )}
         {!isPublicSite && <NavigationBridge />}
+        {!isPublicSite && <OfflineBanner />}
         {!isPublicSite && <OperationsTopNav />}
         {children}
         {isPublicSite && (

@@ -6,6 +6,7 @@ declare global {
     ASSETS: Fetcher;
     META_PRIVATE: KVNamespace;
     OTA_PRIVATE: KVNamespace;
+    GOOGLE_PRIVATE: KVNamespace;
     CF_VERSION_METADATA?: {
       id: string;
       tag?: string;
@@ -27,6 +28,8 @@ declare global {
     GOOGLE_PLACE_ID_DESTAN?: string;
     GOOGLE_REVIEW_REQUEST_URL_SAFIRA?: string;
     GOOGLE_REVIEW_REQUEST_URL_DESTAN?: string;
+    GOOGLE_CLIENT_ID?: string;
+    GOOGLE_CLIENT_SECRET?: string;
     PAYTR_MERCHANT_ID?: string;
     PAYTR_MERCHANT_KEY?: string;
     PAYTR_MERCHANT_SALT?: string;

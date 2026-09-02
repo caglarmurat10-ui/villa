@@ -17,6 +17,9 @@ export interface GoogleVisibilitySnapshot {
   placeIdConfigured: Record<Villa, boolean>;
   reviewRequestUrlConfigured: Record<Villa, boolean>;
   gbpState: GoogleReadinessState;
+  searchConsoleState: GoogleReadinessState;
+  ga4State: GoogleReadinessState;
+  reviewLinksState: GoogleReadinessState;
   reviewAutomationState: GoogleReadinessState;
   napPhone: string;
 }
@@ -66,6 +69,24 @@ export async function getGoogleVisibilitySnapshot(): Promise<GoogleVisibilitySna
     ? "WAITING_OWNER_ACCESS" // API key+place ID olsa bile "yorum iste" linki olmadan otomasyon tam değildir
     : "WAITING_API_ACCESS";
 
+  // Search Console/GA4: aynı Google OAuth client'ı (GOOGLE_CLIENT_ID/SECRET) gerektirir - hiçbiri
+  // Cloudflare secret'larında yok (doğrulandı), bu yüzden ikisi de API erişimi bekliyor. OAuth
+  // akışı hazır (src/app/api/admin/google/oauth/{start,callback}) ama client credential'ı
+  // olmadan hiç tetiklenemez. GOOGLE_PRIVATE KV'de gerçek bir "connection:search_console" veya
+  // "connection:ga4" kaydı varsa (kullanıcı OAuth akışını gerçekten tamamladıysa) GOOGLE_READY.
+  const oauthClientConfigured = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
+  const searchConsoleConnected = oauthClientConfigured && env.GOOGLE_PRIVATE
+    ? Boolean(await env.GOOGLE_PRIVATE.get("connection:search_console"))
+    : false;
+  const ga4Connected = oauthClientConfigured && env.GOOGLE_PRIVATE
+    ? Boolean(await env.GOOGLE_PRIVATE.get("connection:ga4"))
+    : false;
+  const searchConsoleState: GoogleReadinessState = searchConsoleConnected ? "GOOGLE_READY" : "WAITING_API_ACCESS";
+  const ga4State: GoogleReadinessState = ga4Connected ? "GOOGLE_READY" : "WAITING_API_ACCESS";
+  const reviewLinksState: GoogleReadinessState = reviewRequestUrlConfigured.Safira && reviewRequestUrlConfigured.Destan
+    ? "GOOGLE_READY"
+    : "WAITING_API_ACCESS";
+
   return {
     sitemapUrls: SITEMAP_URLS,
     jsonLdPages: JSON_LD_PAGES,
@@ -74,6 +95,9 @@ export async function getGoogleVisibilitySnapshot(): Promise<GoogleVisibilitySna
     placeIdConfigured,
     reviewRequestUrlConfigured,
     gbpState,
+    searchConsoleState,
+    ga4State,
+    reviewLinksState,
     reviewAutomationState,
     napPhone: WHATSAPP_PHONE_DISPLAY_INTL,
   };

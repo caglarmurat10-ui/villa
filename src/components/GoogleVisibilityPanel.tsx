@@ -4,19 +4,29 @@ import type { Reservation } from "@/lib/types";
 import { gbpContentLibrary } from "@/lib/google-business-content";
 import { getReviewRequestMessage, reservationsEligibleForReviewRequest } from "@/lib/social-engagement";
 
-const STATE_LABEL: Record<string, string> = {
-  GOOGLE_READY: "✓ Hazır",
-  WAITING_OWNER_ACCESS: "Sahiplik/erişim bekleniyor",
-  WAITING_API_ACCESS: "API erişimi bekleniyor",
-};
 const STATE_COLOR: Record<string, string> = {
   GOOGLE_READY: "#86efac",
   WAITING_OWNER_ACCESS: "#fbbf24",
   WAITING_API_ACCESS: "#fbbf24",
 };
+// 4 ana durum kartı için ikon: Bağlı / Erişim bekliyor. Bu üründe hiçbir zaman "✗ Hata" durumu
+// üretilmiyor çünkü kod hiçbir Google API çağrısı yapamadığı sürece hata da oluşamaz - yalnız
+// "henüz bağlı değil" var. Gerçek bir API çağrısı hata dönerse (ör. token süresi dolmuş) bu ayrıca
+// ele alınmalı; şimdilik iki durumlu.
+function statusIcon(state: string) {
+  return state === "GOOGLE_READY" ? "✓ Bağlı" : "⚠ Erişim bekliyor";
+}
 
 function box(label: string, value: React.ReactNode, color = "#dbeafe") {
   return <div style={{padding:"8px 10px",border:"1px solid #223a57",borderRadius:9,background:"#0b1728",fontSize:10}}>{label}<br /><b style={{fontSize:14,color}}>{value}</b></div>;
+}
+
+function statusCard(label: string, state: string) {
+  const color = STATE_COLOR[state];
+  return <div style={{padding:"12px 10px",border:`1px solid ${state === "GOOGLE_READY" ? "#1f5f3b" : "#3a2f0a"}`,borderRadius:11,background:state === "GOOGLE_READY" ? "#071b16" : "#1a1408",textAlign:"center"}}>
+    <div style={{fontSize:10,color:"#9fb0c5",fontWeight:800}}>{label}</div>
+    <div style={{fontSize:13,fontWeight:900,marginTop:4,color}}>{statusIcon(state)}</div>
+  </div>;
 }
 
 export default function GoogleVisibilityPanel({
@@ -39,29 +49,37 @@ export default function GoogleVisibilityPanel({
       <small style={{display:"block",fontSize:9,fontWeight:900,letterSpacing:1.4,color:"#93c5fd"}}>GOOGLE GÖRÜNÜRLÜK</small>
       <h2 style={{margin:"5px 0 10px",fontSize:18}}>Search, Maps, Business Profile</h2>
 
-      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:8}}>
-        {box("Sitemap URL sayısı", snapshot.sitemapUrls.length)}
-        {box("JSON-LD sayfa sayısı", snapshot.jsonLdPages.length)}
-        {box("Maps linki (Safira)", snapshot.mapsLinkConfigured.Safira ? "✓ Var" : "Yok", snapshot.mapsLinkConfigured.Safira ? "#86efac" : "#fbbf24")}
-        {box("Maps linki (Destan)", snapshot.mapsLinkConfigured.Destan ? "✓ Var" : "Yok", snapshot.mapsLinkConfigured.Destan ? "#86efac" : "#fbbf24")}
-        {box("Google Business Profile", STATE_LABEL[snapshot.gbpState], STATE_COLOR[snapshot.gbpState])}
-        {box("Review otomasyonu", STATE_LABEL[snapshot.reviewAutomationState], STATE_COLOR[snapshot.reviewAutomationState])}
+      <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(150px,1fr))",gap:8}}>
+        {statusCard("Search Console", snapshot.searchConsoleState)}
+        {statusCard("Google Analytics", snapshot.ga4State)}
+        {statusCard("Business Profile", snapshot.gbpState)}
+        {statusCard("Yorum Linkleri", snapshot.reviewLinksState)}
       </div>
 
-      <p style={{marginTop:10,fontSize:9,color:"#8fa4bd"}}>Search Console API bağlı değil — index sayısı tahmini olarak gösterilmiyor. GBP owner/manager erişimi koddan doğrulanamaz; aşağıdaki adminler manuel kontrol gerektirir.</p>
+      <p style={{marginTop:10,fontSize:9,color:"#8fa4bd"}}>Search Console/GA4 için OAuth akışı hazır ama Google Cloud client credential&apos;ı (GOOGLE_CLIENT_ID/SECRET) henüz Cloudflare secret olarak girilmedi. GBP owner/manager erişimi koddan doğrulanamaz; aşağıdaki adminler manuel kontrol gerektirir.</p>
 
       <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
-        <strong style={{fontSize:11,color:"#93c5fd"}}>GBP admin checklist (owner tarafından — Cloudflare secret'larında GBP API credential'ı yok, doğrulandı)</strong>
+        <strong style={{fontSize:11,color:"#93c5fd"}}>Gerçek KPI&apos;lar</strong>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(160px,1fr))",gap:8,marginTop:8}}>
+          {box("Sitemap URL sayısı", snapshot.sitemapUrls.length)}
+          {box("JSON-LD sayfa sayısı", snapshot.jsonLdPages.length)}
+          {box("Maps linki (Safira)", snapshot.mapsLinkConfigured.Safira ? "✓ Var" : "Yok", snapshot.mapsLinkConfigured.Safira ? "#86efac" : "#fbbf24")}
+          {box("Maps linki (Destan)", snapshot.mapsLinkConfigured.Destan ? "✓ Var" : "Yok", snapshot.mapsLinkConfigured.Destan ? "#86efac" : "#fbbf24")}
+        </div>
+      </div>
+
+      <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
+        <strong style={{fontSize:11,color:"#93c5fd"}}>GBP admin checklist (owner tarafından — Cloudflare secret&apos;larında GBP API credential&apos;ı yok, doğrulandı)</strong>
         <ul style={{margin:"8px 0 0",paddingLeft:18,fontSize:10,color:"#b8c6d8",lineHeight:1.7}}>
-          <li>business.google.com'da Safira/Destan profillerinde şu bilgilerin GBP ile eşleştiğini kontrol edin: telefon <b>{snapshot.napPhone}</b>, website <code>safiradestan.com/villa-safira</code> / <code>villa-destan</code>, Instagram/Facebook linkleri</li>
-          <li>GBP API kullanmak isterseniz: Google Cloud'da bir proje açıp Business Profile API'yi etkinleştirin, OAuth client credential'ı oluşturun, bize (yalnız isim/talimat olarak) hangi env değişkenlerinin bekleneceğini söyleriz — değerleri asla bizimle paylaşmayın, doğrudan Cloudflare secret olarak girilmeli</li>
-          <li>Her villa için GBP panelinden "Yorum iste" linkini alıp Cloudflare secret olarak girin (GOOGLE_REVIEW_REQUEST_URL_SAFIRA/DESTAN) — link tahmin edilemez</li>
+          <li>business.google.com&apos;da Safira/Destan profillerinde şu bilgilerin GBP ile eşleştiğini kontrol edin: telefon <b>{snapshot.napPhone}</b>, website <code>safiradestan.com/villa-safira</code> / <code>villa-destan</code>, Instagram/Facebook linkleri</li>
+          <li>GBP API kullanmak isterseniz: Google Cloud&apos;da bir proje açıp Business Profile API&apos;yi etkinleştirin, OAuth client credential&apos;ı oluşturun, bize (yalnız isim/talimat olarak) hangi env değişkenlerinin bekleneceğini söyleriz — değerleri asla bizimle paylaşmayın, doğrudan Cloudflare secret olarak girilmeli</li>
+          <li>Her villa için GBP panelinden &quot;Yorum iste&quot; linkini alıp Cloudflare secret olarak girin (GOOGLE_REVIEW_REQUEST_URL_SAFIRA/DESTAN) — link tahmin edilemez</li>
         </ul>
       </div>
 
-      <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
-        <strong style={{fontSize:11,color:"#93c5fd"}}>Hazır GBP içerik kütüphanesi ({gbpContentLibrary.length} taslak, API erişimi gelince kullanılabilir)</strong>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:8,marginTop:8}}>
+      <details style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
+        <summary style={{fontSize:11,color:"#93c5fd",fontWeight:800,cursor:"pointer"}}>GBP İçerik Kütüphanesi ({gbpContentLibrary.length} taslak, API erişimi gelince kullanılabilir)</summary>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:8,marginTop:10}}>
           {gbpContentLibrary.map((post) => (
             <div key={`${post.villa}-${post.category}`} style={{padding:"8px 10px",border:"1px solid #223a57",borderRadius:9,background:"#0b1728",fontSize:9}}>
               <b style={{color:"#dbeafe"}}>Villa {post.villa} · {post.category}</b>
@@ -69,7 +87,7 @@ export default function GoogleVisibilityPanel({
             </div>
           ))}
         </div>
-      </div>
+      </details>
 
       <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
         <strong style={{fontSize:11,color:"#93c5fd"}}>Yayın istatistiği (D1 kaynaklı — site trafiği/lead için GA4 Data API gerekir, burada yok)</strong>

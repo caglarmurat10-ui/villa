@@ -37,7 +37,8 @@
   },
   "kv_namespaces": [
     { "binding": "META_PRIVATE" },
-    { "binding": "OTA_PRIVATE", "id": "9d1b206b16604753996c73a218773802" }
+    { "binding": "OTA_PRIVATE", "id": "9d1b206b16604753996c73a218773802" },
+    { "binding": "GOOGLE_PRIVATE", "id": "cd02a392208f4835ab3b84fd679f8464" }
   ],
   "d1_databases": [
     { "binding": "DB", "database_name": "villa-yonetim", "database_id": "fa8fc6ec-9cc5-4c92-ba04-b23f2a9b8106" }
