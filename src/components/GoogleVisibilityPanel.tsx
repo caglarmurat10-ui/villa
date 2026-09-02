@@ -114,6 +114,15 @@ export default function GoogleVisibilityPanel({
             </div>)}
           </div>
         </div> : null}
+        {sc.topPages.length > 0 ? <div style={{marginTop:9,padding:"9px 10px",border:"1px solid #1f5f3b",borderRadius:9,background:"#071b16"}}>
+          <b style={{fontSize:10,color:"#bbf7d0"}}>En çok tıklanan sayfalar</b>
+          <div style={{display:"grid",gap:4,marginTop:6}}>
+            {sc.topPages.map((item) => <div key={item.page} style={{display:"flex",justifyContent:"space-between",gap:10,fontSize:9,color:"#a7d8b8"}}>
+              <span style={{overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{item.page.replace("https://safiradestan.com","") || "/"}</span>
+              <span style={{flexShrink:0}}>{formatNumber(item.clicks)} tık · {formatNumber(item.impressions)} gösterim</span>
+            </div>)}
+          </div>
+        </div> : null}
       </div> : snapshot.searchConsoleError ? <div style={{marginTop:12,padding:"10px 12px",border:"1px solid #a1620755",borderRadius:10,background:"#241a06",color:"#fbbf24",fontSize:10}}>
         {snapshot.searchConsoleError}
       </div> : null}
@@ -130,6 +139,15 @@ export default function GoogleVisibilityPanel({
           {box("Etkileşimli oturum", formatNumber(ga.engagedSessions))}
         </div>
         <small style={{display:"block",marginTop:7,fontSize:9,color:"#8fa4bd"}}>Son 28 tamamlanmış gün · {ga.propertyDisplayName} · {ga.streamDisplayName}</small>
+        {ga.eventKpis.length > 0 ? <div style={{marginTop:9,padding:"9px 10px",border:"1px solid #1f5f3b",borderRadius:9,background:"#071b16"}}>
+          <b style={{fontSize:10,color:"#bbf7d0"}}>Etkileşim event&apos;leri (GTM-KFZ62MJG)</b>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:6,marginTop:6}}>
+            {ga.eventKpis.map((item) => <div key={item.eventName} style={{display:"flex",justifyContent:"space-between",gap:8,fontSize:9,color:"#a7d8b8"}}>
+              <span>{item.eventName}</span><b style={{color: item.count > 0 ? "#bbf7d0" : "#fbbf24"}}>{formatNumber(item.count)}</b>
+            </div>)}
+          </div>
+          {ga.eventKpis.every((item) => item.count === 0) ? <small style={{display:"block",marginTop:6,fontSize:9,color:"#fbbf24"}}>Henüz veri yok — GTM konteynerinde bu event&apos;lerin GA4&apos;e iletildiğini doğrulayın.</small> : null}
+        </div> : null}
       </div> : snapshot.ga4Error ? <div style={{marginTop:12,padding:"10px 12px",border:"1px solid #a1620755",borderRadius:10,background:"#241a06",color:"#fbbf24",fontSize:10}}>
         {snapshot.ga4Error}
       </div> : null}

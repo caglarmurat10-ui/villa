@@ -5,6 +5,19 @@ const CACHE_KEY = "cache:ga4:summary:v1";
 const CACHE_TTL_SECONDS = 15 * 60;
 const TARGET_DOMAIN = "safiradestan.com";
 
+// analytics.ts'in dataLayer'a push ettigi event isimleriyle birebir eslesir (bkz. src/lib/analytics.ts
+// trackWhatsappClick/trackPhoneClick/trackMapsClick vb.) - GTM-KFZ62MJG konteynerinin bu event'leri
+// GA4'e gercekten ilettigini dogrulamanin tek yolu, GA4 Data API'den geri okumak.
+const TRACKED_EVENT_NAMES = [
+  "generate_lead",
+  "check_availability",
+  "whatsapp_click",
+  "phone_click",
+  "maps_click",
+] as const;
+
+export type Ga4EventKpi = { eventName: string; count: number };
+
 export type Ga4Summary = {
   property: string;
   propertyId: string;
@@ -19,6 +32,7 @@ export type Ga4Summary = {
   sessions: number;
   views: number;
   engagedSessions: number;
+  eventKpis: Ga4EventKpi[];
 };
 
 export type Ga4Probe = {
@@ -51,6 +65,7 @@ type DataStreamsResponse = {
 
 type RunReportResponse = {
   rows?: Array<{
+    dimensionValues?: Array<{ value?: string }>;
     metricValues?: Array<{ value?: string }>;
   }>;
 };
@@ -128,10 +143,49 @@ async function runLiveReport(accessToken: string, property: string) {
   return response.json() as Promise<RunReportResponse>;
 }
 
+async function runEventReport(accessToken: string, property: string): Promise<Ga4EventKpi[]> {
+  const response = await fetch(`https://analyticsdata.googleapis.com/v1beta/${property}:runReport`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      dateRanges: [{ startDate: "28daysAgo", endDate: "yesterday" }],
+      dimensions: [{ name: "eventName" }],
+      metrics: [{ name: "eventCount" }],
+      dimensionFilter: {
+        filter: {
+          fieldName: "eventName",
+          inListFilter: { values: [...TRACKED_EVENT_NAMES] },
+        },
+      },
+      limit: TRACKED_EVENT_NAMES.length,
+    }),
+  });
+  if (!response.ok) {
+    console.error(`[GA4 Data] event runReport HTTP ${response.status}`);
+    // Ozel event raporu basarisiz olsa bile ana KPI'lari (users/sessions/views) dusurmemek icin
+    // burada throw etmiyoruz - loadLiveSummary bos eventKpis ile devam eder.
+    return TRACKED_EVENT_NAMES.map((eventName) => ({ eventName, count: 0 }));
+  }
+  const body = await response.json() as RunReportResponse;
+  const counts = new Map<string, number>();
+  for (const row of body.rows ?? []) {
+    const name = row.dimensionValues?.[0]?.value;
+    if (!name) continue;
+    counts.set(name, Number(row.metricValues?.[0]?.value ?? 0));
+  }
+  return TRACKED_EVENT_NAMES.map((eventName) => ({ eventName, count: counts.get(eventName) ?? 0 }));
+}
+
 async function loadLiveSummary(): Promise<Ga4Summary> {
   const accessToken = await getGoogleAccessToken("ga4");
   const { property, stream } = await discoverTargetProperty(accessToken);
-  const report = await runLiveReport(accessToken, property.property);
+  const [report, eventKpis] = await Promise.all([
+    runLiveReport(accessToken, property.property),
+    runEventReport(accessToken, property.property),
+  ]);
   const metrics = report.rows?.[0]?.metricValues ?? [];
   const propertyId = property.property.replace(/^properties\//, "");
 
@@ -149,6 +203,7 @@ async function loadLiveSummary(): Promise<Ga4Summary> {
     sessions: Number(metrics[1]?.value ?? 0),
     views: Number(metrics[2]?.value ?? 0),
     engagedSessions: Number(metrics[3]?.value ?? 0),
+    eventKpis,
   };
 }
 

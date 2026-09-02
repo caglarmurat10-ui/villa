@@ -13,6 +13,14 @@ export type SearchConsoleTopQuery = {
   position: number;
 };
 
+export type SearchConsoleTopPage = {
+  page: string;
+  clicks: number;
+  impressions: number;
+  ctr: number;
+  position: number;
+};
+
 export type SearchConsoleSummary = {
   siteUrl: string;
   startDate: string;
@@ -22,6 +30,7 @@ export type SearchConsoleSummary = {
   ctr: number;
   position: number;
   topQueries: SearchConsoleTopQuery[];
+  topPages: SearchConsoleTopPage[];
 };
 
 export type SearchConsoleProbe = {
@@ -105,9 +114,10 @@ async function loadLiveSummary(): Promise<SearchConsoleSummary> {
   if (!siteUrl) throw new Error("SEARCH_CONSOLE_SITE_NOT_FOUND");
 
   const { startDate, endDate } = complete28DayRange();
-  const [aggregate, topQueriesResponse] = await Promise.all([
+  const [aggregate, topQueriesResponse, topPagesResponse] = await Promise.all([
     searchAnalytics(accessToken, siteUrl, { startDate, endDate, rowLimit: 1 }),
     searchAnalytics(accessToken, siteUrl, { startDate, endDate, dimensions: ["query"], rowLimit: 5 }),
+    searchAnalytics(accessToken, siteUrl, { startDate, endDate, dimensions: ["page"], rowLimit: 5 }),
   ]);
 
   const row = aggregate.rows?.[0];
@@ -118,6 +128,13 @@ async function loadLiveSummary(): Promise<SearchConsoleSummary> {
     ctr: Number(item.ctr ?? 0),
     position: Number(item.position ?? 0),
   })).filter((item) => item.query);
+  const topPages = (topPagesResponse.rows ?? []).map((item) => ({
+    page: item.keys?.[0] ?? "",
+    clicks: Number(item.clicks ?? 0),
+    impressions: Number(item.impressions ?? 0),
+    ctr: Number(item.ctr ?? 0),
+    position: Number(item.position ?? 0),
+  })).filter((item) => item.page);
 
   return {
     siteUrl,
@@ -128,6 +145,7 @@ async function loadLiveSummary(): Promise<SearchConsoleSummary> {
     ctr: Number(row?.ctr ?? 0),
     position: Number(row?.position ?? 0),
     topQueries,
+    topPages,
   };
 }
 
