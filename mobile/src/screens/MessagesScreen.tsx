@@ -30,10 +30,19 @@ export function MessagesScreen() {
 
   const filtered = useMemo(() => {
     if (!data) return [];
-    const list = [...data.reservations].sort((a, b) => a.checkIn.localeCompare(b.checkIn));
-    if (time === "today") return list.filter((r) => r.checkIn === today || r.checkOut === today);
-    if (time === "tomorrow") return list.filter((r) => r.checkIn === tomorrow);
-    return list;
+    // "Tümü" yalnız aktif rezervasyonları gösterir - geçmiş (checkOut < today) hariç.
+    const active = data.reservations.filter((r) => r.checkOut >= today);
+    // Operasyonel sıralama: önce tarih, aynı tarihte Çıkış Giriş'ten önce gelir.
+    const sorted = [...active].sort((a, b) => {
+      const eventA = a.checkIn >= today ? { date: a.checkIn, isCheckout: false } : { date: a.checkOut, isCheckout: true };
+      const eventB = b.checkIn >= today ? { date: b.checkIn, isCheckout: false } : { date: b.checkOut, isCheckout: true };
+      if (eventA.date !== eventB.date) return eventA.date.localeCompare(eventB.date);
+      if (eventA.isCheckout !== eventB.isCheckout) return eventA.isCheckout ? -1 : 1;
+      return a.guestName.localeCompare(b.guestName);
+    });
+    if (time === "today") return sorted.filter((r) => r.checkIn === today || r.checkOut === today);
+    if (time === "tomorrow") return sorted.filter((r) => r.checkIn === tomorrow || r.checkOut === tomorrow);
+    return sorted;
   }, [data, time, today, tomorrow]);
 
   async function send(reservation: Reservation, kind: "confirmation" | "location" | "checkout" | "review") {
