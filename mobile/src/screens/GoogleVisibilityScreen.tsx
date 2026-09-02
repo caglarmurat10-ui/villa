@@ -43,6 +43,22 @@ export function GoogleVisibilityScreen() {
               <div className="card-title">Google Places API</div>
               <p style={{ fontSize: 12, margin: "8px 0 0" }}>{data.snapshot.placesApiConfigured ? "✓ Yapılandırılmış" : "Yapılandırılmamış — credential eksik"}</p>
             </div>
+            <div className="card">
+              <div className="card-title">Yorum İsteme Linki</div>
+              <p style={{ fontSize: 12, margin: "8px 0 0" }}>Safira: {data.snapshot.reviewRequestUrlConfigured.Safira ? "✓ Var" : "Yok"} · Destan: {data.snapshot.reviewRequestUrlConfigured.Destan ? "✓ Var" : "Yok"}</p>
+            </div>
+            <div className="card">
+              <div className="card-title">NAP Telefon</div>
+              <p style={{ fontSize: 12, margin: "8px 0 0" }}>{data.snapshot.napPhone}</p>
+            </div>
+            <div className="card">
+              <div className="card-title">Search Console</div>
+              <p style={{ fontSize: 12, margin: "8px 0 0", color: "#9fb0c5" }}>API bağlı değil — index sayısı bu yüzden gösterilmiyor.</p>
+            </div>
+            <div className="card">
+              <div className="card-title">GA4</div>
+              <p style={{ fontSize: 12, margin: "8px 0 0", color: "#9fb0c5" }}>Data API bağlı değil — site trafiği/lead istatistiği burada yok.</p>
+            </div>
           </>
         )}
       </div>

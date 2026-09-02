@@ -120,8 +120,10 @@ export function CalendarScreen() {
                         const isReviewOnly = vEntries.every((e) => e.confidence === "needs_review");
                         const isIn = vEntries.some((e) => e.checkIn === cell.date);
                         const isOut = vEntries.some((e) => e.checkOut === cell.date && e.checkOut !== e.checkIn);
-                        const cls = ["cal-bar", isReviewOnly ? "needs-review" : villaClass(v), isIn ? "checkin" : "", isOut && !isIn ? "checkout" : ""].join(" ").trim();
-                        return <div key={v} className={cls} />;
+                        const isTurnover = isIn && isOut;
+                        const shapeCls = isTurnover ? "turnover" : isIn ? "checkin" : isOut ? "checkout" : "";
+                        const cls = ["cal-bar", isReviewOnly ? "needs-review" : villaClass(v), shapeCls].join(" ").trim();
+                        return <div key={v} className={cls} title={isTurnover ? "Aynı gün çıkış + giriş" : undefined} />;
                       })}
                     </div>
                     {hasCheckIn && <span className="cal-badge cal-badge-in">↓</span>}

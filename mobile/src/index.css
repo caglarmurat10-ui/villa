@@ -319,6 +319,12 @@ a { color: var(--accent-blue); }
 .cal-bar.villa-destan { background: var(--villa-destan); }
 .cal-bar.checkin { border-top-left-radius: 5px; border-bottom-left-radius: 5px; margin-left: 2px; }
 .cal-bar.checkout { border-top-right-radius: 5px; border-bottom-right-radius: 5px; margin-right: 2px; }
+.cal-bar.turnover {
+  border-radius: 5px;
+  margin-left: 2px;
+  margin-right: 2px;
+  background-image: linear-gradient(90deg, transparent 0%, transparent 44%, var(--bg-elevated) 44%, var(--bg-elevated) 56%, transparent 56%, transparent 100%);
+}
 .cal-bar.needs-review {
   background: repeating-linear-gradient(45deg, var(--warning), var(--warning) 2px, transparent 2px, transparent 4px);
   border: 1px dashed var(--warning);

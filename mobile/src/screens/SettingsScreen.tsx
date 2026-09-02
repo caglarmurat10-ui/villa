@@ -49,6 +49,10 @@ export function SettingsScreen() {
           </div>
         )}
         <div className="card">
+          <div className="card-title">Bildirimler</div>
+          <p style={{ margin: "8px 0 0", fontSize: 12, color: "#9fb0c5" }}>Altyapı hazır / yapılandırma bekleniyor — gerçek Firebase (Android) ve APNs (iOS) kimlik bilgileri tanımlanana kadar bildirim gönderilemez. Sahte bir "açık" gösterge sunulmuyor.</p>
+        </div>
+        <div className="card">
           <div className="card-title">Hakkında</div>
           <p style={{ margin: "8px 0 0", fontSize: 12, color: "#9fb0c5" }}>Safira &amp; Destan Villas — yalnız işletme ekibi için yönetim uygulaması. Misafirlere yönelik değildir.</p>
         </div>
