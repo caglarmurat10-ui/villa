@@ -33,6 +33,16 @@ function googleScopeLabel(scope: string) {
   return "Google";
 }
 
+function googleOauthErrorMessage(code: string) {
+  if (code === "not_configured") return "Google OAuth client bilgileri Worker üzerinde yapılandırılmamış.";
+  if (code === "denied") return "Google yetkilendirmesi kullanıcı tarafından iptal edildi veya reddedildi.";
+  if (code === "invalid_request") return "Google OAuth dönüş isteğinde gerekli code/state bilgisi eksik.";
+  if (code === "invalid_state") return "OAuth güvenlik state değeri geçersiz veya süresi dolmuş. Bağlantıyı yeniden başlatın.";
+  if (code === "token_exchange_failed") return "Google authorization code access/refresh tokena çevrilemedi.";
+  if (code === "no_refresh_token") return "Google refresh token döndürmedi. Bağlantıyı yeniden başlatıp erişim iznini tekrar onaylayın.";
+  return "Google OAuth akışı tamamlanamadı. Tekrar deneyin.";
+}
+
 const villas: Villa[] = ["Safira", "Destan"];
 
 type SocialPageProps = {
@@ -48,7 +58,6 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
   const metaBrand = firstParam(params.meta_brand);
   const googleOauth = firstParam(params.google_oauth);
   const googleScope = firstParam(params.scope);
-  const googleError = firstParam(params.google_error);
 
   const today = istanbulToday();
   const [posts, initialAccounts, reservations, contentLibrarySummary, googleSnapshot, stats7, stats30, cronHeartbeat] = await Promise.all([
@@ -80,10 +89,11 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
       </div>
     </section> : null}
 
-    {googleOauth === "error" || googleError ? <section style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
+    {googleOauth && googleOauth !== "connected" ? <section style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
       <div style={{padding:"13px 15px",border:"1px solid #ef444477",borderRadius:13,background:"#2a1014",color:"#fecaca",fontSize:12,lineHeight:1.5}}>
         <strong style={{display:"block",marginBottom:4,color:"#fff"}}>{googleScopeLabel(googleScope)} bağlantısı tamamlanamadı</strong>
-        <span>{googleError || "Google OAuth akışı tamamlanamadı. Tekrar deneyin."}</span>
+        <span>{googleOauthErrorMessage(googleOauth)}</span>
+        <small style={{display:"block",marginTop:5,color:"#fca5a5"}}>Kod: {googleOauth}</small>
       </div>
     </section> : null}
 
