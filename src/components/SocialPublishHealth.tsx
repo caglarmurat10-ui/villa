@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { SocialPost } from "@/lib/types";
 import type { ContentLibrarySummary } from "@/lib/social-library-summary";
+import type { SocialCronHeartbeat } from "@/lib/social-cron-health";
 
 function formatTime(value?: string | null) {
   if (!value) return "Henüz denenmedi";
@@ -15,6 +16,32 @@ function formatTime(value?: string | null) {
   }).format(new Date(value));
 }
 
+function minutesAgo(iso: string) {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.max(0, Math.round(diffMs / 60000));
+  if (minutes < 1) return "az önce";
+  if (minutes === 1) return "1 dakika önce";
+  return `${minutes} dakika önce`;
+}
+
+// Cron tam olarak */15'te çalışıyor ama Worker'ın gerçek tetiklenme anı birkaç saniye kayabilir -
+// bu yüzden "sıradaki cron" yalnız YAKLAŞIK bir tahmin, kesin garanti değil (component adı da
+// "yaklaşık" diyor).
+function nextApproximateCron() {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Istanbul",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date());
+  const hour = Number(parts.find((p) => p.type === "hour")?.value ?? "0");
+  const minute = Number(parts.find((p) => p.type === "minute")?.value ?? "0");
+  const nextQuarter = Math.ceil((minute + 1) / 15) * 15;
+  const displayHour = nextQuarter >= 60 ? (hour + 1) % 24 : hour;
+  const displayMinute = nextQuarter % 60;
+  return `${String(displayHour).padStart(2, "0")}:${String(displayMinute).padStart(2, "0")}`;
+}
+
 function compactCaption(value: string) {
   const normalized = value.replace(/\s+/g, " ").trim();
   return normalized.length > 120 ? `${normalized.slice(0, 117)}…` : normalized;
@@ -24,7 +51,7 @@ function todayIstanbul() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
 }
 
-export default function SocialPublishHealth({ posts, autoPublishEnabled, contentLibrarySummary }: { posts: SocialPost[]; autoPublishEnabled: boolean; contentLibrarySummary: ContentLibrarySummary }) {
+export default function SocialPublishHealth({ posts, autoPublishEnabled, contentLibrarySummary, cronHeartbeat }: { posts: SocialPost[]; autoPublishEnabled: boolean; contentLibrarySummary: ContentLibrarySummary; cronHeartbeat: SocialCronHeartbeat | null }) {
   const [items, setItems] = useState(posts);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
@@ -98,6 +125,15 @@ export default function SocialPublishHealth({ posts, autoPublishEnabled, content
       </div>
 
       {notice ? <div style={{marginTop:12,padding:"9px 11px",borderRadius:10,border:"1px solid #2e5075",background:"#0b1b2e",color:"#bfdbfe",fontSize:10}}>{notice}</div> : null}
+
+      <div style={{marginTop:12,padding:"9px 11px",borderRadius:10,border:"1px solid #223a57",background:"#0b1728",display:"flex",gap:14,flexWrap:"wrap",fontSize:10,color:"#b8c6d8"}}>
+        {cronHeartbeat ? <>
+          <span>Son cron: <b style={{color:"#dbeafe"}}>{formatTime(cronHeartbeat.ranAt)}</b> <span style={{color:"#7f94ae"}}>({minutesAgo(cronHeartbeat.ranAt)})</span></span>
+          <span>Bu turdaki aday: <b style={{color:"#dbeafe"}}>{cronHeartbeat.candidateCount}</b></span>
+          <span>Başarı/Atlandı/Hata: <b style={{color:"#86efac"}}>{cronHeartbeat.successCount}</b>/<b style={{color:"#fbbf24"}}>{cronHeartbeat.skippedCount}</b>/<b style={{color:cronHeartbeat.errorCount?"#fca5a5":"#8fa4bd"}}>{cronHeartbeat.errorCount}</b></span>
+        </> : <span>Cron heartbeat henüz kaydedilmedi (Worker&apos;ın en az bir kez tetiklenmesi gerekiyor).</span>}
+        <span>Sıradaki cron ~<b style={{color:"#dbeafe"}}>{nextApproximateCron()}</b></span>
+      </div>
 
       <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
         <strong style={{fontSize:11,color:"#93c5fd"}}>Bugün ({today})</strong>

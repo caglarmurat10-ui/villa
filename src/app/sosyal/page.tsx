@@ -11,6 +11,7 @@ import { listReservations } from "@/lib/db";
 import { findAvailabilityGaps } from "@/lib/social-availability";
 import { listSocialPosts } from "@/lib/social-db";
 import { getContentLibrarySummary, getPublishStats } from "@/lib/social-library-summary";
+import { getSocialCronHeartbeat } from "@/lib/social-cron-health";
 import { getGoogleVisibilitySnapshot } from "@/lib/google-visibility";
 import GoogleVisibilityPanel from "@/components/GoogleVisibilityPanel";
 import type { Villa } from "@/lib/types";
@@ -40,7 +41,7 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
   const metaBrand = firstParam(params.meta_brand);
 
   const today = istanbulToday();
-  const [posts, initialAccounts, reservations, contentLibrarySummary, googleSnapshot, stats7, stats30] = await Promise.all([
+  const [posts, initialAccounts, reservations, contentLibrarySummary, googleSnapshot, stats7, stats30, cronHeartbeat] = await Promise.all([
     listSocialPosts(30),
     listMetaAccounts(),
     listReservations(),
@@ -48,6 +49,7 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
     getGoogleVisibilitySnapshot(),
     getPublishStats(7, today),
     getPublishStats(30, today),
+    getSocialCronHeartbeat(),
   ]);
   const { env } = await getCloudflareContext({ async: true });
   const autoPublishEnabled = String(env.SOCIAL_AUTO_PUBLISH_ENABLED ?? "true").toLowerCase() === "true";
@@ -109,7 +111,7 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
 
     <MetaConnections initialAccounts={accounts} />
     <MetaPublishTestCenter />
-    <SocialPublishHealth posts={posts} autoPublishEnabled={autoPublishEnabled} contentLibrarySummary={contentLibrarySummary} />
+    <SocialPublishHealth posts={posts} autoPublishEnabled={autoPublishEnabled} contentLibrarySummary={contentLibrarySummary} cronHeartbeat={cronHeartbeat} />
     <div style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
       <div style={{marginBottom:10,padding:"10px 13px",border:"1px solid #22c55e55",borderRadius:12,background:"#071b16",color:"#bbf7d0",fontSize:11,fontWeight:700}}>
         ✓ Drive medya otomasyonu aktif · İlk ekranda en yakın 30 sosyal plan gösteriliyor. Ağır içerik kütüphanesi ve takvim tarayıcı tarafında yüklenir; Worker CPU bütçesi korunur.

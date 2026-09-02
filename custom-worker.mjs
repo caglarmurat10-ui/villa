@@ -825,20 +825,36 @@ async function publishThroughApp(post, env, ctx) {
 
   if (response.ok) {
     console.log(`[Social Cron] Villa ${post.villa} ${post.platform} ${post.content_type} yayını tamamlandı.`);
-    return;
+    return "success";
   }
 
   const payload = await response.json().catch(() => ({}));
   if (response.status === 409) {
     console.log(`[Social Cron] ${post.platform} ${post.id} atlandı: ${safeCronError(payload.error ?? "artık uygun değil")}`);
-    return;
+    return "skipped";
   }
   console.error(`[Social Cron] ${post.platform} ${post.id} HTTP ${response.status}: ${safeCronError(payload.error)}`);
+  return "error";
+}
+
+// Cron'un kendisinin gerçekten çalışıp çalışmadığını admin panelinde dürüstçe gösterebilmek için
+// (D1'e yalnız bir yayın DENEMESİ olduğunda satır düşer - aday yoksa hiçbir iz kalmaz) her tikte
+// META_PRIVATE KV'ye küçük bir "heartbeat" yazılır. Bu satır SocialPublishHealth panelindeki
+// "son cron", "bu turdaki aday sayısı", "başarı/hata" alanlarının tek gerçek kaynağıdır.
+async function writeSocialCronHeartbeat(env, ranAt, counts) {
+  try {
+    await env.META_PRIVATE.put("social_cron_heartbeat", JSON.stringify({ ranAt, ...counts }));
+  } catch (error) {
+    console.error(`[Social Cron] Heartbeat yazılamadı: ${safeCronError(error)}`);
+  }
 }
 
 async function runSocialCron(controller, env, ctx) {
+  const ranAt = new Date(controller.scheduledTime).toISOString();
+
   if (String(env.SOCIAL_AUTO_PUBLISH_ENABLED ?? "true").toLowerCase() !== "true") {
     console.log("[Social Cron] Otomatik yayın kapalı.");
+    await writeSocialCronHeartbeat(env, ranAt, { enabled: false, candidateCount: 0, successCount: 0, skippedCount: 0, errorCount: 0 });
     return;
   }
 
@@ -847,21 +863,31 @@ async function runSocialCron(controller, env, ctx) {
     posts = await duePosts(env, new Date(controller.scheduledTime));
   } catch (error) {
     console.error(`[Social Cron] D1 sorgusu başarısız: ${safeCronError(error)}`);
+    await writeSocialCronHeartbeat(env, ranAt, { enabled: true, candidateCount: 0, successCount: 0, skippedCount: 0, errorCount: 0, queryFailed: true });
     return;
   }
 
   if (!posts.length) {
     console.log("[Social Cron] Yayına hazır zamanı gelmiş içerik yok.");
+    await writeSocialCronHeartbeat(env, ranAt, { enabled: true, candidateCount: 0, successCount: 0, skippedCount: 0, errorCount: 0 });
     return;
   }
 
+  let successCount = 0;
+  let skippedCount = 0;
+  let errorCount = 0;
   for (const post of posts) {
     try {
-      await publishThroughApp(post, env, ctx);
+      const outcome = await publishThroughApp(post, env, ctx);
+      if (outcome === "success") successCount += 1;
+      else if (outcome === "skipped") skippedCount += 1;
+      else errorCount += 1;
     } catch (error) {
+      errorCount += 1;
       console.error(`[Social Cron] ${post.platform} ${post.id} çağrısı başarısız: ${safeCronError(error)}`);
     }
   }
+  await writeSocialCronHeartbeat(env, ranAt, { enabled: true, candidateCount: posts.length, successCount, skippedCount, errorCount });
 }
 
 // ============ OTA (Airbnb/Booking) takvim senkronu ============
