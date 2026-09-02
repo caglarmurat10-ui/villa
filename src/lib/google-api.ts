@@ -14,9 +14,14 @@ type TokenResponse = {
 };
 
 export async function hasGoogleConnection(scopeKey: GoogleConnectionKey): Promise<boolean> {
-  const { env } = await getCloudflareContext({ async: true });
-  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_PRIVATE) return false;
-  return Boolean(await env.GOOGLE_PRIVATE.get(`connection:${scopeKey}`));
+  try {
+    const { env } = await getCloudflareContext({ async: true });
+    if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET || !env.GOOGLE_PRIVATE) return false;
+    return Boolean(await env.GOOGLE_PRIVATE.get(`connection:${scopeKey}`));
+  } catch (error) {
+    console.error(`[Google OAuth] connection check ${scopeKey} failed: ${error instanceof Error ? error.message : "unknown"}`);
+    return false;
+  }
 }
 
 export async function getGoogleAccessToken(scopeKey: GoogleConnectionKey): Promise<string> {
