@@ -60,7 +60,10 @@ export function middleware(request: NextRequest) {
   }
 
   if (host.endsWith(".workers.dev")) {
-    return WORKER_ALLOWED_PATHS.has(pathname) ? NextResponse.next() : notFound();
+    if (WORKER_ALLOWED_PATHS.has(pathname) || pathname.startsWith("/api/media/drive/")) {
+      return NextResponse.next();
+    }
+    return notFound();
   }
 
   if (!PUBLIC_HOSTS.has(host)) {

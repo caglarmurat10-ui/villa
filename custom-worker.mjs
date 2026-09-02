@@ -527,7 +527,13 @@ async function adminAuthGate(request, env) {
   if (url.pathname === ADMIN_LOGIN_API) return handleAdminLogin(request, env);
   if (url.pathname === ADMIN_LOGOUT_API) return handleAdminLogout(request);
   if (url.pathname === ADMIN_CHANGE_PASSWORD_API) return handleChangePassword(request, env);
-  if (adminPublicAssetPath(url.pathname) || ADMIN_PUBLIC_PATHS.has(url.pathname)) return null;
+  // /api/media/drive/[fileId]: Meta'nın Graph API'si Instagram/Facebook medya container'ı
+  // oluştururken bu URL'yi KENDİ SUNUCULARINDAN, oturum çerezi olmadan indiriyor - admin oturumu
+  // gerektirmemeli. Route'un kendisi kapalı bir allowlist'ten (resolveDriveMediaById, sabit 21
+  // gerçek villa dosyası) besleniyor, keyfi URL'e fetch yapmıyor - herkese açık olması güvenli.
+  // Bu satır olmadan Meta 401/JSON hatası alıyor ve "medya container oluşturulamadı (9004)" ile
+  // reddediyor - dosyanın kendisinde hiçbir sorun yok, erişilemez olması sorunun tamamı.
+  if (adminPublicAssetPath(url.pathname) || url.pathname.startsWith("/api/media/drive/") || ADMIN_PUBLIC_PATHS.has(url.pathname)) return null;
 
   const authenticated = await verifyAdminSession(request, env);
   if (url.pathname === ADMIN_LOGIN_PATH) {
