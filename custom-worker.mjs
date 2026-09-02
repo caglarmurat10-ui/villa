@@ -174,6 +174,10 @@ function routeRequest(request) {
   if (host === ADMIN_HOST) return { request };
 
   if (host.endsWith(".workers.dev")) {
+    // routeRequest() adminAuthGate'ten SONRA ama nextWorker.fetch()'ten (dolayısıyla
+    // middleware.ts'ten) ÖNCE çalışıyor - middleware.ts'teki WORKER_ALLOWED_PATHS muafiyeti tek
+    // başına yetmiyor, burada da aynı path'in geçmesine izin vermek gerekiyor.
+    if (url.pathname.startsWith("/api/media/drive/")) return { request };
     if (LEGACY_ADMIN_ENTRY_PATHS.has(url.pathname)) {
       const destination = new URL(`${url.pathname}${url.search}`, ADMIN_ORIGIN);
       return { response: Response.redirect(destination.toString(), 308) };
