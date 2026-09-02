@@ -1,29 +1,34 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Device } from "@capacitor/device";
-import { loginRequest, logoutRequest, setAuthToken } from "../api/client";
+import { pairDeviceRequest, logoutRequest, setAuthToken, PREVIEW_MODE } from "../api/client";
 import { clearToken, loadToken, saveToken } from "../lib/secureStorage";
-import { isBiometricEnabled, requestBiometricUnlock } from "../lib/biometric";
+import { isBiometricEnabled, requestBiometricUnlock, setBiometricEnabled } from "../lib/biometric";
 
 type AuthStatus = "loading" | "signedOut" | "locked" | "signedIn";
 
 interface AuthContextValue {
   status: AuthStatus;
-  login: (password: string) => Promise<void>;
+  pairDevice: (code: string) => Promise<void>;
   logout: () => Promise<void>;
   unlockWithBiometric: () => Promise<boolean>;
-  fallbackToPasswordUnlock: () => void;
-  loginError: string | null;
-  loggingIn: boolean;
+  disableBiometricAndContinue: () => Promise<void>;
+  pairError: string | null;
+  pairing: boolean;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>("loading");
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [loggingIn, setLoggingIn] = useState(false);
+  const [pairError, setPairError] = useState<string | null>(null);
+  const [pairing, setPairing] = useState(false);
 
   useEffect(() => {
+    if (PREVIEW_MODE) {
+      // Tasarım önizlemesi: hiçbir gerçek eşleştirme/login isteği yapılmaz, doğrudan signedIn.
+      setStatus("signedIn");
+      return;
+    }
     (async () => {
       const token = await loadToken();
       if (!token) {
@@ -36,9 +41,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })();
   }, []);
 
-  const login = useCallback(async (password: string) => {
-    setLoggingIn(true);
-    setLoginError(null);
+  const pairDevice = useCallback(async (code: string) => {
+    setPairing(true);
+    setPairError(null);
     try {
       let deviceLabel = "Villa Yönetim Mobil";
       try {
@@ -47,15 +52,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         // Device bilgisi opsiyonel - alınamazsa varsayılan etiket kullanılır.
       }
-      const result = await loginRequest(password, deviceLabel);
+      const result = await pairDeviceRequest(code, deviceLabel);
       await saveToken(result.token);
       setAuthToken(result.token);
       setStatus("signedIn");
     } catch (error) {
-      setLoginError(error instanceof Error ? error.message : "Giriş başarısız.");
+      setPairError(error instanceof Error ? error.message : "Eşleştirme başarısız.");
       throw error;
     } finally {
-      setLoggingIn(false);
+      setPairing(false);
     }
   }, []);
 
@@ -72,18 +77,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return ok;
   }, []);
 
-  const fallbackToPasswordUnlock = useCallback(() => {
-    // Biyometri başarısız/iptal - güvenli fallback: mevcut token'ı at, yeniden parola gerektir.
-    (async () => {
-      await clearToken();
-      setAuthToken(null);
-      setStatus("signedOut");
-    })();
+  // Biyometri başarısız/iptal olsa bile geçerli session token'ı ASLA silinmez - yalnız
+  // kullanıcı açıkça "Bu cihazdan çıkış yap" dediğinde (logout()) tam çıkış olur. Burada
+  // biyometriği kapatıp mevcut token ile devam edilir; bu, cihaz zaten kilidini açmış (ekran
+  // kilidi vb.) güvenilir bir kullanıcı için makul bir ikincil kilit devre dışı bırakmadır.
+  const disableBiometricAndContinue = useCallback(async () => {
+    await setBiometricEnabled(false);
+    setStatus("signedIn");
   }, []);
 
   const value = useMemo<AuthContextValue>(() => ({
-    status, login, logout, unlockWithBiometric, fallbackToPasswordUnlock, loginError, loggingIn,
-  }), [status, login, logout, unlockWithBiometric, fallbackToPasswordUnlock, loginError, loggingIn]);
+    status, pairDevice, logout, unlockWithBiometric, disableBiometricAndContinue, pairError, pairing,
+  }), [status, pairDevice, logout, unlockWithBiometric, disableBiometricAndContinue, pairError, pairing]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

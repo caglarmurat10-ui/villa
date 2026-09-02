@@ -2,7 +2,7 @@ import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import { useOnline } from "./lib/useOnline";
 import { BottomNav } from "./components/BottomNav";
-import { LoginScreen } from "./screens/LoginScreen";
+import { PairDeviceScreen } from "./screens/PairDeviceScreen";
 import { LockScreen } from "./screens/LockScreen";
 import { DashboardScreen } from "./screens/DashboardScreen";
 import { ReservationsScreen } from "./screens/ReservationsScreen";
@@ -45,7 +45,7 @@ function AuthedShell() {
 function Root() {
   const { status } = useAuth();
   if (status === "loading") return <div className="app-shell" />;
-  if (status === "signedOut") return <LoginScreen />;
+  if (status === "signedOut") return <PairDeviceScreen />;
   if (status === "locked") return <LockScreen />;
   return <AuthedShell />;
 }

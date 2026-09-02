@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
 
 export function LockScreen() {
-  const { unlockWithBiometric, fallbackToPasswordUnlock } = useAuth();
+  const { unlockWithBiometric, disableBiometricAndContinue } = useAuth();
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -18,11 +18,11 @@ export function LockScreen() {
       <h1 style={{ fontSize: 18, margin: 0 }}>Villa Yönetim kilitli</h1>
       <p style={{ color: "#9fb0c5", fontSize: 13 }}>Devam etmek için kimliğinizi doğrulayın.</p>
       <button className="btn btn-primary" onClick={() => unlockWithBiometric().then((ok) => setFailed(!ok))}>
-        Tekrar dene
+        Tekrar Dene
       </button>
       {failed && (
-        <button className="btn" onClick={fallbackToPasswordUnlock}>
-          Parola ile giriş yap
+        <button className="btn" onClick={disableBiometricAndContinue}>
+          Biyometriyi Kapat
         </button>
       )}
     </div>

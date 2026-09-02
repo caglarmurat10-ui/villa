@@ -37,6 +37,10 @@ export function SettingsScreen() {
           <div className="card-title">Backend Bağlantısı</div>
           <p style={{ margin: "8px 0 0" }}>{backendOk === null ? "Kontrol ediliyor…" : backendOk ? "✓ Bağlı" : "✗ Bağlanılamadı"}</p>
         </div>
+        <div className="card">
+          <div className="card-title">Cihaz</div>
+          <p style={{ margin: "8px 0 0" }}>✓ Yetkili</p>
+        </div>
         {biometricAvailable && (
           <div className="card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div>
@@ -57,7 +61,7 @@ export function SettingsScreen() {
           <p style={{ margin: "8px 0 0", fontSize: 12, color: "#9fb0c5" }}>Safira &amp; Destan Villas — yalnız işletme ekibi için yönetim uygulaması. Misafirlere yönelik değildir.</p>
         </div>
         <button className="btn btn-block" style={{ marginTop: 16, borderColor: "#dc2626", color: "#fca5a5" }} onClick={logout}>
-          Çıkış Yap
+          Bu Cihazdan Çıkış Yap
         </button>
       </div>
     </div>
