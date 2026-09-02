@@ -1,4 +1,5 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import type { KVNamespace } from "@cloudflare/workers-types";
 import type { Villa } from "./types";
 
 // Google Places API (New) entegrasyonu — güvenli, "sahte veri yok" ilkesiyle.

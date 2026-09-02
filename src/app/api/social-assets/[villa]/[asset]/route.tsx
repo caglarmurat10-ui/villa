@@ -2,7 +2,7 @@ import { ImageResponse } from "next/og";
 import { resolveDriveMediaById } from "@/lib/social-drive-media";
 import type { Villa } from "@/lib/types";
 
-export const runtime = "edge";
+export const runtime = "nodejs";
 
 const BRAND = {
   Safira: {
