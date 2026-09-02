@@ -26,6 +26,13 @@ function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] ?? "" : value ?? "";
 }
 
+function googleScopeLabel(scope: string) {
+  if (scope === "search_console") return "Search Console";
+  if (scope === "ga4") return "Google Analytics (GA4)";
+  if (scope === "gbp") return "Google Business Profile";
+  return "Google";
+}
+
 const villas: Villa[] = ["Safira", "Destan"];
 
 type SocialPageProps = {
@@ -39,6 +46,9 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
   const metaStage = firstParam(params.meta_stage);
   const metaConnected = firstParam(params.meta_connected);
   const metaBrand = firstParam(params.meta_brand);
+  const googleOauth = firstParam(params.google_oauth);
+  const googleScope = firstParam(params.scope);
+  const googleError = firstParam(params.google_error);
 
   const today = istanbulToday();
   const [posts, initialAccounts, reservations, contentLibrarySummary, googleSnapshot, stats7, stats30, cronHeartbeat] = await Promise.all([
@@ -63,6 +73,20 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
   );
 
   return <>
+    {googleOauth === "connected" ? <section style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
+      <div style={{padding:"13px 15px",border:"1px solid #22c55e66",borderRadius:13,background:"#071b16",color:"#bbf7d0",fontSize:12,lineHeight:1.5}}>
+        <strong style={{display:"block",marginBottom:4,color:"#fff"}}>✓ {googleScopeLabel(googleScope)} bağlantısı tamamlandı</strong>
+        <span>Google OAuth refresh tokenı sunucu tarafında GOOGLE_PRIVATE KV&apos;ye kaydedildi. Token değeri admin ekranına veya tarayıcıya gönderilmez.</span>
+      </div>
+    </section> : null}
+
+    {googleOauth === "error" || googleError ? <section style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
+      <div style={{padding:"13px 15px",border:"1px solid #ef444477",borderRadius:13,background:"#2a1014",color:"#fecaca",fontSize:12,lineHeight:1.5}}>
+        <strong style={{display:"block",marginBottom:4,color:"#fff"}}>{googleScopeLabel(googleScope)} bağlantısı tamamlanamadı</strong>
+        <span>{googleError || "Google OAuth akışı tamamlanamadı. Tekrar deneyin."}</span>
+      </div>
+    </section> : null}
+
     {metaError ? <section style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
       <div style={{padding:"13px 15px",border:"1px solid #ef444477",borderRadius:13,background:"#2a1014",color:"#fecaca",fontSize:12,lineHeight:1.5}}>
         <strong style={{display:"block",marginBottom:4,color:"#fff"}}>{metaPlatform || "Meta"} bağlantısı tamamlanamadı</strong>
