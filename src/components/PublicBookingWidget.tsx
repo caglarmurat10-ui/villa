@@ -160,6 +160,7 @@ export default function PublicBookingWidget({
 
   const alternativeHref = result?.alternative === "Safira" ? "/villa-safira" : "/villa-destan";
   const resultClass = result?.kind === "available" ? styles.available : result?.kind === "busy" ? styles.busy : result?.kind === "error" ? styles.error : result?.kind === "price_gap" ? styles.priceGap : "";
+  const resultIcon = result?.kind === "available" ? "✓" : result?.kind === "price_gap" ? "!" : result ? "✕" : "";
   const canSubmitInquiry = result?.kind === "available" || result?.kind === "price_gap";
 
   function resetRequestFeedback() {
@@ -248,7 +249,7 @@ export default function PublicBookingWidget({
               Villa {villa} · {formatDateLabel(checkIn)} – {formatDateLabel(checkOut)} · {nightsBetween(checkIn, checkOut)} gece
             </div>
             <div className={styles.resultTop}>
-              <strong>{result.title}</strong>
+              <strong><span className={styles.resultIcon} aria-hidden="true">{resultIcon}</span>{result.title}</strong>
               {typeof result.total === "number" && <b>{money.format(result.total)}</b>}
             </div>
             <p>{result.detail}</p>

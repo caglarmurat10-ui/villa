@@ -4,6 +4,7 @@ import PublicBookingWidget from "@/components/PublicBookingWidget";
 import VillaComparison from "@/components/VillaComparison";
 import TrustStrip from "@/components/TrustStrip";
 import ReservationConfidenceSection from "@/components/ReservationConfidenceSection";
+import Reveal from "@/components/Reveal";
 import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
 import { getInstallmentCampaignReadiness } from "@/lib/payments/installment-campaign";
 import { VILLAS, FAQ_ITEMS, REGION_INFO, type VillaSlug } from "@/lib/villa-content";
@@ -183,7 +184,7 @@ export default async function PublicHomePage() {
         </div>
       </section>
 
-      <ReservationConfidenceSection />
+      <Reveal><ReservationConfidenceSection /></Reveal>
 
       <section className={styles.section} id="villalar">
         <div className={styles.editorialHead}><span className={styles.kicker}>PATARA VİLLA KİRALAMA</span><h2>Hangisi sizin<br />tatiliniz?</h2><p>Villa Safira ve Villa Destan’ı gerçek fotoğraflarıyla keşfedin; Patara’da özel havuzlu villa tatili için size en uygun seçeneği bulun.</p></div>
@@ -232,7 +233,7 @@ export default async function PublicHomePage() {
         <div className={styles.experiencePhoto}><img src={MEDIA.destanExperience} alt={MEDIA.destanExperienceAlt} loading="lazy" /></div>
       </section>
 
-      <VillaComparison />
+      <Reveal><VillaComparison /></Reveal>
 
       <section className={styles.homeLocation} id="konum">
         <span className={styles.kicker}>KONUM</span>
