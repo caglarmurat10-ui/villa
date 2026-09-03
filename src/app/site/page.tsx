@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import PublicBookingWidget from "@/components/PublicBookingWidget";
+import VillaComparison from "@/components/VillaComparison";
 import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
 import { VILLAS, FAQ_ITEMS, REGION_INFO, type VillaSlug } from "@/lib/villa-content";
 import { GUIDE_PLACES, GUIDE_CATEGORIES } from "@/lib/region-guide";
@@ -218,6 +219,8 @@ export default async function PublicHomePage() {
         </div>
         <div className={styles.experiencePhoto}><img src={MEDIA.destanExperience} alt={MEDIA.destanExperienceAlt} loading="lazy" /></div>
       </section>
+
+      <VillaComparison />
 
       <section className={styles.homeLocation} id="konum">
         <span className={styles.kicker}>KONUM</span>

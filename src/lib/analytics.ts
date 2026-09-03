@@ -164,6 +164,12 @@ export function trackGuidePlaceClick(params: { place_id: string; place_name: str
   pushEvent("guide_place_click", { ...params, action: "open_maps" });
 }
 
+// Ana sayfadaki "Hangi villa size daha uygun?" karşılaştırma bölümünden bir villanın "Tarih & fiyat
+// kontrol et" CTA'sına tıklanınca - hangi villanın karşılaştırmadan seçildiğini ölçer.
+export function trackCompareVillasSelect(ref: VillaRef, ctaLocation: string) {
+  pushEvent("select_villa", { ...ref, cta_location: ctaLocation });
+}
+
 export type OtaBookingChannel = "airbnb" | "booking";
 
 // generate_lead PRIMARY key event olarak kalır - bu event'ler key event DEĞİL, yalnız analiz için.
