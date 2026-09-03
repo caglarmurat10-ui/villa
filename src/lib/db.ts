@@ -2,6 +2,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
 import type { PriceRange, Reservation, SocialPost, SocialPostStatus, Villa, VillaLocations } from "./types";
 import type { ReservationInput, SocialPostInput } from "./schema";
+import { computePriceQuote, type PriceQuoteResult } from "./price-engine";
 
 type ReservationRow = {
   id: string;
@@ -211,19 +212,20 @@ export async function deletePriceRange(id: string): Promise<boolean> {
   return (result.meta.changes ?? 0) > 0;
 }
 
-export async function calculatePrice(villa: Villa, checkIn: string, checkOut: string) {
+// price-engine.ts'teki SAF computePriceQuote'a delege eder - sunucu tarafı canonical hesaplama
+// burada, istemci tarafı (PublicBookingWidget) AYNI fonksiyonu kendi price_ranges kopyasıyla
+// çağırır. Davranış birebir korunur (missing price -> throw, mevcut çağıranlar değişmeden çalışır),
+// yalnız segments (dönem kırılımı) eklendi.
+export async function getPriceQuote(villa: Villa, checkIn: string, checkOut: string): Promise<PriceQuoteResult> {
   const ranges = (await listPriceRanges()).filter((range) => range.villa === villa);
-  let total = 0;
-  let nights = 0;
-  for (let cursor = new Date(`${checkIn}T00:00:00Z`); cursor < new Date(`${checkOut}T00:00:00Z`); cursor.setUTCDate(cursor.getUTCDate() + 1)) {
-    const date = cursor.toISOString().slice(0, 10);
-    const range = ranges.find((item) => item.startDate <= date && item.endDate >= date);
-    if (!range) throw new Error(`${date} tarihi için ${villa} fiyatı tanımlı değil.`);
-    total += range.nightlyRate;
-    nights += 1;
-  }
-  if (!nights) throw new Error("Geçerli bir konaklama tarihi seçin.");
-  return { total, nights, averageRate: total / nights };
+  return computePriceQuote(ranges, checkIn, checkOut);
+}
+
+export async function calculatePrice(villa: Villa, checkIn: string, checkOut: string) {
+  const result = await getPriceQuote(villa, checkIn, checkOut);
+  if (result.status === "invalid_range") throw new Error("Geçerli bir konaklama tarihi seçin.");
+  if (result.status === "gap") throw new Error(`${result.missingDates[0]} tarihi için ${villa} fiyatı tanımlı değil.`);
+  return { total: result.total, nights: result.nights, averageRate: result.averageRate, segments: result.segments };
 }
 
 export async function softDeleteReservation(id: string): Promise<boolean> {
