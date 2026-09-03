@@ -3,6 +3,7 @@ import { getVillaLocations } from "./db";
 import { WHATSAPP_PHONE_DISPLAY_INTL } from "./contact";
 import { getSearchConsoleProbe, type SearchConsoleSummary } from "./google-search-console";
 import { getGa4Probe, type Ga4Summary } from "./google-analytics";
+import { hasGoogleConnection } from "./google-api";
 import type { Villa } from "./types";
 
 // Admin "Google Görünürlük" paneli için tek kaynak - hiçbir alan tahmin/uydurma değil, yalnız
@@ -54,10 +55,11 @@ const JSON_LD_PAGES = [
 export async function getGoogleVisibilitySnapshot(): Promise<GoogleVisibilitySnapshot> {
   const { env } = await getCloudflareContext({ async: true });
   const oauthClientConfigured = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
-  const [locations, searchConsoleProbe, ga4Probe] = await Promise.all([
+  const [locations, searchConsoleProbe, ga4Probe, gbpConnected] = await Promise.all([
     getVillaLocations(),
     getSearchConsoleProbe(),
     getGa4Probe(),
+    hasGoogleConnection("gbp"),
   ]);
 
   const placesApiConfigured = Boolean(env.GOOGLE_PLACES_API_KEY);
@@ -70,9 +72,12 @@ export async function getGoogleVisibilitySnapshot(): Promise<GoogleVisibilitySna
     Destan: Boolean(env.GOOGLE_REVIEW_REQUEST_URL_DESTAN),
   };
 
-  // GBP hazır sayılmaz: OAuth tokenının varlığı tek başına yeterli değildir. Google Cloud proje
-  // erişim onayı ve gerçek Business Profile API probe'u daha sonra ayrıca doğrulanacaktır.
-  const gbpState: GoogleReadinessState = "WAITING_API_ACCESS";
+  // GBP hazır sayılmaz: OAuth tokenının varlığı tek başına yeterli değildir - GOOGLE_READY asla
+  // otomatik olmaz, yalnız /entegrasyonlar sayfasındaki gerçek keşif (discoverGbpAccountsAndLocations)
+  // sonucuna göre admin belirler. Burada yalnız OAuth bağlantısının var olup olmadığına göre
+  // WAITING_API_ACCESS (hiç bağlanmamış) / WAITING_OWNER_ACCESS (bağlı, hesap/location keşfi ve
+  // villa eşlemesi henüz doğrulanmadı) ayrımı yapılır.
+  const gbpState: GoogleReadinessState = gbpConnected ? "WAITING_OWNER_ACCESS" : "WAITING_API_ACCESS";
   const reviewAutomationState: GoogleReadinessState = placesApiConfigured && placeIdConfigured.Safira && placeIdConfigured.Destan
     ? "WAITING_OWNER_ACCESS"
     : "WAITING_API_ACCESS";

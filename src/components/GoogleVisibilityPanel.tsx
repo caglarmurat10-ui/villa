@@ -3,6 +3,7 @@ import type { PublishStats } from "@/lib/social-library-summary";
 import type { Reservation } from "@/lib/types";
 import { gbpContentLibrary } from "@/lib/google-business-content";
 import { getReviewRequestMessage, reservationsEligibleForReviewRequest } from "@/lib/social-engagement";
+import GbpLocationPicker from "@/components/GbpLocationPicker";
 
 const STATE_COLOR: Record<string, string> = {
   GOOGLE_READY: "#86efac",
@@ -26,7 +27,7 @@ function statusCard(label: string, state: string) {
   </div>;
 }
 
-function oauthButton(label: string, scope: "search_console" | "ga4", connected: boolean, enabled: boolean) {
+function oauthButton(label: string, scope: "search_console" | "ga4" | "gbp", connected: boolean, enabled: boolean) {
   const href = enabled ? `/api/admin/google/oauth/start?scope=${scope}` : undefined;
   const text = connected ? `${label} bağlantısını yenile` : `${label} bağla`;
   const style = {
@@ -91,6 +92,7 @@ export default function GoogleVisibilityPanel({
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           {oauthButton("Search Console", "search_console", searchConsoleConnected, snapshot.oauthClientConfigured)}
           {oauthButton("GA4", "ga4", ga4Connected, snapshot.oauthClientConfigured)}
+          {oauthButton("Business Profile", "gbp", snapshot.gbpState === "GOOGLE_READY", snapshot.oauthClientConfigured)}
         </div>
       </div>
 
@@ -169,6 +171,7 @@ export default function GoogleVisibilityPanel({
           <li>GBP API erişimi ayrıca Google Cloud proje erişim onayı gerektirir. OAuth bağlantısı tek başına Business Profile durumunu GOOGLE_READY yapmaz; başarılı gerçek API probe gerekir.</li>
           <li>Her villa için GBP panelinden &quot;Yorum iste&quot; linkini alıp Cloudflare secret olarak girin (GOOGLE_REVIEW_REQUEST_URL_SAFIRA/DESTAN) — link tahmin edilmez.</li>
         </ul>
+        <GbpLocationPicker />
       </div>
 
       <details style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
