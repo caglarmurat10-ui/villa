@@ -1,10 +1,20 @@
 import type { IntegrationCenterSnapshot } from "@/lib/integration-center";
 import { GOOGLE_ADS_CAMPAIGN_DRAFTS, GOOGLE_ADS_CONVERSION_MAPPING, GOOGLE_ADS_NEGATIVE_KEYWORDS } from "@/lib/google-ads-campaign-drafts";
 import { META_ADS_CAMPAIGN_DRAFTS, META_ADS_READINESS_NOTES } from "@/lib/meta-ads-campaign-drafts";
+import PaytrConnectivityTest from "@/components/PaytrConnectivityTest";
 
-type Chip = { label: string; state: "PASS" | "READY" | "WARNING" | "WAITING_EXTERNAL_ACCESS" | "WAITING_USER_ACTION" | "FAIL"; detail?: string };
+type ServiceState = "PASS" | "READY" | "WARNING" | "WAITING_EXTERNAL_ACCESS" | "WAITING_USER_ACTION" | "FAIL";
 
-const STATE_STYLE: Record<Chip["state"], { color: string; bg: string; border: string; text: string }> = {
+interface ServiceRow {
+  name: string;
+  status: ServiceState;
+  lastSuccess: string | null;
+  lastCheck: string | null;
+  lastError: string | null;
+  actionRequired: string | null;
+}
+
+const STATE_STYLE: Record<ServiceState, { color: string; bg: string; border: string; text: string }> = {
   PASS: { color: "#86efac", bg: "#071b16", border: "#1f5f3b", text: "PASS" },
   READY: { color: "#86efac", bg: "#071b16", border: "#1f5f3b", text: "READY" },
   WARNING: { color: "#fbbf24", bg: "#241a06", border: "#a16207", text: "WARNING" },
@@ -13,15 +23,9 @@ const STATE_STYLE: Record<Chip["state"], { color: string; bg: string; border: st
   FAIL: { color: "#fca5a5", bg: "#2a0a0a", border: "#dc2626", text: "FAIL" },
 };
 
-function chip({ label, state, detail }: Chip) {
+function statusBadge(state: ServiceState) {
   const style = STATE_STYLE[state];
-  return (
-    <div key={label} style={{ padding: "10px 11px", border: `1px solid ${style.border}`, borderRadius: 10, background: style.bg }}>
-      <div style={{ fontSize: 9, fontWeight: 800, color: "#9fb0c5", textTransform: "uppercase" }}>{label}</div>
-      <div style={{ fontSize: 12, fontWeight: 900, color: style.color, marginTop: 3 }}>{style.text}</div>
-      {detail ? <div style={{ fontSize: 9, color: "#8fa4bd", marginTop: 3, lineHeight: 1.4 }}>{detail}</div> : null}
-    </div>
-  );
+  return <span style={{ padding: "3px 8px", borderRadius: 99, border: `1px solid ${style.border}`, background: style.bg, color: style.color, fontSize: 9, fontWeight: 900, whiteSpace: "nowrap" }}>{style.text}</span>;
 }
 
 function timeAgo(iso: string | null) {
@@ -36,26 +40,54 @@ function timeAgo(iso: string | null) {
   return `${Math.round(hours / 24)} gün önce`;
 }
 
-export default function IntegrationCenterPanel({ snapshot }: { snapshot: IntegrationCenterSnapshot }) {
-  const otaByPlatform = (platform: "airbnb" | "booking") => {
+function buildServiceRows(snapshot: IntegrationCenterSnapshot): ServiceRow[] {
+  const now = new Date().toISOString();
+  const otaRow = (platform: "airbnb" | "booking"): ServiceRow => {
     const rows = snapshot.otaConnections.filter((c) => c.platform === platform);
+    const connected = rows.filter((r) => r.connected);
     const anyRed = rows.some((r) => r.health === "red");
     const anyYellow = rows.some((r) => r.health === "yellow");
-    const state: Chip["state"] = !rows.some((r) => r.connected)
-      ? "WAITING_EXTERNAL_ACCESS"
-      : anyRed ? "FAIL" : anyYellow ? "WARNING" : "PASS";
+    const lastSuccess = rows.reduce<string | null>((latest, r) => (!r.lastSuccessAt ? latest : !latest || r.lastSuccessAt > latest ? r.lastSuccessAt : latest), null);
+    const lastCheck = rows.reduce<string | null>((latest, r) => (!r.lastSyncedAt ? latest : !latest || r.lastSyncedAt > latest ? r.lastSyncedAt : latest), null);
+    const lastError = rows.map((r) => r.lastError).filter(Boolean).join(" · ") || null;
     const conflictCount = rows.reduce((sum, r) => sum + r.conflictCount, 0);
-    return chip({
-      label: platform === "airbnb" ? "Airbnb (iCal)" : "Booking.com (iCal)",
-      state,
-      detail: `${rows.filter((r) => r.connected).length}/${rows.length} villa bağlı${conflictCount > 0 ? ` · ${conflictCount} inceleme bekleyen blok` : ""} · Partner API: WAITING_PARTNER_ACCESS`,
-    });
+    return {
+      name: platform === "airbnb" ? "Airbnb (iCal)" : "Booking.com (iCal)",
+      status: connected.length === 0 ? "WAITING_EXTERNAL_ACCESS" : anyRed ? "FAIL" : anyYellow ? "WARNING" : "PASS",
+      lastSuccess,
+      lastCheck,
+      lastError,
+      actionRequired: connected.length === 0
+        ? "Villa başına import URL'si (KV) yapılandırılmalı"
+        : conflictCount > 0
+          ? `${conflictCount} needs_review bloğu admin takviminde incelenmeli`
+          : anyRed
+            ? "Senkron hatası - /entegrasyonlar detayına bakın"
+            : null,
+    };
   };
 
-  const paytrState: Chip["state"] = snapshot.paytr.state === "PAYTR_READY" ? "READY" : snapshot.paytr.state === "PAYTR_TEST_MODE_ONLY" ? "WARNING" : "WAITING_USER_ACTION";
-  const googleAdsChip = chip({ label: "Google Ads", state: "WAITING_USER_ACTION", detail: "Kod yok - OAuth+developer token+customer ID gerekli" });
-  const metaAdsChip = chip({ label: "Meta Ads", state: "WAITING_USER_ACTION", detail: "Kod yok - ads_management izni gerekli" });
-  const gbpChip = chip({ label: "Google Business Profile", state: "WAITING_EXTERNAL_ACCESS", detail: "Gerçek API erişimi yok" });
+  const paytrStatus: ServiceState = snapshot.paytr.state === "PAYTR_READY" ? "READY" : snapshot.paytr.state === "PAYTR_TEST_MODE_ONLY" ? "WARNING" : "WAITING_USER_ACTION";
+  const metaOrganicOk = snapshot.metaOrganic.safiraInstagramConnected && snapshot.metaOrganic.safiraFacebookConnected && snapshot.metaOrganic.destanFacebookConnected;
+
+  return [
+    { name: "Worker", status: snapshot.workerVersionId ? "PASS" : "WARNING", lastSuccess: now, lastCheck: now, lastError: null, actionRequired: snapshot.workerVersionId ? null : "CF_VERSION_METADATA binding eksik" },
+    { name: "D1", status: snapshot.d1Healthy ? "PASS" : "FAIL", lastSuccess: snapshot.d1Healthy ? now : null, lastCheck: now, lastError: snapshot.d1Healthy ? null : "SELECT 1 başarısız", actionRequired: snapshot.d1Healthy ? null : "D1 binding/veritabanı erişimini kontrol edin" },
+    { name: "Cron", status: snapshot.cronHealthy ? "PASS" : "WARNING", lastSuccess: snapshot.cronHeartbeat?.ranAt ?? null, lastCheck: now, lastError: null, actionRequired: snapshot.cronHeartbeat ? null : "Heartbeat hiç yazılmamış - cron tetikleyicisini kontrol edin" },
+    otaRow("airbnb"),
+    otaRow("booking"),
+    { name: "PayTR", status: paytrStatus, lastSuccess: null, lastCheck: now, lastError: null, actionRequired: snapshot.paytr.state === "PAYTR_NOT_CONFIGURED" ? "PAYTR_MERCHANT_ID/KEY/SALT secret olarak eklenmeli" : "Aşağıdaki checklist + Bağlantı Testi ile merchant panel adımlarını teyit edin" },
+    { name: "Search Console", status: snapshot.google.searchConsoleState === "GOOGLE_READY" ? "READY" : "WAITING_EXTERNAL_ACCESS", lastSuccess: snapshot.google.searchConsole ? now : null, lastCheck: now, lastError: snapshot.google.searchConsoleError, actionRequired: snapshot.google.searchConsoleState === "GOOGLE_READY" ? null : (snapshot.google.oauthClientConfigured ? "OAuth bağlantısını /sosyal sayfasından tamamlayın" : "GOOGLE_CLIENT_ID/SECRET secret olarak eklenmeli") },
+    { name: "GA4", status: snapshot.google.ga4State === "GOOGLE_READY" ? "READY" : "WAITING_EXTERNAL_ACCESS", lastSuccess: snapshot.google.ga4 ? now : null, lastCheck: now, lastError: snapshot.google.ga4Error, actionRequired: snapshot.google.ga4State === "GOOGLE_READY" ? null : (snapshot.google.oauthClientConfigured ? "OAuth bağlantısını /sosyal sayfasından tamamlayın" : "GOOGLE_CLIENT_ID/SECRET secret olarak eklenmeli") },
+    { name: "Google Business Profile", status: "WAITING_EXTERNAL_ACCESS", lastSuccess: null, lastCheck: null, lastError: null, actionRequired: "Gerçek GBP API erişimi/onayı yok - kod hazır (READY_TO_CONNECT), erişim geldiğinde read-only audit başlar" },
+    { name: "Google Ads", status: "WAITING_USER_ACTION", lastSuccess: null, lastCheck: null, lastError: null, actionRequired: "OAuth + developer token + customer ID sağlanmalı (taslak kampanyalar hazır)" },
+    { name: "Meta Organik", status: metaOrganicOk ? "PASS" : "WARNING", lastSuccess: metaOrganicOk ? now : null, lastCheck: now, lastError: null, actionRequired: metaOrganicOk ? null : "Eksik hesap bağlantısını /sosyal sayfasından tamamlayın" },
+    { name: "Meta Ads", status: "WAITING_USER_ACTION", lastSuccess: null, lastCheck: null, lastError: null, actionRequired: "Business Manager/ad_account + ads_management izni sağlanmalı (taslak kampanyalar hazır)" },
+  ];
+}
+
+export default function IntegrationCenterPanel({ snapshot }: { snapshot: IntegrationCenterSnapshot }) {
+  const rows = buildServiceRows(snapshot);
 
   return (
     <section style={{ maxWidth: 1250, margin: "0 auto 18px", padding: "0 20px" }}>
@@ -63,30 +95,50 @@ export default function IntegrationCenterPanel({ snapshot }: { snapshot: Integra
         <small style={{ display: "block", fontSize: 9, fontWeight: 900, letterSpacing: 1.4, color: "#93c5fd" }}>SİSTEM DURUMU</small>
         <h2 style={{ margin: "5px 0 12px", fontSize: 18 }}>Entegrasyon Merkezi</h2>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(150px,1fr))", gap: 8 }}>
-          {chip({ label: "Worker", state: snapshot.workerVersionId ? "PASS" : "WARNING", detail: snapshot.workerVersionId ? `v ${snapshot.workerVersionId.slice(0, 8)}` : "version metadata yok" })}
-          {chip({ label: "D1", state: snapshot.d1Healthy ? "PASS" : "FAIL" })}
-          {chip({ label: "Cron", state: snapshot.cronHealthy ? "PASS" : "WARNING", detail: snapshot.cronHeartbeat ? `son çalışma ${timeAgo(snapshot.cronHeartbeat.ranAt)}` : "heartbeat yok" })}
-          {otaByPlatform("airbnb")}
-          {otaByPlatform("booking")}
-          {chip({ label: "PayTR", state: paytrState, detail: `test_mode=${snapshot.paytr.testMode ? "true" : "false"}` })}
-          {chip({ label: "Search Console", state: snapshot.google.searchConsoleState === "GOOGLE_READY" ? "READY" : "WAITING_EXTERNAL_ACCESS" })}
-          {chip({ label: "GA4", state: snapshot.google.ga4State === "GOOGLE_READY" ? "READY" : "WAITING_EXTERNAL_ACCESS" })}
-          {gbpChip}
-          {googleAdsChip}
-          {chip({
-            label: "Meta Organik",
-            state: snapshot.metaOrganic.safiraInstagramConnected && snapshot.metaOrganic.safiraFacebookConnected && snapshot.metaOrganic.destanFacebookConnected ? "PASS" : "WARNING",
-            detail: `Safira IG${snapshot.metaOrganic.safiraInstagramConnected ? "✓" : "✗"} FB${snapshot.metaOrganic.safiraFacebookConnected ? "✓" : "✗"} · Destan FB${snapshot.metaOrganic.destanFacebookConnected ? "✓" : "✗"} · IG HARD BLOCK`,
-          })}
-          {metaAdsChip}
-          {chip({
-            label: "Son 7 gün yayın",
-            state: snapshot.publishStats7.failedCount > 0 ? "WARNING" : "PASS",
-            detail: `${snapshot.publishStats7.publishedCount} başarılı · ${snapshot.publishStats7.failedCount} hatalı`,
-          })}
-          {chip({ label: "Son OTA sync", state: snapshot.lastOtaSyncAt ? "PASS" : "WARNING", detail: timeAgo(snapshot.lastOtaSyncAt) })}
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10 }}>
+            <thead>
+              <tr style={{ textAlign: "left", color: "#9fb0c5", fontSize: 9, textTransform: "uppercase" }}>
+                <th style={{ padding: "6px 8px" }}>Servis</th>
+                <th style={{ padding: "6px 8px" }}>Durum</th>
+                <th style={{ padding: "6px 8px" }}>Son başarı</th>
+                <th style={{ padding: "6px 8px" }}>Son kontrol</th>
+                <th style={{ padding: "6px 8px" }}>Son hata</th>
+                <th style={{ padding: "6px 8px" }}>Gereken aksiyon</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.name} style={{ borderTop: "1px solid #1c2e46" }}>
+                  <td style={{ padding: "7px 8px", fontWeight: 800, color: "#dbeafe", whiteSpace: "nowrap" }}>{row.name}</td>
+                  <td style={{ padding: "7px 8px" }}>{statusBadge(row.status)}</td>
+                  <td style={{ padding: "7px 8px", color: "#8fa4bd" }}>{timeAgo(row.lastSuccess)}</td>
+                  <td style={{ padding: "7px 8px", color: "#8fa4bd" }}>{timeAgo(row.lastCheck)}</td>
+                  <td style={{ padding: "7px 8px", color: row.lastError ? "#fca5a5" : "#556275" }}>{row.lastError ?? "—"}</td>
+                  <td style={{ padding: "7px 8px", color: row.actionRequired ? "#fbbf24" : "#556275" }}>{row.actionRequired ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
+
+        <details style={{ marginTop: 14, paddingTop: 13, borderTop: "1px solid #203954" }}>
+          <summary style={{ fontSize: 11, color: "#93c5fd", fontWeight: 800, cursor: "pointer" }}>
+            PayTR merchant panel checklist ({snapshot.paytr.state})
+          </summary>
+          <div style={{ display: "grid", gap: 6, marginTop: 10 }}>
+            {snapshot.paytr.merchantPanelChecklist.map((item) => (
+              <div key={item.label} style={{ padding: "8px 10px", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728", fontSize: 9 }}>
+                <b style={{ color: item.status === "VERIFIED" ? "#86efac" : "#dbeafe" }}>
+                  {item.status === "VERIFIED" ? "✓" : item.status === "NOT_VERIFIED" ? "✗" : "○"} {item.label}
+                  {item.status === "MANUAL_ONLY" ? <span style={{ color: "#8fa4bd", fontWeight: 700 }}> (yalnız elle doğrulanabilir)</span> : null}
+                </b>
+                <p style={{ margin: "4px 0 0", color: "#9fb0c5" }}>{item.note}</p>
+              </div>
+            ))}
+          </div>
+          <PaytrConnectivityTest />
+        </details>
 
         <details style={{ marginTop: 14, paddingTop: 13, borderTop: "1px solid #203954" }}>
           <summary style={{ fontSize: 11, color: "#93c5fd", fontWeight: 800, cursor: "pointer" }}>
