@@ -26,6 +26,22 @@ async function seedConnection(villa: "Safira" | "Destan", platform: "airbnb" | "
   ).bind(crypto.randomUUID(), villa, platform, lastSuccessAt, lastSuccessAt, now, now).run();
 }
 
+async function seedNeedsReviewBlock(villa: "Safira" | "Destan", source: "airbnb" | "booking", start: string, end: string) {
+  const now = new Date().toISOString();
+  await db.prepare(
+    `INSERT INTO external_blocks (id, villa, source, external_uid, start_date, end_date, status, last_synced_at, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, 'needs_review', ?, ?, ?)`,
+  ).bind(crypto.randomUUID(), villa, source, `uid-${crypto.randomUUID()}`, start, end, now, now, now).run();
+}
+
+async function seedReservation(villa: "Safira" | "Destan", checkIn: string, checkOut: string) {
+  const now = new Date().toISOString();
+  await db.prepare(
+    `INSERT INTO reservations (id, villa, guest_name, check_in, check_out, channel, nightly_rate, total_amount, created_at, updated_at)
+     VALUES (?, ?, 'Test Misafir', ?, ?, 'Diğer', 1000, 7000, ?, ?)`,
+  ).bind(crypto.randomUUID(), villa, checkIn, checkOut, now, now).run();
+}
+
 describe("listOtaConnectionsStatus - healthScore/anomalyCount (gercek SQLite entegrasyon testi)", () => {
   beforeEach(() => {
     db = createFakeD1(loadSchema());
@@ -84,5 +100,86 @@ describe("listOtaConnectionsStatus - healthScore/anomalyCount (gercek SQLite ent
     const rows = await listOtaConnectionsStatus();
     const row = rows.find((r) => r.villa === "Safira" && r.platform === "airbnb")!;
     expect(row.anomalyCount).toBe(0);
+  });
+});
+
+describe("listOtaConnectionsStatus - conflictCount (FALSE POSITIVE OTA CONFLICT SEMANTICS FIX, 2026-09-03 karari)", () => {
+  beforeEach(() => {
+    db = createFakeD1(loadSchema());
+  });
+  afterEach(() => {
+    db.close();
+    vi.resetModules();
+  });
+
+  it("needs_review blok tamamen bilinen bir rezervasyon tarafindan acikliyorsa conflictCount 0 sayilir (EXPECTED_RESERVATION_MIRROR)", async () => {
+    await seedConnection("Destan", "airbnb", new Date().toISOString());
+    await seedNeedsReviewBlock("Destan", "airbnb", "2026-09-07", "2026-09-11");
+    await seedReservation("Destan", "2026-09-07", "2026-09-11");
+
+    const { listOtaConnectionsStatus } = await import("./status");
+    const rows = await listOtaConnectionsStatus();
+    const row = rows.find((r) => r.villa === "Destan" && r.platform === "airbnb")!;
+    expect(row.conflictCount).toBe(0);
+  });
+
+  it("gercek production Destan/Airbnb 3 fixture - ucu de rezervasyonla acikliyor, conflictCount 0", async () => {
+    await seedConnection("Destan", "airbnb", new Date().toISOString());
+    await seedNeedsReviewBlock("Destan", "airbnb", "2026-09-01", "2026-09-05");
+    await seedNeedsReviewBlock("Destan", "airbnb", "2026-09-07", "2026-09-11");
+    await seedNeedsReviewBlock("Destan", "airbnb", "2026-09-14", "2027-06-15");
+    await seedReservation("Destan", "2026-08-31", "2026-09-05");
+    await seedReservation("Destan", "2026-09-07", "2026-09-11");
+    await seedReservation("Destan", "2026-09-14", "2026-09-20"); // PRE_POLICY_CONFIRMED_EXCEPTION legacy kaydi
+
+    const { listOtaConnectionsStatus } = await import("./status");
+    const rows = await listOtaConnectionsStatus();
+    const row = rows.find((r) => r.villa === "Destan" && r.platform === "airbnb")!;
+    expect(row.conflictCount).toBe(0);
+  });
+
+  it("needs_review blogu aciklayan hicbir rezervasyon yoksa GERCEK conflict sayilir (REVIEW_REQUIRED, conflictCount 1)", async () => {
+    await seedConnection("Destan", "airbnb", new Date().toISOString());
+    await seedNeedsReviewBlock("Destan", "airbnb", "2026-07-01", "2026-07-08");
+
+    const { listOtaConnectionsStatus } = await import("./status");
+    const rows = await listOtaConnectionsStatus();
+    const row = rows.find((r) => r.villa === "Destan" && r.platform === "airbnb")!;
+    expect(row.conflictCount).toBe(1);
+  });
+
+  it("yalniz kapali-sezon needs_review blogu (rezervasyon olmasa bile) conflictCount'a girmez", async () => {
+    await seedConnection("Destan", "airbnb", new Date().toISOString());
+    await seedNeedsReviewBlock("Destan", "airbnb", "2026-10-01", "2027-03-01");
+
+    const { listOtaConnectionsStatus } = await import("./status");
+    const rows = await listOtaConnectionsStatus();
+    const row = rows.find((r) => r.villa === "Destan" && r.platform === "airbnb")!;
+    expect(row.conflictCount).toBe(0);
+  });
+
+  it("VILLA IZOLASYONU - Safira'nin rezervasyonu Destan'in needs_review blogunu ACIKLAMAZ (yanlislikla cakisma gizlenmez)", async () => {
+    await seedConnection("Destan", "airbnb", new Date().toISOString());
+    await seedNeedsReviewBlock("Destan", "airbnb", "2026-07-01", "2026-07-08");
+    await seedReservation("Safira", "2026-07-01", "2026-07-08");
+
+    const { listOtaConnectionsStatus } = await import("./status");
+    const rows = await listOtaConnectionsStatus();
+    const row = rows.find((r) => r.villa === "Destan" && r.platform === "airbnb")!;
+    expect(row.conflictCount).toBe(1);
+  });
+
+  it("active blok sayisi (activeBlockCount) mevcut normal semantikle degismeden kalir - yalniz conflictCount etkilenir", async () => {
+    await seedConnection("Destan", "airbnb", new Date().toISOString());
+    const now = new Date().toISOString();
+    await db.prepare(`INSERT INTO external_blocks (id, villa, source, external_uid, start_date, end_date, status, last_synced_at, created_at, updated_at)
+      VALUES (?, 'Destan', 'airbnb', 'uid-active', '2027-07-01', '2027-07-08', 'active', ?, ?, ?)`)
+      .bind(crypto.randomUUID(), now, now, now).run();
+
+    const { listOtaConnectionsStatus } = await import("./status");
+    const rows = await listOtaConnectionsStatus();
+    const row = rows.find((r) => r.villa === "Destan" && r.platform === "airbnb")!;
+    expect(row.activeBlockCount).toBe(1);
+    expect(row.conflictCount).toBe(0);
   });
 });

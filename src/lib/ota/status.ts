@@ -1,6 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
 import { OTA_PLATFORMS, OTA_VILLAS, type OtaConnectionStatus, type OtaSyncHealth } from "./types";
+import { evaluateOtaConflictDisposition, type ReservationRangeLike } from "./conflict-disposition";
 
 // Takvim senkronu gerçek-zamanlı bir API değil - bizim cron'umuz 30 dk'da bir, Airbnb'nin kendi
 // import yenilemesi ise (kendi Help Center'ına göre) ~3 saatte bir çalışıyor. Eşikler buna göre:
@@ -52,6 +53,19 @@ interface BlockCountRow {
   source: string;
   status: string;
   count: number;
+}
+
+interface NeedsReviewBlockRow {
+  villa: string;
+  source: string;
+  start_date: string;
+  end_date: string;
+}
+
+interface ReservationRangeRow {
+  villa: string;
+  check_in: string;
+  check_out: string;
 }
 
 interface AuditPayloadRow {
@@ -111,9 +125,13 @@ export async function listOtaConnectionsStatus(): Promise<OtaConnectionStatus[]>
     const { env } = await getCloudflareContext({ async: true });
     const db = env.DB;
 
-    const [connections, blockCounts, anomalyCounts] = await Promise.all([
+    const [connections, blockCounts, needsReviewBlocks, activeReservations, anomalyCounts] = await Promise.all([
       db.prepare("SELECT villa, platform, is_enabled, last_synced_at, last_success_at, last_error FROM ota_connections").all<ConnectionRow>(),
       db.prepare("SELECT villa, source, status, COUNT(*) as count FROM external_blocks GROUP BY villa, source, status").all<BlockCountRow>(),
+      db.prepare("SELECT villa, source, start_date, end_date FROM external_blocks WHERE status = 'needs_review'").all<NeedsReviewBlockRow>(),
+      // Yalniz tarih araliklari cekilir - misafir adi/telefon/e-posta hicbir zaman bu sorguya dahil
+      // degil (PII yok, bkz. conflict-disposition.ts dosya basi notu).
+      db.prepare("SELECT villa, check_in, check_out FROM reservations WHERE deleted_at IS NULL").all<ReservationRangeRow>(),
       countAnomaliesByVillaPlatform(db),
     ]);
 
@@ -123,13 +141,31 @@ export async function listOtaConnectionsStatus(): Promise<OtaConnectionStatus[]>
       return blockCounts.results.find((row) => row.villa === villa && row.source === source && row.status === status)?.count ?? 0;
     }
 
+    const reservationsByVilla = new Map<string, ReservationRangeLike[]>();
+    for (const row of activeReservations.results) {
+      const list = reservationsByVilla.get(row.villa) ?? [];
+      list.push({ checkIn: row.check_in, checkOut: row.check_out });
+      reservationsByVilla.set(row.villa, list);
+    }
+
+    // FALSE POSITIVE OTA CONFLICT SEMANTICS FIX (2026-09-03 karari) - needs_review satir sayisi
+    // artik dogrudan "cakisma" sayilmiyor. Bir blok yalniz sistemde zaten bilinen, active bir
+    // rezervasyonun OTA yansimasiysa (EXPECTED_RESERVATION_MIRROR) sayilmaz - yalniz gercekten
+    // aciklanamayan/insan incelemesi gereken bloklar (REVIEW_REQUIRED) conflictCount'a girer.
+    function conflictCountFor(villa: string, source: string): number {
+      return needsReviewBlocks.results.filter((row) => row.villa === villa && row.source === source && evaluateOtaConflictDisposition(
+        { startDate: row.start_date, endDateExclusive: row.end_date },
+        reservationsByVilla.get(row.villa) ?? [],
+      ) === "REVIEW_REQUIRED").length;
+    }
+
     const result: OtaConnectionStatus[] = [];
     for (const villa of OTA_VILLAS) {
       for (const platform of OTA_PLATFORMS) {
         const row = byKey.get(`${villa}:${platform}`);
         const connected = Boolean(row?.is_enabled);
         const lastSuccessAt = row?.last_success_at ?? null;
-        const conflictCount = countFor(villa, platform, "needs_review");
+        const conflictCount = conflictCountFor(villa, platform);
         const anomalyCount = anomalyCounts.get(`${villa}:${platform}`) ?? 0;
         result.push({
           villa,
