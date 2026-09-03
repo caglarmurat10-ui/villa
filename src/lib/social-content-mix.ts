@@ -1,30 +1,53 @@
 // Faz 4 bölüm O - Content Quality Engine (çeşitlilik ölçümü kısmı). SAF fonksiyon: mevcut statik
 // içerik kütüphanesindeki (social-content-library.ts, content01-06.json - KIRILMADI, yalnız
-// okunuyor) gerçek `theme` etiketlerinden kategori dağılımını hesaplar ve bölüm H'deki hedef
-// yüzdelerle karşılaştırır. Hiçbir sayı uydurulmaz - yalnız gerçek şablon sayımı.
+// okunuyor) gerçek `theme` etiketlerinden kategori dağılımını hesaplar ve hedef yüzdelerle
+// karşılaştırır. Hiçbir sayı uydurulmaz - yalnız gerçek şablon sayımı.
+//
+// FAZ 6 (2026-09-03 kesinleşen karma) - 5 kovalık eski taksonomi 7 kovaya ayrıştırıldı; her kova
+// artık GERÇEK, ayrı bir theme'e sahip (bkz. THEME_TO_CATEGORY) - hiçbiri artık "Diğer" gibi bir
+// yedek kovaya düşmüyor.
 
-export type ContentMixCategory = "Villa" | "Bölge" | "Aktivite" | "Satış/Müsaitlik" | "Diğer";
+export type ContentMixCategory =
+  | "Destinasyon/Bölge"
+  | "Aktivite/Gezi"
+  | "Villa/Konaklama"
+  | "Tarih/Kültür/Doğa"
+  | "Yerel Yaşam/Yemek/İpucu"
+  | "Doğrudan Rezervasyon/Güven"
+  | "Müsaitlik/Kampanya";
 
-// Bölüm H'deki hedef karma - "yaklaşık hedef, katı matematik olmak zorunda değil" (kullanıcının
-// kendi ifadesi). Mevcut theme etiketleri (Villa/Bölge/Gezi/Müsaitlik/Özel) bu 5 kovaya eşlenir;
-// bölüm H'nin ayrıca istediği "Tarih/Kültür/Doğa" ve "Yerel/Yemek" alt-kırılımları için mevcut
-// veri modelinde ayrı bir theme YOK - bu, section I'daki APPROVED_CONTENT_TOPICS ile ileride
-// yeni şablonlar eklenirken theme çeşitlendirilerek kapatılabilecek gerçek bir boşluk (raporda not).
+// Kullanıcının 2026-09-03'te kesinleştirdiği hedef karma - "yaklaşık hedef, katı matematik olmak
+// zorunda değil" (kullanıcının kendi ifadesi, önceki turdan). Toplam ~%65 çevre/gezi/kültür/
+// aktivite/yerel yaşam, ~%35 villa/rezervasyon/ticari içerik.
 export const CONTENT_MIX_TARGETS: Record<ContentMixCategory, number> = {
-  "Bölge": 25,
-  "Aktivite": 20,
-  "Villa": 20,
-  "Diğer": 20, // Tarih/Kültür/Doğa (%10) + Yerel/Yaşam/Yemek (%10) - ayrı theme'ler eklenene kadar birleşik
-  "Satış/Müsaitlik": 15, // Direct booking/güven (%10) + Müsaitlik/kampanya (%5) - ayrı theme'ler eklenene kadar birleşik
+  "Destinasyon/Bölge": 25,
+  "Aktivite/Gezi": 20,
+  "Villa/Konaklama": 20,
+  "Tarih/Kültür/Doğa": 10,
+  "Yerel Yaşam/Yemek/İpucu": 10,
+  "Doğrudan Rezervasyon/Güven": 10,
+  "Müsaitlik/Kampanya": 5,
 };
 
+// Her theme TEK bir kategoriye eşlenir - statik kütüphanedeki (Villa/Bölge/Gezi/Müsaitlik/Özel) ve
+// sanal şablonlardaki (Tarih-Doğa/Yerel İpucu/Güven, bkz. social-content-virtual-templates.ts) TÜM
+// gerçek theme değerleri burada karşılığını bulur. "Özel" (satış baskısı OLMAYAN yumuşak villa
+// detay içeriği, bkz. SM012/SM015/SM030/SM033/SM048/SM051 caption'ları) ticari/satış değil, villa
+// atmosferi içeriğidir - Villa/Konaklama'ya eşlenir, Müsaitlik/Kampanya'ya DEĞİL.
 const THEME_TO_CATEGORY: Record<string, ContentMixCategory> = {
-  "Villa": "Villa",
-  "Bölge": "Bölge",
-  "Gezi": "Aktivite",
-  "Müsaitlik": "Satış/Müsaitlik",
-  "Özel": "Satış/Müsaitlik",
+  "Villa": "Villa/Konaklama",
+  "Özel": "Villa/Konaklama",
+  "Bölge": "Destinasyon/Bölge",
+  "Gezi": "Aktivite/Gezi",
+  "Tarih-Doğa": "Tarih/Kültür/Doğa",
+  "Yerel İpucu": "Yerel Yaşam/Yemek/İpucu",
+  "Güven": "Doğrudan Rezervasyon/Güven",
+  "Müsaitlik": "Müsaitlik/Kampanya",
 };
+
+export function categoryForTheme(theme: string): ContentMixCategory | null {
+  return THEME_TO_CATEGORY[theme] ?? null;
+}
 
 export interface ContentMixEntry {
   category: ContentMixCategory;
@@ -50,7 +73,8 @@ export function computeContentMix(templates: Array<{ theme: string }>): ContentM
   for (const category of Object.keys(CONTENT_MIX_TARGETS) as ContentMixCategory[]) counts.set(category, 0);
 
   for (const template of templates) {
-    const category = THEME_TO_CATEGORY[template.theme] ?? "Diğer";
+    const category = categoryForTheme(template.theme);
+    if (!category) continue; // SPECIAL_DAY/LOCAL_EVENT gibi karma-dışı theme'ler (bkz. social-plan-seed.ts) burada sayılmaz
     counts.set(category, (counts.get(category) ?? 0) + 1);
   }
 

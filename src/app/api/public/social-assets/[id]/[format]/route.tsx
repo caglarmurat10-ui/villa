@@ -1,6 +1,14 @@
-import { isFormat, parseTemplateId, renderTemplate, type Format } from "@/lib/social-design-templates";
+import { isFormat, parseTemplateId, renderLocalEvent, renderTemplate, type Format } from "@/lib/social-design-templates";
+import { getLocalEventCandidate } from "@/lib/local-events";
 
 export const runtime = "nodejs";
+
+const EVENT_DATE_FMT = new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "long" });
+function eventDateLabel(startIso: string, endIso: string | null): string {
+  const start = EVENT_DATE_FMT.format(new Date(`${startIso}T00:00:00Z`));
+  if (!endIso || endIso === startIso) return start;
+  return `${start} – ${EVENT_DATE_FMT.format(new Date(`${endIso}T00:00:00Z`))}`;
+}
 
 // FAZ 5 bölüm 9 - Meta/Facebook'un Graph API'sinin, oturum çerezi OLMADAN kendi sunucularından
 // indirebileceği public medya rotası (bkz. /api/media/drive/[fileId] ile AYNI, zaten kanıtlanmış
@@ -22,6 +30,22 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 
   const parsed = parseTemplateId(id);
   if (!parsed) return new Response("Şablon bulunamadı.", { status: 404 });
+
+  // LOCAL EVENT - içerik D1'deki admin-onaylı aday kaydına dayanır (bkz. local-events.ts), bu
+  // yüzden diğer TÜM tiplerin aksine burada bir D1 okuması var. Yalnız status IN
+  // ('approved','published') olan bir kayıt render edilir - pending_review/rejected bir aday
+  // (henüz insan tarafından doğrulanmamış/reddedilmiş) hiçbir zaman görsele dönüşmez.
+  if (parsed.type === "local-event") {
+    const candidate = await getLocalEventCandidate(parsed.key);
+    if (!candidate || (candidate.status !== "approved" && candidate.status !== "published")) {
+      return new Response("Şablon bulunamadı.", { status: 404 });
+    }
+    const response = renderLocalEvent(parsed.villa, format, candidate.title, eventDateLabel(candidate.eventDate, candidate.eventDateEnd), candidate.venue);
+    const headers = new Headers(response.headers);
+    headers.set("Cache-Control", "public, max-age=3600, s-maxage=3600, stale-while-revalidate=600");
+    headers.set("X-Content-Type-Options", "nosniff");
+    return new Response(response.body, { status: response.status, headers });
+  }
 
   const response = renderTemplate(parsed, format);
   if (!response) return new Response("Şablon bulunamadı.", { status: 404 });

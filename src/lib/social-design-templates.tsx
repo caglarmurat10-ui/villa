@@ -1,6 +1,7 @@
 import { ImageResponse } from "next/og";
 import { GUIDE_PLACES, GUIDE_CATEGORIES } from "@/lib/region-guide";
 import { socialDriveMedia } from "@/lib/social-drive-media";
+import { getSpecialDayForDate } from "@/lib/special-days";
 import type { Villa } from "@/lib/types";
 
 // FAZ 5 bölüm 4/9/10 - Social Design Engine'in paylaşılan render katmanı. Hem admin-korumalı
@@ -14,10 +15,10 @@ import type { Villa } from "@/lib/types";
 //  - Villa Lifestyle/Offer: YALNIZ gerçek, Drive'dan çözümlenmiş, lisanslı villa fotoğrafı.
 //  - Destination/Activity içeriği YALNIZ GUIDE_PLACES'ten (region-guide.ts, doğrulanmış) gelir.
 
-export type TemplateType = "destination" | "activity" | "villa-lifestyle" | "travel-tip" | "offer";
+export type TemplateType = "destination" | "activity" | "villa-lifestyle" | "travel-tip" | "offer" | "trust" | "special-day" | "local-event";
 export type Format = "feed" | "story";
 
-export const TEMPLATE_TYPES: TemplateType[] = ["destination", "activity", "villa-lifestyle", "travel-tip", "offer"];
+export const TEMPLATE_TYPES: TemplateType[] = ["destination", "activity", "villa-lifestyle", "travel-tip", "offer", "trust", "special-day", "local-event"];
 
 const DIMENSIONS: Record<Format, { width: number; height: number }> = {
   feed: { width: 1080, height: 1350 },
@@ -52,6 +53,17 @@ export const EVERGREEN_TIPS = [
   "Kaş ve Patara çevresinde araç kiralamak, bölgedeki antik kentleri kendi temponuzda gezmek için pratik bir seçenektir.",
   "Likya bölgesindeki antik kentleri gezerken rahat yürüyüş ayakkabısı ve şapka bulundurmanız öneriliriz.",
   "Villa Safira ve Villa Destan'dan çevredeki koylara ve antik kentlere kendi aracınızla ulaşmak mümkündür.",
+];
+
+// Faz 6 - "Doğrudan Rezervasyon/Güven" kovası için GERÇEK, zaten canlı sitede yayınlanan
+// doğrulanmış iddialar (TrustStrip.tsx, ReservationConfidenceSection.tsx, PublicBookingWidget.tsx
+// trust satırı) - yeni bir iddia UYDURULMAZ. Taksit gibi KOŞULLU doğru (installmentVerified'a
+// bağlı) hiçbir iddia burada YOK - yalnız her zaman, koşulsuz doğru olan maddeler kullanılır.
+export const TRUST_CLAIMS = [
+  "Müsaitlik, yönetim sistemimizdeki gerçek rezervasyon takvimiyle karşılaştırılır - tahmini/güncel olmayan bir bilgi paylaşmayız.",
+  "Gördüğünüz tutar, seçtiğiniz tarihler için sistemde tanımlı gerçek dönemsel fiyattır; ödeme sırasında ayrıca işletme komisyonu eklenmez.",
+  "Rezervasyon talebiniz bir aracı üzerinden değil, doğrudan villa yönetimine ulaşır.",
+  "Ön ödeme, iptal ve konaklama koşulları rezervasyon öncesinde nettir - sürpriz şart yoktur.",
 ];
 
 function BrandFooter({ villa }: { villa: Villa }) {
@@ -124,6 +136,30 @@ export function renderOfferCampaign(villa: Villa, format: Format): Response {
   return photoCard(villa, format, "DOĞRUDAN REZERVASYON", "Aracısız, doğrudan sizinle.", "Gerçek müsaitlik ve dönemsel fiyat, doğrudan rezervasyon.");
 }
 
+export function renderTrustClaim(villa: Villa, format: Format, claimIndex: number): Response | null {
+  if (claimIndex < 0 || claimIndex >= TRUST_CLAIMS.length) return null;
+  return textCard(villa, format, "GÜVEN", "Neden doğrudan bizden?", TRUST_CLAIMS[claimIndex]);
+}
+
+// SPECIAL DAY / HOLIDAY - bölüm 6 kuralı: ticari satış ilanı gibi görünmez, fiyat/müsaitlik CTA'sı
+// yok, sade ve saygılı, marka logosu küçük (mevcut BrandFooter zaten küçük - yeni bir tasarım
+// gerekmez), günün anlamı merkezde. key = tarih (YYYY-MM-DD) - getSpecialDayForDate ile eşleşen
+// GERÇEK bir özel gün YOKSA (uydurma tarih/id kabul edilmez) null döner.
+export function renderSpecialDay(villa: Villa, format: Format, dateIso: string): Response | null {
+  const match = getSpecialDayForDate(dateIso);
+  if (!match) return null;
+  const name = match.kind === "fixed" ? match.holiday.name : match.entry.name;
+  return textCard(villa, format, "ÖZEL GÜN", name, match.message);
+}
+
+// LOCAL EVENT - içerik D1'deki admin-onaylı aday kayıtlarına dayanır (bkz. local-events.ts), bu
+// yüzden bu fonksiyon SAF kalır (D1 çağrısı YOK) - çağıran taraf (route handler) zaten doğrulanmış
+// title/dateLabel/venueLabel/sourceLabel değerlerini geçirir, burada yalnız görsel üretilir.
+export function renderLocalEvent(villa: Villa, format: Format, title: string, dateLabel: string, venueLabel: string): Response {
+  const body = venueLabel ? `${dateLabel} · ${venueLabel}` : dateLabel;
+  return textCard(villa, format, "YEREL ETKİNLİK", title, body);
+}
+
 // ============ Allowlisted public template ID ============
 // Format: "<villa>_<type>_<key>" - villa: safira|destan, type: TemplateType, key: destination/
 // activity için GUIDE_PLACES id, travel-tip için sayısal index, villa-lifestyle/offer için "default".
@@ -144,6 +180,8 @@ export function parseTemplateId(id: string): ParsedTemplateId | null {
   return { villa, type: typeRaw, key };
 }
 
+const DATE_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 export function renderTemplate(parsed: ParsedTemplateId, format: Format): Response | null {
   const { villa, type, key } = parsed;
   if (type === "destination") return renderDestinationOrActivity(villa, format, key, "BÖLGE REHBERİ");
@@ -155,5 +193,17 @@ export function renderTemplate(parsed: ParsedTemplateId, format: Format): Respon
   }
   if (type === "villa-lifestyle") return key === "default" ? renderVillaLifestyle(villa, format) : null;
   if (type === "offer") return key === "default" ? renderOfferCampaign(villa, format) : null;
+  if (type === "trust") {
+    const index = Number.parseInt(key, 10);
+    if (!Number.isInteger(index)) return null;
+    return renderTrustClaim(villa, format, index);
+  }
+  if (type === "special-day") {
+    if (!DATE_KEY_PATTERN.test(key)) return null;
+    return renderSpecialDay(villa, format, key);
+  }
+  // "local-event" bilerek burada YOK - içeriği D1'de saklanan admin-onaylı aday kayıtlarına
+  // dayanır, bu yüzden renderLocalEvent ayrı, ASENKRON bir fonksiyondur (bkz. local-events.ts,
+  // public route bunu ayrıca çağırır) - bu senkron fonksiyon yalnız statik/sabit tipleri kapsar.
   return null;
 }

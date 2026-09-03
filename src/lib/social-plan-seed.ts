@@ -8,6 +8,8 @@ import { planRolling30Days, type ExistingPost, type PlannedSlot } from "./social
 import type { RecentPost } from "./social-duplicate-guard";
 import { buildVirtualTemplates } from "./social-content-virtual-templates";
 import { isClosedSeasonDate } from "./season-policy";
+import { classifySpecialDaySafety, getSpecialDayForDate, type SpecialDayMatch } from "./special-days";
+import type { Villa } from "./types";
 
 function istanbulToday() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
@@ -233,4 +235,60 @@ export async function ensureRolling30DayPlan(dailyTarget = 1) {
     filledDays: new Set(planned.map((slot) => slot.date)).size,
     needsReview: needsReview.map((slot: PlannedSlot) => ({ date: slot.date, villa: slot.villa, templateId: slot.templateId, automationClass: slot.automationClass, reason: slot.reason })),
   };
+}
+
+// Faz 6 bölüm 5 - SPECIAL_DAY içerikleri normal 30 günlük içerik karmasından (social-content-mix.ts)
+// TAMAMEN AYRI: planRolling30Days'e hiç girmez, "SPECIAL_DAY" theme'i categoryForTheme()'de
+// eşleşmediği için karma yüzdelerini etkilemez. Aynı gün normal bir post zaten planlıysa onun
+// YERİNE geçmez - ek bir satır olarak eklenir; günlük toplam yayın sınırı (SOCIAL_AUTO_PUBLISH_LIMIT)
+// zaten cron/publish katmanında (custom-worker.mjs) korunuyor, burada AYRICA sınırlanmaz.
+const SPECIAL_DAY_HORIZON_DAYS = 30;
+
+function specialDayCaption(match: SpecialDayMatch, villa: Villa): string {
+  return [match.message, `Villa ${villa} · Patara`, "#patara #kaş #antalya"].join("\n\n");
+}
+
+export interface SpecialDayReviewItem {
+  date: string;
+  name: string;
+  automationClass: "REVIEW_REQUIRED";
+  reason: string;
+}
+
+export async function ensureSpecialDayPosts(): Promise<{ created: number; updated: number; skipped: number; total: number; needsReview: SpecialDayReviewItem[] }> {
+  const today = istanbulToday();
+  const baseUrl = await appBaseUrl();
+  const villas: Villa[] = ["Safira", "Destan"];
+
+  const inputs: SocialPostInput[] = [];
+  const needsReview: SpecialDayReviewItem[] = [];
+
+  for (let offset = 0; offset < SPECIAL_DAY_HORIZON_DAYS; offset += 1) {
+    const date = new Date(Date.parse(`${today}T00:00:00Z`) + offset * 86_400_000).toISOString().slice(0, 10);
+    const match = getSpecialDayForDate(date);
+    if (!match) continue;
+
+    const { automationClass, reason } = classifySpecialDaySafety(match);
+    const name = match.kind === "fixed" ? match.holiday.name : match.entry.name;
+    if (automationClass !== "AUTO_SAFE") {
+      needsReview.push({ date, name, automationClass: "REVIEW_REQUIRED", reason });
+      continue;
+    }
+
+    for (const villa of villas) {
+      const caption = specialDayCaption(match, villa);
+      const villaSlug = villa === "Safira" ? "safira" : "destan";
+      const mediaUrl = new URL(`/api/public/social-assets/${villaSlug}_special-day_${date}/feed`, `${baseUrl}/`).toString();
+
+      // Destan Instagram HARD BLOCK - bayram içeriği dahil, İSTİSNASIZ (bkz. ensureRolling30DayPlan
+      // aynı guard, bağımsız ikinci savunma katmanı).
+      if (villa !== "Destan") {
+        inputs.push({ villa, platform: "Instagram", contentType: "Gönderi", scheduledDate: date, caption, mediaUrl, mediaUrls: [mediaUrl] });
+      }
+      inputs.push({ villa, platform: "Facebook", contentType: "Gönderi", scheduledDate: date, caption, mediaUrl, mediaUrls: [mediaUrl] });
+    }
+  }
+
+  const result = inputs.length > 0 ? await seedSocialPosts(inputs, { autoApproveNewRows: true }) : { created: 0, updated: 0, skipped: 0, total: 0 };
+  return { ...result, needsReview };
 }

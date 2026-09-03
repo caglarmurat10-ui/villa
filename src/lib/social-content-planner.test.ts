@@ -96,26 +96,24 @@ describe("planRolling30Days", () => {
     expect(needsReview.some((p) => p.templateId === "E1")).toBe(true);
   });
 
-  it("bir önceki dolu günün kategorisi Satış/Müsaitlik ise aynı kategori ertesi gün tekrar seçilmez", () => {
-    // dailyTarget=1, havuzda yalnız 1 Satış/Müsaitlik şablonu var (D1) - ikinci gün başka bir
-    // Satış/Müsaitlik şablonu YOKSA zaten test anlamsız olur; burada iki tane var (D1, D2) ama
-    // D2 farklı villa/kategori (Özel de Satış/Müsaitlik'e eşleniyor) - iki günü de Satış/Müsaitlik
-    // ile doldurmaya zorlayacak şekilde diğer tüm kategorileri tüketiyoruz.
+  it("bir önceki dolu günün kategorisi Müsaitlik/Kampanya ise aynı kategori ertesi gün tekrar seçilmez", () => {
+    // dailyTarget=1, havuzda 2 ayrı Müsaitlik/Kampanya şablonu var (S1, S2) - iki günü de bu
+    // kategoriyle doldurmaya zorlayacak şekilde başka kategori YOK.
     const salesOnlyPool = [
       template({ id: "S1", theme: "Müsaitlik", villa: "Safira", caption: "Müsaitlik 1" }),
-      template({ id: "S2", theme: "Özel", villa: "Destan", caption: "Özel kampanya 2" }),
+      template({ id: "S2", theme: "Müsaitlik", villa: "Destan", caption: "Müsaitlik 2" }),
     ];
     const input: PlannerInput = {
       todayIso: "2026-09-10", horizonDays: 2, dailyTarget: 1,
       pool: salesOnlyPool, existingScheduled: [], recentPosts: [],
     };
     const { planned } = planRolling30Days(input);
-    // Birinci gün bir Satış/Müsaitlik şablonuyla dolar (başka kategori yok), ikinci gün ise
-    // kural gereği Satış/Müsaitlik hariç tutulur ve havuzda başka kategori kalmadığı için BOŞ kalır.
-    expect(planned.filter((p) => p.category === "Satış/Müsaitlik")).toHaveLength(1);
+    // Birinci gün bir Müsaitlik/Kampanya şablonuyla dolar (başka kategori yok), ikinci gün ise
+    // kural gereği bu kategori hariç tutulur ve havuzda başka kategori kalmadığı için BOŞ kalır.
+    expect(planned.filter((p) => p.category === "Müsaitlik/Kampanya")).toHaveLength(1);
   });
 
-  it("KESIN SEZON POLITIKASI - isClosedSeasonDate verildiginde Satış/Müsaitlik kategorisi kapali sezon gunune HIC planlanmaz, gunluk hedef yine baska kategoriyle doldurulur", () => {
+  it("KESIN SEZON POLITIKASI - isClosedSeasonDate verildiginde Müsaitlik/Kampanya kategorisi kapali sezon gunune HIC planlanmaz, gunluk hedef yine baska kategoriyle doldurulur", () => {
     const input: PlannerInput = {
       todayIso: "2026-09-29", horizonDays: 3, dailyTarget: 1, // 09-29 (acik), 09-30 (acik), 10-01 (KAPALI)
       pool: basePool, existingScheduled: [], recentPosts: [],
@@ -123,19 +121,19 @@ describe("planRolling30Days", () => {
     };
     const { planned } = planRolling30Days(input);
     const closedDaySlots = planned.filter((p) => p.date === "2026-10-01");
-    expect(closedDaySlots.every((p) => p.category !== "Satış/Müsaitlik")).toBe(true);
+    expect(closedDaySlots.every((p) => p.category !== "Müsaitlik/Kampanya")).toBe(true);
     // Gün yine doldu (baska kategoriyle) - kapali sezon nedeniyle icerik uretimi tamamen DURMAZ.
     expect(closedDaySlots.length).toBe(1);
   });
 
-  it("KESIN SEZON POLITIKASI - gercek 60 sablonluk havuz + gercek bugunku tarih (2026-09-03, 30 gunluk ufuk 2026-10-01/02/03'e tasiyor) ile HICBIR Satış/Müsaitlik gonderisi kapali sezon gunlerine planlanmaz", () => {
+  it("KESIN SEZON POLITIKASI - gercek 60 sablonluk havuz + gercek bugunku tarih (2026-09-03, 30 gunluk ufuk 2026-10-01/02/03'e tasiyor) ile HICBIR Müsaitlik/Kampanya gonderisi kapali sezon gunlerine planlanmaz", () => {
     const input: PlannerInput = {
       todayIso: "2026-09-03", horizonDays: 30, dailyTarget: 2,
       pool: socialContentTemplates, existingScheduled: [], recentPosts: [],
       isClosedSeasonDate,
     };
     const { planned } = planRolling30Days(input);
-    const closedSeasonSalesSlots = planned.filter((p) => isClosedSeasonDate(p.date) && p.category === "Satış/Müsaitlik");
+    const closedSeasonSalesSlots = planned.filter((p) => isClosedSeasonDate(p.date) && p.category === "Müsaitlik/Kampanya");
     expect(closedSeasonSalesSlots).toHaveLength(0);
   });
 

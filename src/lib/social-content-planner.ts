@@ -15,7 +15,7 @@
 //     otomatik yayına ASLA dahil edilmez (bkz. FAZ5 bölüm 5).
 import type { SocialContentTemplate } from "./social-content-library";
 import type { Villa } from "./types";
-import { CONTENT_MIX_TARGETS, type ContentMixCategory } from "./social-content-mix";
+import { CONTENT_MIX_TARGETS, categoryForTheme, type ContentMixCategory } from "./social-content-mix";
 import { checkDuplicateContent, type RecentPost } from "./social-duplicate-guard";
 
 export type AutomationClass = "AUTO_SAFE" | "REVIEW_REQUIRED" | "BLOCKED";
@@ -34,13 +34,23 @@ const VARIABLE_INFO_PATTERNS: RegExp[] = [
   /\d+\s?(dakika|saat)\s?(sürer|uzaklık|mesafe|yol)/i,
 ];
 
+// Faz 6 denetimi - SM050'nin caption'ı gerçek yayınlanabilir içerik DEĞİL, editöryal bir talimat
+// metni sızıntısı ("Bu içerik yayınlanırken ... otomatik olarak eklenmeli. Eski veya tahmini tarih
+// paylaşılmamalı.") - VARIABLE_INFO_PATTERNS bunu yakalamaz (fiyat/saat/tarih deseni yok) ama bu
+// hiçbir zaman olduğu gibi yayınlanamaz. Kaynak veri (content01-06.json) elle değiştirilmiyor -
+// yalnız bu bilinen kayıt kimliği kalıcı olarak BLOCKED sayılıyor.
+const HARD_BLOCKED_TEMPLATE_IDS = new Set(["SM050"]);
+
 function hasVariableInfo(text: string): boolean {
   return VARIABLE_INFO_PATTERNS.some((pattern) => pattern.test(text));
 }
 
 export function classifyContentSafety(
-  template: Pick<SocialContentTemplate, "caption" | "hook" | "mediaResolved">,
+  template: Pick<SocialContentTemplate, "id" | "caption" | "hook" | "mediaResolved">,
 ): { automationClass: AutomationClass; reason: string } {
+  if (HARD_BLOCKED_TEMPLATE_IDS.has(template.id)) {
+    return { automationClass: "BLOCKED", reason: `${template.id} kalıcı olarak engellendi - caption gerçek içerik değil, editöryal talimat metni sızıntısı içeriyor.` };
+  }
   if (!template.mediaResolved) {
     return { automationClass: "BLOCKED", reason: "Medya çözümlenemedi (Drive dosyası bulunamadı)." };
   }
@@ -53,11 +63,11 @@ export function classifyContentSafety(
   return { automationClass: "AUTO_SAFE", reason: "Sabit, doğrulanmış içerik - değişken bilgi tespit edilmedi." };
 }
 
-function templateCategory(theme: string): ContentMixCategory {
-  const map: Record<string, ContentMixCategory> = {
-    Villa: "Villa", "Bölge": "Bölge", Gezi: "Aktivite", "Müsaitlik": "Satış/Müsaitlik", "Özel": "Satış/Müsaitlik",
-  };
-  return map[theme] ?? "Diğer";
+// social-content-mix.ts'teki THEME_TO_CATEGORY ile TEK kaynak (categoryForTheme) - burada ayrı bir
+// kopya eşleme YOK. Karma-dışı theme'ler (SPECIAL_DAY/LOCAL_EVENT, bkz. social-plan-seed.ts) null
+// döner - bu şablonlar bu planlayıcının normal 30 günlük döngüsüne hiç girmez.
+function templateCategory(theme: string): ContentMixCategory | null {
+  return categoryForTheme(theme);
 }
 
 export interface ExistingPost {
@@ -146,12 +156,13 @@ export function planRolling30Days(input: PlannerInput): { planned: PlannedSlot[]
       const counts = new Map<ContentMixCategory, number>(categories.map((c) => [c, 0]));
       for (const post of cumulative) {
         const category = templateCategory(post.theme);
+        if (!category) continue; // karma-dışı theme (SPECIAL_DAY/LOCAL_EVENT vb.) sayılmaz
         counts.set(category, (counts.get(category) ?? 0) + 1);
       }
       const total = cumulative.length || 1;
       return categories
-        .filter((c) => c !== "Satış/Müsaitlik" || lastFilledCategory !== "Satış/Müsaitlik")
-        .filter((c) => c !== "Satış/Müsaitlik" || !closedSeason)
+        .filter((c) => c !== "Müsaitlik/Kampanya" || lastFilledCategory !== "Müsaitlik/Kampanya")
+        .filter((c) => c !== "Müsaitlik/Kampanya" || !closedSeason)
         .sort((a, b) => {
           const deficitA = CONTENT_MIX_TARGETS[a] - ((counts.get(a) ?? 0) / total) * 100;
           const deficitB = CONTENT_MIX_TARGETS[b] - ((counts.get(b) ?? 0) / total) * 100;

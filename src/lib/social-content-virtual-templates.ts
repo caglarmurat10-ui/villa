@@ -1,5 +1,5 @@
 import { GUIDE_PLACES, GUIDE_CATEGORIES, type GuidePlace } from "@/lib/region-guide";
-import { EVERGREEN_TIPS } from "@/lib/social-design-templates";
+import { EVERGREEN_TIPS, TRUST_CLAIMS } from "@/lib/social-design-templates";
 import type { SocialContentTemplate } from "@/lib/social-content-library";
 import type { Villa } from "@/lib/types";
 
@@ -39,6 +39,17 @@ function tipCaption(tip: string, villa: Villa): { hook: string; caption: string 
   };
 }
 
+// Faz 6 - "Doğrudan Rezervasyon/Güven" kovası (bkz. social-content-mix.ts) için GERÇEK, zaten
+// canlı sitede yayınlanan doğrulanmış iddialar. TRUST_CLAIMS TEK KAYNAK social-design-templates.tsx'te
+// tanımlı (renderTrustClaim ile AYNI dizi/index) - burada ayrı bir kopya YOK, görsel ve caption
+// birbirinden asla sapamaz.
+function trustCaption(claim: string, villa: Villa): { hook: string; caption: string } {
+  return {
+    hook: "Neden doğrudan bizden rezervasyon yapmalısınız?",
+    caption: [claim, `Villa ${villa} · Patara`, `#${villaSlug(villa)}patara #patara #kaş #dogrudanrezervasyon #villatatili`].join("\n\n"),
+  };
+}
+
 function baseTemplate(id: string, villa: Villa, theme: string, hook: string, caption: string, publicPath: string): SocialContentTemplate {
   const mediaUrl = `/api/public/social-assets/${publicPath}`;
   return {
@@ -49,15 +60,23 @@ function baseTemplate(id: string, villa: Villa, theme: string, hook: string, cap
   };
 }
 
-// theme değerleri BİLİNÇLİ: "Bölge" ve "Gezi" mevcut social-content-mix.ts eşlemesine (THEME_TO_CATEGORY)
-// birebir uyar (Bölge->Bölge, Gezi->Aktivite). "Yerel İpucu" ise KASITLI OLARAK haritada yok - bu
-// yüzden templateCategory() onu otomatik "Diğer" kovasına düşürür (Tarih/Kültür/Doğa + Yerel Yaşam
-// hedefi, bkz. social-content-mix.ts CONTENT_MIX_TARGETS yorumu).
+// theme değerleri BİLİNÇLİ: her biri social-content-mix.ts'in THEME_TO_CATEGORY eşlemesinde
+// birebir bir karşılığa sahip (Bölge/Gezi/Tarih-Doğa/Yerel İpucu/Güven) - hiçbiri artık bir
+// "yedek" kovaya düşmüyor. region-guide.ts'in kendi "tarih"/"doga" kategorileri (GERÇEK, 2026-09-01
+// çok kaynaklı doğrulanmış veri) "Tarih-Doğa" temasına, "deniz" ve diğerleri "Bölge"ye, "gezi" ise
+// "Gezi"ye eşlenir - yeni bir ayrım UYDURULMADI, yalnız region-guide.ts'in zaten var olan
+// kategorileri kullanıldı.
+function guideTheme(category: GuidePlace["category"]): string {
+  if (category === "gezi") return "Gezi";
+  if (category === "tarih" || category === "doga") return "Tarih-Doğa";
+  return "Bölge";
+}
+
 export function buildVirtualTemplates(): SocialContentTemplate[] {
   const templates: SocialContentTemplate[] = [];
 
   for (const place of GUIDE_PLACES) {
-    const theme = place.category === "gezi" ? "Gezi" : "Bölge";
+    const theme = guideTheme(place.category);
     const kickerType = place.category === "gezi" ? "activity" : "destination";
     for (const villa of VILLAS) {
       const { hook, caption } = guideCaption(place, villa);
@@ -71,6 +90,14 @@ export function buildVirtualTemplates(): SocialContentTemplate[] {
       const { hook, caption } = tipCaption(tip, villa);
       const publicPath = `${villaSlug(villa)}_travel-tip_${index}/feed`;
       templates.push(baseTemplate(`tip-${villaSlug(villa)}-${index}`, villa, "Yerel İpucu", hook, caption, publicPath));
+    }
+  });
+
+  TRUST_CLAIMS.forEach((claim, index) => {
+    for (const villa of VILLAS) {
+      const { hook, caption } = trustCaption(claim, villa);
+      const publicPath = `${villaSlug(villa)}_trust_${index}/feed`;
+      templates.push(baseTemplate(`trust-${villaSlug(villa)}-${index}`, villa, "Güven", hook, caption, publicPath));
     }
   });
 

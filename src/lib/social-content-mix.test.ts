@@ -9,32 +9,35 @@ describe("computeContentMix", () => {
     expect(report.dominantCategoryWarning).toBeNull();
   });
 
-  it("gercek uretim icerik kutuphanesi dagilimini (2026-09-03 audit) dogru hesaplar", () => {
-    // Gercek theme sayimlari: Villa 24, Bölge 14, Müsaitlik 8, Gezi 8, Özel 6 (toplam 60)
+  it("gercek uretim icerik kutuphanesi dagilimini (2026-09-03 Faz 6 audit) dogru hesaplar - Villa+Ozel birlesik Villa/Konaklama'ya sayilir", () => {
+    // Gercek theme sayimlari: Villa 24, Özel 6 (ikisi de Villa/Konaklama), Bölge 14, Müsaitlik 8, Gezi 8 (toplam 60)
     const templates = [
       ...Array(24).fill({ theme: "Villa" }),
+      ...Array(6).fill({ theme: "Özel" }),
       ...Array(14).fill({ theme: "Bölge" }),
       ...Array(8).fill({ theme: "Müsaitlik" }),
       ...Array(8).fill({ theme: "Gezi" }),
-      ...Array(6).fill({ theme: "Özel" }),
     ];
     const report = computeContentMix(templates);
     expect(report.totalTemplates).toBe(60);
 
-    const villa = report.entries.find((e) => e.category === "Villa")!;
-    expect(villa.count).toBe(24);
-    expect(villa.actualPercent).toBe(40); // 24/60 = %40, hedef %20 - ASIRI TEMSIL EDILMIS
+    const villa = report.entries.find((e) => e.category === "Villa/Konaklama")!;
+    expect(villa.count).toBe(30); // 24 Villa + 6 Özel
+    expect(villa.actualPercent).toBe(50); // 30/60 = %50, hedef %20 - ASIRI TEMSIL EDILMIS
     expect(villa.overrepresented).toBe(true);
 
-    const region = report.entries.find((e) => e.category === "Bölge")!;
+    const region = report.entries.find((e) => e.category === "Destinasyon/Bölge")!;
     expect(region.actualPercent).toBeCloseTo(23.3, 1); // 14/60 ≈ %23.3, hedef %25'e yakin
     expect(region.overrepresented).toBe(false);
+
+    const availability = report.entries.find((e) => e.category === "Müsaitlik/Kampanya")!;
+    expect(availability.count).toBe(8);
   });
 
   it("tek kategori toplamin %40'indan fazlasiysa dominant-category uyarisi verir", () => {
     const templates = [...Array(50).fill({ theme: "Villa" }), ...Array(10).fill({ theme: "Bölge" })];
     const report = computeContentMix(templates);
-    expect(report.dominantCategoryWarning).toContain("Villa");
+    expect(report.dominantCategoryWarning).toContain("Villa/Konaklama");
     expect(report.dominantCategoryWarning).toContain("reklam");
   });
 
@@ -43,18 +46,22 @@ describe("computeContentMix", () => {
       ...Array(25).fill({ theme: "Bölge" }),
       ...Array(20).fill({ theme: "Gezi" }),
       ...Array(20).fill({ theme: "Villa" }),
-      ...Array(20).fill({ theme: "bilinmeyen-tema" }), // "Diğer" kovasina duser
-      ...Array(15).fill({ theme: "Müsaitlik" }),
+      ...Array(10).fill({ theme: "Tarih-Doğa" }),
+      ...Array(10).fill({ theme: "Yerel İpucu" }),
+      ...Array(10).fill({ theme: "Güven" }),
+      ...Array(5).fill({ theme: "Müsaitlik" }),
     ];
     const report = computeContentMix(templates);
     expect(report.entries.every((e) => !e.overrepresented)).toBe(true);
     expect(report.dominantCategoryWarning).toBeNull();
   });
 
-  it("bilinmeyen theme etiketleri 'Diğer' kovasina duser, kaybolmaz", () => {
-    const report = computeContentMix([{ theme: "Yeni Bir Tema" }, { theme: "Villa" }]);
-    const other = report.entries.find((e) => e.category === "Diğer")!;
-    expect(other.count).toBe(1);
-    expect(report.totalTemplates).toBe(2);
+  it("bilinmeyen/karma-disi theme etiketleri (SPECIAL_DAY/LOCAL_EVENT gibi) SAYILMAZ - kaybolmaz ama kategori dagilimini bozmaz", () => {
+    const report = computeContentMix([{ theme: "SPECIAL_DAY" }, { theme: "Villa" }]);
+    expect(report.totalTemplates).toBe(2); // totalTemplates hala TUM sablonlari sayar
+    const villa = report.entries.find((e) => e.category === "Villa/Konaklama")!;
+    expect(villa.count).toBe(1); // yalniz gercekten eslenen 1 tanesi kategori sayimina girer
+    const allCounts = report.entries.reduce((sum, e) => sum + e.count, 0);
+    expect(allCounts).toBe(1); // SPECIAL_DAY hicbir kategoriye sayilmadi (kaybolmadi, sadece haric tutuldu)
   });
 });

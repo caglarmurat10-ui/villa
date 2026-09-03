@@ -96,16 +96,14 @@ describe("ensureRolling30DayPlan (gerçek D1 entegrasyon testi)", () => {
     }
   });
 
-  it("KESIN SEZON POLITIKASI - 30 gunluk ufuk kapali sezona (2026-10-01) tastigi icin, o gune HICBIR Satış/Müsaitlik temali gercek sablon planlanmaz", async () => {
+  it("KESIN SEZON POLITIKASI - 30 gunluk ufuk kapali sezona (2026-10-01) tastigi icin, o gune HICBIR Müsaitlik/Kampanya temali gercek sablon planlanmaz", async () => {
     const { ensureRolling30DayPlan } = await import("./social-plan-seed");
     const { socialContentTemplates } = await import("./social-content-library");
-    const { buildVirtualTemplates } = await import("./social-content-virtual-templates");
-    // Gercek havuzdaki Müsaitlik/Özel temali (Satış/Müsaitlik kategorisine eşlenen) tüm gerçek
-    // caption'lar - planlayıcının bunlardan hiçbirini kapalı sezon gününe koymadığını doğrulamak için.
+    // Gercek havuzdaki Müsaitlik temali (Müsaitlik/Kampanya kategorisine eşlenen, bkz.
+    // social-content-mix.ts) tüm gerçek caption'lar - "Özel" artik Villa/Konaklama'ya eslendigi
+    // icin (satis kategorisi DEGIL) burada KASITLI OLARAK yok, kapali sezonda gorunmesi beklenir.
     const salesCaptions = new Set(
-      [...socialContentTemplates, ...buildVirtualTemplates()]
-        .filter((t) => t.theme === "Müsaitlik" || t.theme === "Özel")
-        .map((t) => t.caption),
+      socialContentTemplates.filter((t) => t.theme === "Müsaitlik").map((t) => t.caption),
     );
 
     await ensureRolling30DayPlan(2); // TEST_TODAY=2026-09-03 -> 30 gunluk ufuk 2026-10-03'e kadar, sinirin (2026-10-01) OTESINE gecer
@@ -128,6 +126,56 @@ describe("ensureRolling30DayPlan (gerçek D1 entegrasyon testi)", () => {
     // Orijinal 'Yayınlandı' satırın kendisi hâlâ tabloda olmalı (silinmedi) - ama planlayıcı
     // AYNI caption'ı YENİ bir 'Planlandı' satır olarak bir daha ÖNERMEMİŞ olmalı (tam olarak 1 kez).
     expect(rows.filter((r) => r.caption === publishedCaption)).toHaveLength(1);
+  });
+});
+
+describe("ensureSpecialDayPosts (gerçek D1 entegrasyon testi) - Faz 6 bölüm 5", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2027-04-01T09:00:00.000Z")); // 30 günlük ufuk 2027-04-23 (23 Nisan) icerir
+    db = createFakeD1(loadSchema());
+  });
+  afterEach(() => {
+    db.close();
+    vi.useRealTimers();
+    vi.resetModules();
+  });
+
+  it("sabit resmi tatil (23 Nisan) icin her iki villaya da AUTO_SAFE post eklenir, approval_status='Onaylandı'", async () => {
+    const { ensureSpecialDayPosts } = await import("./social-plan-seed");
+    const result = await ensureSpecialDayPosts();
+    expect(result.created).toBeGreaterThan(0);
+    const rows = await socialPostRows();
+    const holidayRows = rows.filter((r) => r.scheduled_date === "2027-04-23");
+    expect(holidayRows.length).toBeGreaterThan(0);
+    expect(holidayRows.every((r) => r.approval_status === "Onaylandı")).toBe(true);
+    expect(holidayRows.every((r) => r.caption.includes("23 Nisan"))).toBe(true);
+  });
+
+  it("Destan + Instagram kombinasyonu bayram icerigi icin de HIC uretilmez (HARD BLOCK istisnasiz)", async () => {
+    const { ensureSpecialDayPosts } = await import("./social-plan-seed");
+    await ensureSpecialDayPosts();
+    const rows = await socialPostRows();
+    expect(rows.some((r) => r.villa === "Destan" && r.platform === "Instagram")).toBe(false);
+    // Ama Destan Facebook ve Safira Instagram/Facebook uretilmis olmali.
+    expect(rows.some((r) => r.villa === "Destan" && r.platform === "Facebook")).toBe(true);
+    expect(rows.some((r) => r.villa === "Safira" && r.platform === "Instagram")).toBe(true);
+  });
+
+  it("normal 30 gunluk icerik karmasindan (ensureRolling30DayPlan) TAMAMEN AYRIDIR - ayni kosuda ikisi birbirini bozmaz", async () => {
+    const { ensureRolling30DayPlan, ensureSpecialDayPosts } = await import("./social-plan-seed");
+    await ensureRolling30DayPlan(1);
+    const afterMix = await socialPostRows();
+    await ensureSpecialDayPosts();
+    const afterSpecialDay = await socialPostRows();
+    // Normal karma satirlari (23 Nisan disindaki gunler) hala oldugu gibi duruyor - special-day
+    // cagrisi onlari silmedi/degistirmedi.
+    const mixDates = new Set(afterMix.map((r) => r.scheduled_date));
+    const stillPresent = afterMix.every((row) =>
+      afterSpecialDay.some((r) => r.scheduled_date === row.scheduled_date && r.villa === row.villa && r.platform === row.platform && r.caption === row.caption),
+    );
+    expect(stillPresent).toBe(true);
+    expect(mixDates.size).toBeGreaterThan(0);
   });
 });
 
