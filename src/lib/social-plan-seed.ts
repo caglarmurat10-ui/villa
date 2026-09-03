@@ -6,6 +6,7 @@ import { approvedProxyMediaAsset } from "./social-drive-media";
 import { listSocialPostMedia, replaceSocialPostMedia } from "./social-media-store";
 import { planRolling30Days, type ExistingPost, type PlannedSlot } from "./social-content-planner";
 import type { RecentPost } from "./social-duplicate-guard";
+import { buildVirtualTemplates } from "./social-content-virtual-templates";
 
 function istanbulToday() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
@@ -24,7 +25,7 @@ function planIdentity(input: Pick<SocialPostInput, "villa" | "platform" | "conte
   return `${input.villa}\u001f${input.platform}\u001f${input.contentType}\u001f${input.scheduledDate}\u001f${input.caption}`;
 }
 
-async function syncSeededCarouselMedia(inputs: SocialPostInput[], baseUrl: string, today: string) {
+async function syncSeededCarouselMedia(inputs: SocialPostInput[], baseUrl: string, today: string, preserveApproval = false) {
   const carouselInputs = inputs.filter((input) => [...new Set(input.mediaUrls ?? [])].length > 1);
   if (carouselInputs.length === 0) return 0;
 
@@ -76,7 +77,7 @@ async function syncSeededCarouselMedia(inputs: SocialPostInput[], baseUrl: strin
     );
     if (unchanged) continue;
 
-    await replaceSocialPostMedia(postId, verified);
+    await replaceSocialPostMedia(postId, verified, { preserveApproval });
     synced += 1;
   }
 
@@ -153,12 +154,23 @@ export async function ensureRolling30DayPlan(dailyTarget = 1) {
   const lookbackStart = new Date(Date.parse(`${today}T00:00:00Z`) - ROLLING_LOOKBACK_DAYS * 86_400_000).toISOString().slice(0, 10);
   const horizonEnd = new Date(Date.parse(`${today}T00:00:00Z`) + ROLLING_HORIZON_DAYS * 86_400_000).toISOString().slice(0, 10);
 
+  // status IN ('Planlandı','Yayınlandı') - Faz 5 son denetim düzeltmesi: daha önce YAYINLANMIŞ
+  // içerikler de 60 günlük duplicate lookback'e dahil olmalı, yalnız hâlâ 'Planlandı' olanlar değil
+  // (aksi halde aynı caption/medya, yayınlandıktan hemen sonra "tekrar değil" sayılıp yeniden
+  // önerilebilirdi). Gelecek pencerede (scheduled_date >= today) pratikte yalnız 'Planlandı' satır
+  // olur - 'Yayınlandı' bir satırın scheduled_date'i tanım gereği geçmişte kalır.
   const rows = await env.DB.prepare(
     `SELECT villa, scheduled_date, caption, media_url FROM social_posts
-     WHERE status = 'Planlandı' AND scheduled_date >= ? AND scheduled_date < ?`,
+     WHERE status IN ('Planlandı', 'Yayınlandı') AND scheduled_date >= ? AND scheduled_date < ?`,
   ).bind(lookbackStart, horizonEnd).all<{ villa: "Safira" | "Destan"; scheduled_date: string; caption: string; media_url: string | null }>();
 
-  const themeOf = templateCaptionLookup(socialContentTemplates);
+  // Havuz: gerçek 60 statik şablon (fotoğraflı) + region-guide.ts'ten türetilen "sanal" şablonlar
+  // (Destination/Activity/Travel Tip - Social Design Engine ile gerçek zamanlı render edilir).
+  // İkincisi, statik kütüphanede HİÇ karşılığı olmayan Tarih/Kültür/Doğa/Yerel-Yaşam boşluğunu
+  // (bkz. önceki tur raporu, "Diğer" kovası %0) gerçek, benzersiz içerikle kapatır - bkz.
+  // social-content-virtual-templates.ts.
+  const pool = [...socialContentTemplates, ...buildVirtualTemplates()];
+  const themeOf = templateCaptionLookup(pool);
   const existingScheduled: ExistingPost[] = [];
   const recentPosts: RecentPost[] = [];
   for (const row of rows.results) {
@@ -173,12 +185,12 @@ export async function ensureRolling30DayPlan(dailyTarget = 1) {
     todayIso: today,
     horizonDays: ROLLING_HORIZON_DAYS,
     dailyTarget,
-    pool: socialContentTemplates,
+    pool,
     existingScheduled,
     recentPosts,
   });
 
-  const templateById = new Map(socialContentTemplates.map((t) => [t.id, t]));
+  const templateById = new Map(pool.map((t) => [t.id, t]));
   const inputs: SocialPostInput[] = [];
   for (const slot of planned) {
     const template = templateById.get(slot.templateId);
@@ -190,14 +202,28 @@ export async function ensureRolling30DayPlan(dailyTarget = 1) {
     const mediaUrl = mediaUrls[0] ?? "";
     if (!mediaUrl) continue;
 
-    inputs.push({ villa: template.villa, platform: "Instagram", contentType: template.contentType, scheduledDate: slot.date, caption: template.caption, mediaUrl, mediaUrls });
+    // Faz 5 son denetim düzeltmesi (bölüm 11) - Destan Instagram HARD BLOCK'u yalnız cron/publish
+    // route katmanına bırakmak yerine, planlayıcı aşamasında da bu kombinasyon hiç ÜRETİLMEZ
+    // ("tercihen planner aşamasında da platformu üretme"). Aşağıdaki cron (duePosts,
+    // custom-worker.mjs) ve manuel publish route (route.ts) guard'ları DEĞİŞMEDEN, bağımsız bir
+    // ikinci savunma katmanı olarak kalmaya devam eder.
+    if (template.villa !== "Destan") {
+      inputs.push({ villa: template.villa, platform: "Instagram", contentType: template.contentType, scheduledDate: slot.date, caption: template.caption, mediaUrl, mediaUrls });
+    }
     if (template.contentType === "Gönderi" || (template.contentType === "Reels" && template.mediaKind === "video")) {
       inputs.push({ villa: template.villa, platform: "Facebook", contentType: template.contentType, scheduledDate: slot.date, caption: template.caption, mediaUrl, mediaUrls });
     }
   }
 
-  const result = inputs.length > 0 ? await seedSocialPosts(inputs) : { created: 0, updated: 0, skipped: 0, total: 0 };
-  const mediaSynced = inputs.length > 0 ? await syncSeededCarouselMedia(inputs, baseUrl, today) : 0;
+  // autoApproveNewRows:true GÜVENLİDİR - inputs yalnız planned'dan (planRolling30Days) türetildi,
+  // ki bu dizi zaten YALNIZ automationClass==='AUTO_SAFE' adayları içerir (needsReview asla buraya
+  // girmez). Mevcut satırların güncellenmesi (media değişikliği) yine de HER ZAMAN 'İnsan onayı'na
+  // döner - bu bayraktan etkilenmez (bkz. seedSocialPosts).
+  const result = inputs.length > 0 ? await seedSocialPosts(inputs, { autoApproveNewRows: true }) : { created: 0, updated: 0, skipped: 0, total: 0 };
+  // preserveApproval:true - bu satırlar zaten seedSocialPosts(..., {autoApproveNewRows:true}) ile
+  // 'Onaylandı' yazıldı; carousel medya senkronu bunu sessizce geri ALMAMALI (bkz. social-media-
+  // store.ts replaceSocialPostMedia notu).
+  const mediaSynced = inputs.length > 0 ? await syncSeededCarouselMedia(inputs, baseUrl, today, true) : 0;
 
   return {
     ...result,

@@ -65,21 +65,30 @@ export async function listSocialPostMediaBulk(postIds: string[]) {
   return result;
 }
 
-export async function replaceSocialPostMedia(postId: string, items: Array<{ mediaUrl: string; kind: SocialMediaKind }>) {
+// preserveApproval:true - Faz 5 son denetim düzeltmesi (bölüm 7). Normalde medya değişince
+// approval_status BİLİNÇLİ olarak 'İnsan onayı'ya döner (bir insanın yeniden gözden geçirmesi
+// için - admin panelinden medya değiştirme dahil, davranış AYNI kalır). TEK istisna:
+// ensureRolling30DayPlan() planlayıcısının KENDİ bu turda AUTO_SAFE olarak oluşturduğu ve
+// seedSocialPosts(..., {autoApproveNewRows:true}) ile ZATEN 'Onaylandı' yazdığı taze satırların
+// carousel medya senkronu (syncSeededCarouselMedia), bu onayı sessizce GERİ ALMAMALI - aksi halde
+// AUTO_SAFE onayı, aynı fonksiyonun birkaç satır sonrasındaki bu çağrı tarafından anında bozulurdu.
+export async function replaceSocialPostMedia(postId: string, items: Array<{ mediaUrl: string; kind: SocialMediaKind }>, options?: { preserveApproval?: boolean }) {
   const db = await database();
   await ensure(db);
   const now = new Date().toISOString();
   const editablePost = `id = ?
     AND status = 'Planlandı'
     AND (publish_lock_token IS NULL OR publish_lock_expires_at IS NULL OR publish_lock_expires_at <= ?)`;
+  const approvalResetClause = options?.preserveApproval
+    ? ""
+    : "approval_status = 'İnsan onayı', approved_at = NULL,\n          ";
   const statements = [
     db.prepare(`DELETE FROM social_post_media
       WHERE post_id = ?
         AND EXISTS (SELECT 1 FROM social_posts WHERE ${editablePost})`)
       .bind(postId, postId, now),
     db.prepare(`UPDATE social_posts
-      SET media_url = ?, approval_status = 'İnsan onayı', approved_at = NULL,
-          publish_lock_token = NULL, publish_lock_expires_at = NULL,
+      SET media_url = ?, ${approvalResetClause}publish_lock_token = NULL, publish_lock_expires_at = NULL,
           last_publish_error = NULL, updated_at = ?
       WHERE ${editablePost}`)
       .bind(items[0]?.mediaUrl ?? "", now, postId, now),

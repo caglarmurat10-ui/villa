@@ -167,7 +167,14 @@ export async function createSocialPost(input: SocialPostInput): Promise<SocialPo
   return post;
 }
 
-export async function seedSocialPosts(inputs: SocialPostInput[]) {
+// autoApproveNewRows: yalnız YENİ (henüz D1'de aynı kimlikte bir satır olmayan) kayıtlar için
+// approval_status='Onaylandı' yazar - bkz. src/lib/social-content-planner.ts classifyContentSafety,
+// çağıran taraf (ensureRolling30DayPlan) yalnız automationClass==='AUTO_SAFE' adayları için bu
+// bayrağı true geçirmelidir. MEVCUT bir satırın güncellenmesi (media_url değişikliği) bu bayraktan
+// TAMAMEN bağımsız, HER ZAMAN approval_status='İnsan onayı'ya döner - "medya değişti diye yanlışlıkla
+// yeniden auto-approve etme" kuralı böylece koddan garanti edilir, çağıranın dikkatine bırakılmaz.
+// Varsayılan (false/verilmemiş) - admin formu ve ensureDefaultSocialPlan davranışı BİREBİR aynı kalır.
+export async function seedSocialPosts(inputs: SocialPostInput[], options?: { autoApproveNewRows?: boolean }) {
   const db = await database();
   await ensureTable(db);
   const existingRows = await db.prepare("SELECT id, villa, platform, content_type, scheduled_date, caption, media_url, status FROM social_posts").all<SocialPostIdentityRow>();
@@ -197,10 +204,11 @@ export async function seedSocialPosts(inputs: SocialPostInput[]) {
   }
 
   const now = new Date().toISOString();
+  const autoApprove = options?.autoApproveNewRows === true;
   const insertStatements = pending.map((input) => db.prepare(`INSERT INTO social_posts
     (id, villa, platform, content_type, scheduled_date, caption, media_url, status, approval_status, approved_at, published_at, platform_post_id, publish_attempt_count, last_publish_attempt_at, last_publish_error, publish_lock_token, publish_lock_expires_at, created_at, updated_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?, 'Planlandı', 'İnsan onayı', NULL, NULL, NULL, 0, NULL, NULL, NULL, NULL, ?, ?)`)
-    .bind(crypto.randomUUID(), input.villa, input.platform, input.contentType, input.scheduledDate, input.caption, input.mediaUrl, now, now));
+    VALUES (?, ?, ?, ?, ?, ?, ?, 'Planlandı', ?, ?, NULL, NULL, 0, NULL, NULL, NULL, NULL, ?, ?)`)
+    .bind(crypto.randomUUID(), input.villa, input.platform, input.contentType, input.scheduledDate, input.caption, input.mediaUrl, autoApprove ? "Onaylandı" : "İnsan onayı", autoApprove ? now : null, now, now));
   const updateStatements = updates.map((item) => db.prepare(`UPDATE social_posts
     SET media_url = ?, approval_status = 'İnsan onayı', approved_at = NULL, last_publish_error = NULL,
         publish_lock_token = NULL, publish_lock_expires_at = NULL, updated_at = ?

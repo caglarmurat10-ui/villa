@@ -1,0 +1,131 @@
+// Faz 5 son denetim düzeltmesi - ensureRolling30DayPlan()'ın gerçek D1 katmanıyla uçtan uca
+// davranışını doğrular: AUTO_SAFE -> approval_status='Onaylandı', Destan+Instagram hiç üretilmez,
+// 60 günlük duplicate history YAYINLANMIŞ (Yayınlandı) postları da kapsar.
+import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { createFakeD1, type FakeD1 } from "./test-utils/fake-d1";
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const ROOT = resolve(HERE, "..", "..");
+
+let db: FakeD1;
+const TEST_TODAY = "2026-09-03T09:00:00.000Z";
+
+vi.mock("@opennextjs/cloudflare", () => ({
+  getCloudflareContext: async () => ({ env: { DB: db, APP_BASE_URL: "https://admin.safiradestan.com" } }),
+}));
+
+function loadSchema(): string {
+  return ["0001_schema.sql", "0002_social_posts.sql", "0004_social_publish_tracking.sql", "0006_social_publish_lock.sql", "0007_social_post_media.sql", "0015_social_posts_scheduled_time.sql"]
+    .map((name) => readFileSync(resolve(ROOT, "migrations", name), "utf-8"))
+    .join("\n");
+}
+
+async function socialPostRows() {
+  const result = await db.prepare("SELECT villa, platform, content_type, scheduled_date, caption, approval_status FROM social_posts").all<{
+    villa: string; platform: string; content_type: string; scheduled_date: string; caption: string; approval_status: string;
+  }>();
+  return result.results;
+}
+
+describe("ensureRolling30DayPlan (gerçek D1 entegrasyon testi)", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(TEST_TODAY));
+    db = createFakeD1(loadSchema());
+  });
+  afterEach(() => {
+    db.close();
+    vi.useRealTimers();
+    vi.resetModules();
+  });
+
+  it("AUTO_SAFE olarak sınıflandırılan yeni kayıtlar approval_status='Onaylandı' ile eklenir (carousel medya senkronu dahil, geri alınmaz)", async () => {
+    const { ensureRolling30DayPlan } = await import("./social-plan-seed");
+    await ensureRolling30DayPlan(1);
+    const rows = await socialPostRows();
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows.every((r) => r.approval_status === "Onaylandı")).toBe(true);
+  });
+
+  it("Destan + Instagram kombinasyonu planlayıcı tarafından HİÇ üretilmez (HARD BLOCK, planlama aşamasında)", async () => {
+    const { ensureRolling30DayPlan } = await import("./social-plan-seed");
+    await ensureRolling30DayPlan(4); // birden fazla villa/platform üretmeye zorla
+    const rows = await socialPostRows();
+    expect(rows.some((r) => r.villa === "Destan" && r.platform === "Instagram")).toBe(false);
+  });
+
+  it("Safira Instagram/Facebook ve Destan Facebook üretilebilir", async () => {
+    const { ensureRolling30DayPlan } = await import("./social-plan-seed");
+    await ensureRolling30DayPlan(4);
+    const rows = await socialPostRows();
+    expect(rows.some((r) => r.villa === "Safira" && r.platform === "Instagram")).toBe(true);
+    expect(rows.some((r) => r.villa === "Destan" && r.platform === "Facebook")).toBe(true);
+  });
+
+  it("aynı gün içinde tekrar çağrılmak zaten dolu günlere (>= dailyTarget) asla ikinci kez içerik eklemez", async () => {
+    // Not: bir gün için havuz/duplicate/no-consecutive-sales kısıtları yüzünden İLK çağrıda
+    // GERÇEKTEN boş kalmışsa, ikinci çağrı o günü doldurabilir - bu bir tekrar/duplicate DEĞİL,
+    // planlayıcının kaldığı yerden devam etmesidir (KV/Istanbul-tarih guard'ı, custom-worker.mjs'te,
+    // cron'un GÜNDE BİR KEZ bu fonksiyonu ÇAĞIRMASINI garanti eder - bkz. ayrı DIAG testi altında).
+    // Asıl garanti edilmesi gereken: zaten >= dailyTarget dolu bir GÜN asla ikinci kez içerik almaz.
+    const { ensureRolling30DayPlan } = await import("./social-plan-seed");
+    await ensureRolling30DayPlan(1);
+    const firstRows = await socialPostRows();
+    const firstDateCounts = new Map<string, number>();
+    for (const row of firstRows) firstDateCounts.set(row.scheduled_date, (firstDateCounts.get(row.scheduled_date) ?? 0) + (row.platform === "Instagram" ? 1 : 0) + (row.platform === "Facebook" && row.villa === "Destan" ? 1 : 0));
+    const fullyPlannedDates = new Set(firstRows.filter((r) => r.platform === "Instagram" || r.villa === "Destan").map((r) => r.scheduled_date));
+
+    await ensureRolling30DayPlan(1);
+    const secondRows = await socialPostRows();
+
+    // Önceki tam çalışmadan gelen HER satır ikinci çağrıdan sonra da (id bazında değil, içerik
+    // bazında) hâlâ tam olarak bir kez mevcut olmalı - hiçbiri kopyalanmadı/bozulmadı.
+    for (const row of firstRows) {
+      const matches = secondRows.filter((r) => r.scheduled_date === row.scheduled_date && r.villa === row.villa && r.platform === row.platform && r.caption === row.caption);
+      expect(matches).toHaveLength(1);
+    }
+    // Zaten dolu (Instagram veya Destan Facebook ile temsil edilen) günlerde ikinci çağrı sonrası
+    // FARKLI bir caption'a sahip ek bir satır oluşmadı.
+    for (const date of fullyPlannedDates) {
+      const firstCaptionsForDate = new Set(firstRows.filter((r) => r.scheduled_date === date).map((r) => r.caption));
+      const secondCaptionsForDate = new Set(secondRows.filter((r) => r.scheduled_date === date).map((r) => r.caption));
+      expect(secondCaptionsForDate).toEqual(firstCaptionsForDate);
+    }
+  });
+
+  it("daha önce YAYINLANMIŞ (Yayınlandı) bir gönderinin caption'ı 60 gün içinde tekrar önerilmez", async () => {
+    const now = new Date().toISOString();
+    const publishedCaption = "Bir villayı özel yapan şey sadece odaları değil, günün nasıl aktığıdır.\n\nVilla Safira’da gün, havuz başında başlamak zorunda değil; ama çoğu zaman öyle devam etmek isteyeceksiniz. Gerçek villa görüntülerini kullanarak konaklama deneyimini olduğu gibi gösteriyoruz: sakin, ferah ve size ait.\n\nVillanın diğer gerçek fotoğrafları için profili inceleyin.\n\n#villasafirapatara #patara #kaş #villatatili #özelhavuz #antalya #tatil";
+    await db.prepare(`INSERT INTO social_posts
+      (id, villa, platform, content_type, scheduled_date, caption, media_url, status, approval_status, approved_at, published_at, created_at, updated_at)
+      VALUES ('published-1', 'Safira', 'Instagram', 'Reels', '2026-08-10', ?, '/api/media/drive/x', 'Yayınlandı', 'Onaylandı', ?, ?, ?, ?)`)
+      .bind(publishedCaption, now, now, now, now).run();
+
+    const { ensureRolling30DayPlan } = await import("./social-plan-seed");
+    await ensureRolling30DayPlan(8); // havuzu zorla tüket
+    const rows = await socialPostRows();
+    // Orijinal 'Yayınlandı' satırın kendisi hâlâ tabloda olmalı (silinmedi) - ama planlayıcı
+    // AYNI caption'ı YENİ bir 'Planlandı' satır olarak bir daha ÖNERMEMİŞ olmalı (tam olarak 1 kez).
+    expect(rows.filter((r) => r.caption === publishedCaption)).toHaveLength(1);
+  });
+});
+
+describe("Günlük planlayıcı cron guard regresyonu (custom-worker.mjs)", () => {
+  it("KV tabanlı 'günde bir kez' idempotency guard'ı hâlâ kaynak kodda mevcut", () => {
+    const source = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
+    expect(source).toContain("social_daily_planner_last_run_date");
+    expect(source).toContain("runDailySocialPlannerIfDue");
+    expect(source).toContain("if (lastRunDate === today) return;");
+  });
+
+  it("runSocialCron, günlük planlayıcıyı çağırır (mevcut yayın akışını bozmadan, izole try/catch içinde)", () => {
+    const source = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
+    const cronIndex = source.indexOf("async function runSocialCron(controller, env, ctx) {");
+    const plannerCallIndex = source.indexOf("runDailySocialPlannerIfDue(env, ctx)", cronIndex);
+    expect(cronIndex).toBeGreaterThan(-1);
+    expect(plannerCallIndex).toBeGreaterThan(cronIndex);
+  });
+});

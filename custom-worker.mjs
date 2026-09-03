@@ -537,7 +537,12 @@ async function adminAuthGate(request, env) {
   // gerçek villa dosyası) besleniyor, keyfi URL'e fetch yapmıyor - herkese açık olması güvenli.
   // Bu satır olmadan Meta 401/JSON hatası alıyor ve "medya container oluşturulamadı (9004)" ile
   // reddediyor - dosyanın kendisinde hiçbir sorun yok, erişilemez olması sorunun tamamı.
-  if (adminPublicAssetPath(url.pathname) || url.pathname.startsWith("/api/media/drive/") || ADMIN_PUBLIC_PATHS.has(url.pathname)) return null;
+  // /api/public/social-assets/[id]/[format]: Faz 5 son denetim düzeltmesi (bölüm 9) - AYNI ihtiyaç,
+  // AYNI çözüm: Social Design Engine'in ürettiği evergreen görselleri (Destination/Activity/Travel
+  // Tip/Villa Lifestyle/Offer) Meta'ya publish media olarak vermek için de oturumsuz erişim gerekir.
+  // Route yalnız kapalı bir allowlist'ten (parseTemplateId - Villa enum + TemplateType enum +
+  // GUIDE_PLACES/EVERGREEN_TIPS sabit listeleri) besleniyor, serbest metin render etmiyor.
+  if (adminPublicAssetPath(url.pathname) || url.pathname.startsWith("/api/media/drive/") || url.pathname.startsWith("/api/public/social-assets/") || ADMIN_PUBLIC_PATHS.has(url.pathname)) return null;
 
   const authenticated = await verifyAdminSession(request, env);
   if (url.pathname === ADMIN_LOGIN_PATH) {
@@ -859,8 +864,55 @@ async function writeSocialCronHeartbeat(env, ranAt, counts) {
   }
 }
 
+// Faz 5 son denetim düzeltmesi (bölüm 5) - ensureRolling30DayPlan()'ı (src/lib/social-plan-seed.ts)
+// GÜNDE BİR KEZ tetikler. custom-worker.mjs derlenmiş TS/Next.js modüllerini import EDEMEZ (bkz.
+// yukarıdaki OTA bölümü notu) - bu yüzden publishThroughApp ile AYNI, zaten kanıtlanmış desen
+// kullanılır: nextWorker.fetch() ile in-process internal POST + zorunlu Host header (bkz.
+// publishThroughApp'teki 2026-08-30 kök neden notu - Host header'sız istek middleware'de sessizce
+// 404 olur). Idempotency KV'de (META_PRIVATE) Europe/Istanbul tarihiyle tutulur - cron */15 dakikada
+// bir çalışsa da planner günde yalnız bir kez tetiklenir. Yalnız BAŞARILI bir çağrıdan sonra
+// "bugün çalıştı" işaretlenir - başarısız bir deneme aynı gün içindeki bir sonraki tikte tekrar
+// denenir (kalıcı olarak atlanmaz).
+const DAILY_PLANNER_KV_KEY = "social_daily_planner_last_run_date";
+
+async function runDailySocialPlannerIfDue(env, ctx) {
+  const today = istanbulClock(new Date()).date;
+  let lastRunDate = null;
+  try {
+    lastRunDate = await env.META_PRIVATE.get(DAILY_PLANNER_KV_KEY);
+  } catch (error) {
+    console.error(`[Social Planner] KV okuma hatası: ${safeCronError(error)}`);
+  }
+  if (lastRunDate === today) return;
+
+  const baseUrl = String(env.APP_BASE_URL ?? "https://admin.safiradestan.com").replace(/\/$/, "");
+  const targetUrl = `${baseUrl}/api/social-posts/plan-30-day`;
+  try {
+    const response = await nextWorker.fetch(new Request(targetUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Host: new URL(targetUrl).host },
+    }), env, ctx);
+    if (!response.ok) {
+      console.error(`[Social Planner] plan-30-day HTTP ${response.status} döndü, bugün tekrar denenecek.`);
+      return;
+    }
+    await env.META_PRIVATE.put(DAILY_PLANNER_KV_KEY, today);
+    const payload = await response.json().catch(() => ({}));
+    console.log(`[Social Planner] Günlük plan çalıştı: ${JSON.stringify(payload.result ?? {}).slice(0, 300)}`);
+  } catch (error) {
+    console.error(`[Social Planner] Çağrı başarısız, bugün tekrar denenecek: ${safeCronError(error)}`);
+  }
+}
+
 async function runSocialCron(controller, env, ctx) {
   const ranAt = new Date(controller.scheduledTime).toISOString();
+
+  // Planlayıcı hatası, mevcut yayın akışını ASLA engellemez - tamamen izole, ayrı bir adım.
+  try {
+    await runDailySocialPlannerIfDue(env, ctx);
+  } catch (error) {
+    console.error(`[Social Cron] Günlük planlayıcı beklenmeyen hata: ${safeCronError(error)}`);
+  }
 
   if (String(env.SOCIAL_AUTO_PUBLISH_ENABLED ?? "true").toLowerCase() !== "true") {
     console.log("[Social Cron] Otomatik yayın kapalı.");
