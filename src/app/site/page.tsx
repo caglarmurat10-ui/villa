@@ -2,7 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import PublicBookingWidget from "@/components/PublicBookingWidget";
 import VillaComparison from "@/components/VillaComparison";
+import TrustStrip from "@/components/TrustStrip";
+import ReservationConfidenceSection from "@/components/ReservationConfidenceSection";
 import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
+import { getInstallmentCampaignReadiness } from "@/lib/payments/installment-campaign";
 import { VILLAS, FAQ_ITEMS, REGION_INFO, type VillaSlug } from "@/lib/villa-content";
 import { GUIDE_PLACES, GUIDE_CATEGORIES } from "@/lib/region-guide";
 import { toVillaId } from "@/lib/analytics";
@@ -114,7 +117,7 @@ const structuredData = {
 };
 
 export default async function PublicHomePage() {
-  const [reservations, prices, locations, blockedRanges] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), listBlockedRanges()]);
+  const [reservations, prices, locations, blockedRanges, installmentCampaign] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), listBlockedRanges(), getInstallmentCampaignReadiness()]);
   const bookingReservations = [
     ...reservations.map(({ villa, checkIn, checkOut }) => ({ villa, checkIn, checkOut })),
     ...blockedRanges,
@@ -166,12 +169,16 @@ export default async function PublicHomePage() {
         <div className={styles.heroNote}><span>01</span><p>İki ayrı villa.<br />Tek bir özenli deneyim.</p></div>
       </section>
 
+      <TrustStrip installmentVerified={installmentCampaign.state === "INSTALLMENT_CAMPAIGN_VERIFIED"} maxInstallment={installmentCampaign.maxInstallment} />
+
       <section className={styles.bookingBand} id="musaitlik">
         <div className={styles.bookingWrap}>
           <div className={styles.bookingIntro}><span className={styles.kicker}>CANLI TAKVİM</span><h2>Tatil tarihiniz<br />müsait mi?</h2><p>Takvim doğrudan yönetim sistemindeki rezervasyonlarla kontrol edilir.</p></div>
           <PublicBookingWidget reservations={bookingReservations} prices={bookingPrices} />
         </div>
       </section>
+
+      <ReservationConfidenceSection />
 
       <section className={styles.section} id="villalar">
         <div className={styles.editorialHead}><span className={styles.kicker}>PATARA VİLLA KİRALAMA</span><h2>Hangisi sizin<br />tatiliniz?</h2><p>Villa Safira ve Villa Destan’ı gerçek fotoğraflarıyla keşfedin; Patara’da özel havuzlu villa tatili için size en uygun seçeneği bulun.</p></div>
