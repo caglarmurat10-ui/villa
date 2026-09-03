@@ -51,7 +51,7 @@ async function waitUntilReady(containerId: string, accessToken: string, attempts
     if (["ERROR", "EXPIRED"].includes(status)) throw new Error(`Instagram medya işleme başarısız (${status}).`);
     if (index < attempts - 1) await new Promise((resolve) => setTimeout(resolve, 2500));
   }
-  throw new Error("Instagram video işleme henüz tamamlanmadı. Birkaç dakika sonra yeniden deneyin.");
+  throw new Error("Instagram medya işleme henüz tamamlanmadı. Birkaç dakika sonra yeniden deneyin.");
 }
 
 async function publishContainer(accountId: string, accessToken: string, creationId: string) {
@@ -133,6 +133,10 @@ export async function publishInstagramStory(
   if (media.kind === "video") params.video_url = media.mediaUrl;
   else params.image_url = media.mediaUrl;
   const containerId = await createContainer(accountId, accessToken, params);
-  if (media.kind === "video") await waitUntilReady(containerId, accessToken);
+  // Reels/video ile ayni bekleme - Story container'lari (resim olsa bile) bazen media_publish'ten
+  // once islenmeyi bitirmiyor (production'da gorulen HTTP 400/9007 hatasi buna isaret ediyor).
+  // Container zaten hazirsa ilk containerStatus() cagrisi FINISHED donup hemen cikar - ek maliyet
+  // yalniz gerektiginde olusur.
+  await waitUntilReady(containerId, accessToken);
   return publishContainer(accountId, accessToken, containerId);
 }
