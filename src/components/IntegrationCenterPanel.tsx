@@ -79,7 +79,16 @@ function buildServiceRows(snapshot: IntegrationCenterSnapshot): ServiceRow[] {
     { name: "PayTR", status: paytrStatus, lastSuccess: null, lastCheck: now, lastError: null, actionRequired: snapshot.paytr.state === "PAYTR_NOT_CONFIGURED" ? "PAYTR_MERCHANT_ID/KEY/SALT secret olarak eklenmeli" : "Aşağıdaki checklist + Bağlantı Testi ile merchant panel adımlarını teyit edin" },
     { name: "Search Console", status: snapshot.google.searchConsoleState === "GOOGLE_READY" ? "READY" : "WAITING_EXTERNAL_ACCESS", lastSuccess: snapshot.google.searchConsole ? now : null, lastCheck: now, lastError: snapshot.google.searchConsoleError, actionRequired: snapshot.google.searchConsoleState === "GOOGLE_READY" ? null : (snapshot.google.oauthClientConfigured ? "OAuth bağlantısını /sosyal sayfasından tamamlayın" : "GOOGLE_CLIENT_ID/SECRET secret olarak eklenmeli") },
     { name: "GA4", status: snapshot.google.ga4State === "GOOGLE_READY" ? "READY" : "WAITING_EXTERNAL_ACCESS", lastSuccess: snapshot.google.ga4 ? now : null, lastCheck: now, lastError: snapshot.google.ga4Error, actionRequired: snapshot.google.ga4State === "GOOGLE_READY" ? null : (snapshot.google.oauthClientConfigured ? "OAuth bağlantısını /sosyal sayfasından tamamlayın" : "GOOGLE_CLIENT_ID/SECRET secret olarak eklenmeli") },
-    { name: "Google Business Profile", status: "WAITING_EXTERNAL_ACCESS", lastSuccess: null, lastCheck: null, lastError: null, actionRequired: "Gerçek GBP API erişimi/onayı yok - kod hazır (READY_TO_CONNECT), erişim geldiğinde read-only audit başlar" },
+    {
+      name: "Google Business Profile",
+      status: "WAITING_EXTERNAL_ACCESS",
+      lastSuccess: null,
+      lastCheck: null,
+      lastError: null,
+      actionRequired: snapshot.google.gbpState === "WAITING_OWNER_ACCESS"
+        ? "OAuth bağlandı - /entegrasyonlar'da 'GBP Hesap/Location Keşfet' ile hesap/location bulup Safira/Destan için seçin"
+        : "Önce Google Business Profile'a bağlanın (oauth start?scope=gbp) - kod hazır (READY_TO_CONNECT)",
+    },
     { name: "Google Ads", status: "WAITING_USER_ACTION", lastSuccess: null, lastCheck: null, lastError: null, actionRequired: "OAuth + developer token + customer ID sağlanmalı (taslak kampanyalar hazır)" },
     { name: "Meta Organik", status: metaOrganicOk ? "PASS" : "WARNING", lastSuccess: metaOrganicOk ? now : null, lastCheck: now, lastError: null, actionRequired: metaOrganicOk ? null : "Eksik hesap bağlantısını /sosyal sayfasından tamamlayın" },
     { name: "Meta Ads", status: "WAITING_USER_ACTION", lastSuccess: null, lastCheck: null, lastError: null, actionRequired: "Business Manager/ad_account + ads_management izni sağlanmalı (taslak kampanyalar hazır)" },
