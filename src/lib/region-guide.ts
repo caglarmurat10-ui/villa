@@ -97,6 +97,20 @@ export const GUIDE_PLACES: GuidePlace[] = [
     description: "Eski bir Rum balıkçı köyünden gelişen, beyaz badanalı evleri ve marinasıyla bilinen şık bir sahil kasabası.",
     mapsQuery: "Kalkan, Antalya",
   },
+  {
+    id: "letoon-antik-kenti",
+    name: "Letoon Antik Kenti",
+    category: "tarih",
+    description: "Likya Birliği'nin dinî merkezi olan antik kutsal alan; Apollon, Artemis ve Leto'ya adanmış üç tapınağıyla bilinir. Xanthos ile birlikte 1988'de UNESCO Dünya Mirası Listesi'ne girmiştir.",
+    mapsQuery: "Letoon Antik Kenti, Kumluova, Muğla",
+  },
+  {
+    id: "likya-yolu",
+    name: "Likya Yolu",
+    category: "doga",
+    description: "Antalya'dan Fethiye'ye uzanan, dünyanın önde gelen uzun mesafe yürüyüş rotalarından biri olarak bilinen Likya Yolu'nun bir bölümü Patara, Kalkan ve Kaş üzerinden geçer; kıyı ve antik kent manzaralarını bir arada sunar.",
+    mapsQuery: "Lykian Way, Kaş, Antalya",
+  },
 ];
 
 export function guideMapsUrl(query: string): string {
