@@ -37,10 +37,10 @@ function resolveSource(): string {
 }
 
 type BookingReservation = Pick<Reservation, "villa" | "checkIn" | "checkOut">;
-type BookingPrice = Pick<PriceRange, "villa" | "startDate" | "endDate" | "nightlyRate">;
+type BookingPrice = Pick<PriceRange, "villa" | "startDate" | "endDate" | "nightlyRate" | "basePriceMinor" | "baseNights" | "minimumNights">;
 
 type AvailabilityResult = {
-  kind: "available" | "busy" | "error" | "price_gap";
+  kind: "available" | "busy" | "error" | "price_gap" | "min_stay";
   title: string;
   detail: string;
   total?: number;
@@ -48,6 +48,7 @@ type AvailabilityResult = {
   averageRate?: number;
   segments?: PriceSegment[];
   alternative?: Villa;
+  minimumNights?: number;
 };
 
 type RequestState = {
@@ -60,6 +61,22 @@ const money = new Intl.NumberFormat("tr-TR", {
   currency: "TRY",
   maximumFractionDigits: 0,
 });
+
+// Haftalık esas fiyattan türetilen referans gecelik oran (ör. 130000/7 = 18571.428571...) tam
+// kuruşa kadar gösterilmeli - money (0 ondalık) burada YETERSİZ, "₺18.571,43" gibi net gösterim şart.
+const moneyPrecise = new Intl.NumberFormat("tr-TR", {
+  style: "currency",
+  currency: "TRY",
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
+
+// Tam TL tutarları eskisi gibi 0 ondalıkla ("₺130.000"), küsuratlı tutarlar (haftalık esas fiyatın
+// 7'ye tam bölünmediği kısmi konaklamalar gibi) 2 ondalıkla ("₺74.285,71") gösterilir - müşteriye
+// gösterilen tutar HİÇBİR ZAMAN gerçek ödenecek tutardan sessizce yuvarlanmaz.
+function formatMoney(amount: number): string {
+  return Math.round(amount * 100) % 100 === 0 ? money.format(amount) : moneyPrecise.format(amount);
+}
 
 function isOccupied(reservations: BookingReservation[], villa: Villa, checkIn: string, checkOut: string) {
   return reservations.some(
@@ -84,7 +101,6 @@ export default function PublicBookingWidget({
   initialCheckOut,
   initialGuestCount,
   installmentVerified = false,
-  maxInstallment = 6,
 }: {
   reservations: BookingReservation[];
   prices: BookingPrice[];
@@ -99,7 +115,6 @@ export default function PublicBookingWidget({
   // edilmez (bkz. src/lib/payments/installment-campaign.ts, merchant doğrulaması tamamlanmadan
   // public'e asla çıkmaz).
   installmentVerified?: boolean;
-  maxInstallment?: number;
 }) {
   const prefill = validateBookingPrefill({ checkIn: initialCheckIn, checkOut: initialCheckOut, guestCount: initialGuestCount });
 
@@ -146,6 +161,14 @@ export default function PublicBookingWidget({
     if (quote.status === "invalid_range") {
       return { kind: "error", title: "Tarihleri kontrol edin", detail: "Çıkış tarihi girişten sonra olmalı." };
     }
+    if (quote.status === "min_stay") {
+      return {
+        kind: "min_stay",
+        title: "Minimum konaklama süresi",
+        detail: `Bu dönem için minimum konaklama süresi ${quote.minimumNights} gecedir.`,
+        minimumNights: quote.minimumNights,
+      };
+    }
 
     return {
       kind: "available",
@@ -159,8 +182,8 @@ export default function PublicBookingWidget({
   }, [checkIn, checkOut, prices, reservations, villa]);
 
   const alternativeHref = result?.alternative === "Safira" ? "/villa-safira" : "/villa-destan";
-  const resultClass = result?.kind === "available" ? styles.available : result?.kind === "busy" ? styles.busy : result?.kind === "error" ? styles.error : result?.kind === "price_gap" ? styles.priceGap : "";
-  const resultIcon = result?.kind === "available" ? "✓" : result?.kind === "price_gap" ? "!" : result ? "✕" : "";
+  const resultClass = result?.kind === "available" ? styles.available : result?.kind === "busy" ? styles.busy : result?.kind === "error" ? styles.error : result?.kind === "price_gap" || result?.kind === "min_stay" ? styles.priceGap : "";
+  const resultIcon = result?.kind === "available" ? "✓" : result?.kind === "price_gap" || result?.kind === "min_stay" ? "!" : result ? "✕" : "";
   const canSubmitInquiry = result?.kind === "available" || result?.kind === "price_gap";
 
   function resetRequestFeedback() {
@@ -250,14 +273,15 @@ export default function PublicBookingWidget({
             </div>
             <div className={styles.resultTop}>
               <strong><span className={styles.resultIcon} aria-hidden="true">{resultIcon}</span>{result.title}</strong>
-              {typeof result.total === "number" && <b>{money.format(result.total)}</b>}
+              {typeof result.total === "number" && <b>{formatMoney(result.total)}</b>}
             </div>
             <p>{result.detail}</p>
-            {result.kind === "available" && installmentVerified && typeof result.total === "number" && maxInstallment > 0 && (
+            {result.kind === "available" && installmentVerified && typeof result.total === "number" && (
               <div className={styles.installment}>
-                <strong>Peşin fiyatına {maxInstallment} taksit</strong>
-                <span>{maxInstallment} × yaklaşık {money.format(splitEvenInstallments(result.total, maxInstallment)[0])}</span>
-                <small>Taksit seçenekleri kart ve banka koşullarına göre ödeme ekranında görüntülenir.</small>
+                <strong>Peşin fiyatına 3 veya 6 taksit</strong>
+                <span>3 taksit: 3 × yaklaşık {formatMoney(splitEvenInstallments(result.total, 3)[0])}</span>
+                <span>6 taksit: 6 × yaklaşık {formatMoney(splitEvenInstallments(result.total, 6)[0])}</span>
+                <small>Toplam rezervasyon tutarı değişmez. Kesin taksit tutarları kartınıza göre ödeme ekranında gösterilir.</small>
               </div>
             )}
             {result.segments && result.segments.length > 1 ? (
@@ -266,13 +290,13 @@ export default function PublicBookingWidget({
                   <tbody>
                     {result.segments.map((segment) => (
                       <tr key={segment.startDate}>
-                        <td>{formatDateLabel(segment.startDate)} – {formatDateLabel(segment.endDate)} · {segment.nights} gece × {money.format(segment.nightlyRate)}</td>
-                        <td>{money.format(segment.subtotal)}</td>
+                        <td>{formatDateLabel(segment.startDate)} – {formatDateLabel(segment.endDate)} · {segment.nights} gece × {formatMoney(segment.nightlyRate)}</td>
+                        <td>{formatMoney(segment.subtotal)}</td>
                       </tr>
                     ))}
                     <tr className={styles.breakdownTotal}>
-                      <td>TOPLAM · Ortalama gecelik {money.format(result.averageRate ?? 0)}</td>
-                      <td>{money.format(result.total ?? 0)}</td>
+                      <td>TOPLAM · Ortalama gecelik {formatMoney(result.averageRate ?? 0)}</td>
+                      <td>{formatMoney(result.total ?? 0)}</td>
                     </tr>
                   </tbody>
                 </table>

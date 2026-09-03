@@ -26,6 +26,14 @@ export interface InstallmentCampaignReadiness {
 // bir kod değişikliği + deploy gerektirir - bir admin panel toggle'ı YANLIŞLIKLA bunu açamaz.
 export const INSTALLMENT_CAMPAIGN_MERCHANT_VERIFIED = false;
 
+// NOT (2027 fiyat kararı, "3 veya 6 taksit" public copy'si): PayTR'ın iframe/API'sinin ara taksit
+// sayılarını (2,3,4,5) da mı sunduğu, yoksa max_installment=6 ile 2-6 arası TÜM seçeneklerin mi
+// otomatik açıldığı - bu, gerçek merchant panel/API dokümantasyonu incelenip canlı test edilmeden
+// buradan doğrulanamaz/uydurulamaz. Public banner ve booking widget'taki "3 veya 6 taksit" copy'si
+// bu belirsizlikten BAĞIMSIZ olarak doğrudur (müşteri toplamı hangi taksit sayısını seçerse seçsin
+// değişmez) - yalnız PayTR'ın müşteriye TAM OLARAK 3 ve 6'yı mı, yoksa daha geniş bir aralığı mı
+// sunacağı ayrı, doğrulanmamış bir konu. Merchant verification aşamasında ayrıca kontrol edilmeli.
+
 interface RealFullPaymentRow {
   requested_amount_minor: number;
   provider_customer_total_minor: number | null;

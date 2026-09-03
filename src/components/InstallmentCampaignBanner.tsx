@@ -11,9 +11,9 @@ export default function InstallmentCampaignBanner({ readiness, variant = "card" 
 
   return (
     <div className={variant === "compact" ? styles.compact : styles.card}>
-      <strong className={styles.headline}>Peşin Fiyatına {readiness.maxInstallment} Taksit</strong>
-      <p className={styles.body}>Villa Safira ve Villa Destan&apos;da uygun kartlara {readiness.maxInstallment} taksite kadar ödeme seçeneği.</p>
-      <small className={styles.disclaimer}>Taksit seçenekleri kart ve banka koşullarına göre ödeme ekranında görüntülenir.</small>
+      <strong className={styles.headline}>Peşin Fiyatına 3 veya 6 Taksit</strong>
+      <p className={styles.body}>Villa Safira ve Villa Destan&apos;da uygun kartlara {readiness.maxInstallment} taksite kadar ödeme seçeneği. Toplam rezervasyon tutarı değişmez.</p>
+      <small className={styles.disclaimer}>Kesin taksit tutarları kartınıza göre ödeme ekranında görüntülenir.</small>
     </div>
   );
 }

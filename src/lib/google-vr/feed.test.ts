@@ -46,3 +46,39 @@ describe("computeGoogleVrQuote", () => {
     expect(quote.currency).toBe("TRY");
   });
 });
+
+describe("computeGoogleVrQuote - 2027-06-15 -> 2027-09-15 haftalık esas fiyat (Destan 130000 TRY)", () => {
+  const DESTAN_2027: PriceRangeInput = {
+    startDate: "2027-06-15", endDate: "2027-09-15", nightlyRate: 18571.43,
+    basePriceMinor: 13000000, baseNights: 7, minimumNights: 4,
+  };
+
+  it("7 gecelik totalMinor TAM OLARAK 13000000 kuruş (130000 TRY) - sitedeki canonical toplamla birebir aynı", () => {
+    const checkIn = "2027-06-15";
+    const checkOut = "2027-06-22";
+    const quote = computeGoogleVrQuote("DESTAN", checkIn, checkOut, 6, { priceRanges: [DESTAN_2027], isOccupied: false });
+    const publicQuote = computePriceQuote([DESTAN_2027], checkIn, checkOut);
+    expect(publicQuote.status).toBe("ok");
+    if (publicQuote.status !== "ok") throw new Error("beklenmeyen");
+    expect(quote.totalMinor).toBe(13000000);
+    expect(quote.totalMinor).toBe(Math.round(publicQuote.total * 100));
+  });
+
+  it("nightlyBreakdown toplamı totalMinor'a birebir eşit - tek kuruşluk sürüklenme bile yok", () => {
+    const quote = computeGoogleVrQuote("DESTAN", "2027-06-15", "2027-06-22", 6, { priceRanges: [DESTAN_2027], isOccupied: false });
+    const breakdownSum = quote.nightlyBreakdown.reduce((sum, day) => sum + day.rateMinor, 0);
+    expect(breakdownSum).toBe(quote.totalMinor);
+  });
+
+  it("minimum konaklamanın altındaki (3 gece) sorgu available:false döner - politika dışı tarih asla bookable görünmez", () => {
+    const quote = computeGoogleVrQuote("DESTAN", "2027-06-15", "2027-06-18", 6, { priceRanges: [DESTAN_2027], isOccupied: false });
+    expect(quote.available).toBe(false);
+    expect(quote.totalMinor).toBeNull();
+    expect(quote.minimumNights).toBe(4);
+  });
+
+  it("minimumNights alanı ilgili dönemden doğru okunur (available=true durumda da)", () => {
+    const quote = computeGoogleVrQuote("DESTAN", "2027-06-15", "2027-06-22", 6, { priceRanges: [DESTAN_2027], isOccupied: false });
+    expect(quote.minimumNights).toBe(4);
+  });
+});

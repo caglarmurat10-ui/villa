@@ -123,7 +123,7 @@ export default async function PublicHomePage() {
     ...reservations.map(({ villa, checkIn, checkOut }) => ({ villa, checkIn, checkOut })),
     ...blockedRanges,
   ];
-  const bookingPrices = prices.map(({ villa, startDate, endDate, nightlyRate }) => ({ villa, startDate, endDate, nightlyRate }));
+  const bookingPrices = prices.map(({ villa, startDate, endDate, nightlyRate, basePriceMinor, baseNights, minimumNights }) => ({ villa, startDate, endDate, nightlyRate, basePriceMinor, baseNights, minimumNights }));
 
   return (
     <main className={styles.page}>
@@ -179,7 +179,6 @@ export default async function PublicHomePage() {
             reservations={bookingReservations}
             prices={bookingPrices}
             installmentVerified={installmentCampaign.state === "INSTALLMENT_CAMPAIGN_VERIFIED"}
-            maxInstallment={installmentCampaign.maxInstallment}
           />
         </div>
       </section>

@@ -1,4 +1,4 @@
-import { computePriceQuote, type PriceRangeInput } from "../price-engine";
+import { computePriceQuote, splitEvenMinor, type PriceRangeInput } from "../price-engine";
 import type { GoogleVrPropertyId, GoogleVrQuote } from "./types";
 
 // SAF fonksiyon - D1/network cagrisi yok. price-engine.ts'teki AYNI computePriceQuote'u kullanir
@@ -26,26 +26,39 @@ export function computeGoogleVrQuote(
 ): GoogleVrQuote {
   const lastUpdated = new Date().toISOString();
   const base = { propertyId, checkIn, checkOut, occupancy, currency: "TRY" as const, lastUpdated };
+  // checkIn'i kapsayan dönemin minimum_nights'ı - available=false olsa bile (ör. min_stay/gap)
+  // çağıran tarafın LOS politikasını görebilmesi için ayrıca hesaplanır.
+  const minimumNights = inputs.priceRanges.find((range) => range.startDate <= checkIn && range.endDate >= checkIn)?.minimumNights ?? null;
 
   if (inputs.isOccupied) {
-    return { ...base, available: false, nightlyBreakdown: [], totalMinor: null };
+    return { ...base, available: false, nightlyBreakdown: [], totalMinor: null, minimumNights };
   }
 
+  // enforceMinimumStay varsayılan (true) ile çağrılır - Google'a, siteye 4 geceden kısa bir
+  // konaklama "müsait+fiyatlı" olarak asla bildirilmemeli (minimum konaklama politikası burada da
+  // geçerli - bkz. computePriceQuote enforceMinimumStay).
   const quote = computePriceQuote(inputs.priceRanges, checkIn, checkOut);
   if (quote.status !== "ok") {
-    // gap veya invalid_range - fiyat tanimsiz/gecersiz tarih ASLA "musait+fiyatli" olarak gonderilmez
-    return { ...base, available: false, nightlyBreakdown: [], totalMinor: null };
+    // gap, invalid_range veya min_stay - fiyat tanimsiz/gecersiz/politika-disi tarih ASLA
+    // "musait+fiyatli" olarak gonderilmez
+    return { ...base, available: false, nightlyBreakdown: [], totalMinor: null, minimumNights };
   }
 
+  // Her segment'in TAM kuruş toplamı (segment.subtotal zaten minor-unit-safe hesaplandı, bkz.
+  // price-engine.ts segmentSubtotal) splitEvenMinor ile gecelere dağıtılır - nightlyBreakdown'ın
+  // toplamı HER ZAMAN totalMinor'a birebir eşit kalır (1 kuruşluk sürüklenme dahi olmaz).
   const nightlyBreakdown: Array<{ date: string; rateMinor: number }> = [];
+  let totalMinor = 0;
   for (const segment of quote.segments) {
+    const segmentSubtotalMinor = Math.round(segment.subtotal * 100);
+    totalMinor += segmentSubtotalMinor;
+    const perNight = splitEvenMinor(segmentSubtotalMinor, segment.nights);
     let cursor = new Date(`${segment.startDate}T00:00:00Z`);
-    const end = new Date(`${segment.endDate}T00:00:00Z`);
-    while (cursor < end) {
-      nightlyBreakdown.push({ date: cursor.toISOString().slice(0, 10), rateMinor: Math.round(segment.nightlyRate * 100) });
+    for (let index = 0; index < segment.nights; index += 1) {
+      nightlyBreakdown.push({ date: cursor.toISOString().slice(0, 10), rateMinor: perNight[index] });
       cursor = new Date(cursor.getTime() + 86_400_000);
     }
   }
 
-  return { ...base, available: true, nightlyBreakdown, totalMinor: Math.round(quote.total * 100) };
+  return { ...base, available: true, nightlyBreakdown, totalMinor, minimumNights };
 }

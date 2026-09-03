@@ -66,7 +66,7 @@ export default async function VillaDetailPage({ params, searchParams }: { params
     ...reservations.map(({ villa: itemVilla, checkIn, checkOut }) => ({ villa: itemVilla, checkIn, checkOut })),
     ...blockedRanges,
   ];
-  const bookingPrices = prices.map(({ villa: itemVilla, startDate, endDate, nightlyRate }) => ({ villa: itemVilla, startDate, endDate, nightlyRate }));
+  const bookingPrices = prices.map(({ villa: itemVilla, startDate, endDate, nightlyRate, basePriceMinor, baseNights, minimumNights }) => ({ villa: itemVilla, startDate, endDate, nightlyRate, basePriceMinor, baseNights, minimumNights }));
   const todayIso = new Date().toISOString().slice(0, 10);
   const mapsUrl = locations[villa.villa];
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${villa.geo.lat},${villa.geo.lng}`;
@@ -372,7 +372,6 @@ export default async function VillaDetailPage({ params, searchParams }: { params
             initialCheckOut={firstParam(query.checkout)}
             initialGuestCount={firstParam(query.guests)}
             installmentVerified={installmentCampaign.state === "INSTALLMENT_CAMPAIGN_VERIFIED"}
-            maxInstallment={installmentCampaign.maxInstallment}
           />
         </div>
       </section>

@@ -37,4 +37,8 @@ export interface GoogleVrQuote {
   totalMinor: number | null; // available=false veya fiyat eksikse null - asla tahmini deger degil
   currency: "TRY";
   lastUpdated: string; // ISO timestamp - feed'in hesaplandigi an
+  // checkIn tarihini kapsayan price_ranges satırının minimum_nights'ı varsa (2027 yaz kararı gibi) -
+  // yoksa null. Gerçek Google VR API'sinin resmi LOS alan adı doğrulanmadan burada uydurulmadı; bu
+  // yalnız INTERNAL model (bkz. dosya başı not) - gerçek adapter ayrı bir aşama.
+  minimumNights: number | null;
 }
