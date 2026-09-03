@@ -41,13 +41,20 @@ export const CLOSED_SEASON_MESSAGE =
   "Bu tarihlerde sezonumuz kapalıdır. Rezervasyon sezonumuz her yıl 15 Haziran – 15 Eylül arasındadır.";
 
 // LEGACY CONFIRMED RESERVATION EXCEPTIONS (2026-09-03 kararı) - yıllık kural devreye girmeden ÖNCE
-// alınmış, gerçek/aktif rezervasyonlar geriye dönük olarak reddedilmez/silinmez/kırpılmaz. Bu tarih,
-// bu modülün mevcut (yıllık, 09-15/06-15) sürümünün production'a deploy edildiği andır - yalnız BU
-// sabitten ÖNCE oluşturulmuş rezervasyonlar "eski politika altında onaylanmış" sayılır. YENİ hiçbir
-// talep/rezervasyon (bu tarihten sonra oluşturulan) hiçbir zaman bu istisnadan yararlanmaz - bkz.
-// booking-inquiries.ts createBookingInquiry, bu sabiti hiç import ETMEZ, hasClosedSeasonNight kuralı
-// yeni talepler için istisnasız uygulanmaya devam eder.
-export const ANNUAL_SEASON_POLICY_DEPLOYED_AT = "2026-09-03T00:00:00.000Z";
+// alınmış, gerçek/aktif rezervasyonlar geriye dönük olarak reddedilmez/silinmez/kırpılmaz. Bu sabit,
+// bu modülün mevcut (yıllık, 09-15/06-15) sürümünü taşıyan Cloudflare Worker version'ının GERÇEK
+// production activation anıdır - keyfi bir gün başlangıcı DEĞİL. Kaynak: `wrangler deployments list`
+// çıktısında version a7188423-5a6e-4800-82b4-87208937ae48 için deployment (100% trafik) kaydının
+// kendi "Created" zaman damgası = 2026-09-03T18:11:21.599Z; bu, aynı version'ın kendi build/"Created"
+// zaman damgasından (2026-09-03T18:11:17.969Z) ~4sn SONRAdır ve production'a asıl trafiğin yönlendiği
+// andır. İki bağımsız kayıt birbirini doğruluyor: (1) wrangler deployments list (deployment log), (2)
+// o deploy'un hemen ardından çağrılan canlı /api/system/version yanıtı - versionId=a7188423-... ve
+// versionCreatedAt=2026-09-03T18:11:17.969861Z (build zaman damgasıyla mikrosaniyeye kadar eşleşir).
+// Yalnız BU sabitten ÖNCE oluşturulmuş rezervasyonlar "eski politika altında onaylanmış" sayılır.
+// YENİ hiçbir talep/rezervasyon (bu tarihten sonra oluşturulan) hiçbir zaman bu istisnadan
+// yararlanmaz - bkz. booking-inquiries.ts createBookingInquiry, bu sabiti hiç import ETMEZ,
+// hasClosedSeasonNight kuralı yeni talepler için istisnasız uygulanmaya devam eder.
+export const ANNUAL_SEASON_POLICY_DEPLOYED_AT = "2026-09-03T18:11:21.599Z";
 
 export const PRE_POLICY_EXCEPTION_LABEL = "Önceki sezon politikasında onaylanmış rezervasyon";
 

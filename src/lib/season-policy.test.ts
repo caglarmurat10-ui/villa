@@ -135,4 +135,27 @@ describe("isPrePolicyConfirmedException - LEGACY CONFIRMED RESERVATION EXCEPTION
   it("acik sezon icindeki bir rezervasyon (kapali gece yok) hicbir zaman istisna SAYILMAZ - kapali sezona tasmiyor zaten", () => {
     expect(isPrePolicyConfirmedException({ checkIn: "2026-07-01", checkOut: "2026-07-08", createdAt: "2026-01-01T00:00:00.000Z" })).toBe(false);
   });
+
+  // Boundary hassasiyeti - cutoff GERCEK production activation zaman damgasi (wrangler deployments
+  // list + /api/system/version ile capraz dogrulanmis, bkz. dosya basi not), keyfi bir gun baslangici
+  // DEGIL. Milisaniye hassasiyetinde dogru calistigini kanitlamak icin cutoff'un tam kendisi ve bir
+  // milisaniye once/sonrasi ayri ayri test edilir.
+  it("cutoff'tan 1ms ONCE olusturulmus -> istisna true, cutoff'un TAM KENDISI -> false, cutoff'tan 1ms SONRA -> false", () => {
+    const cutoffMs = new Date(ANNUAL_SEASON_POLICY_DEPLOYED_AT).getTime();
+    const before = new Date(cutoffMs - 1).toISOString();
+    const at = new Date(cutoffMs).toISOString();
+    const after = new Date(cutoffMs + 1).toISOString();
+
+    expect(isPrePolicyConfirmedException({ checkIn: "2026-09-22", checkOut: "2026-09-27", createdAt: before })).toBe(true);
+    expect(isPrePolicyConfirmedException({ checkIn: "2026-09-22", checkOut: "2026-09-27", createdAt: at })).toBe(false);
+    expect(isPrePolicyConfirmedException({ checkIn: "2026-09-22", checkOut: "2026-09-27", createdAt: after })).toBe(false);
+  });
+
+  // Gercek 3 legacy reservation - production audit'inde bulunan tam createdAt degerleriyle (bkz.
+  // 2026-09-03 D1 audit) ucu de exception=true olmali.
+  it("gercek 3 legacy reservation fixture'i - ucu de PRE_POLICY_CONFIRMED_EXCEPTION=true", () => {
+    expect(isPrePolicyConfirmedException({ checkIn: "2026-09-22", checkOut: "2026-09-27", createdAt: "2026-08-25T07:15:13.545Z" })).toBe(true); // bf26c751-...
+    expect(isPrePolicyConfirmedException({ checkIn: "2026-09-15", checkOut: "2026-09-20", createdAt: "2026-08-19T14:23:34.730Z" })).toBe(true); // legacy-2e08bf2b...
+    expect(isPrePolicyConfirmedException({ checkIn: "2026-09-14", checkOut: "2026-09-20", createdAt: "2026-08-19T14:23:34.730Z" })).toBe(true); // legacy-948b67ab...
+  });
 });
