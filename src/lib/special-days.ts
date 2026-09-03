@@ -43,6 +43,19 @@ export const FIXED_HOLIDAYS: FixedHoliday[] = [
 // N. yılı" ifadesindeki N, basit yıl farkı ile hesaplanır; bu bir TAHMİN değil, aritmetiktir.
 const REPUBLIC_FOUNDING_YEAR = 1923;
 
+// Resmi tatil adları (2429 sayılı Kanun'daki kendi tam adları) zaten 3. tekil şahıs iyelik ekiyle
+// biter ("Bayramı", "Günü") - "bizim" anlamını eklemek için doğrudan "ımız" EKLENEMEZ (çift "ı"
+// üretir: "Bayramıımız" - yanlış). Son sesli harfe göre yalnız "mız"/"müz" eklenir: "Bayramı" + "mız"
+// = "Bayramımız", "Günü" + "müz" = "Günümüz" (doğru büyük ünlü uyumu).
+function possessiveOurSuffix(name: string): string {
+  const last = name.slice(-1);
+  if (last === "ı") return "mız";
+  if (last === "ü") return "müz";
+  if (last === "u") return "muz";
+  if (last === "i") return "miz";
+  return "ımız"; // savunma amaçlı varsayılan - şu an bilinen tüm sabit tatil adları yukarıdaki 4 durumdan birine uyuyor
+}
+
 export function fixedHolidayMessage(holiday: FixedHoliday, year: number): string {
   if (holiday.id === "29-ekim") {
     return `29 Ekim Cumhuriyet Bayramımız kutlu olsun. Cumhuriyetimizin ${year - REPUBLIC_FOUNDING_YEAR}. yılı kutlu olsun.`;
@@ -53,7 +66,7 @@ export function fixedHolidayMessage(holiday: FixedHoliday, year: number): string
   if (holiday.id === "yilbasi") {
     return "Yeni yılınız kutlu olsun.";
   }
-  return `${holiday.day} ${["", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"][holiday.month]} ${holiday.name}ımız kutlu olsun.`;
+  return `${holiday.day} ${["", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"][holiday.month]} ${holiday.name}${possessiveOurSuffix(holiday.name)} kutlu olsun.`;
 }
 
 export function getFixedHolidayForDate(dateIso: string): FixedHoliday | null {

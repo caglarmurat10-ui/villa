@@ -26,6 +26,26 @@ describe("getFixedHolidayForDate - 2429 sayılı Kanun sabit resmi tatiller", ()
     const holiday = getFixedHolidayForDate("2027-10-29")!;
     expect(fixedHolidayMessage(holiday, 2027)).toContain("104. yılı");
   });
+
+  // Regresyon: "Bayramı" gibi zaten iyelik ekiyle biten resmi adlara dogrudan "ımız" eklemek
+  // "Bayramıımız" (cift ı) uretiyordu - canli render'da gozle goruldu, duzeltildi.
+  it("iyelik eki uretimi cift unlu HATASI yapmaz - 'ı' ile biten adlar icin", () => {
+    const holiday23Nisan = getFixedHolidayForDate("2027-04-23")!;
+    expect(fixedHolidayMessage(holiday23Nisan, 2027)).toContain("Bayramımız");
+    expect(fixedHolidayMessage(holiday23Nisan, 2027)).not.toContain("Bayramıımız");
+
+    const holiday19Mayis = getFixedHolidayForDate("2027-05-19")!;
+    expect(fixedHolidayMessage(holiday19Mayis, 2027)).toContain("Bayramımız");
+    expect(fixedHolidayMessage(holiday19Mayis, 2027)).not.toContain("ıımız");
+
+    const holiday30Agustos = getFixedHolidayForDate("2027-08-30")!;
+    expect(fixedHolidayMessage(holiday30Agustos, 2027)).toBe("30 Ağustos Zafer Bayramımız kutlu olsun.");
+  });
+
+  it("iyelik eki uretimi 'ü' ile biten adlar icin dogru buyuk unlu uyumu kullanir (Gunumuz, GunUmuz degil)", () => {
+    const holiday1Mayis = getFixedHolidayForDate("2027-05-01")!;
+    expect(fixedHolidayMessage(holiday1Mayis, 2027)).toBe("1 Mayıs Emek ve Dayanışma Günümüz kutlu olsun.");
+  });
 });
 
 describe("getReligiousHolidayForDate / RELIGIOUS_HOLIDAY_REGISTRY - Diyanet kaynaklı", () => {
