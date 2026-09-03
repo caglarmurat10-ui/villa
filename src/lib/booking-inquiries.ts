@@ -1,6 +1,7 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
 import type { Villa } from "./types";
+import { computePriceQuote, type PriceRangeInput } from "./price-engine";
 
 export type BookingInquiryStatus = "Yeni" | "İletişime geçildi" | "Kapatıldı";
 
@@ -59,6 +60,9 @@ type PriceRow = {
   start_date: string;
   end_date: string;
   nightly_rate: number;
+  base_nights: number | null;
+  base_price_minor: number | null;
+  minimum_nights: number | null;
 };
 
 export class BookingInquiryConflictError extends Error {
@@ -140,23 +144,50 @@ export function normalizeBookingPhone(value: string) {
   return digits;
 }
 
-async function quoteForDates(db: D1Database, villa: Villa, checkIn: string, checkOut: string) {
-  const ranges = await db.prepare(`SELECT start_date, end_date, nightly_rate
+function nightsBetween(checkIn: string, checkOut: string): number {
+  const start = new Date(`${checkIn}T00:00:00Z`).getTime();
+  const end = new Date(`${checkOut}T00:00:00Z`).getTime();
+  return Math.round((end - start) / (24 * 60 * 60 * 1000));
+}
+
+async function fetchPriceRanges(db: D1Database, villa: Villa): Promise<PriceRangeInput[]> {
+  const result = await db.prepare(`SELECT start_date, end_date, nightly_rate, base_nights, base_price_minor, minimum_nights
     FROM price_ranges WHERE villa = ? ORDER BY start_date ASC`).bind(villa).all<PriceRow>();
-  let total = 0;
-  let nights = 0;
-  let complete = true;
-  const end = new Date(`${checkOut}T00:00:00Z`);
+  return result.results.map((row) => ({
+    startDate: row.start_date,
+    endDate: row.end_date,
+    nightlyRate: row.nightly_rate,
+    basePriceMinor: row.base_price_minor ?? undefined,
+    baseNights: row.base_nights ?? undefined,
+    minimumNights: row.minimum_nights ?? undefined,
+  }));
+}
 
-  for (let cursor = new Date(`${checkIn}T00:00:00Z`); cursor < end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
-    const date = cursor.toISOString().slice(0, 10);
-    const range = ranges.results.find((item) => item.start_date <= date && item.end_date >= date);
-    if (!range) complete = false;
-    else total += range.nightly_rate;
-    nights += 1;
-  }
+// Faz 5 son denetim düzeltmesi - public booking inquiry artık TEK canonical kaynağı
+// (price-engine.ts computePriceQuote) kullanır, kendi nightly_rate x gece matematiğini YENİDEN
+// ÜRETMEZ. enforceMinimumStay parametresi çağırana bırakılır: public müşteri yolu (true, varsayılan)
+// vs admin dönüşüm yolu (false, bkz. convertBookingInquiryToReservation) - "public müşteri yolu ile
+// admin personel yolu birbirine karıştırılmasın" kuralı burada, TEK fonksiyonun iki farklı BİLİNÇLİ
+// çağrı şekliyle korunur (iki ayrı, birbirinden sapabilecek fiyat matematiği YOK).
+async function canonicalQuote(db: D1Database, villa: Villa, checkIn: string, checkOut: string, enforceMinimumStay: boolean) {
+  const ranges = await fetchPriceRanges(db, villa);
+  const quote = computePriceQuote(ranges, checkIn, checkOut, { enforceMinimumStay });
+  if (quote.status === "ok") return { total: quote.total, nights: quote.nights, minStayRejected: false as const, minimumNights: null };
+  if (quote.status === "min_stay") return { total: null, nights: nightsBetween(checkIn, checkOut), minStayRejected: true as const, minimumNights: quote.minimumNights };
+  // "gap" veya "invalid_range" - eski davranışla aynı: fiyat henüz tanımsız, inquiry yine de
+  // oluşturulabilir (quotedTotal null, ekip manuel iletişime geçer) - bu bir REJECTION değil.
+  return { total: null, nights: nightsBetween(checkIn, checkOut), minStayRejected: false as const, minimumNights: null };
+}
 
-  return { total: complete ? total : null, nights };
+// Faz 5 son denetim düzeltmesi - public inquiry artık yalnız reservations tablosunu değil,
+// GERÇEKTEN doğrulanmış (status='active') OTA bloklarını da çakışma sayar - public takvimin
+// (listBlockedRanges, ota/availability.ts) gösterdiğiyle BİREBİR aynı davranış. needs_review
+// (doğrulanmamış/şüpheli) bloklar public müşteriyi ASLA bloklamaz - yalnız admin takviminde görünür.
+async function hasActiveOtaConflict(db: D1Database, villa: Villa, checkIn: string, checkOut: string): Promise<boolean> {
+  const row = await db.prepare(`SELECT id FROM external_blocks
+    WHERE villa = ? AND status = 'active' AND start_date < ? AND end_date > ? LIMIT 1`)
+    .bind(villa, checkOut, checkIn).first();
+  return Boolean(row);
 }
 
 async function findBookingInquiry(db: D1Database, id: string) {
@@ -173,6 +204,10 @@ export async function createBookingInquiry(input: BookingInquiryInput) {
     .bind(input.villa, input.checkOut, input.checkIn).first();
   if (occupied) throw new BookingInquiryConflictError("Seçtiğiniz tarihler artık dolu görünüyor. Lütfen başka tarih seçin.");
 
+  if (await hasActiveOtaConflict(db, input.villa, input.checkIn, input.checkOut)) {
+    throw new BookingInquiryConflictError("Seçtiğiniz tarihler artık dolu görünüyor. Lütfen başka tarih seçin.");
+  }
+
   const phoneNormalized = normalizeBookingPhone(input.phone);
   const duplicateAfter = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const duplicate = await db.prepare(`SELECT * FROM booking_inquiries
@@ -183,7 +218,10 @@ export async function createBookingInquiry(input: BookingInquiryInput) {
     .first<BookingInquiryRow>();
   if (duplicate) return { inquiry: mapRow(duplicate), duplicate: true };
 
-  const quote = await quoteForDates(db, input.villa, input.checkIn, input.checkOut);
+  const quote = await canonicalQuote(db, input.villa, input.checkIn, input.checkOut, true);
+  if (quote.minStayRejected) {
+    throw new BookingInquiryConflictError(`Bu dönem için minimum konaklama süresi ${quote.minimumNights} gecedir.`);
+  }
   const now = new Date().toISOString();
   const inquiry: BookingInquiry = {
     id: crypto.randomUUID(),
@@ -261,7 +299,10 @@ export async function convertBookingInquiryToReservation(id: string) {
     throw new BookingInquiryConversionError("Kapatılmış talep rezervasyona dönüştürülemez. Önce talebi yeniden açın.");
   }
 
-  const quote = await quoteForDates(db, inquiry.villa, inquiry.checkIn, inquiry.checkOut);
+  // enforceMinimumStay:false - admin bilinçli olarak eski/kısa bir inquiry'i dönüştürebilir (personel
+  // override), AMA fiyat her zaman canonical engine'den gelir, ASLA override edilmez (bkz. dosya başı
+  // canonicalQuote notu).
+  const quote = await canonicalQuote(db, inquiry.villa, inquiry.checkIn, inquiry.checkOut, false);
   if (!quote.nights || quote.total === null) {
     throw new BookingInquiryConversionError("Bu tarihler için fiyat dönemi eksik. Önce fiyatları tamamlayın.");
   }
@@ -271,6 +312,12 @@ export async function convertBookingInquiryToReservation(id: string) {
     .bind(inquiry.villa, inquiry.checkOut, inquiry.checkIn).first();
   if (occupied) {
     throw new BookingInquiryConversionError("Bu tarihler artık dolu. Talep rezervasyona dönüştürülmedi.");
+  }
+
+  // Dönüşüm anında son bir kez GERÇEK (active) OTA çakışması da kontrol edilir - talep
+  // oluşturulduğundan beri Airbnb/Booking senkronu yeni bir aktif blok eklemiş olabilir.
+  if (await hasActiveOtaConflict(db, inquiry.villa, inquiry.checkIn, inquiry.checkOut)) {
+    throw new BookingInquiryConversionError("Bu tarihler artık başka bir kanalda (Airbnb/Booking) dolu görünüyor. Talep rezervasyona dönüştürülmedi.");
   }
 
   const reservationId = crypto.randomUUID();

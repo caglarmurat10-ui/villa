@@ -12,6 +12,7 @@ const { DatabaseSync } = createRequire(import.meta.url)("node:sqlite") as typeof
 
 export interface FakeD1 {
   prepare(sql: string): FakeD1Statement;
+  batch(statements: FakeD1Statement[]): Promise<Array<{ success: true; meta: { changes: number; last_row_id: number } }>>;
   exec(sql: string): void;
   close(): void;
 }
@@ -68,6 +69,17 @@ export function createFakeD1(schemaSql: string): FakeD1 {
   return {
     prepare(sql: string) {
       return makeStatement(sql, []);
+    },
+    // D1Database.batch() taklidi - gerçek D1 bunları tek bir örtük transaction içinde sırayla
+    // çalıştırır; bu testler için sıralı .run() yeterli sadakati sağlıyor (bkz. booking-inquiries.ts
+    // - batch içindeki INSERT...SELECT...WHERE EXISTS deseni zaten koşullu no-op'a dayanıyor,
+    // gerçek ROLLBACK-on-error semantiğine değil).
+    async batch(statements: FakeD1Statement[]) {
+      const results: Array<{ success: true; meta: { changes: number; last_row_id: number } }> = [];
+      for (const statement of statements) {
+        results.push(await statement.run());
+      }
+      return results;
     },
     exec(sql: string) {
       raw.exec(sql);
