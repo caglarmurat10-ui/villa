@@ -108,6 +108,8 @@ export default function VillaGalleryLightbox({
 
   return (
     <>
+      <p className={styles.countLabel}>Tüm Fotoğraflar · {images.length} fotoğraf</p>
+
       {availableCategories.length > 1 && (
         <div className={styles.filterBar} role="group" aria-label={`${villaName} galeri filtresi`}>
           <button
