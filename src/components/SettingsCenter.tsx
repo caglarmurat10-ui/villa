@@ -140,6 +140,12 @@ export default function SettingsCenter({ initialCommission, initialPrices, initi
     {priceCoverage ? (
       <section className="settings-box price-gap-section">
         <span className="ops-eyebrow">FİYAT KAPSAMI</span><h2>Önümüzdeki {priceCoverage.Safira.totalDays} gün — PRICE_GAP</h2>
+        <p className="price-gap-season-labels">
+          <span style={{ color: "#86efac" }}>OPEN SEASON: 15 Haziran – 15 Eylül</span>
+          {" · "}
+          <span style={{ color: "#9fb0c5" }}>CLOSED SEASON: 16 Eylül – 14 Haziran</span>
+          {" "}(her yıl tekrarlanan kural)
+        </p>
         <div className="settings-two">
           {villas.map((villa) => {
             const report = priceCoverage[villa];

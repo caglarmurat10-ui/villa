@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Reservation, Villa, VillaLocations } from "@/lib/types";
 import type { AdminExternalBlock } from "@/lib/ota/types";
+import { evaluateOtaBlockAgainstSeason } from "@/lib/season-policy";
 
 const villas: Villa[] = ["Safira", "Destan"];
 const SOURCE_LABEL: Record<AdminExternalBlock["source"], string> = { airbnb: "Airbnb", booking: "Booking.com", manual: "Manuel blok" };
@@ -89,8 +90,34 @@ function DetailSheet({ selection, locations, onClose }: { selection: Selection; 
           ? `Bu tarih aralığı ${SOURCE_LABEL[b.source]} üzerinden yönetiliyor olabilir ve sistemdeki bir kayıtla çakışıyor - kontrol edin.`
           : `Bu tarih aralığı ${SOURCE_LABEL[b.source]} üzerinden yönetiliyor; sistem içinde ayrı bir rezervasyon kaydı yok.`}</p>
       </div>
+      {b.status === "needs_review" ? <SeasonBreakdown startDate={b.startDate} endDateExclusive={b.endDate} /> : null}
     </div>
   </div>;
+}
+
+// KESİN YILLIK SEZON KURALI - uzun bir OTA bloğu hem açık hem kapalı sezonu kapsayabilir; yalnız
+// açık-sezonla kesişen kısım GERÇEK bir çakışma adayıdır, kapalı-sezon kısmı zaten kiralanmayacağı
+// için "beklenen"dir - needs_review durumunun TAMAMINI aynı önemde göstermek yanıltıcı olur. Bu
+// yalnız BİLGİLENDİRME amaçlı bir ayrıştırma - block'un kendi status/tarihlerini DEĞİŞTİRMEZ,
+// takvim ızgarasının tasarımına dokunmaz (yalnız bu detay panelinde ek bir satır).
+function SeasonBreakdown({ startDate, endDateExclusive }: { startDate: string; endDateExclusive: string }) {
+  const { openSegments, closedSegments } = evaluateOtaBlockAgainstSeason(startDate, endDateExclusive);
+  if (openSegments.length === 0 && closedSegments.length === 0) return null;
+  return (
+    <div className="calendar-sheet-notes">
+      <small>SEZON KIRILIMI</small>
+      {openSegments.length > 0 ? (
+        <p style={{ color: "#fca5a5" }}>
+          ÇAKIŞMA (gerçek açık sezon, 15 Haziran – 15 Eylül ile kesişiyor): {openSegments.map((s) => `${trDate(s.startDate)} – ${trDate(s.endDate)}`).join(", ")}
+        </p>
+      ) : null}
+      {closedSegments.length > 0 ? (
+        <p style={{ color: "#9fb0c5" }}>
+          BEKLENEN KAPALI (kapalı sezon, çakışma sayılmaz): {closedSegments.map((s) => `${trDate(s.startDate)} – ${trDate(s.endDate)}`).join(", ")}
+        </p>
+      ) : null}
+    </div>
+  );
 }
 
 function VillaMonth({ villa, reservations, externalBlocks, year, month, onSelect }: { villa: Villa; reservations: Reservation[]; externalBlocks: AdminExternalBlock[]; year: number; month: number; onSelect: (selection: Selection) => void }) {

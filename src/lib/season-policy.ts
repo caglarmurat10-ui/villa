@@ -1,41 +1,59 @@
-// Kullanıcının 2026-09-02'de kesinleştirdiği sezon kararı - HER İKİ villa için TEK kaynak. SAF
-// fonksiyonlar, D1/network çağrısı yok - hem client (PublicBookingWidget, VillaAvailabilityCalendar)
-// hem server (booking-inquiries.ts, social-plan-seed.ts, google-vr/readiness.ts) aynı modülü kullanır.
+// Kullanıcının kesinleştirdiği YILLIK, TEKRARLANAN sezon kuralı (2026-09-03 - artık yıla bağlı
+// değil). SAF fonksiyonlar, D1/network çağrısı yok - hem client (PublicBookingWidget,
+// VillaAvailabilityCalendar) hem server (booking-inquiries.ts, social-plan-seed.ts,
+// google-vr/readiness.ts) aynı modülü kullanır.
 //
-// 2026 sezonu 2026-09-30'da (dahil) sona erer; bu tarih ve öncesi bu modülün kapsamı DIŞINDADIR -
-// mevcut/geçmiş 2026 price_ranges kayıtları zaten neyin açık olduğuna karar veriyor, burada
-// TEKRAR ÜRETİLMEZ. 2026-10-01'den 2027-06-14'e kadar (dahil) ve 2027-09-16'dan itibaren (yeni bir
-// sezon kararı alınana kadar sınırsız) CLOSED_SEASON'dur: fiyat gösterilmez, inquiry kabul edilmez,
-// Google VR'da bookable gösterilmez, "müsait/rezervasyon açık" pazarlama içeriği üretilmez. Tek açık
-// 2027 penceresi: 2027-06-15 -> 2027-09-15 (ikisi de dahil).
+// HER YIL, her iki villa için:
+//   AÇIK SEZON: 15 Haziran -> 15 Eylül (ikisi de dahil)
+//   KAPALI SEZON: 16 Eylül -> ertesi yılın 14 Haziran'ı (ikisi de dahil)
+// Kural yalnız ay/gün (MM-DD) karşılaştırmasıyla çalışır - hangi YIL olduğu tamamen önemsizdir,
+// bu yüzden 2026/2027/2028/... arasında hiçbir özel durum/istisna YOKTUR (eski sürüm 2026-09-30'a
+// kadar olan tarihleri bu modülün kapsamı dışında tutuyordu - bu istisna kullanıcının "artık yıla
+// bağlı değil" kararıyla KALDIRILDI, kural artık gerçekten her yıl aynı şekilde uygulanır).
+//
+// Çağıran taraf zaten Europe/Istanbul yerel tarihine göre bir YYYY-MM-DD string'i sağlamalı
+// (mevcut istanbulToday() deseniyle tutarlı) - bu modülün kendisi ayrıca bir timezone dönüşümü
+// YAPMAZ, yalnız string karşılaştırması yapar (leap year dahil hiçbir takvim aritmetiği gerekmez -
+// MM-DD karşılaştırması Şubat'ın kaç gün olduğundan tamamen bağımsızdır).
+//
+// Fiyat/sezon FİYATLARI (kaç TRY, kaç gece) bu modülün kapsamı DIŞINDADIR - onlar HER YIL için ayrı
+// ayrı D1 price_ranges'ta doğrulanmalı (bkz. price-engine.ts computePriceQuote, TEK gerçek fiyat
+// kaynağı). Bu dosya yalnız "hangi tarihler sezon içinde/dışında" sorusuna cevap verir.
 import type { Villa } from "./types";
 
-export const SEASON_2026_CLOSE_DATE = "2026-09-30"; // dahil - son açık gün, bu modülün kapsamı bundan SONRASI
-export const SEASON_2027_OPEN_START = "2027-06-15"; // dahil
-export const SEASON_2027_OPEN_END = "2027-09-15"; // dahil
-export const SEASON_2027_MINIMUM_NIGHTS = 4;
+export const SEASON_OPEN_START_MD = "06-15"; // dahil, her yıl
+export const SEASON_OPEN_END_MD = "09-15"; // dahil, her yıl
+export const SEASON_MINIMUM_NIGHTS = 4; // referans/dokümantasyon amaçlı - gerçek zorunluluk price_ranges.minimum_nights'tan gelir
 
-// D1 price_ranges'daki canonical kayıtlarla (2026-09-03 production audit'inde doğrulandı: Safira
-// base_price_minor=11000000/base_nights=7/minimum_nights=4, Destan base_price_minor=13000000/
-// base_nights=7/minimum_nights=4) BİREBİR eşleşmesi gereken referans değerler. Yalnız test/gösterim
-// amaçlı - fiyat HER ZAMAN price-engine.ts computePriceQuote üzerinden gerçek D1 satırlarından
-// hesaplanır, bu sabitler asla doğrudan bir fiyat hesabının YERİNE geçmez.
+// D1 price_ranges'daki 2027 canonical kayıtlarla (2026-09-03 production audit'inde doğrulandı:
+// Safira base_price_minor=11000000/base_nights=7/minimum_nights=4, Destan
+// base_price_minor=13000000/base_nights=7/minimum_nights=4) BİREBİR eşleşmesi gereken referans
+// değerler - yalnız 2027 için, GELECEK yıllara otomatik UYGULANMAZ (her yılın fiyatı ayrı
+// doğrulanmalı). Yalnız test/gösterim amaçlı - fiyat HER ZAMAN price-engine.ts computePriceQuote
+// üzerinden gerçek D1 satırlarından hesaplanır, bu sabitler asla doğrudan bir fiyat hesabının
+// YERİNE geçmez.
 export const SEASON_2027_REFERENCE_PRICES: Record<Villa, { totalTRY: number; nights: number }> = {
   Safira: { totalTRY: 110000, nights: 7 },
   Destan: { totalTRY: 130000, nights: 7 },
 };
 
 export const CLOSED_SEASON_MESSAGE =
-  "Bu tarihlerde sezonumuz kapalıdır. 2027 sezonu için rezervasyonlarımız 15 Haziran – 15 Eylül tarihleri arasında açıktır.";
+  "Bu tarihlerde sezonumuz kapalıdır. Rezervasyon sezonumuz her yıl 15 Haziran – 15 Eylül arasındadır.";
+
+function monthDay(dateIso: string): string {
+  return dateIso.slice(5, 10); // "MM-DD"
+}
+
+// true dönmesi: bu tarih (yılından bağımsız) 15 Haziran - 15 Eylül aralığındadır.
+export function isOpenSeasonDate(dateIso: string): boolean {
+  const md = monthDay(dateIso);
+  return md >= SEASON_OPEN_START_MD && md <= SEASON_OPEN_END_MD;
+}
 
 // true dönmesi: bu tarih BİLİNÇLİ olarak kapalı sezon politikası kapsamındadır (fiyatı eksik bir
-// PRICE_GAP DEĞİL - kiralama yapılmayacağı zaten kesinleşmiş bir dönem). 2026-09-30 ve öncesi bu
-// fonksiyonun kapsamı dışında tutulur (false döner) - o dönemin açık/kapalılığına mevcut 2026
-// price_ranges kayıtları karar verir.
+// PRICE_GAP DEĞİL - kiralama yapılmayacağı zaten kesinleşmiş, her yıl tekrarlanan bir dönem).
 export function isClosedSeasonDate(dateIso: string): boolean {
-  if (dateIso <= SEASON_2026_CLOSE_DATE) return false;
-  if (dateIso >= SEASON_2027_OPEN_START && dateIso <= SEASON_2027_OPEN_END) return false;
-  return true;
+  return !isOpenSeasonDate(dateIso);
 }
 
 // [checkIn, checkOut) arasındaki GECELERDEN en az biri kapalı sezona denk geliyorsa true - bir
@@ -49,4 +67,57 @@ export function hasClosedSeasonNight(checkIn: string, checkOut: string): boolean
     if (isClosedSeasonDate(cursor.toISOString().slice(0, 10))) return true;
   }
   return false;
+}
+
+// GÖSTERİM amaçlı dahil-uçlu aralık (startDate VE endDate ikisi de dahil) - external_blocks'un
+// kendi start_date/end_date şemasıyla (end_date checkout-tarzı HARİÇ) KARIŞTIRILMAMALI. Bu tip
+// yalnız section 5'in admin UI'da istediği "CONFLICT: 1 Eylül -> 15 Eylül" gibi insan-okunur
+// aralıkları temsil eder.
+export interface DisplayRange {
+  startDate: string; // dahil
+  endDate: string; // dahil - GÖSTERİM İÇİN son GECE, checkout günü değil
+}
+
+function nextDayIso(iso: string): string {
+  const date = new Date(`${iso}T00:00:00Z`);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10);
+}
+
+// Bir [startDate, endDateExclusive) aralığını (external_blocks/reservations ile AYNI checkout-tarzı
+// hariç-uçlu semantik - bkz. ics-parser.ts DTEND, price-engine.ts segment yorumu) gün gün dolaşıp
+// açık-sezon ve kapalı-sezon GECELERİNİ ayrı, ardışık DAHİL segmentlere ayırır. Section 5: uzun bir
+// OTA bloğu (ör. 1 Eylül -> 15 Haziran ertesi yıl, DTEND hariç) hem açık hem kapalı sezonu, hatta
+// BİRDEN FAZLA AYRIK açık-sezon segmentini kapsayabilir (blok bir sonraki yılın 15 Haziran'ına
+// kadar sürüyorsa, o gün de yeni açık sezonun ilk günüdür) - bu yüzden TEK bir {start,end} yerine
+// bir DİZİ döner, hiçbir segment yanlışlıkla birleştirilmez.
+export function evaluateOtaBlockAgainstSeason(startDate: string, endDateExclusive: string): { openSegments: DisplayRange[]; closedSegments: DisplayRange[] } {
+  const openSegments: DisplayRange[] = [];
+  const closedSegments: DisplayRange[] = [];
+  if (!startDate || !endDateExclusive || endDateExclusive <= startDate) return { openSegments, closedSegments };
+
+  let openCurrent: DisplayRange | null = null;
+  let closedCurrent: DisplayRange | null = null;
+  const end = new Date(`${endDateExclusive}T00:00:00Z`);
+  for (let cursor = new Date(`${startDate}T00:00:00Z`); cursor < end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
+    const iso = cursor.toISOString().slice(0, 10);
+    if (isOpenSeasonDate(iso)) {
+      closedCurrent = null;
+      if (openCurrent && nextDayIso(openCurrent.endDate) === iso) {
+        openCurrent.endDate = iso;
+      } else {
+        openCurrent = { startDate: iso, endDate: iso };
+        openSegments.push(openCurrent);
+      }
+    } else {
+      openCurrent = null;
+      if (closedCurrent && nextDayIso(closedCurrent.endDate) === iso) {
+        closedCurrent.endDate = iso;
+      } else {
+        closedCurrent = { startDate: iso, endDate: iso };
+        closedSegments.push(closedCurrent);
+      }
+    }
+  }
+  return { openSegments, closedSegments };
 }

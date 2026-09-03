@@ -84,22 +84,24 @@ describe("createBookingInquiry (public inquiry - canonical price engine + min st
   });
 
   it("fiyati tanimsiz (gap, kapali sezon DEGIL) donem icin inquiry yine de olusturulur, quotedTotal null kalir (uydurma yok)", async () => {
-    // 2026-01-01, kesin sezon politikasinin (bkz. season-policy.ts) kapsami DISINDA (<= 2026-09-30)
-    // - bu tarihte fiyat tanimsiz olmasi bir CLOSED_SEASON degil, gercek bir PRICE_GAP senaryosudur.
+    // KESIN YILLIK SEZON KURALI (artik yila bagli degil) - 2026-07-01..08, MM-DD olarak
+    // 06-15..09-15 acik-sezon araliginin icinde, ama bu test dosyasinda YALNIZ 2027 canonical
+    // fiyat satirlari seed edildigi icin 2026'nin kendi fiyati tanimsiz - bu GERCEK bir PRICE_GAP
+    // senaryosudur (CLOSED_SEASON degil, cunku tarih zaten acik sezonun icinde).
     const { createBookingInquiry } = await import("./booking-inquiries");
-    const result = await createBookingInquiry({ ...BASE_INPUT, villa: "Destan", checkIn: "2026-01-01", checkOut: "2026-01-08" });
+    const result = await createBookingInquiry({ ...BASE_INPUT, villa: "Destan", checkIn: "2026-07-01", checkOut: "2026-07-08" });
     expect(result.inquiry.quotedTotal).toBeNull();
     expect(result.duplicate).toBe(false);
   });
 
-  it("KESIN SEZON POLITIKASI - kapali sezon (2026-10-01 -> 2027-06-14) tarihleri icin inquiry REDDEDILIR", async () => {
+  it("KESIN YILLIK SEZON KURALI - kapali sezon (16 Eylul -> ertesi yilin 14 Haziran'i) tarihleri icin inquiry REDDEDILIR", async () => {
     const { createBookingInquiry, BookingInquiryConflictError } = await import("./booking-inquiries");
     await expect(createBookingInquiry({ ...BASE_INPUT, villa: "Destan", checkIn: "2026-11-01", checkOut: "2026-11-08" }))
       .rejects.toBeInstanceOf(BookingInquiryConflictError);
     try {
       await createBookingInquiry({ ...BASE_INPUT, villa: "Destan", checkIn: "2026-11-01", checkOut: "2026-11-08" });
     } catch (error) {
-      expect((error as Error).message).toBe("Bu tarihlerde sezonumuz kapalıdır. 2027 sezonu için rezervasyonlarımız 15 Haziran – 15 Eylül tarihleri arasında açıktır.");
+      expect((error as Error).message).toBe("Bu tarihlerde sezonumuz kapalıdır. Rezervasyon sezonumuz her yıl 15 Haziran – 15 Eylül arasındadır.");
     }
   });
 

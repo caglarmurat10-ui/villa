@@ -201,6 +201,12 @@ export default function IntegrationCenterPanel({ snapshot }: { snapshot: Integra
           <summary style={{ fontSize: 11, color: "#93c5fd", fontWeight: 800, cursor: "pointer" }}>
             Google Vacation Rentals ({snapshot.googleVr.state} · connectivity: {snapshot.googleVr.connectivity})
           </summary>
+          <p style={{ margin: "8px 0 0", fontSize: 9, color: "#9fb0c5" }}>
+            <span style={{ color: "#86efac" }}>OPEN SEASON: 15 Haziran – 15 Eylül</span>
+            {" · "}
+            <span style={{ color: "#9fb0c5" }}>CLOSED SEASON: 16 Eylül – 14 Haziran</span>
+            {" "}(her yıl tekrarlanan kural)
+          </p>
           <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
             {snapshot.googleVr.villas.map((v) => (
               <div key={v.villa} style={{ padding: "8px 10px", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728", fontSize: 9 }}>
