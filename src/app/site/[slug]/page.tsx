@@ -7,7 +7,8 @@ import InstallmentCampaignBanner from "@/components/InstallmentCampaignBanner";
 import VillaGalleryLightbox from "@/components/VillaGalleryLightbox";
 import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
 import { getInstallmentCampaignReadiness } from "@/lib/payments/installment-campaign";
-import { VILLAS, FAQ_ITEMS, REGION_INFO, formatAddress, type VillaSlug } from "@/lib/villa-content";
+import { getPaytrReadiness } from "@/lib/payments/paytr/config";
+import { VILLAS, getFaqItems, REGION_INFO, formatAddress, type VillaSlug } from "@/lib/villa-content";
 import { POLICY_SUMMARY } from "@/lib/reservation-policy";
 import { fetchGoogleReviews } from "@/lib/google-reviews";
 import { toVillaId } from "@/lib/analytics";
@@ -61,7 +62,11 @@ export default async function VillaDetailPage({ params, searchParams }: { params
   const firstParam = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
   if (!(slug in villas)) notFound();
   const villa = villas[slug as VillaSlug];
-  const [reservations, prices, locations, googleReviews, blockedRanges, installmentCampaign] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), fetchGoogleReviews(villa.villa), listBlockedRanges(), getInstallmentCampaignReadiness()]);
+  const [reservations, prices, locations, googleReviews, blockedRanges, installmentCampaign, paytrReadiness] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), fetchGoogleReviews(villa.villa), listBlockedRanges(), getInstallmentCampaignReadiness(), getPaytrReadiness()]);
+  const faqItems = getFaqItems({
+    paytrReady: paytrReadiness.state === "PAYTR_READY",
+    installmentVerified: installmentCampaign.state === "INSTALLMENT_CAMPAIGN_VERIFIED",
+  });
   const bookingReservations = [
     ...reservations.map(({ villa: itemVilla, checkIn, checkOut }) => ({ villa: itemVilla, checkIn, checkOut })),
     ...blockedRanges,
@@ -143,7 +148,7 @@ export default async function VillaDetailPage({ params, searchParams }: { params
       {
         "@type": "FAQPage",
         "@id": `${canonical}#faq`,
-        mainEntity: FAQ_ITEMS.map((item) => ({
+        mainEntity: faqItems.map((item) => ({
           "@type": "Question",
           name: item.question,
           acceptedAnswer: { "@type": "Answer", text: item.answer },
@@ -379,7 +384,7 @@ export default async function VillaDetailPage({ params, searchParams }: { params
       <section className={styles.faq} id="sss">
         <span className={styles.kicker}>SIK SORULAN SORULAR</span>
         <h2>Merak edilenler</h2>
-        {FAQ_ITEMS.map((item) => (
+        {faqItems.map((item) => (
           <details className={styles.faqItem} key={item.question}>
             <summary>{item.question}</summary>
             <p>{item.answer}</p>

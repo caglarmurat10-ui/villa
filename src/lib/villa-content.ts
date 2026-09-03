@@ -231,28 +231,46 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
   },
 };
 
-export const FAQ_ITEMS: VillaFaq[] = [
-  {
-    question: "Rezervasyon nasıl işliyor?",
-    answer: "Sitede seçtiğiniz tarihler doğrudan yönetim sistemimizdeki gerçek rezervasyon takvimiyle karşılaştırılır. Müsaitse rezervasyon talebi gönderirsiniz, ekibimiz en kısa sürede sizinle iletişime geçer.",
-  },
-  {
-    question: "Talep gönderince rezervasyon kesinleşmiş olur mu?",
-    answer: "Hayır. Web sitesinden gönderilen talep bir ön talep kaydıdır; ekibimiz sizinle iletişime geçip detayları teyit ettikten sonra rezervasyon kesinleşir.",
-  },
-  {
-    question: "Sitede online ödeme alınıyor mu?",
-    answer: "Hayır, rezervasyon talebi aşamasında herhangi bir ödeme alınmaz. Ödeme ve depozito detayları ekibimizle doğrudan görüşülür.",
-  },
-  {
-    question: "Fiyata neler dahil?",
-    answer: "Gösterilen tutar, seçtiğiniz tarihler için sistemdeki dönemsel gecelik fiyatlardan hesaplanan toplam konaklama bedelidir. Bazı dönemler için fiyat henüz tanımlı değilse bu durum sonuçta belirtilir ve ekibimiz sizinle teyitleşir.",
-  },
-  {
-    question: "İki villa arasındaki fark nedir?",
-    answer: "Villa Safira ve Villa Destan, Patara/Kaş bölgesinde ayrı iki özel havuzlu villadır; her birinin kendine özgü yaşam alanı ve karakteri vardır. Detayları ilgili villa sayfasında inceleyebilirsiniz.",
-  },
-];
+export interface PaymentFaqStatus {
+  paytrReady: boolean;
+  installmentVerified: boolean;
+}
+
+// Bu tek soru için cevap SABİT DEĞİL - gerçek ödeme readiness durumuna göre hesaplanır (bkz.
+// getPaytrReadiness() / getInstallmentCampaignReadiness()). "Online ödeme aktif" veya "peşin
+// fiyatına 3/6 taksit" iddiası yalnız BU İKİ koşul de doğrulanmışsa gösterilir - hiçbiri diğerinden
+// çıkarım yapılarak varsayılmaz. Ekrandaki metin ve FAQPage JSON-LD AYNI fonksiyondan üretilir.
+function paymentFaqAnswer(status: PaymentFaqStatus): string {
+  if (status.paytrReady && status.installmentVerified) {
+    return "Evet. Rezervasyonunuz onaylandıktan sonra güvenli online ödeme yapabilirsiniz. Görünen rezervasyon tutarına ayrıca işletme veya ödeme komisyonu eklenmez. Uygun kartlarda peşin, 3 veya 6 taksit seçenekleri ödeme ekranında sunulur.";
+  }
+  return "Rezervasyon talebi gönderirken ödeme alınmaz. Online ödeme altyapımız hazırdır. Rezervasyonunuz onaylandıktan sonra güvenli ödeme adımına geçilir. Peşin ve taksitli ödeme seçenekleri, PayTR doğrulaması tamamlandıktan sonra ödeme ekranında sunulacaktır.";
+}
+
+export function getFaqItems(status: PaymentFaqStatus): VillaFaq[] {
+  return [
+    {
+      question: "Rezervasyon nasıl işliyor?",
+      answer: "Sitede seçtiğiniz tarihler doğrudan yönetim sistemimizdeki gerçek rezervasyon takvimiyle karşılaştırılır. Müsaitse rezervasyon talebi gönderirsiniz, ekibimiz en kısa sürede sizinle iletişime geçer.",
+    },
+    {
+      question: "Talep gönderince rezervasyon kesinleşmiş olur mu?",
+      answer: "Hayır. Web sitesinden gönderilen talep bir ön talep kaydıdır; ekibimiz sizinle iletişime geçip detayları teyit ettikten sonra rezervasyon kesinleşir.",
+    },
+    {
+      question: "Sitede online ödeme alınıyor mu?",
+      answer: paymentFaqAnswer(status),
+    },
+    {
+      question: "Fiyata neler dahil?",
+      answer: "Gösterilen tutar, seçtiğiniz tarihler için sistemdeki dönemsel gecelik fiyatlardan hesaplanan toplam konaklama bedelidir. Bazı dönemler için fiyat henüz tanımlı değilse bu durum sonuçta belirtilir ve ekibimiz sizinle teyitleşir.",
+    },
+    {
+      question: "İki villa arasındaki fark nedir?",
+      answer: "Villa Safira ve Villa Destan, Patara/Kaş bölgesinde ayrı iki özel havuzlu villadır; her birinin kendine özgü yaşam alanı ve karakteri vardır. Detayları ilgili villa sayfasında inceleyebilirsiniz.",
+    },
+  ];
+}
 
 export const REGION_INFO = {
   kicker: "PATARA · KAŞ · ANTALYA",

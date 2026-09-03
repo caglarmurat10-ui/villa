@@ -7,7 +7,8 @@ import ReservationConfidenceSection from "@/components/ReservationConfidenceSect
 import Reveal from "@/components/Reveal";
 import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
 import { getInstallmentCampaignReadiness } from "@/lib/payments/installment-campaign";
-import { VILLAS, FAQ_ITEMS, REGION_INFO, type VillaSlug } from "@/lib/villa-content";
+import { getPaytrReadiness } from "@/lib/payments/paytr/config";
+import { VILLAS, getFaqItems, REGION_INFO, type VillaSlug } from "@/lib/villa-content";
 import { GUIDE_PLACES, GUIDE_CATEGORIES } from "@/lib/region-guide";
 import { toVillaId } from "@/lib/analytics";
 import { listBlockedRanges } from "@/lib/ota/availability";
@@ -88,7 +89,8 @@ const MEDIA = {
   destanExperienceAlt: destanExperienceImage.alt,
 } as const;
 
-const structuredData = {
+function buildStructuredData(faqItems: ReturnType<typeof getFaqItems>) {
+  return {
   "@context": "https://schema.org",
   "@graph": [
     {
@@ -108,17 +110,23 @@ const structuredData = {
     {
       "@type": "FAQPage",
       "@id": `${ORIGIN}/#faq`,
-      mainEntity: FAQ_ITEMS.map((item) => ({
+      mainEntity: faqItems.map((item) => ({
         "@type": "Question",
         name: item.question,
         acceptedAnswer: { "@type": "Answer", text: item.answer },
       })),
     },
   ],
-};
+  };
+}
 
 export default async function PublicHomePage() {
-  const [reservations, prices, locations, blockedRanges, installmentCampaign] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), listBlockedRanges(), getInstallmentCampaignReadiness()]);
+  const [reservations, prices, locations, blockedRanges, installmentCampaign, paytrReadiness] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), listBlockedRanges(), getInstallmentCampaignReadiness(), getPaytrReadiness()]);
+  const faqItems = getFaqItems({
+    paytrReady: paytrReadiness.state === "PAYTR_READY",
+    installmentVerified: installmentCampaign.state === "INSTALLMENT_CAMPAIGN_VERIFIED",
+  });
+  const structuredData = buildStructuredData(faqItems);
   const bookingReservations = [
     ...reservations.map(({ villa, checkIn, checkOut }) => ({ villa, checkIn, checkOut })),
     ...blockedRanges,
@@ -291,7 +299,7 @@ export default async function PublicHomePage() {
       <section className={styles.faq} id="sss">
         <span className={styles.kicker}>SIK SORULAN SORULAR</span>
         <h2>Merak edilenler</h2>
-        {FAQ_ITEMS.map((item) => (
+        {faqItems.map((item) => (
           <details className={styles.faqItem} key={item.question}>
             <summary>{item.question}</summary>
             <p>{item.answer}</p>
