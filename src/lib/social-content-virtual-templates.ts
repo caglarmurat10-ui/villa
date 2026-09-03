@@ -1,5 +1,6 @@
 import { GUIDE_PLACES, GUIDE_CATEGORIES, type GuidePlace } from "@/lib/region-guide";
 import { EVERGREEN_TIPS, TRUST_CLAIMS } from "@/lib/social-design-templates";
+import { ITINERARY_DEFINITIONS, itineraryCaption, resolveItineraryPlaces } from "@/lib/itinerary-content";
 import type { SocialContentTemplate } from "@/lib/social-content-library";
 import type { Villa } from "@/lib/types";
 
@@ -100,6 +101,19 @@ export function buildVirtualTemplates(): SocialContentTemplate[] {
       templates.push(baseTemplate(`trust-${villaSlug(villa)}-${index}`, villa, "Güven", hook, caption, publicPath));
     }
   });
+
+  // Faz 6.1 bölüm 11 - itinerary (rota) içerikleri. resolveItineraryPlaces null dönerse (eksik/
+  // yanlış yazılmış bir GUIDE_PLACES id'si) o tanım HİÇ üretilmez - "bütün constituent bilgiler
+  // evergreen/verified ise AUTO_SAFE" kuralı burada, üretim ANINDA zorlanır.
+  for (const definition of ITINERARY_DEFINITIONS) {
+    const places = resolveItineraryPlaces(definition);
+    if (!places) continue;
+    for (const villa of VILLAS) {
+      const { hook, caption } = itineraryCaption(definition, places, villa);
+      const publicPath = `${villaSlug(villa)}_itinerary_${definition.id}/feed`;
+      templates.push(baseTemplate(`itinerary-${villaSlug(villa)}-${definition.id}`, villa, "Rota", hook, caption, publicPath));
+    }
+  }
 
   return templates;
 }

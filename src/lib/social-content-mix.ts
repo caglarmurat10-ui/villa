@@ -38,6 +38,7 @@ const THEME_TO_CATEGORY: Record<string, ContentMixCategory> = {
   "Villa": "Villa/Konaklama",
   "Özel": "Villa/Konaklama",
   "Bölge": "Destinasyon/Bölge",
+  "Rota": "Destinasyon/Bölge", // itinerary-content.ts - çok-yerli rota fikirleri, doğası gereği destinasyon/bölge içeriği
   "Gezi": "Aktivite/Gezi",
   "Tarih-Doğa": "Tarih/Kültür/Doğa",
   "Yerel İpucu": "Yerel Yaşam/Yemek/İpucu",

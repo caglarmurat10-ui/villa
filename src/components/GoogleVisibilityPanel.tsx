@@ -229,10 +229,15 @@ export default function GoogleVisibilityPanel({
         <strong style={{fontSize:11,color:"#93c5fd"}}>Yayın istatistiği (D1 kaynaklı)</strong>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8,marginTop:8}}>
           {box("Son 7 gün yayınlanan", stats7.publishedCount, "#86efac")}
-          {box("Son 7 gün hatalı", stats7.failedCount, stats7.failedCount > 0 ? "#fca5a5" : "#86efac")}
+          {box("Son 7 gün hatalı (AKTİF)", stats7.failedCount, stats7.failedCount > 0 ? "#fca5a5" : "#86efac")}
           {box("Son 30 gün yayınlanan", stats30.publishedCount, "#86efac")}
-          {box("Son 30 gün hatalı", stats30.failedCount, stats30.failedCount > 0 ? "#fca5a5" : "#86efac")}
+          {box("Son 30 gün hatalı (AKTİF)", stats30.failedCount, stats30.failedCount > 0 ? "#fca5a5" : "#86efac")}
         </div>
+        {stats30.legacyFailedCount > 0 ? (
+          <p style={{marginTop:8,fontSize:9,color:"#8fa4bd"}}>
+            + {stats30.legacyFailedCount} kayıt RETRIES_EXHAUSTED (deneme hakkı tükendi, cron bir daha denemeyecek) - geçmiş hata olarak audit&apos;te kalır, yeni bir otomasyon sorunu değildir.
+          </p>
+        ) : null}
       </div>
 
       <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>

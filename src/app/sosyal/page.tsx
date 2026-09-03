@@ -14,6 +14,8 @@ import { getContentLibrarySummary, getPublishStats } from "@/lib/social-library-
 import { getSocialCronHeartbeat } from "@/lib/social-cron-health";
 import { getGoogleVisibilitySnapshot } from "@/lib/google-visibility";
 import GoogleVisibilityPanel from "@/components/GoogleVisibilityPanel";
+import LocalEventsPanel from "@/components/LocalEventsPanel";
+import PlanRefreshButton from "@/components/PlanRefreshButton";
 import type { Villa } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -156,6 +158,8 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
       </a>
     </div>
     <SocialDeferredContent posts={posts} gaps={gaps} />
+    <PlanRefreshButton />
+    <LocalEventsPanel />
     <GoogleVisibilityPanel snapshot={googleSnapshot} stats7={stats7} stats30={stats30} reservations={reservations} todayIso={today} />
   </>;
 }

@@ -177,6 +177,29 @@ describe("ensureSpecialDayPosts (gerçek D1 entegrasyon testi) - Faz 6 bölüm 5
     expect(stillPresent).toBe(true);
     expect(mixDates.size).toBeGreaterThan(0);
   });
+
+  // Faz 6.1 bölüm 12 - "aynı special-day postunu aynı hesapta iki kez üretmesin" regresyonu.
+  it("ayni gunde iki kez cagrilirsa (ornegin cron + admin manuel tetikleme cakisirsa) AYNI bayram postu ayni villa/platform icin ikinci kez EKLENMEZ", async () => {
+    const { ensureSpecialDayPosts } = await import("./social-plan-seed");
+    await ensureSpecialDayPosts();
+    const afterFirst = await socialPostRows();
+    const holidayRowsFirst = afterFirst.filter((r) => r.scheduled_date === "2027-04-23");
+    expect(holidayRowsFirst.length).toBeGreaterThan(0);
+
+    await ensureSpecialDayPosts(); // ikinci cagri - AYNI gun, AYNI sistem saati
+    const afterSecond = await socialPostRows();
+    const holidayRowsSecond = afterSecond.filter((r) => r.scheduled_date === "2027-04-23");
+
+    // Satir SAYISI degismedi (villa+platform+content_type+scheduled_date+caption kimligine gore
+    // ayni kayit tekrar EKLENMEDI, seedSocialPosts'un mevcut upsert/dedup davranisina guvenilir).
+    expect(holidayRowsSecond.length).toBe(holidayRowsFirst.length);
+    for (const villa of ["Safira", "Destan"] as const) {
+      for (const platform of ["Instagram", "Facebook"] as const) {
+        const count = holidayRowsSecond.filter((r) => r.villa === villa && r.platform === platform).length;
+        expect(count).toBeLessThanOrEqual(1); // ayni villa+platform icin en fazla 1 bayram postu
+      }
+    }
+  });
 });
 
 describe("Günlük planlayıcı cron guard regresyonu (custom-worker.mjs)", () => {

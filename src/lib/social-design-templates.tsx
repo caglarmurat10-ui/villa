@@ -2,6 +2,7 @@ import { ImageResponse } from "next/og";
 import { GUIDE_PLACES, GUIDE_CATEGORIES } from "@/lib/region-guide";
 import { socialDriveMedia } from "@/lib/social-drive-media";
 import { getSpecialDayForDate } from "@/lib/special-days";
+import { ITINERARY_DEFINITIONS, resolveItineraryPlaces } from "@/lib/itinerary-content";
 import type { Villa } from "@/lib/types";
 
 // FAZ 5 bölüm 4/9/10 - Social Design Engine'in paylaşılan render katmanı. Hem admin-korumalı
@@ -15,10 +16,10 @@ import type { Villa } from "@/lib/types";
 //  - Villa Lifestyle/Offer: YALNIZ gerçek, Drive'dan çözümlenmiş, lisanslı villa fotoğrafı.
 //  - Destination/Activity içeriği YALNIZ GUIDE_PLACES'ten (region-guide.ts, doğrulanmış) gelir.
 
-export type TemplateType = "destination" | "activity" | "villa-lifestyle" | "travel-tip" | "offer" | "trust" | "special-day" | "local-event";
+export type TemplateType = "destination" | "activity" | "villa-lifestyle" | "travel-tip" | "offer" | "trust" | "special-day" | "local-event" | "itinerary";
 export type Format = "feed" | "story";
 
-export const TEMPLATE_TYPES: TemplateType[] = ["destination", "activity", "villa-lifestyle", "travel-tip", "offer", "trust", "special-day", "local-event"];
+export const TEMPLATE_TYPES: TemplateType[] = ["destination", "activity", "villa-lifestyle", "travel-tip", "offer", "trust", "special-day", "local-event", "itinerary"];
 
 const DIMENSIONS: Record<Format, { width: number; height: number }> = {
   feed: { width: 1080, height: 1350 },
@@ -152,6 +153,17 @@ export function renderSpecialDay(villa: Villa, format: Format, dateIso: string):
   return textCard(villa, format, "ÖZEL GÜN", name, match.message);
 }
 
+// ITINERARY (rota) - yalnız GUIDE_PLACES'te GERÇEKTEN var olan yerlerden derlenir
+// (resolveItineraryPlaces null dönerse - eksik/bozuk id - render de null döner, uydurma yok).
+export function renderItinerary(villa: Villa, format: Format, itineraryId: string): Response | null {
+  const definition = ITINERARY_DEFINITIONS.find((d) => d.id === itineraryId);
+  if (!definition) return null;
+  const places = resolveItineraryPlaces(definition);
+  if (!places) return null;
+  const stops = places.map((p) => p.name).join(" · ");
+  return textCard(villa, format, "ROTA FİKRİ", definition.title, stops);
+}
+
 // LOCAL EVENT - içerik D1'deki admin-onaylı aday kayıtlarına dayanır (bkz. local-events.ts), bu
 // yüzden bu fonksiyon SAF kalır (D1 çağrısı YOK) - çağıran taraf (route handler) zaten doğrulanmış
 // title/dateLabel/venueLabel/sourceLabel değerlerini geçirir, burada yalnız görsel üretilir.
@@ -202,6 +214,7 @@ export function renderTemplate(parsed: ParsedTemplateId, format: Format): Respon
     if (!DATE_KEY_PATTERN.test(key)) return null;
     return renderSpecialDay(villa, format, key);
   }
+  if (type === "itinerary") return renderItinerary(villa, format, key);
   // "local-event" bilerek burada YOK - içeriği D1'de saklanan admin-onaylı aday kayıtlarına
   // dayanır, bu yüzden renderLocalEvent ayrı, ASENKRON bir fonksiyondur (bkz. local-events.ts,
   // public route bunu ayrıca çağırır) - bu senkron fonksiyon yalnız statik/sabit tipleri kapsar.

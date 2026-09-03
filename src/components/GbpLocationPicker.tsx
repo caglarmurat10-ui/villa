@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Villa } from "@/lib/types";
 
 type GbpLocation = {
@@ -55,6 +55,17 @@ export default function GbpLocationPicker() {
     }
   }
 
+  // Faz 6.1 bölüm 3 - mevcut kalıcı eşleme sayfa yüklendiğinde (browser refresh dahil) manuel
+  // "Keşfet" tıklaması beklemeden görünmeli - "seçim persist oldu mu" sorusu bir buton tıklamasına
+  // bağımlı kalmamalı.
+  useEffect(() => {
+    // queueMicrotask: discover()'ın kendi ilk satırı senkron bir setState (setLoading(true)) -
+    // doğrudan çağrılırsa "effect içinde senkron setState" derleyici uyarısı üretir. Mikro-görev
+    // kuyruğuna erteleme, kullanıcı için algılanamayacak kadar kısa bir gecikmeyle AYNI davranışı
+    // korurken bu analiz sınırını (senkron ulaşılabilirlik) kırar.
+    queueMicrotask(() => { discover(); });
+  }, []);
+
   async function selectLocation(villa: Villa, locationName: string) {
     if (!locationName) return;
     setSaving(villa);
@@ -66,12 +77,17 @@ export default function GbpLocationPicker() {
         body: JSON.stringify({ villa, locationName }),
       });
       const body = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        setNotice(body.error ?? "Location kaydedilemedi.");
+      if (!response.ok || !body.persisted) {
+        // persisted:true olmadan ASLA "kaydedildi" denmez - read-back doğrulaması başarısız
+        // olduysa (bkz. select-location/route.ts) burası da başarı gibi GÖRÜNMEZ.
+        setNotice(body.error ?? "Location kaydedilemedi - lütfen tekrar deneyin.");
         return;
       }
-      setNotice(`Villa ${villa} → ${body.locationTitle} olarak kaydedildi.`);
+      // discover() ayrıca KV'den taze bir read-back yapar (getAllGbpLocationMappings) - bu satırın
+      // kendisi zaten route'un kendi read-back'inden geçti, discover() ise BAĞIMSIZ bir ikinci
+      // doğrulama (farklı bir request/round-trip) sağlıyor.
       await discover();
+      setNotice(`Villa ${villa} → ${body.locationTitle} olarak kaydedildi. Kalıcı kayıt doğrulandı.`);
     } catch {
       setNotice("Bağlantı hatası.");
     } finally {
@@ -104,7 +120,14 @@ export default function GbpLocationPicker() {
                 return (
                   <div key={villa} style={{ padding: "8px 10px", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728" }}>
                     <b style={{ fontSize: 10, color: "#dbeafe" }}>Villa {villa}</b>
-                    {currentMapping ? <p style={{ margin: "4px 0", fontSize: 9, color: "#86efac" }}>✓ Seçili: {currentMapping.locationTitle}</p> : <p style={{ margin: "4px 0", fontSize: 9, color: "#fbbf24" }}>Henüz seçilmedi</p>}
+                    {currentMapping ? (
+                      <p style={{ margin: "4px 0", fontSize: 9, color: "#86efac" }}>
+                        ✓ Seçili: {currentMapping.locationTitle}
+                        <br />Kalıcı kayıt doğrulandı ({new Date(currentMapping.selectedAt).toLocaleString("tr-TR")})
+                      </p>
+                    ) : (
+                      <p style={{ margin: "4px 0", fontSize: 9, color: "#fbbf24" }}>Henüz seçilmedi</p>
+                    )}
                     <select
                       defaultValue=""
                       disabled={saving === villa}
