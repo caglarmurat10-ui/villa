@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import type { PriceRange, Reservation, Villa } from "@/lib/types";
 import { toVillaId, trackCheckAvailability, trackGenerateLead } from "@/lib/analytics";
+import { computePriceQuote, type PriceSegment } from "@/lib/price-engine";
 import VillaAvailabilityCalendar from "./VillaAvailabilityCalendar";
 import styles from "./PublicBookingWidget.module.css";
 
@@ -38,11 +39,13 @@ type BookingReservation = Pick<Reservation, "villa" | "checkIn" | "checkOut">;
 type BookingPrice = Pick<PriceRange, "villa" | "startDate" | "endDate" | "nightlyRate">;
 
 type AvailabilityResult = {
-  kind: "available" | "busy" | "error";
+  kind: "available" | "busy" | "error" | "price_gap";
   title: string;
   detail: string;
   total?: number;
   nights?: number;
+  averageRate?: number;
+  segments?: PriceSegment[];
   alternative?: Villa;
 };
 
@@ -62,6 +65,7 @@ function isOccupied(reservations: BookingReservation[], villa: Villa, checkIn: s
     (item) => item.villa === villa && item.checkIn < checkOut && item.checkOut > checkIn,
   );
 }
+
 
 export default function PublicBookingWidget({
   reservations,
@@ -102,38 +106,34 @@ export default function PublicBookingWidget({
       };
     }
 
-    let total = 0;
-    let nights = 0;
-    let missingPrice = false;
-    const end = new Date(`${checkOut}T00:00:00Z`);
-    for (let cursor = new Date(`${checkIn}T00:00:00Z`); cursor < end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
-      const date = cursor.toISOString().slice(0, 10);
-      const range = prices.find((item) => item.villa === villa && item.startDate <= date && item.endDate >= date);
-      if (!range) missingPrice = true;
-      else total += range.nightlyRate;
-      nights += 1;
-    }
+    const villaRanges = prices.filter((item) => item.villa === villa);
+    const quote = computePriceQuote(villaRanges, checkIn, checkOut);
 
-    if (missingPrice) {
+    if (quote.status === "gap") {
       return {
-        kind: "available",
+        kind: "price_gap",
         title: `Villa ${villa} müsait`,
-        detail: `${nights} gece için müsaitlik doğrulandı. Bu dönem için fiyat bilgisi yönetim ekibinden teyit edilecek.`,
-        nights,
+        detail: "Bu tarih aralığının fiyatı henüz tanımlanmadı. Lütfen bizimle iletişime geçin.",
       };
+    }
+    if (quote.status === "invalid_range") {
+      return { kind: "error", title: "Tarihleri kontrol edin", detail: "Çıkış tarihi girişten sonra olmalı." };
     }
 
     return {
       kind: "available",
       title: `Villa ${villa} müsait`,
-      detail: `${nights} gece · Toplam konaklama bedeli`,
-      total,
-      nights,
+      detail: `${quote.nights} gece · Toplam konaklama bedeli`,
+      total: quote.total,
+      nights: quote.nights,
+      averageRate: quote.averageRate,
+      segments: quote.segments,
     };
   }, [checkIn, checkOut, prices, reservations, villa]);
 
   const alternativeHref = result?.alternative === "Safira" ? "/villa-safira" : "/villa-destan";
-  const resultClass = result?.kind === "available" ? styles.available : result?.kind === "busy" ? styles.busy : result?.kind === "error" ? styles.error : "";
+  const resultClass = result?.kind === "available" ? styles.available : result?.kind === "busy" ? styles.busy : result?.kind === "error" ? styles.error : result?.kind === "price_gap" ? styles.priceGap : "";
+  const canSubmitInquiry = result?.kind === "available" || result?.kind === "price_gap";
 
   function resetRequestFeedback() {
     if (requestState.kind !== "idle") setRequestState({ kind: "idle", message: "" });
@@ -141,7 +141,7 @@ export default function PublicBookingWidget({
 
   async function submitInquiry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (result?.kind !== "available") return;
+    if (!canSubmitInquiry) return;
     setRequestState({ kind: "sending", message: "Talebiniz kaydediliyor…" });
 
     try {
@@ -222,6 +222,24 @@ export default function PublicBookingWidget({
               {typeof result.total === "number" && <b>{money.format(result.total)}</b>}
             </div>
             <p>{result.detail}</p>
+            {result.segments && result.segments.length > 1 ? (
+              <div className={styles.breakdown}>
+                <table>
+                  <tbody>
+                    {result.segments.map((segment) => (
+                      <tr key={segment.startDate}>
+                        <td>{formatDateLabel(segment.startDate)} – {formatDateLabel(segment.endDate)} · {segment.nights} gece × {money.format(segment.nightlyRate)}</td>
+                        <td>{money.format(segment.subtotal)}</td>
+                      </tr>
+                    ))}
+                    <tr className={styles.breakdownTotal}>
+                      <td>TOPLAM · Ortalama gecelik {money.format(result.averageRate ?? 0)}</td>
+                      <td>{money.format(result.total ?? 0)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ) : null}
             {result.alternative && (
               <Link className={styles.alternative} href={alternativeHref}>
                 Villa {result.alternative}&apos;ı aynı tarihler için incele →
@@ -233,7 +251,7 @@ export default function PublicBookingWidget({
         )}
       </div>
 
-      {result?.kind === "available" && (
+      {canSubmitInquiry && (
         <form className={styles.requestForm} onSubmit={submitInquiry}>
           <div className={styles.requestHeading}>
             <div>
