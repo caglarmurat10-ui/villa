@@ -532,7 +532,8 @@ a.secondary {
 .locationAddress b { display: block; font-size: 10px; letter-spacing: .16em; font-weight: 800; color: #6b6152; margin-bottom: 6px; }
 .locationRegionText { margin: 0 0 30px; font-size: 13px; line-height: 1.75; color: var(--muted); }
 .locationActions { display: flex; gap: 12px; flex-wrap: wrap; }
-.locationActions a {
+a.locationActionPrimary,
+a.locationActionSecondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -543,10 +544,10 @@ a.secondary {
   font-size: 12px;
   font-weight: 800;
 }
-.locationActionPrimary { background: var(--ink); color: #fff; }
-.locationActionPrimary:hover { background: #223b30; }
-.locationActionSecondary { border: 1px solid var(--ink); color: var(--ink); }
-.locationActionSecondary:hover { background: rgba(19, 32, 25, .06); }
+a.locationActionPrimary { background: var(--ink); color: #fff; }
+a.locationActionPrimary:hover { background: #223b30; }
+a.locationActionSecondary { border: 1px solid var(--ink); color: var(--ink); }
+a.locationActionSecondary:hover { background: rgba(19, 32, 25, .06); }
 .locationVisual {
   position: relative;
   min-height: 320px;
