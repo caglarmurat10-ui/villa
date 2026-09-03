@@ -1,6 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 
-export type GoogleConnectionKey = "search_console" | "ga4" | "gbp";
+export type GoogleConnectionKey = "search_console" | "ga4" | "gbp" | "google_ads";
 
 type StoredConnection = {
   refreshToken?: string;

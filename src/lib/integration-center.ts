@@ -6,11 +6,14 @@ import { getGoogleVisibilitySnapshot, type GoogleVisibilitySnapshot } from "./go
 import { listMetaAccounts } from "./meta-store";
 import { getSocialCronHeartbeat, type SocialCronHeartbeat } from "./social-cron-health";
 import { getPublishStats, type PublishStats } from "./social-library-summary";
+import { getGoogleAdsReadiness, type GoogleAdsReadiness } from "./google-ads/readiness";
+import { getMetaAdsReadiness, type MetaAdsReadiness } from "./meta-ads/readiness";
 
 // Admin > Entegrasyonlar sayfasındaki tek-ekran "Entegrasyon Merkezi" için tek kaynak. Hiçbir yeni
 // iş mantığı yok - yalnız zaten var olan, kendi başına test edilmiş fonksiyonları (OTA/PayTR/Google/
-// Meta/cron/yayın istatistiği) paralel toplar. Google Ads/Meta Ads için kodda hiçbir entegrasyon
-// olmadığından sabit WAITING_USER_ACTION döner - hiçbir zaman fabrikasyon bir "bağlı" durumu yok.
+// Meta/cron/yayın istatistiği) paralel toplar. Google Ads/Meta Ads asla otomatik "bağlı" görünmez -
+// getGoogleAdsReadiness/getMetaAdsReadiness her koşulu (OAuth/developer token/customer ID/ad account)
+// ayrı ayrı kontrol eder, hiçbiri diğerinden çıkarım yapılmaz.
 function istanbulToday() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
 }
@@ -30,8 +33,8 @@ export interface IntegrationCenterSnapshot {
   paytr: PaytrReadiness;
   google: GoogleVisibilitySnapshot;
   metaOrganic: MetaOrganicStatus;
-  googleAdsState: "WAITING_USER_ACTION";
-  metaAdsState: "WAITING_USER_ACTION";
+  googleAds: GoogleAdsReadiness;
+  metaAds: MetaAdsReadiness;
   cronHeartbeat: SocialCronHeartbeat | null;
   cronHealthy: boolean;
   publishStats7: PublishStats;
@@ -53,7 +56,7 @@ export async function getIntegrationCenterSnapshot(): Promise<IntegrationCenterS
   const { env } = await getCloudflareContext({ async: true });
   const workerVersionId = env.CF_VERSION_METADATA?.id ?? null;
 
-  const [otaConnections, paytr, google, metaAccounts, cronHeartbeat, publishStats7, d1Healthy] = await Promise.all([
+  const [otaConnections, paytr, google, metaAccounts, cronHeartbeat, publishStats7, d1Healthy, googleAds, metaAds] = await Promise.all([
     listOtaConnectionsStatus(),
     getPaytrReadiness(),
     getGoogleVisibilitySnapshot(),
@@ -61,6 +64,8 @@ export async function getIntegrationCenterSnapshot(): Promise<IntegrationCenterS
     getSocialCronHeartbeat(),
     getPublishStats(7, istanbulToday()),
     checkD1Health(),
+    getGoogleAdsReadiness(),
+    getMetaAdsReadiness(),
   ]);
 
   const lastOtaSyncAt = otaConnections.reduce<string | null>((latest, connection) => {
@@ -86,8 +91,8 @@ export async function getIntegrationCenterSnapshot(): Promise<IntegrationCenterS
     paytr,
     google,
     metaOrganic,
-    googleAdsState: "WAITING_USER_ACTION",
-    metaAdsState: "WAITING_USER_ACTION",
+    googleAds,
+    metaAds,
     cronHeartbeat,
     cronHealthy,
     publishStats7,

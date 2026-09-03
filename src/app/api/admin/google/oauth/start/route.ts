@@ -6,12 +6,15 @@ export const dynamic = "force-dynamic";
 // /api/admin/* route'ları gibi hiçbir public allowlist'e eklenmedi.
 //
 // Search Console + GA4, aynı Google OAuth client'ı (GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET) ile tek
-// bir izin ekranında istenir - GBP ayrı, daha geniş bir izin (business.manage) gerektirdiği için
-// ayrı bir "scope" parametresiyle (query: ?scope=search_console|ga4|gbp) tetiklenir.
+// bir izin ekranında istenir - GBP ve Google Ads ayrı, daha geniş izinler gerektirdiği için ayrı
+// bir "scope" parametresiyle (query: ?scope=search_console|ga4|gbp|google_ads) tetiklenir. Google
+// Ads API'sinin KENDİSİ ayrıca developer token + customer ID gerektirir (bkz. google-ads/readiness.ts)
+// - bu OAuth adımı yalnız "adwords" izninin verilmesini sağlar, tek başına API erişimine yetmez.
 const SCOPES: Record<string, string> = {
   search_console: "https://www.googleapis.com/auth/webmasters.readonly",
   ga4: "https://www.googleapis.com/auth/analytics.readonly",
   gbp: "https://www.googleapis.com/auth/business.manage",
+  google_ads: "https://www.googleapis.com/auth/adwords",
 };
 const STATE_TTL_SECONDS = 10 * 60;
 
@@ -32,7 +35,7 @@ export async function GET(request: Request) {
   const scopeKey = url.searchParams.get("scope") ?? "";
   const scope = SCOPES[scopeKey];
   if (!scope) {
-    return Response.json({ error: "Geçersiz scope. Beklenen: search_console, ga4 veya gbp." }, { status: 400 });
+    return Response.json({ error: "Geçersiz scope. Beklenen: search_console, ga4, gbp veya google_ads." }, { status: 400 });
   }
 
   // CSRF: state KV'de kısa ömürlü saklanır, callback'te birebir eşleşmeli ve tek kullanımlıktır.

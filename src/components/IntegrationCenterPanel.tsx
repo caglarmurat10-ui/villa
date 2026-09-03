@@ -89,9 +89,23 @@ function buildServiceRows(snapshot: IntegrationCenterSnapshot): ServiceRow[] {
         ? "OAuth bağlandı - /entegrasyonlar'da 'GBP Hesap/Location Keşfet' ile hesap/location bulup Safira/Destan için seçin"
         : "Önce Google Business Profile'a bağlanın (oauth start?scope=gbp) - kod hazır (READY_TO_CONNECT)",
     },
-    { name: "Google Ads", status: "WAITING_USER_ACTION", lastSuccess: null, lastCheck: null, lastError: null, actionRequired: "OAuth + developer token + customer ID sağlanmalı (taslak kampanyalar hazır)" },
+    {
+      name: "Google Ads",
+      status: snapshot.googleAds.state === "GOOGLE_ADS_READY_READ_ONLY" ? "READY" : "WAITING_USER_ACTION",
+      lastSuccess: null,
+      lastCheck: null,
+      lastError: null,
+      actionRequired: snapshot.googleAds.state === "GOOGLE_ADS_READY_READ_ONLY" ? "Ön koşullar tamam - taslak kampanyalar hazır, canlıya almadan önce bütçe onayı gerekli" : snapshot.googleAds.missing[0],
+    },
     { name: "Meta Organik", status: metaOrganicOk ? "PASS" : "WARNING", lastSuccess: metaOrganicOk ? now : null, lastCheck: now, lastError: null, actionRequired: metaOrganicOk ? null : "Eksik hesap bağlantısını /sosyal sayfasından tamamlayın" },
-    { name: "Meta Ads", status: "WAITING_USER_ACTION", lastSuccess: null, lastCheck: null, lastError: null, actionRequired: "Business Manager/ad_account + ads_management izni sağlanmalı (taslak kampanyalar hazır)" },
+    {
+      name: "Meta Ads",
+      status: "WAITING_USER_ACTION",
+      lastSuccess: null,
+      lastCheck: null,
+      lastError: null,
+      actionRequired: snapshot.metaAds.missing[0],
+    },
   ];
 }
 
@@ -151,8 +165,11 @@ export default function IntegrationCenterPanel({ snapshot }: { snapshot: Integra
 
         <details style={{ marginTop: 14, paddingTop: 13, borderTop: "1px solid #203954" }}>
           <summary style={{ fontSize: 11, color: "#93c5fd", fontWeight: 800, cursor: "pointer" }}>
-            Google Ads taslak kampanyalar ({GOOGLE_ADS_CAMPAIGN_DRAFTS.length} DRAFT — hesap/bütçe gelince kullanılabilir, hiçbiri gönderilmedi)
+            Google Ads — {snapshot.googleAds.state} · {GOOGLE_ADS_CAMPAIGN_DRAFTS.length} DRAFT kampanya (hiçbiri gönderilmedi)
           </summary>
+          <div style={{ padding: "8px 10px", margin: "10px 0", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728", fontSize: 9, color: "#9fb0c5" }}>
+            <ul style={{ margin: 0, paddingLeft: 16 }}>{snapshot.googleAds.missing.map((m) => <li key={m}>{m}</li>)}</ul>
+          </div>
           <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
             {GOOGLE_ADS_CAMPAIGN_DRAFTS.map((c) => (
               <div key={c.id} style={{ padding: "8px 10px", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728", fontSize: 9 }}>
@@ -173,8 +190,11 @@ export default function IntegrationCenterPanel({ snapshot }: { snapshot: Integra
 
         <details style={{ marginTop: 10, paddingTop: 13, borderTop: "1px solid #203954" }}>
           <summary style={{ fontSize: 11, color: "#93c5fd", fontWeight: 800, cursor: "pointer" }}>
-            Meta Ads taslak kampanyalar ({META_ADS_CAMPAIGN_DRAFTS.length} DRAFT — ad_account gelince kullanılabilir, hiçbiri gönderilmedi)
+            Meta Ads — {snapshot.metaAds.state} · {META_ADS_CAMPAIGN_DRAFTS.length} DRAFT kampanya (hiçbiri gönderilmedi)
           </summary>
+          <div style={{ padding: "8px 10px", margin: "10px 0", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728", fontSize: 9, color: "#9fb0c5" }}>
+            <ul style={{ margin: 0, paddingLeft: 16 }}>{snapshot.metaAds.missing.map((m) => <li key={m}>{m}</li>)}</ul>
+          </div>
           <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
             {META_ADS_CAMPAIGN_DRAFTS.map((c) => (
               <div key={c.id} style={{ padding: "8px 10px", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728", fontSize: 9 }}>

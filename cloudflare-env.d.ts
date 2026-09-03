@@ -33,6 +33,10 @@ declare global {
     PAYTR_MERCHANT_ID?: string;
     PAYTR_MERCHANT_KEY?: string;
     PAYTR_MERCHANT_SALT?: string;
+    GOOGLE_ADS_DEVELOPER_TOKEN?: string;
+    GOOGLE_ADS_CUSTOMER_ID?: string;
+    GOOGLE_ADS_LOGIN_CUSTOMER_ID?: string;
+    META_ADS_AD_ACCOUNT_ID?: string;
   }
 }
 
