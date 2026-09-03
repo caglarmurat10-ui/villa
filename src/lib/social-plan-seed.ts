@@ -1,9 +1,11 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { SocialPostInput } from "./schema";
-import { socialContentTemplates } from "./social-content-library";
+import { socialContentTemplates, type SocialContentTemplate } from "./social-content-library";
 import { seedSocialPosts } from "./social-db";
 import { approvedProxyMediaAsset } from "./social-drive-media";
 import { listSocialPostMedia, replaceSocialPostMedia } from "./social-media-store";
+import { planRolling30Days, type ExistingPost, type PlannedSlot } from "./social-content-planner";
+import type { RecentPost } from "./social-duplicate-guard";
 
 function istanbulToday() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
@@ -121,4 +123,86 @@ export async function ensureDefaultSocialPlan() {
   const result = await seedSocialPosts(inputs);
   const mediaSynced = await syncSeededCarouselMedia(inputs, baseUrl, today);
   return { ...result, mediaSynced };
+}
+
+// FAZ 5 bölüm 3 - önümüzdeki 30 günü, mevcut gerçek içerik havuzunu (socialContentTemplates)
+// kullanarak SÜREKLİ dolduran planlayıcı. ensureDefaultSocialPlan (yukarısı) statik şablonların
+// KENDİ scheduledDate'ini olduğu gibi seed eder; bu fonksiyon ise şablonları YENİDEN TARİHLEYEREK
+// bir rotasyon havuzu gibi kullanır - takvim asla boş kalmasın diye.
+//
+// GÜVENLİK: planRolling30Days'in AUTO_SAFE dediği adaylar dahi seedSocialPosts() üzerinden
+// approval_status='İnsan onayı' ile eklenir - TÜM diğer oluşturma yollarıyla (admin formu,
+// ensureDefaultSocialPlan) BİREBİR aynı davranış. AUTO_SAFE/REVIEW_REQUIRED/BLOCKED yalnız
+// "bu içerik takvime otomatik ÖNERİLSİN mi" sorusuna cevap verir - "cron'un onaysız yayınlayıp
+// yayınlamayacağı" sorusuna DEĞİL (o soru zaten ayrı, değişmemiş bir kapı: duePosts()
+// approval_status='Onaylandı' şartı + Destan/Instagram HARD BLOCK). REVIEW_REQUIRED/BLOCKED
+// adaylar HİÇBİR ZAMAN seedSocialPosts()'a gönderilmez, yalnız raporlanır.
+const ROLLING_HORIZON_DAYS = 30;
+const ROLLING_LOOKBACK_DAYS = 60;
+
+function templateCaptionLookup(pool: SocialContentTemplate[]) {
+  const byCaption = new Map(pool.map((t) => [t.caption, t]));
+  return (caption: string) => byCaption.get(caption)?.theme;
+}
+
+export async function ensureRolling30DayPlan(dailyTarget = 1) {
+  const today = istanbulToday();
+  const baseUrl = await appBaseUrl();
+  const { env } = await getCloudflareContext({ async: true });
+
+  const lookbackStart = new Date(Date.parse(`${today}T00:00:00Z`) - ROLLING_LOOKBACK_DAYS * 86_400_000).toISOString().slice(0, 10);
+  const horizonEnd = new Date(Date.parse(`${today}T00:00:00Z`) + ROLLING_HORIZON_DAYS * 86_400_000).toISOString().slice(0, 10);
+
+  const rows = await env.DB.prepare(
+    `SELECT villa, scheduled_date, caption, media_url FROM social_posts
+     WHERE status = 'Planlandı' AND scheduled_date >= ? AND scheduled_date < ?`,
+  ).bind(lookbackStart, horizonEnd).all<{ villa: "Safira" | "Destan"; scheduled_date: string; caption: string; media_url: string | null }>();
+
+  const themeOf = templateCaptionLookup(socialContentTemplates);
+  const existingScheduled: ExistingPost[] = [];
+  const recentPosts: RecentPost[] = [];
+  for (const row of rows.results) {
+    if (row.scheduled_date >= today) {
+      existingScheduled.push({ scheduledDate: row.scheduled_date, villa: row.villa, theme: themeOf(row.caption) });
+    } else {
+      recentPosts.push({ villa: row.villa, caption: row.caption, mediaFile: row.media_url ?? "", scheduledDate: row.scheduled_date });
+    }
+  }
+
+  const { planned, needsReview } = planRolling30Days({
+    todayIso: today,
+    horizonDays: ROLLING_HORIZON_DAYS,
+    dailyTarget,
+    pool: socialContentTemplates,
+    existingScheduled,
+    recentPosts,
+  });
+
+  const templateById = new Map(socialContentTemplates.map((t) => [t.id, t]));
+  const inputs: SocialPostInput[] = [];
+  for (const slot of planned) {
+    const template = templateById.get(slot.templateId);
+    if (!template || !template.mediaResolved || !template.mediaUrl) continue;
+    if (template.contentType === "Reels" && template.mediaKind !== "video") continue;
+    const mediaUrls = (template.mediaUrls.length ? template.mediaUrls : [template.mediaUrl])
+      .map((url) => new URL(url, `${baseUrl}/`).toString())
+      .slice(0, 10);
+    const mediaUrl = mediaUrls[0] ?? "";
+    if (!mediaUrl) continue;
+
+    inputs.push({ villa: template.villa, platform: "Instagram", contentType: template.contentType, scheduledDate: slot.date, caption: template.caption, mediaUrl, mediaUrls });
+    if (template.contentType === "Gönderi" || (template.contentType === "Reels" && template.mediaKind === "video")) {
+      inputs.push({ villa: template.villa, platform: "Facebook", contentType: template.contentType, scheduledDate: slot.date, caption: template.caption, mediaUrl, mediaUrls });
+    }
+  }
+
+  const result = inputs.length > 0 ? await seedSocialPosts(inputs) : { created: 0, updated: 0, skipped: 0, total: 0 };
+  const mediaSynced = inputs.length > 0 ? await syncSeededCarouselMedia(inputs, baseUrl, today) : 0;
+
+  return {
+    ...result,
+    mediaSynced,
+    filledDays: new Set(planned.map((slot) => slot.date)).size,
+    needsReview: needsReview.map((slot: PlannedSlot) => ({ date: slot.date, villa: slot.villa, templateId: slot.templateId, automationClass: slot.automationClass, reason: slot.reason })),
+  };
 }
