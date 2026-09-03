@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import PublicBookingWidget from "@/components/PublicBookingWidget";
+import SeasonalPricingTable from "@/components/SeasonalPricingTable";
 import VillaGalleryLightbox from "@/components/VillaGalleryLightbox";
 import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
 import { VILLAS, FAQ_ITEMS, REGION_INFO, formatAddress, type VillaSlug } from "@/lib/villa-content";
@@ -61,6 +62,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
     ...blockedRanges,
   ];
   const bookingPrices = prices.map(({ villa: itemVilla, startDate, endDate, nightlyRate }) => ({ villa: itemVilla, startDate, endDate, nightlyRate }));
+  const todayIso = new Date().toISOString().slice(0, 10);
   const mapsUrl = locations[villa.villa];
   const directionsUrl = `https://www.google.com/maps/dir/?api=1&destination=${villa.geo.lat},${villa.geo.lng}`;
   // Yalnız GERÇEKTEN mevcut olan OTA butonlarını isimlendirir - Booking public URL'si yokken metin
@@ -155,7 +157,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
         <div className={styles.heroShade} />
         <nav className={styles.nav} aria-label="Villa menüsü">
           <Link href="/" className={styles.brand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></Link>
-          <div className={styles.navlinks}><Link href="/">Ana sayfa</Link><a href="#galeri">Villa</a><a href="#konum">Konum</a><a href="#sss">SSS</a><a className={styles.cta} href="#rezervasyon">Müsaitlik</a></div>
+          <div className={styles.navlinks}><Link href="/">Ana sayfa</Link><a href="#galeri">Villa</a><a href="#donemsel-fiyatlar">Fiyatlar</a><a href="#konum">Konum</a><a href="#sss">SSS</a><a className={styles.cta} href="#rezervasyon">Müsaitlik</a></div>
         </nav>
         <div className={styles.detailHeroCopy} id="ana-icerik" tabIndex={-1}>
           <span className={styles.eyebrow}>{villa.label} · PATARA · KAŞ</span>
@@ -347,6 +349,8 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
           <p className={styles.reservationOptionsNote}>{otaPlatformNames.join(" ve ")} üzerinden yapılan rezervasyonlarda ödeme ve rezervasyon işlemleri ilgili platformun koşullarına tabidir.</p>
         </section>
       )}
+
+      <SeasonalPricingTable villa={villa.villa} prices={bookingPrices} todayIso={todayIso} />
 
       <section className={styles.bookingBand} id="rezervasyon">
         <div className={styles.bookingWrap}>
