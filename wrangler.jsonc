@@ -46,8 +46,11 @@
   "version_metadata": {
     "binding": "CF_VERSION_METADATA"
   },
+  // "0 3 * * *" - günlük sosyal planlayıcı (ensureRolling30DayPlan), yayın-kritik */15 cron'undan
+  // BİLEREK ayrı bir invocation'da çalışır (bkz. custom-worker.mjs scheduled() - Error 1102 sonrası
+  // kaynak izolasyonu). 03:00 UTC = 06:00 İstanbul, düşük trafik saati.
   "triggers": {
-    "crons": ["*/15 * * * *", "*/30 * * * *"]
+    "crons": ["*/15 * * * *", "*/30 * * * *", "0 3 * * *"]
   },
   "observability": { "enabled": true }
 }

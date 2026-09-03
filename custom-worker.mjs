@@ -864,15 +864,22 @@ async function writeSocialCronHeartbeat(env, ranAt, counts) {
   }
 }
 
-// Faz 5 son denetim düzeltmesi (bölüm 5) - ensureRolling30DayPlan()'ı (src/lib/social-plan-seed.ts)
-// GÜNDE BİR KEZ tetikler. custom-worker.mjs derlenmiş TS/Next.js modüllerini import EDEMEZ (bkz.
-// yukarıdaki OTA bölümü notu) - bu yüzden publishThroughApp ile AYNI, zaten kanıtlanmış desen
-// kullanılır: nextWorker.fetch() ile in-process internal POST + zorunlu Host header (bkz.
-// publishThroughApp'teki 2026-08-30 kök neden notu - Host header'sız istek middleware'de sessizce
-// 404 olur). Idempotency KV'de (META_PRIVATE) Europe/Istanbul tarihiyle tutulur - cron */15 dakikada
-// bir çalışsa da planner günde yalnız bir kez tetiklenir. Yalnız BAŞARILI bir çağrıdan sonra
-// "bugün çalıştı" işaretlenir - başarısız bir deneme aynı gün içindeki bir sonraki tikte tekrar
-// denenir (kalıcı olarak atlanmaz).
+// Faz 5 son denetim düzeltmesi (bölüm 5), sonra Error 1102 kaynak-izolasyon düzeltmesi -
+// ensureRolling30DayPlan()'ı (src/lib/social-plan-seed.ts) GÜNDE BİR KEZ tetikler. custom-worker.mjs
+// derlenmiş TS/Next.js modüllerini import EDEMEZ (bkz. yukarıdaki OTA bölümü notu) - bu yüzden
+// publishThroughApp ile AYNI, zaten kanıtlanmış desen kullanılır: nextWorker.fetch() ile in-process
+// internal POST + zorunlu Host header (bkz. publishThroughApp'teki 2026-08-30 kök neden notu -
+// Host header'sız istek middleware'de sessizce 404 olur).
+//
+// KENDİ AYRI cron tetikleyicisinden ("0 3 * * *", wrangler.jsonc) çağrılır - yayın-kritik */15
+// cron'unun (duePosts/publishThroughApp) İÇİNDEN DEĞİL. Önceden */15 içinden çağrılıyordu; planlayıcının
+// 60+ günlük geçmişe karşı duplicate-guard karşılaştırması (checkDuplicateContent, her aday için
+// O(geçmiş kayıt sayısı) Jaccard benzerliği) yayın-kritik invocation'ın CPU/hafıza bütçesini
+// gereksiz paylaşıyordu - production'da bir Error 1102 sonrası bu ayrım eklendi (bkz. rapor).
+// KV guard (META_PRIVATE) yine de korunur - günlük cron birden fazla region/retry ile tetiklenirse
+// veya elle /api/social-posts/plan-30-day çağrılırsa idempotency ikinci savunma katmanı olarak kalır.
+// Yalnız BAŞARILI bir çağrıdan sonra "bugün çalıştı" işaretlenir - başarısız bir deneme ertesi günkü
+// tetiklemede tekrar denenir (kalıcı olarak atlanmaz).
 const DAILY_PLANNER_KV_KEY = "social_daily_planner_last_run_date";
 
 async function runDailySocialPlannerIfDue(env, ctx) {
@@ -906,13 +913,6 @@ async function runDailySocialPlannerIfDue(env, ctx) {
 
 async function runSocialCron(controller, env, ctx) {
   const ranAt = new Date(controller.scheduledTime).toISOString();
-
-  // Planlayıcı hatası, mevcut yayın akışını ASLA engellemez - tamamen izole, ayrı bir adım.
-  try {
-    await runDailySocialPlannerIfDue(env, ctx);
-  } catch (error) {
-    console.error(`[Social Cron] Günlük planlayıcı beklenmeyen hata: ${safeCronError(error)}`);
-  }
 
   if (String(env.SOCIAL_AUTO_PUBLISH_ENABLED ?? "true").toLowerCase() !== "true") {
     console.log("[Social Cron] Otomatik yayın kapalı.");
@@ -1186,6 +1186,16 @@ export default {
     if (typeof controller.noRetry === "function") controller.noRetry();
     if (controller.cron === "*/30 * * * *") {
       await runOtaCron(env);
+      return;
+    }
+    // Günlük sosyal planlayıcı - yayın-kritik */15 cron'undan BİLEREK ayrı bir invocation (bkz.
+    // runDailySocialPlannerIfDue üzerindeki not - Error 1102 sonrası kaynak izolasyonu).
+    if (controller.cron === "0 3 * * *") {
+      try {
+        await runDailySocialPlannerIfDue(env, ctx);
+      } catch (error) {
+        console.error(`[Social Planner] Zamanlanmış çalıştırma beklenmeyen hata: ${safeCronError(error)}`);
+      }
       return;
     }
     await runSocialCron(controller, env, ctx);

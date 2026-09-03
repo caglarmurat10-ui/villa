@@ -121,11 +121,25 @@ describe("Günlük planlayıcı cron guard regresyonu (custom-worker.mjs)", () =
     expect(source).toContain("if (lastRunDate === today) return;");
   });
 
-  it("runSocialCron, günlük planlayıcıyı çağırır (mevcut yayın akışını bozmadan, izole try/catch içinde)", () => {
+  it("günlük planlayıcı KENDİ ayrı cron tetikleyicisinden (\"0 3 * * *\") çalışır, yayın-kritik */15 cron'unun İÇİNDEN DEĞİL (Error 1102 sonrası kaynak izolasyonu)", () => {
     const source = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
-    const cronIndex = source.indexOf("async function runSocialCron(controller, env, ctx) {");
-    const plannerCallIndex = source.indexOf("runDailySocialPlannerIfDue(env, ctx)", cronIndex);
-    expect(cronIndex).toBeGreaterThan(-1);
-    expect(plannerCallIndex).toBeGreaterThan(cronIndex);
+    const wranglerSource = readFileSync(resolve(ROOT, "wrangler.jsonc"), "utf-8");
+    expect(wranglerSource).toContain('"0 3 * * *"');
+
+    const scheduledIndex = source.indexOf("async scheduled(controller, env, ctx) {");
+    expect(scheduledIndex).toBeGreaterThan(-1);
+    const dedicatedCronIndex = source.indexOf('controller.cron === "0 3 * * *"', scheduledIndex);
+    const dedicatedPlannerCallIndex = source.indexOf("runDailySocialPlannerIfDue(env, ctx)", dedicatedCronIndex);
+    expect(dedicatedCronIndex).toBeGreaterThan(scheduledIndex);
+    expect(dedicatedPlannerCallIndex).toBeGreaterThan(dedicatedCronIndex);
+
+    // runSocialCron (yayın-kritik */15 yolu) ARTIK planlayıcıyı çağırmamalı - ikisi ayrı invocation.
+    // Fonksiyonun bittiği yer için sıradaki bölüm başlığı (OTA senkronu) net bir sınır oluşturur.
+    const cronFnIndex = source.indexOf("async function runSocialCron(controller, env, ctx) {");
+    const cronFnEnd = source.indexOf("============ OTA", cronFnIndex);
+    expect(cronFnIndex).toBeGreaterThan(-1);
+    expect(cronFnEnd).toBeGreaterThan(cronFnIndex);
+    const cronFnBody = source.slice(cronFnIndex, cronFnEnd);
+    expect(cronFnBody).not.toContain("runDailySocialPlannerIfDue(env, ctx)");
   });
 });
