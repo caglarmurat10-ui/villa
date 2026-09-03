@@ -1,4 +1,6 @@
 import type { IntegrationCenterSnapshot } from "@/lib/integration-center";
+import { GOOGLE_ADS_CAMPAIGN_DRAFTS, GOOGLE_ADS_CONVERSION_MAPPING, GOOGLE_ADS_NEGATIVE_KEYWORDS } from "@/lib/google-ads-campaign-drafts";
+import { META_ADS_CAMPAIGN_DRAFTS, META_ADS_READINESS_NOTES } from "@/lib/meta-ads-campaign-drafts";
 
 type Chip = { label: string; state: "PASS" | "READY" | "WARNING" | "WAITING_EXTERNAL_ACCESS" | "WAITING_USER_ACTION" | "FAIL"; detail?: string };
 
@@ -85,6 +87,46 @@ export default function IntegrationCenterPanel({ snapshot }: { snapshot: Integra
           })}
           {chip({ label: "Son OTA sync", state: snapshot.lastOtaSyncAt ? "PASS" : "WARNING", detail: timeAgo(snapshot.lastOtaSyncAt) })}
         </div>
+
+        <details style={{ marginTop: 14, paddingTop: 13, borderTop: "1px solid #203954" }}>
+          <summary style={{ fontSize: 11, color: "#93c5fd", fontWeight: 800, cursor: "pointer" }}>
+            Google Ads taslak kampanyalar ({GOOGLE_ADS_CAMPAIGN_DRAFTS.length} DRAFT — hesap/bütçe gelince kullanılabilir, hiçbiri gönderilmedi)
+          </summary>
+          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+            {GOOGLE_ADS_CAMPAIGN_DRAFTS.map((c) => (
+              <div key={c.id} style={{ padding: "8px 10px", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728", fontSize: 9 }}>
+                <b style={{ color: "#dbeafe" }}>{c.name} · {c.campaignType} · {c.status}</b>
+                {c.keywords.length > 0 ? <p style={{ margin: "4px 0 0", color: "#9fb0c5" }}>Anahtar kelimeler: {c.keywords.join(", ")}</p> : null}
+                <p style={{ margin: "4px 0 0", color: "#8fa4bd" }}>Bütçe: {c.dailyBudgetNote}</p>
+              </div>
+            ))}
+            <div style={{ padding: "8px 10px", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728", fontSize: 9, color: "#9fb0c5" }}>
+              <b style={{ color: "#dbeafe" }}>Negatif anahtar kelimeler:</b> {GOOGLE_ADS_NEGATIVE_KEYWORDS.join(", ")}
+            </div>
+            <div style={{ padding: "8px 10px", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728", fontSize: 9, color: "#9fb0c5" }}>
+              <b style={{ color: "#dbeafe" }}>Conversion eşlemesi (GA4 event isimleriyle birebir):</b>
+              <ul style={{ margin: "4px 0 0", paddingLeft: 16 }}>{GOOGLE_ADS_CONVERSION_MAPPING.map((m) => <li key={m.gtmEvent}>{m.gtmEvent} — {m.note}</li>)}</ul>
+            </div>
+          </div>
+        </details>
+
+        <details style={{ marginTop: 10, paddingTop: 13, borderTop: "1px solid #203954" }}>
+          <summary style={{ fontSize: 11, color: "#93c5fd", fontWeight: 800, cursor: "pointer" }}>
+            Meta Ads taslak kampanyalar ({META_ADS_CAMPAIGN_DRAFTS.length} DRAFT — ad_account gelince kullanılabilir, hiçbiri gönderilmedi)
+          </summary>
+          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+            {META_ADS_CAMPAIGN_DRAFTS.map((c) => (
+              <div key={c.id} style={{ padding: "8px 10px", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728", fontSize: 9 }}>
+                <b style={{ color: "#dbeafe" }}>{c.name} · {c.objective} · {c.status}</b>
+                <p style={{ margin: "4px 0 0", color: "#9fb0c5" }}>Kitle: {c.audienceNote}</p>
+                <p style={{ margin: "4px 0 0", color: "#8fa4bd" }}>Kreatif: {c.creativeConcept}</p>
+              </div>
+            ))}
+            <div style={{ padding: "8px 10px", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728", fontSize: 9, color: "#9fb0c5" }}>
+              <ul style={{ margin: 0, paddingLeft: 16 }}>{META_ADS_READINESS_NOTES.map((n) => <li key={n}>{n}</li>)}</ul>
+            </div>
+          </div>
+        </details>
       </div>
     </section>
   );
