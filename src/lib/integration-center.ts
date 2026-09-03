@@ -9,6 +9,7 @@ import { getPublishStats, type PublishStats } from "./social-library-summary";
 import { getGoogleAdsReadiness, type GoogleAdsReadiness } from "./google-ads/readiness";
 import { getMetaAdsReadiness, type MetaAdsReadiness } from "./meta-ads/readiness";
 import { getInstallmentCampaignReadiness, type InstallmentCampaignReadiness } from "./payments/installment-campaign";
+import { getGoogleVrReadiness, type GoogleVrReadiness } from "./google-vr/readiness";
 
 // Admin > Entegrasyonlar sayfasındaki tek-ekran "Entegrasyon Merkezi" için tek kaynak. Hiçbir yeni
 // iş mantığı yok - yalnız zaten var olan, kendi başına test edilmiş fonksiyonları (OTA/PayTR/Google/
@@ -33,6 +34,7 @@ export interface IntegrationCenterSnapshot {
   lastOtaSyncAt: string | null;
   paytr: PaytrReadiness;
   installmentCampaign: InstallmentCampaignReadiness;
+  googleVr: GoogleVrReadiness;
   google: GoogleVisibilitySnapshot;
   metaOrganic: MetaOrganicStatus;
   googleAds: GoogleAdsReadiness;
@@ -58,10 +60,11 @@ export async function getIntegrationCenterSnapshot(): Promise<IntegrationCenterS
   const { env } = await getCloudflareContext({ async: true });
   const workerVersionId = env.CF_VERSION_METADATA?.id ?? null;
 
-  const [otaConnections, paytr, installmentCampaign, google, metaAccounts, cronHeartbeat, publishStats7, d1Healthy, googleAds, metaAds] = await Promise.all([
+  const [otaConnections, paytr, installmentCampaign, googleVr, google, metaAccounts, cronHeartbeat, publishStats7, d1Healthy, googleAds, metaAds] = await Promise.all([
     listOtaConnectionsStatus(),
     getPaytrReadiness(),
     getInstallmentCampaignReadiness(),
+    getGoogleVrReadiness(),
     getGoogleVisibilitySnapshot(),
     listMetaAccounts(),
     getSocialCronHeartbeat(),
@@ -93,6 +96,7 @@ export async function getIntegrationCenterSnapshot(): Promise<IntegrationCenterS
     lastOtaSyncAt,
     paytr,
     installmentCampaign,
+    googleVr,
     google,
     metaOrganic,
     googleAds,

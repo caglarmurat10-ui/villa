@@ -97,6 +97,14 @@ function buildServiceRows(snapshot: IntegrationCenterSnapshot): ServiceRow[] {
         : "Önce Google Business Profile'a bağlanın (oauth start?scope=gbp) - kod hazır (READY_TO_CONNECT)",
     },
     {
+      name: "Google Vacation Rentals",
+      status: "WAITING_EXTERNAL_ACCESS",
+      lastSuccess: null,
+      lastCheck: null,
+      lastError: null,
+      actionRequired: snapshot.googleVr.missing[0] ?? null,
+    },
+    {
       name: "Google Ads",
       status: snapshot.googleAds.state === "GOOGLE_ADS_READY_READ_ONLY" ? "READY" : "WAITING_USER_ACTION",
       lastSuccess: null,
@@ -187,6 +195,26 @@ export default function IntegrationCenterPanel({ snapshot }: { snapshot: Integra
           {snapshot.installmentCampaign.state !== "INSTALLMENT_CAMPAIGN_VERIFIED" ? (
             <p style={{ marginTop: 8, fontSize: 9, color: "#fbbf24" }}>Doğrulanmadan public sitede &quot;peşin fiyatına&quot; iddiası gösterilmez - kampanya banner&apos;ı bu durumda otomatik gizli kalır.</p>
           ) : null}
+        </details>
+
+        <details style={{ marginTop: 10, paddingTop: 13, borderTop: "1px solid #203954" }}>
+          <summary style={{ fontSize: 11, color: "#93c5fd", fontWeight: 800, cursor: "pointer" }}>
+            Google Vacation Rentals ({snapshot.googleVr.state} · connectivity: {snapshot.googleVr.connectivity})
+          </summary>
+          <div style={{ display: "grid", gap: 8, marginTop: 10 }}>
+            {snapshot.googleVr.villas.map((v) => (
+              <div key={v.villa} style={{ padding: "8px 10px", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728", fontSize: 9 }}>
+                <b style={{ color: "#dbeafe" }}>Villa {v.villa}</b>
+                <p style={{ margin: "4px 0 0", color: v.gbpLocationMapped ? "#86efac" : "#fbbf24" }}>{v.gbpLocationMapped ? "✓ GBP location eşlendi" : "✗ GBP location eşlenmedi"}</p>
+                <p style={{ margin: "4px 0 0", color: v.priceCoverage.gapDays === 0 ? "#86efac" : "#fbbf24" }}>
+                  Fiyat kapsamı: {v.priceCoverage.coveredDays}/{v.priceCoverage.totalDays} gün{v.priceCoverage.gapDays > 0 ? ` · ${v.priceCoverage.gapDays} gün PRICE_GAP` : ""}
+                </p>
+              </div>
+            ))}
+            <div style={{ padding: "8px 10px", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728", fontSize: 9, color: "#9fb0c5" }}>
+              <ul style={{ margin: 0, paddingLeft: 16 }}>{snapshot.googleVr.missing.map((m) => <li key={m}>{m}</li>)}</ul>
+            </div>
+          </div>
         </details>
 
         <details style={{ marginTop: 14, paddingTop: 13, borderTop: "1px solid #203954" }}>
