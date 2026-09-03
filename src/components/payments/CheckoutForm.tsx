@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Script from "next/script";
 import { trackBeginCheckout, type PaymentTypeAnalytics, type VillaId } from "@/lib/analytics";
 import styles from "./CheckoutForm.module.css";
@@ -11,27 +11,36 @@ export default function CheckoutForm({
   villaName,
   paymentType,
   testMode,
+  initialName = "",
+  initialEmail = "",
+  initialPhone = "",
+  initialAddress = "",
+  autoStart = false,
 }: {
   paymentId: string;
   villaId: VillaId;
   villaName: string;
   paymentType: PaymentTypeAnalytics;
   testMode: boolean;
+  initialName?: string;
+  initialEmail?: string;
+  initialPhone?: string;
+  initialAddress?: string;
+  autoStart?: boolean;
 }) {
-  // Bilerek BOŞ başlar - mevcut reservation kaydındaki misafir adı/telefonu buraya OTOMATİK
-  // doldurulmaz (ödeme linkinin sahibi her zaman aynı kişi olmayabilir; iletişim bilgilerini
-  // kullanıcı kendisi girer).
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [address, setAddress] = useState("");
+  // Normal /odeme sayfasında alanlar boş başlayabilir. Public rezervasyon akışında ise müşteri
+  // aynı bilgileri az önce girdiği için tekrar sordurulmaz; değerler güvenli checkout isteğine taşınır.
+  const [name, setName] = useState(initialName);
+  const [email, setEmail] = useState(initialEmail);
+  const [phone, setPhone] = useState(initialPhone);
+  const [address, setAddress] = useState(initialAddress);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
   const [resizerReady, setResizerReady] = useState(false);
+  const autoStarted = useRef(false);
 
-  async function startCheckout(event: React.FormEvent) {
-    event.preventDefault();
+  const requestCheckout = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -49,6 +58,17 @@ export default function CheckoutForm({
     } finally {
       setLoading(false);
     }
+  }, [address, email, name, paymentId, paymentType, phone, testMode, villaId, villaName]);
+
+  useEffect(() => {
+    if (!autoStart || autoStarted.current) return;
+    autoStarted.current = true;
+    void requestCheckout();
+  }, [autoStart, requestCheckout]);
+
+  async function startCheckout(event: React.FormEvent) {
+    event.preventDefault();
+    await requestCheckout();
   }
 
   if (iframeUrl) {
@@ -63,8 +83,29 @@ export default function CheckoutForm({
             win.iFrameResize?.({}, "#paytr-iframe");
           }}
         />
-        {!resizerReady ? <p className={styles.loadingNote}>Güvenli ödeme ekranı yükleniyor…</p> : null}
-        <iframe id="paytr-iframe" src={iframeUrl} frameBorder="0" scrolling="no" style={{ width: "100%" }} title="PayTR güvenli ödeme" />
+        {!resizerReady ? <p className={styles.loadingNote}>Güvenli kart ödeme ekranı yükleniyor…</p> : null}
+        <iframe
+          id="paytr-iframe"
+          src={iframeUrl}
+          frameBorder="0"
+          scrolling="no"
+          style={{ width: "100%" }}
+          title="PayTR güvenli ödeme"
+        />
+      </div>
+    );
+  }
+
+  if (autoStart) {
+    return (
+      <div className={styles.autoStart}>
+        {loading ? <p className={styles.loadingNote}>Güvenli kart ödeme ekranı hazırlanıyor…</p> : null}
+        {error ? (
+          <>
+            <p className={styles.error}>{error}</p>
+            <button type="button" onClick={() => void requestCheckout()}>Tekrar dene</button>
+          </>
+        ) : null}
       </div>
     );
   }

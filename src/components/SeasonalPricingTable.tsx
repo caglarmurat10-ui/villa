@@ -6,13 +6,21 @@ type BookingPrice = Pick<PriceRange, "villa" | "startDate" | "endDate" | "nightl
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
 const moneyPrecise = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const dateFmt = new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "long", year: "numeric" });
+
 function formatRange(start: string, end: string) {
   return `${dateFmt.format(new Date(`${start}T00:00:00Z`))} – ${dateFmt.format(new Date(`${end}T00:00:00Z`))}`;
 }
 
-// Yalnız gerçek D1 price_ranges verisini gösterir - örnek/tahmini rakam yok. Geçmiş dönemler
-// (endDate bugünden önce) varsayılan olarak gizlenir, yaklaşan dönemler tarih sırasıyla listelenir.
-// Hiç yaklaşan dönem yoksa bölüm hiç render edilmez (boş/uydurma bir tablo göstermez).
+function yearOf(iso: string) {
+  return Number(iso.slice(0, 4));
+}
+
+/**
+ * Public fiyat kartı yönetim panelindeki gerçek D1 kayıtlarından gelir.
+ * Kullanıcının son kararı gereği içinde bulunduğumuz takvim yılının kapanan/eski fiyat kartları
+ * public vitrinde gösterilmez; varsa bir sonraki satış sezonu (örn. 2027) öne çıkarılır.
+ * Bir sonraki yıl henüz tanımlı değilse mevcut/yaklaşan gerçek kayıtlar gösterilmeye devam eder.
+ */
 export default function SeasonalPricingTable({ villa, prices, todayIso }: { villa: Villa; prices: BookingPrice[]; todayIso: string }) {
   const upcoming = prices
     .filter((p) => p.villa === villa && p.endDate >= todayIso)
@@ -20,42 +28,61 @@ export default function SeasonalPricingTable({ villa, prices, todayIso }: { vill
 
   if (upcoming.length === 0) return null;
 
-  // Şu an hiçbir dönem "geçerli" değilse (bugün, listelenen dönemlerin hiçbirinin içinde değil)
-  // gösterilen ilk dönemle bugün arasında bir boşluk (kapalı sezon) var demektir - müşteri bunu
-  // "neden ilk fiyatlı dönem bu kadar uzakta" diye sormasın diye kısa bir açıklama eklenir.
-  const hasCurrent = upcoming.some((p) => p.startDate <= todayIso && p.endDate >= todayIso);
+  const currentYear = yearOf(todayIso);
+  const nextSeasonYear = upcoming
+    .map((range) => yearOf(range.startDate))
+    .filter((year) => year > currentYear)
+    .sort((a, b) => a - b)[0];
+
+  const displayed = nextSeasonYear
+    ? upcoming.filter((range) => yearOf(range.startDate) === nextSeasonYear)
+    : upcoming;
 
   return (
     <section className={styles.section} id="donemsel-fiyatlar">
-      <span className={styles.kicker}>DÖNEMSEL FİYATLAR</span>
-      <h2>Villa {villa} gecelik fiyatları</h2>
-      <p className={styles.note}>Aşağıdaki fiyatlar yönetim panelindeki güncel fiyat kayıtlarından gelir.</p>
-      {!hasCurrent && (
-        <p className={styles.note}>{`${villa} için ${formatRange(upcoming[0].startDate, upcoming[0].endDate)} tarihleri arasındaki sezon açıktır.`}</p>
-      )}
+      <span className={styles.kicker}>GÜNCEL SATIŞ SEZONU</span>
+      <h2>Villa {villa} sezon fiyatı</h2>
+      <p className={styles.note}>
+        Fiyat yönetim panelindeki güncel kayıt üzerinden gösterilir. Tarihinizi seçtiğinizde kesin toplam konaklama bedeli ayrıca hesaplanır.
+      </p>
+
       <div className={styles.grid}>
-        {upcoming.map((range) => {
-          const isCurrent = range.startDate <= todayIso && range.endDate >= todayIso;
-          // Haftalık esas fiyat modeli (2027 kararı gibi): esas toplam öne çıkar, gecelik rakam
-          // yalnız esas toplamdan türetilmiş REFERANS değer olarak ikinci sırada gösterilir -
-          // price-engine.ts'teki canonical hesaplamayla birebir aynı kaynaktan (basePriceMinor/
-          // baseNights) türetilir, ayrı bir formülle uydurulmaz.
-          const hasWeeklyBase = typeof range.basePriceMinor === "number" && typeof range.baseNights === "number" && range.baseNights > 0;
+        {displayed.map((range) => {
+          const hasWeeklyBase =
+            typeof range.basePriceMinor === "number" &&
+            typeof range.baseNights === "number" &&
+            range.baseNights > 0;
           const weeklyTotal = hasWeeklyBase ? range.basePriceMinor! / 100 : null;
-          const referenceNightly = hasWeeklyBase ? range.basePriceMinor! / 100 / range.baseNights! : null;
+          const referenceNightly = hasWeeklyBase ? weeklyTotal! / range.baseNights! : range.nightlyRate;
 
           return (
             <article className={styles.card} key={`${range.startDate}-${range.endDate}`}>
-              {isCurrent ? <span className={styles.badge}>Şu an geçerli</span> : null}
+              <span className={styles.badge}>Güncel sezon</span>
               <span className={styles.dates}>{formatRange(range.startDate, range.endDate)}</span>
+
               {hasWeeklyBase ? (
                 <>
-                  <strong className={styles.rate}>{money.format(weeklyTotal!)} <small>/ {range.baseNights} gece</small></strong>
-                  <span className={styles.nightlyRef}>{moneyPrecise.format(referenceNightly!)} / gece</span>
+                  <strong className={styles.rate}>
+                    {moneyPrecise.format(referenceNightly)} <small>/ gece</small>
+                  </strong>
+                  <span className={styles.cashPrice}>
+                    Peşin sezon fiyatı: <b>{money.format(weeklyTotal!)}</b> / {range.baseNights} gece
+                  </span>
                 </>
               ) : (
-                <strong className={styles.rate}>{money.format(range.nightlyRate)} <small>/ gece</small></strong>
+                <strong className={styles.rate}>
+                  {money.format(range.nightlyRate)} <small>/ gece</small>
+                </strong>
               )}
+
+              <div className={styles.paymentInfo}>
+                <strong>Kartla ödeme</strong>
+                <span>3 veya 6 taksit seçeneği</span>
+                <small>
+                  Kesin taksit seçenekleri ve kartınıza uygulanacak koşullar güvenli PayTR ödeme ekranında gösterilir.
+                </small>
+              </div>
+
               {typeof range.minimumNights === "number" && (
                 <span className={styles.minStay}>Minimum {range.minimumNights} gece</span>
               )}

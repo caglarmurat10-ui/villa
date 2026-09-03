@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { BookingInquiry, BookingInquiryStatus } from "@/lib/booking-inquiries";
+import type { BookingGuestDetails } from "@/lib/booking-guest-details";
 
 const money = new Intl.NumberFormat("tr-TR", {
   style: "currency",
@@ -35,6 +36,8 @@ export default function BookingInquiryCenter({ initialItems }: { initialItems: B
   const [items, setItems] = useState(initialItems);
   const [filter, setFilter] = useState<"Tümü" | BookingInquiryStatus>("Tümü");
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [detailsBusyId, setDetailsBusyId] = useState<string | null>(null);
+  const [guestDetails, setGuestDetails] = useState<Record<string, BookingGuestDetails>>({});
   const [notice, setNotice] = useState("");
 
   const counts = useMemo(() => ({
@@ -63,6 +66,29 @@ export default function BookingInquiryCenter({ initialItems }: { initialItems: B
       return false;
     } finally {
       setBusyId(null);
+    }
+  }
+
+  async function loadGuestDetails(id: string) {
+    if (guestDetails[id]) {
+      setGuestDetails((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
+      return;
+    }
+    setDetailsBusyId(id);
+    setNotice("");
+    try {
+      const response = await fetch(`/api/booking-inquiries/${id}/guest-details`);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Misafir bilgileri okunamadı.");
+      setGuestDetails((current) => ({ ...current, [id]: data.details }));
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Misafir bilgileri okunamadı.");
+    } finally {
+      setDetailsBusyId(null);
     }
   }
 
@@ -107,7 +133,7 @@ export default function BookingInquiryCenter({ initialItems }: { initialItems: B
         <div>
           <span className="eyebrow">DOĞRUDAN REZERVASYON</span>
           <h1>Web talepleri</h1>
-          <p>safiradestan.com üzerinden gelen talepleri burada takip edin, WhatsApp ile yanıtlayın ve onaylanan talebi tek işlemle gerçek rezervasyona dönüştürün.</p>
+          <p>safiradestan.com üzerinden gelen talepleri burada takip edin, misafir bilgilerini görüntüleyin, WhatsApp ile yanıtlayın ve onaylanan talebi gerçek rezervasyona dönüştürün.</p>
         </div>
         <div className="inquiry-stats">
           <div><strong>{counts.new}</strong><span>Yeni</span></div>
@@ -125,8 +151,9 @@ export default function BookingInquiryCenter({ initialItems }: { initialItems: B
       {notice ? <div className="inquiry-notice">{notice}</div> : null}
 
       <div className="inquiry-list">
-        {visible.length === 0 ? <div className="inquiry-empty">Bu filtrede rezervasyon talebi yok.</div> : visible.map((item) =>
-          <article className="inquiry-card" key={item.id}>
+        {visible.length === 0 ? <div className="inquiry-empty">Bu filtrede rezervasyon talebi yok.</div> : visible.map((item) => {
+          const details = guestDetails[item.id];
+          return <article className="inquiry-card" key={item.id}>
             <div className="inquiry-card-head">
               <div>
                 <span className={`inquiry-villa ${item.villa.toLowerCase()}`}>Villa {item.villa}</span>
@@ -146,9 +173,21 @@ export default function BookingInquiryCenter({ initialItems }: { initialItems: B
               <div><span>Kaynak</span><strong>{item.source}</strong></div>
             </div>
 
+            {details ? (
+              <div className="inquiry-note">
+                <span>Misafir / fatura bilgileri</span>
+                <p><strong>E-posta:</strong> {details.email}</p>
+                <p><strong>Açık adres:</strong> {details.address}</p>
+                <p><strong>T.C. Kimlik / Pasaport No:</strong> {details.identityNo}</p>
+              </div>
+            ) : null}
+
             {item.note ? <div className="inquiry-note"><span>Misafir notu</span><p>{item.note}</p></div> : null}
 
             <div className="inquiry-actions">
+              <button disabled={detailsBusyId === item.id} onClick={() => void loadGuestDetails(item.id)}>
+                {detailsBusyId === item.id ? "Yükleniyor…" : details ? "Misafir bilgilerini gizle" : "Adres / kimlik bilgileri"}
+              </button>
               <button className="inquiry-whatsapp" disabled={busyId === item.id} onClick={() => void openWhatsApp(item)}>WhatsApp&apos;ta aç</button>
               {item.convertedReservationId ? (
                 <a className="inquiry-reservation-link" href="/rezervasyonlar">Rezervasyonları aç</a>
@@ -161,8 +200,8 @@ export default function BookingInquiryCenter({ initialItems }: { initialItems: B
               <button disabled={busyId === item.id || Boolean(item.convertedReservationId) || item.status === "İletişime geçildi"} onClick={() => void changeStatus(item.id, "İletişime geçildi")}>İletişime geçildi</button>
               <button disabled={busyId === item.id || Boolean(item.convertedReservationId) || item.status === "Kapatıldı"} onClick={() => void changeStatus(item.id, "Kapatıldı")}>Kapat</button>
             </div>
-          </article>
-        )}
+          </article>;
+        })}
       </div>
     </section>
   </main>;

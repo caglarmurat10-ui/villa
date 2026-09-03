@@ -7,10 +7,12 @@ import { toVillaId, trackCheckAvailability, trackGenerateLead } from "@/lib/anal
 import { computePriceQuote, splitEvenInstallments, type PriceSegment } from "@/lib/price-engine";
 import { validateBookingPrefill } from "@/lib/booking-prefill";
 import { CLOSED_SEASON_MESSAGE, hasClosedSeasonNight } from "@/lib/season-policy";
+import CheckoutForm from "@/components/payments/CheckoutForm";
 import VillaAvailabilityCalendar from "./VillaAvailabilityCalendar";
 import styles from "./PublicBookingWidget.module.css";
 
 const dateLabel = new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short" });
+
 function formatDateLabel(iso: string) {
   if (!iso) return "Seçilmedi";
   return dateLabel.format(new Date(`${iso}T00:00:00Z`));
@@ -57,14 +59,17 @@ type RequestState = {
   message: string;
 };
 
+type CheckoutState = {
+  paymentId: string;
+  testMode: boolean;
+} | null;
+
 const money = new Intl.NumberFormat("tr-TR", {
   style: "currency",
   currency: "TRY",
   maximumFractionDigits: 0,
 });
 
-// Haftalık esas fiyattan türetilen referans gecelik oran (ör. 130000/7 = 18571.428571...) tam
-// kuruşa kadar gösterilmeli - money (0 ondalık) burada YETERSİZ, "₺18.571,43" gibi net gösterim şart.
 const moneyPrecise = new Intl.NumberFormat("tr-TR", {
   style: "currency",
   currency: "TRY",
@@ -72,9 +77,6 @@ const moneyPrecise = new Intl.NumberFormat("tr-TR", {
   maximumFractionDigits: 2,
 });
 
-// Tam TL tutarları eskisi gibi 0 ondalıkla ("₺130.000"), küsuratlı tutarlar (haftalık esas fiyatın
-// 7'ye tam bölünmediği kısmi konaklamalar gibi) 2 ondalıkla ("₺74.285,71") gösterilir - müşteriye
-// gösterilen tutar HİÇBİR ZAMAN gerçek ödenecek tutardan sessizce yuvarlanmaz.
 function formatMoney(amount: number): string {
   return Math.round(amount * 100) % 100 === 0 ? money.format(amount) : moneyPrecise.format(amount);
 }
@@ -85,14 +87,11 @@ function isOccupied(reservations: BookingReservation[], villa: Villa, checkIn: s
   );
 }
 
-// Fiyattan bağımsız, saf takvim gece sayısı - sonuç kartındaki VILLA/TARİH/GECE recap satırı
-// için (fiyat "gap"/hata olsa bile giriş-çıkış arasındaki gece sayısı gösterilebilir olmalı).
 function nightsBetween(checkIn: string, checkOut: string): number {
   const start = new Date(`${checkIn}T00:00:00Z`).getTime();
   const end = new Date(`${checkOut}T00:00:00Z`).getTime();
   return Math.round((end - start) / (24 * 60 * 60 * 1000));
 }
-
 
 export default function PublicBookingWidget({
   reservations,
@@ -106,15 +105,9 @@ export default function PublicBookingWidget({
   reservations: BookingReservation[];
   prices: BookingPrice[];
   initialVilla?: Villa;
-  // Google Vacation Rentals/GBP booking link gibi dış kaynaklardan gelen tarih/kişi sayısı
-  // query param'ları - doğrulanmadan güvenilmez (gerçek olmayan bir tarih formatı sessizce
-  // yok sayılır, forma hiç yansımaz).
   initialCheckIn?: string;
   initialCheckOut?: string;
   initialGuestCount?: string;
-  // getInstallmentCampaignReadiness() sonucundan gelir - false iken taksit satırı hiç render
-  // edilmez (bkz. src/lib/payments/installment-campaign.ts, merchant doğrulaması tamamlanmadan
-  // public'e asla çıkmaz).
   installmentVerified?: boolean;
 }) {
   const prefill = validateBookingPrefill({ checkIn: initialCheckIn, checkOut: initialCheckOut, guestCount: initialGuestCount });
@@ -123,11 +116,15 @@ export default function PublicBookingWidget({
   const [checkIn, setCheckIn] = useState(prefill.checkIn);
   const [checkOut, setCheckOut] = useState(prefill.checkOut);
   const [guestName, setGuestName] = useState("");
+  const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [identityNo, setIdentityNo] = useState("");
   const [guestCount, setGuestCount] = useState(prefill.guestCount);
   const [note, setNote] = useState("");
   const [website, setWebsite] = useState("");
   const [requestState, setRequestState] = useState<RequestState>({ kind: "idle", message: "" });
+  const [checkout, setCheckout] = useState<CheckoutState>(null);
   const [source] = useState(() => resolveSource());
 
   const result = useMemo<AvailabilityResult | null>(() => {
@@ -191,18 +188,36 @@ export default function PublicBookingWidget({
   }, [checkIn, checkOut, prices, reservations, villa]);
 
   const alternativeHref = result?.alternative === "Safira" ? "/villa-safira" : "/villa-destan";
-  const resultClass = result?.kind === "available" ? styles.available : result?.kind === "busy" || result?.kind === "closed_season" ? styles.busy : result?.kind === "error" ? styles.error : result?.kind === "price_gap" || result?.kind === "min_stay" ? styles.priceGap : "";
-  const resultIcon = result?.kind === "available" ? "✓" : result?.kind === "price_gap" || result?.kind === "min_stay" ? "!" : result ? "✕" : "";
+  const resultClass =
+    result?.kind === "available"
+      ? styles.available
+      : result?.kind === "busy" || result?.kind === "closed_season"
+        ? styles.busy
+        : result?.kind === "error"
+          ? styles.error
+          : result?.kind === "price_gap" || result?.kind === "min_stay"
+            ? styles.priceGap
+            : "";
+  const resultIcon =
+    result?.kind === "available"
+      ? "✓"
+      : result?.kind === "price_gap" || result?.kind === "min_stay"
+        ? "!"
+        : result
+          ? "✕"
+          : "";
   const canSubmitInquiry = result?.kind === "available" || result?.kind === "price_gap";
 
   function resetRequestFeedback() {
     if (requestState.kind !== "idle") setRequestState({ kind: "idle", message: "" });
+    setCheckout(null);
   }
 
   async function submitInquiry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSubmitInquiry) return;
-    setRequestState({ kind: "sending", message: "Talebiniz kaydediliyor…" });
+    setRequestState({ kind: "sending", message: "Bilgileriniz kaydediliyor…" });
+    setCheckout(null);
 
     try {
       const response = await fetch("/api/public/booking-inquiries", {
@@ -211,7 +226,10 @@ export default function PublicBookingWidget({
         body: JSON.stringify({
           villa,
           guestName,
+          email,
           phone,
+          address,
+          identityNo,
           checkIn,
           checkOut,
           guestCount: Number(guestCount),
@@ -221,16 +239,22 @@ export default function PublicBookingWidget({
         }),
       });
       const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.error ?? "Rezervasyon talebi kaydedilemedi.");
+      if (!response.ok) throw new Error(data.error ?? "Rezervasyon bilgileri kaydedilemedi.");
+
       setRequestState({
         kind: "success",
-        message: data.message ?? "Rezervasyon talebiniz alındı. En kısa sürede sizinle iletişime geçeceğiz.",
+        message: data.message ?? "Rezervasyon bilgileriniz alındı.",
       });
+
+      if (typeof data.paymentId === "string" && data.paymentId) {
+        setCheckout({ paymentId: data.paymentId, testMode: Boolean(data.testMode) });
+      }
+
       trackGenerateLead({ villa_id: toVillaId(villa), villa_name: `Villa ${villa}` }, "booking_widget_form");
     } catch (error) {
       setRequestState({
         kind: "error",
-        message: error instanceof Error ? error.message : "Rezervasyon talebi kaydedilemedi.",
+        message: error instanceof Error ? error.message : "Rezervasyon bilgileri kaydedilemedi.",
       });
     }
   }
@@ -248,7 +272,16 @@ export default function PublicBookingWidget({
       <div className={styles.fields}>
         <label>
           <span>Villa</span>
-          <select value={villa} onChange={(event) => { setVilla(event.target.value as Villa); setCheckIn(""); setCheckOut(""); resetRequestFeedback(); }} disabled={Boolean(initialVilla)}>
+          <select
+            value={villa}
+            onChange={(event) => {
+              setVilla(event.target.value as Villa);
+              setCheckIn("");
+              setCheckOut("");
+              resetRequestFeedback();
+            }}
+            disabled={Boolean(initialVilla)}
+          >
             <option value="Safira">Villa Safira</option>
             <option value="Destan">Villa Destan</option>
           </select>
@@ -285,14 +318,20 @@ export default function PublicBookingWidget({
               {typeof result.total === "number" && <b>{formatMoney(result.total)}</b>}
             </div>
             <p>{result.detail}</p>
-            {result.kind === "available" && installmentVerified && typeof result.total === "number" && (
+
+            {result.kind === "available" && typeof result.total === "number" && (
               <div className={styles.installment}>
-                <strong>Peşin fiyatına 3 veya 6 taksit</strong>
+                <strong>{installmentVerified ? "Peşin fiyatına 3 veya 6 taksit" : "Kartla 3 veya 6 taksit seçeneği"}</strong>
                 <span>3 taksit: 3 × yaklaşık {formatMoney(splitEvenInstallments(result.total, 3)[0])}</span>
                 <span>6 taksit: 6 × yaklaşık {formatMoney(splitEvenInstallments(result.total, 6)[0])}</span>
-                <small>Toplam rezervasyon tutarı değişmez. Kesin taksit tutarları kartınıza göre ödeme ekranında gösterilir.</small>
+                <small>
+                  {installmentVerified
+                    ? "Toplam rezervasyon tutarı değişmez. Kesin taksit tutarları kartınıza göre ödeme ekranında gösterilir."
+                    : "Kesin taksit seçenekleri ve kart koşulları PayTR ekranında kartınıza göre gösterilir."}
+                </small>
               </div>
             )}
+
             {result.segments && result.segments.length > 1 ? (
               <div className={styles.breakdown}>
                 <table>
@@ -311,6 +350,7 @@ export default function PublicBookingWidget({
                 </table>
               </div>
             ) : null}
+
             {result.alternative && (
               <Link className={styles.alternative} href={alternativeHref}>
                 Villa {result.alternative}&apos;ı aynı tarihler için incele →
@@ -322,24 +362,36 @@ export default function PublicBookingWidget({
         )}
       </div>
 
-      {canSubmitInquiry && (
+      {canSubmitInquiry && !checkout && requestState.kind !== "success" && (
         <form className={styles.requestForm} onSubmit={submitInquiry}>
           <div className={styles.requestHeading}>
             <div>
-              <span className={styles.eyebrow}>REZERVASYON TALEBİ</span>
-              <strong>Bu tarihleri ayırtmak için bize ulaşın</strong>
+              <span className={styles.eyebrow}>REZERVASYON & ÖDEME BİLGİLERİ</span>
+              <strong>Konaklama bilgilerinizi tamamlayın</strong>
             </div>
-            <span>Ödeme alınmaz · Talep yönetim ekranına düşer</span>
+            <span>Kart bilgileri bu forma girilmez · Güvenli PayTR ekranı sonraki adımda aynı bölümde açılır</span>
           </div>
 
           <div className={styles.requestGrid}>
             <label>
               <span>Ad soyad</span>
-              <input value={guestName} onChange={(event) => setGuestName(event.target.value)} autoComplete="name" minLength={2} maxLength={100} required />
+              <input value={guestName} onChange={(event) => setGuestName(event.target.value)} autoComplete="name" minLength={2} maxLength={60} required />
+            </label>
+            <label>
+              <span>E-posta</span>
+              <input type="email" value={email} onChange={(event) => setEmail(event.target.value)} autoComplete="email" maxLength={100} required />
             </label>
             <label>
               <span>Telefon / WhatsApp</span>
               <input type="tel" inputMode="tel" autoComplete="tel" placeholder="05xx xxx xx xx" value={phone} onChange={(event) => setPhone(event.target.value)} minLength={7} maxLength={30} required />
+            </label>
+            <label className={styles.fullWidth}>
+              <span>Açık adres</span>
+              <input value={address} onChange={(event) => setAddress(event.target.value)} autoComplete="street-address" minLength={5} maxLength={400} required />
+            </label>
+            <label>
+              <span>T.C. Kimlik / Pasaport No</span>
+              <input value={identityNo} onChange={(event) => setIdentityNo(event.target.value)} autoComplete="off" minLength={5} maxLength={32} required />
             </label>
             <label>
               <span>Kişi sayısı</span>
@@ -360,10 +412,10 @@ export default function PublicBookingWidget({
           </label>
 
           <div className={styles.submitRow}>
-            <button type="submit" disabled={requestState.kind === "sending" || requestState.kind === "success"}>
-              {requestState.kind === "sending" ? "Gönderiliyor…" : requestState.kind === "success" ? "Talep alındı ✓" : "Rezervasyon talebi gönder"}
+            <button type="submit" disabled={requestState.kind === "sending"}>
+              {requestState.kind === "sending" ? "Hazırlanıyor…" : "Bilgileri Kaydet ve Kart Ödemesine Geç"}
             </button>
-            <small>Bilgileriniz yalnız rezervasyon talebiniz için kullanılır. Bu bir ön talep kaydıdır, ödeme alınmaz.</small>
+            <small>Kimlik ve iletişim bilgileri rezervasyon kaydı için kullanılır. Kart numarası, son kullanma tarihi ve CVV sistemimizde saklanmaz.</small>
           </div>
 
           <p className={styles.policyLinkRow}>
@@ -378,10 +430,47 @@ export default function PublicBookingWidget({
         </form>
       )}
 
+      {checkout && (
+        <section className={styles.paymentStage} aria-live="polite">
+          <div className={styles.requestHeading}>
+            <div>
+              <span className={styles.eyebrow}>GÜVENLİ KART ÖDEMESİ</span>
+              <strong>PayTR ödeme ekranı</strong>
+            </div>
+            <span>{checkout.testMode ? "Test modu · Gerçek tahsilat yapılmaz" : "Güvenli ödeme"}</span>
+          </div>
+
+          <div className={styles.paymentSummary}>
+            <span>Villa {villa}</span>
+            <span>{formatDateLabel(checkIn)} – {formatDateLabel(checkOut)}</span>
+            {typeof result?.total === "number" ? <strong>{formatMoney(result.total)}</strong> : null}
+          </div>
+
+          <CheckoutForm
+            paymentId={checkout.paymentId}
+            villaId={toVillaId(villa)}
+            villaName={`Villa ${villa}`}
+            paymentType="full_payment"
+            testMode={checkout.testMode}
+            initialName={guestName}
+            initialEmail={email}
+            initialPhone={phone}
+            initialAddress={address}
+            autoStart
+          />
+        </section>
+      )}
+
+      {!checkout && requestState.kind === "success" ? (
+        <div className={`${styles.requestStatus} ${styles.requestSuccess}`} aria-live="polite">
+          {requestState.message}
+        </div>
+      ) : null}
+
       <div className={styles.trust}>
         <span>✓ Canlı müsaitlik</span>
         <span>✓ Dönemsel fiyat</span>
-        <span>✓ Ödeme sırasında işletme komisyonu eklenmez</span>
+        <span>✓ Güvenli PayTR kart ekranı</span>
         <span>✓ Doğrudan rezervasyon</span>
       </div>
     </div>

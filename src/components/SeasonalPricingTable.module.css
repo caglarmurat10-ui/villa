@@ -20,11 +20,11 @@
 .note {
   color: #655f55;
   margin: 0 0 26px;
-  max-width: 640px;
+  max-width: 720px;
 }
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  grid-template-columns: minmax(280px, 620px);
   gap: 14px;
 }
 .card {
@@ -32,7 +32,7 @@
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 22px 22px 24px;
+  padding: 24px 26px 26px;
   border: 1px solid #e2d9c8;
   border-radius: 6px;
   background: #fbf9f3;
@@ -57,7 +57,7 @@
 .rate {
   font-family: Georgia, "Times New Roman", serif;
   font-weight: 400;
-  font-size: 24px;
+  font-size: 30px;
   color: #132019;
 }
 .rate small {
@@ -66,8 +66,38 @@
   font-weight: 700;
   color: #655f55;
 }
-.nightlyRef {
+.cashPrice {
   font-size: 12px;
+  color: #655f55;
+}
+.cashPrice b {
+  color: #132019;
+}
+.paymentInfo {
+  margin-top: 4px;
+  padding: 14px 16px;
+  border: 1px solid rgba(185, 155, 104, .34);
+  background: rgba(185, 155, 104, .09);
+}
+.paymentInfo strong {
+  display: block;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  font-weight: 400;
+  color: #132019;
+  margin-bottom: 3px;
+}
+.paymentInfo span {
+  display: block;
+  font-size: 13px;
+  font-weight: 800;
+  color: #544c3f;
+}
+.paymentInfo small {
+  display: block;
+  margin-top: 5px;
+  font-size: 10px;
+  line-height: 1.5;
   color: #8a7f6c;
 }
 .minStay {
@@ -82,15 +112,10 @@
   padding: 4px 10px;
   margin-top: 2px;
 }
-
 @media (max-width: 760px) {
   .section { padding: 0 0 64px; }
   .section h2 { font-size: 26px; }
-  .grid { grid-template-columns: 1fr 1fr; gap: 10px; }
-  .card { padding: 16px; }
-  .rate { font-size: 19px; }
-}
-
-@media (max-width: 480px) {
   .grid { grid-template-columns: 1fr; }
+  .card { padding: 18px; }
+  .rate { font-size: 25px; }
 }
