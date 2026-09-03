@@ -23,11 +23,16 @@ vi.mock("@opennextjs/cloudflare", () => ({
   getCloudflareContext: async () => ({ env: { DB: db, OTA_PRIVATE: { get: async () => "https://ical.booking.com/v1/export?s=test" } } }),
 }));
 
+// Not: getImportUrl (OTA_PRIVATE.get, yukarıda) villa'dan bağımsız SABİT bir URL döner - bu
+// mock'un villa bilgisine erişimi yok. Her testte tek bir villa/platform kombinasyonu senkronize
+// edildiği için (iki farklı villa'nın AYNI ANDA farklı ICS içerikle senkronize edildiği hiçbir
+// test yok) anahtar yalnız platform'a göre - villa öneki KASITLI OLARAK yok, gereksiz bir
+// ayrım değil (Villa Destan OTA kapatma turu, sync.integration.test.ts'e Destan testi eklenirken
+// düzeltildi - eskiden "Safira:" sabit önekliydi, Destan testleri sessizce hiç fixture bulamazdı).
 vi.mock("./security", () => ({
   fetchIcsSafely: async (_url: string, platform: string) => {
-    const key = `Safira:${platform}`;
-    if (!(key in icsResponses)) throw new Error(`test: no fixture for ${key}`);
-    return icsResponses[key];
+    if (!(platform in icsResponses)) throw new Error(`test: no fixture for ${platform}`);
+    return icsResponses[platform];
   },
   sanitizeErrorMessage: (msg: string) => msg.slice(0, 500),
 }));
@@ -58,7 +63,7 @@ describe("syncOneConnection (gercek SQLite entegrasyon testi)", () => {
 
   it("ayni UID'li ICS'i iki kez isleme almak idempotent - satir cogalmaz", async () => {
     await seedConnection("Safira", "booking");
-    icsResponses["Safira:booking"] = ics(vevent("evt-1", "20260901", "20260908"));
+    icsResponses["booking"] = ics(vevent("evt-1", "20260901", "20260908"));
     const { syncOneConnection } = await import("./sync");
 
     const first = await syncOneConnection("Safira", "booking");
@@ -77,7 +82,7 @@ describe("syncOneConnection (gercek SQLite entegrasyon testi)", () => {
   it("120 gunden uzun tek bir blok otomatik needs_review'e duser (anomali tespiti)", async () => {
     await seedConnection("Safira", "booking");
     // 2026-09-02 canlı olayindaki gibi ~1 yillik anormal blok
-    icsResponses["Safira:booking"] = ics(vevent("evt-anomaly", "20260902", "20270902"));
+    icsResponses["booking"] = ics(vevent("evt-anomaly", "20260902", "20270902"));
     const { syncOneConnection } = await import("./sync");
 
     await syncOneConnection("Safira", "booking");
@@ -96,7 +101,7 @@ describe("syncOneConnection (gercek SQLite entegrasyon testi)", () => {
        VALUES (?, 'Safira', 'Test Misafir', '2026-09-01', '2026-09-08', 'Doğrudan', 1000, 7000, ?, ?)`,
     ).bind(crypto.randomUUID(), now, now).run();
 
-    icsResponses["Safira:booking"] = ics(vevent("evt-conflict", "20260903", "20260906"));
+    icsResponses["booking"] = ics(vevent("evt-conflict", "20260903", "20260906"));
     const { syncOneConnection } = await import("./sync");
     await syncOneConnection("Safira", "booking");
 
@@ -106,20 +111,43 @@ describe("syncOneConnection (gercek SQLite entegrasyon testi)", () => {
 
   it("feed'den kalkan (iptal edilen) blok status='removed' olur, hard-delete edilmez", async () => {
     await seedConnection("Safira", "booking");
-    icsResponses["Safira:booking"] = ics(vevent("evt-cancel-me", "20260901", "20260905"));
+    icsResponses["booking"] = ics(vevent("evt-cancel-me", "20260901", "20260905"));
     const { syncOneConnection } = await import("./sync");
     await syncOneConnection("Safira", "booking");
 
-    icsResponses["Safira:booking"] = ics(); // feed artik bos - misafir iptal etti
+    icsResponses["booking"] = ics(); // feed artik bos - misafir iptal etti
     await syncOneConnection("Safira", "booking");
 
     const row = await db.prepare("SELECT status FROM external_blocks WHERE external_uid = 'evt-cancel-me'").first<{ status: string }>();
     expect(row?.status).toBe("removed"); // satir hala var, hard-delete edilmedi
   });
 
+  // Villa Destan OTA kapatma turu, senaryo D - hasOtherSourceConflict (CROSS-OTA blok-blok
+  // cakismasi) hicbir zaman ayri test edilmemisti, yalniz hasDirectReservationConflict (yukarida)
+  // test edilmisti. Bu iki AYRI kod yolu (bkz. sync.ts) - biri direkt rezervasyona, digeri
+  // BASKA bir OTA'nin mevcut bloguna karsi kontrol eder.
+  it("Villa Destan - Booking'den gelen bir blok, ONCEDEN senkronlanmis AKTIF bir Airbnb blogu ile cakisirsa needs_review'e duser (cross-OTA cakisma, direkt rezervasyon DEGIL)", async () => {
+    await seedConnection("Destan", "airbnb");
+    await seedConnection("Destan", "booking");
+    const now = new Date().toISOString();
+    // Once Airbnb'den ONCEDEN senkronlanmis, AKTIF bir blok var (D1'e dogrudan ekleniyor - Airbnb
+    // sync'i zaten daha once calismis gibi simule ediliyor).
+    await db.prepare(
+      `INSERT INTO external_blocks (id, villa, source, external_uid, start_date, end_date, status, last_synced_at, created_at, updated_at)
+       VALUES (?, 'Destan', 'airbnb', 'evt-airbnb-existing', '2027-07-10', '2027-07-17', 'active', ?, ?, ?)`,
+    ).bind(crypto.randomUUID(), now, now, now).run();
+
+    icsResponses["booking"] = ics(vevent("evt-booking-overlap", "20270712", "20270715"));
+    const { syncOneConnection } = await import("./sync");
+    await syncOneConnection("Destan", "booking");
+
+    const row = await db.prepare("SELECT status FROM external_blocks WHERE external_uid = 'evt-booking-overlap'").first<{ status: string }>();
+    expect(row?.status).toBe("needs_review");
+  });
+
   it("checkout gunu yeni check-in icin musait sayilir (start<end, end<=start ihlali yok)", async () => {
     await seedConnection("Safira", "booking");
-    icsResponses["Safira:booking"] = ics(vevent("evt-checkout", "20260901", "20260908"));
+    icsResponses["booking"] = ics(vevent("evt-checkout", "20260901", "20260908"));
     const { syncOneConnection } = await import("./sync");
     await syncOneConnection("Safira", "booking");
 
