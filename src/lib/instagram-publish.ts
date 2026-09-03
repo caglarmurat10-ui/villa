@@ -2,9 +2,20 @@ import type { SocialPostMediaItem } from "./social-media-store";
 
 const INSTAGRAM_GRAPH = "https://graph.instagram.com";
 
-function publicGraphError(prefix: string, response: Response, payload: { error?: { message?: string; code?: number } }) {
+// Yalnız gösterim amaçlı okunabilir ipucu - hiçbir retry/publish karar mantığını etkilemez, sadece
+// last_publish_error metnine eklenir (admin panelinde okunuyor, bkz. SocialPublishHealth.tsx).
+// Meta'nın resmi hata kodu dokümantasyonundan (developers.facebook.com/docs/graph-api/guides/error-handling).
+const KNOWN_GRAPH_ERROR_HINTS: Record<number, string> = {
+  9007: "medya işleme tamamlanmamış olabilir (video/reels için yayından önce daha uzun bekleme gerekebilir)",
+  2207052: "medya formatı/boyutu desteklenmiyor olabilir",
+  190: "erişim tokenı süresi dolmuş/geçersiz olabilir",
+  10: "gerekli izin eksik olabilir",
+};
+
+export function publicGraphError(prefix: string, response: Response, payload: { error?: { message?: string; code?: number } }) {
   const code = payload.error?.code ? ` / ${payload.error.code}` : "";
-  return `${prefix} (HTTP ${response.status}${code})`;
+  const hint = payload.error?.code ? KNOWN_GRAPH_ERROR_HINTS[payload.error.code] : undefined;
+  return `${prefix} (HTTP ${response.status}${code})${hint ? ` — ${hint}` : ""}`;
 }
 
 async function createContainer(accountId: string, accessToken: string, params: Record<string, string>) {
