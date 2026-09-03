@@ -8,7 +8,17 @@
 export interface PriceRangeInput {
   startDate: string; // YYYY-MM-DD, dahil
   endDate: string; // YYYY-MM-DD, dahil (mevcut price_ranges şemasıyla aynı: start<=date<=end)
-  nightlyRate: number;
+  nightlyRate: number; // her zaman dolu - display/legacy referans gecelik fiyat (yuvarlanmış)
+  // YENİ (opsiyonel) - haftalık esas fiyat modeli (2027-06-15 -> 2027-09-15 Safira/Destan kararı).
+  // İkisi de doluysa canonical toplam nightlyRate*nights YERİNE round(basePriceMinor*nights/baseNights)
+  // ile hesaplanır - böylece örn. 7 gecelik Destan konaklaması TAM OLARAK 130000 TRY'ye eşitlenir,
+  // nightlyRate (18571.43) yalnız YUVARLANMIŞ bir referans gösterim değeridir, çarpanı DEĞİL.
+  basePriceMinor?: number; // kuruş - haftalık/baz toplam
+  baseNights?: number; // basePriceMinor'ın karşılık geldiği gece sayısı (örn. 7)
+  // Yalnız PublicBookingWidget'ın kendi çağrısında (computePriceQuote'un varsayılan
+  // enforceMinimumStay=true modunda) uygulanır - admin/server tarafı (db.ts getPriceQuote)
+  // bilinçli olarak enforceMinimumStay:false geçer, personel manuel istisna oluşturabilsin diye.
+  minimumNights?: number;
 }
 
 export interface PriceSegment {
@@ -22,7 +32,8 @@ export interface PriceSegment {
 export type PriceQuoteResult =
   | { status: "ok"; nights: number; total: number; averageRate: number; segments: PriceSegment[] }
   | { status: "gap"; missingDates: string[] }
-  | { status: "invalid_range" };
+  | { status: "invalid_range" }
+  | { status: "min_stay"; minimumNights: number };
 
 function nextDay(iso: string): string {
   const date = new Date(`${iso}T00:00:00Z`);
@@ -30,14 +41,30 @@ function nextDay(iso: string): string {
   return date.toISOString().slice(0, 10);
 }
 
-export function computePriceQuote(ranges: PriceRangeInput[], checkIn: string, checkOut: string): PriceQuoteResult {
+// Bir segment'in (aynı price_ranges satırına ait, ardışık geceler) toplamı: haftalık esas fiyat
+// modeli varsa minor-unit-safe oransal pay (round(basePriceMinor*nights/baseNights)/100),
+// segment TAM baseNights kadarsa bu HER ZAMAN basePriceMinor/100'e (ör. 130000) birebir eşittir -
+// floating point sürüklenmesi yok. Yoksa eski davranış: nights * nightlyRate.
+function segmentSubtotal(range: PriceRangeInput, nights: number): number {
+  if (typeof range.basePriceMinor === "number" && typeof range.baseNights === "number" && range.baseNights > 0) {
+    return Math.round((range.basePriceMinor * nights) / range.baseNights) / 100;
+  }
+  return nights * range.nightlyRate;
+}
+
+export function computePriceQuote(
+  ranges: PriceRangeInput[],
+  checkIn: string,
+  checkOut: string,
+  options?: { enforceMinimumStay?: boolean },
+): PriceQuoteResult {
   if (!checkIn || !checkOut || checkOut <= checkIn) return { status: "invalid_range" };
+  const enforceMinimumStay = options?.enforceMinimumStay ?? true;
 
   const missingDates: string[] = [];
-  const segments: PriceSegment[] = [];
-  let currentSegment: PriceSegment | null = null;
-  let total = 0;
-  let nights = 0;
+  type DaySegment = { range: PriceRangeInput; startDate: string; endDate: string; nights: number };
+  const daySegments: DaySegment[] = [];
+  let current: DaySegment | null = null;
 
   const end = new Date(`${checkOut}T00:00:00Z`);
   for (let cursor = new Date(`${checkIn}T00:00:00Z`); cursor < end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
@@ -47,20 +74,39 @@ export function computePriceQuote(ranges: PriceRangeInput[], checkIn: string, ch
       missingDates.push(date);
       continue;
     }
-    nights += 1;
-    total += range.nightlyRate;
-    if (currentSegment && currentSegment.nightlyRate === range.nightlyRate && currentSegment.endDate === date) {
-      currentSegment.nights += 1;
-      currentSegment.subtotal += range.nightlyRate;
-      currentSegment.endDate = nextDay(date);
+    // Aynı price_ranges satırına (referans eşitliği) ait ardışık günler tek segment'te birleşir -
+    // eski "nightlyRate eşitse birleştir" sezgiselinden daha doğru (iki farklı dönem tesadüfen aynı
+    // gecelik fiyata sahipse artık yanlışlıkla birleştirilmez, gerçek DB satır sınırı korunur).
+    if (current && current.range === range && current.endDate === date) {
+      current.nights += 1;
+      current.endDate = nextDay(date);
     } else {
-      currentSegment = { startDate: date, endDate: nextDay(date), nights: 1, nightlyRate: range.nightlyRate, subtotal: range.nightlyRate };
-      segments.push(currentSegment);
+      current = { range, startDate: date, endDate: nextDay(date), nights: 1 };
+      daySegments.push(current);
     }
   }
 
   if (missingDates.length > 0) return { status: "gap", missingDates };
+  const nights = daySegments.reduce((sum, item) => sum + item.nights, 0);
   if (nights === 0) return { status: "invalid_range" };
+
+  if (enforceMinimumStay) {
+    for (const item of daySegments) {
+      const minNights = item.range.minimumNights;
+      if (typeof minNights === "number" && nights < minNights) {
+        return { status: "min_stay", minimumNights: minNights };
+      }
+    }
+  }
+
+  const segments: PriceSegment[] = daySegments.map((item) => ({
+    startDate: item.startDate,
+    endDate: item.endDate,
+    nights: item.nights,
+    nightlyRate: item.range.nightlyRate,
+    subtotal: segmentSubtotal(item.range, item.nights),
+  }));
+  const total = segments.reduce((sum, segment) => sum + segment.subtotal, 0);
   return { status: "ok", nights, total, averageRate: total / nights, segments };
 }
 
@@ -102,15 +148,28 @@ export function computePriceCoverage(ranges: PriceRangeInput[], todayIso: string
   return { windowStart, windowEnd, totalDays: windowDays, coveredDays, gapDays: windowDays - coveredDays, gapRanges };
 }
 
-// TRY tutarını N eşit taksite böler - floating point sürüklenmesi YOK: tam sayı TL üzerinde
-// çalışır, kalan (remainder) ilk taksitlere +1 TL olarak dağıtılır, böylece dizinin toplamı
-// HER ZAMAN girdi tutarına birebir eşittir (installments.reduce(sum) === totalTRY). Bankanın
-// gerçek taksit tutarı (vade farkı vb.) bundan farklı olabilir - bu yalnız bizim tarafımızdan
-// gösterilen "yaklaşık" referans değerdir, ödeme ekranındaki gerçek tutarın yerine geçmez.
+// Bir tam sayı tutarı N eşit parçaya böler - floating point sürüklenmesi YOK: kalan (remainder)
+// ilk parçalara +1 birim olarak dağıtılır, böylece dizinin toplamı HER ZAMAN girdiye birebir
+// eşittir (parts.reduce(sum) === Math.round(total)). Birim (TL/kuruş) çağıran tarafın sorumluluğu.
+function splitEven(total: number, count: number): number[] {
+  if (count <= 0) return [];
+  const rounded = Math.round(total);
+  const base = Math.floor(rounded / count);
+  const remainder = rounded - base * count;
+  return Array.from({ length: count }, (_, index) => base + (index < remainder ? 1 : 0));
+}
+
+// TRY tutarını N eşit taksite böler (bkz. splitEven) - PublicBookingWidget'taki "N × yaklaşık ₺X"
+// gösterimi için. Bankanın gerçek taksit tutarı (vade farkı vb.) bundan farklı olabilir - bu
+// yalnız bizim tarafımızdan gösterilen "yaklaşık" referans değerdir, ödeme ekranındaki gerçek
+// tutarın yerine geçmez.
 export function splitEvenInstallments(totalTRY: number, installmentCount: number): number[] {
-  if (installmentCount <= 0) return [];
-  const total = Math.round(totalTRY);
-  const base = Math.floor(total / installmentCount);
-  const remainder = total - base * installmentCount;
-  return Array.from({ length: installmentCount }, (_, index) => base + (index < remainder ? 1 : 0));
+  return splitEven(totalTRY, installmentCount);
+}
+
+// Kuruş (minor unit) tutarını N eşit parçaya böler (bkz. splitEven) - Google VR feed'in günlük
+// kırılımı için: her segment'in TAM kuruş toplamını gecelere dağıtır, böylece
+// nightlyBreakdown.reduce(sum) HER ZAMAN segment/total ile birebir eşit kalır (bkz. google-vr/feed.ts).
+export function splitEvenMinor(totalMinor: number, parts: number): number[] {
+  return splitEven(totalMinor, parts);
 }

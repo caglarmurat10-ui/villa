@@ -28,6 +28,11 @@ export interface PriceRange {
   startDate: string;
   endDate: string;
   nightlyRate: number;
+  // Haftalık esas fiyat modeli (2027-06-15 -> 2027-09-15 kararı) - bkz. src/lib/price-engine.ts.
+  // Legacy dönemlerde üçü de undefined kalır, nightlyRate x gece davranışı değişmez.
+  basePriceMinor?: number;
+  baseNights?: number;
+  minimumNights?: number;
 }
 
 export interface SocialPost {

@@ -20,7 +20,9 @@ vi.mock("@opennextjs/cloudflare", () => ({
 }));
 
 function loadSchema(): string {
-  return readFileSync(resolve(ROOT, "migrations", "0001_schema.sql"), "utf-8");
+  return ["0001_schema.sql", "0018_price_range_base_pricing.sql"]
+    .map((name) => readFileSync(resolve(ROOT, "migrations", name), "utf-8"))
+    .join("\n");
 }
 
 describe("getGoogleVrReadiness (gercek SQLite entegrasyon testi)", () => {

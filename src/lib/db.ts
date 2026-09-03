@@ -26,6 +26,9 @@ type PriceRangeRow = {
   start_date: string;
   end_date: string;
   nightly_rate: number;
+  base_nights?: number | null;
+  base_price_minor?: number | null;
+  minimum_nights?: number | null;
 };
 
 type SocialPostRow = {
@@ -185,13 +188,16 @@ export async function setVillaLocations(locations: VillaLocations): Promise<Vill
 
 export async function listPriceRanges(): Promise<PriceRange[]> {
   const db = await database();
-  const result = await db.prepare("SELECT id, villa, start_date, end_date, nightly_rate FROM price_ranges ORDER BY villa, start_date").all<PriceRangeRow>();
+  const result = await db.prepare("SELECT id, villa, start_date, end_date, nightly_rate, base_nights, base_price_minor, minimum_nights FROM price_ranges ORDER BY villa, start_date").all<PriceRangeRow>();
   return result.results.map((row) => ({
     id: row.id,
     villa: row.villa,
     startDate: row.start_date,
     endDate: row.end_date,
     nightlyRate: row.nightly_rate,
+    basePriceMinor: row.base_price_minor ?? undefined,
+    baseNights: row.base_nights ?? undefined,
+    minimumNights: row.minimum_nights ?? undefined,
   }));
 }
 
@@ -228,15 +234,20 @@ export async function deletePriceRange(id: string): Promise<boolean> {
 // burada, istemci tarafı (PublicBookingWidget) AYNI fonksiyonu kendi price_ranges kopyasıyla
 // çağırır. Davranış birebir korunur (missing price -> throw, mevcut çağıranlar değişmeden çalışır),
 // yalnız segments (dönem kırılımı) eklendi.
+// enforceMinimumStay:false BİLİNÇLİ - bu, admin panelinin/backend'in (rezervasyon oluşturma,
+// /api/quote, mobile quote) personel özel durumlar için minimum konaklama politikasını manuel
+// aşabilmesini korur. Yalnız PublicBookingWidget (public self-servis widget) minimum stay'i
+// gerçekten uygular - bkz. price-engine.ts computePriceQuote varsayılanı (true).
 export async function getPriceQuote(villa: Villa, checkIn: string, checkOut: string): Promise<PriceQuoteResult> {
   const ranges = (await listPriceRanges()).filter((range) => range.villa === villa);
-  return computePriceQuote(ranges, checkIn, checkOut);
+  return computePriceQuote(ranges, checkIn, checkOut, { enforceMinimumStay: false });
 }
 
 export async function calculatePrice(villa: Villa, checkIn: string, checkOut: string) {
   const result = await getPriceQuote(villa, checkIn, checkOut);
   if (result.status === "invalid_range") throw new Error("Geçerli bir konaklama tarihi seçin.");
   if (result.status === "gap") throw new Error(`${result.missingDates[0]} tarihi için ${villa} fiyatı tanımlı değil.`);
+  if (result.status === "min_stay") throw new Error(`Bu dönem için minimum konaklama süresi ${result.minimumNights} gecedir.`);
   return { total: result.total, nights: result.nights, averageRate: result.averageRate, segments: result.segments };
 }
 
