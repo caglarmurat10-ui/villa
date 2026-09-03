@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
+  ANNUAL_SEASON_POLICY_DEPLOYED_AT,
   CLOSED_SEASON_MESSAGE,
   evaluateOtaBlockAgainstSeason,
   hasClosedSeasonNight,
   isClosedSeasonDate,
   isOpenSeasonDate,
+  isPrePolicyConfirmedException,
   SEASON_MINIMUM_NIGHTS,
   SEASON_OPEN_END_MD,
   SEASON_OPEN_START_MD,
@@ -115,5 +117,22 @@ describe("evaluateOtaBlockAgainstSeason - section 5: uzun bir OTA blogunun acik/
     const result = evaluateOtaBlockAgainstSeason("2027-09-01", "2027-08-01");
     expect(result.openSegments).toEqual([]);
     expect(result.closedSegments).toEqual([]);
+  });
+});
+
+describe("isPrePolicyConfirmedException - LEGACY CONFIRMED RESERVATION EXCEPTIONS (2026-09-03 karari)", () => {
+  it("grandfathered rezervasyon gecerli kalir: kapali sezona tasiyor VE policy deploy'undan ONCE olusturulmus", () => {
+    // Gercek production senaryosu (bf26c751-...): Safira 2026-09-22 -> 2026-09-27, created_at
+    // 2026-08-25 - yeni 09-15 sinirindan sonrasi, ama deploy'dan ONCE onaylanmis.
+    expect(isPrePolicyConfirmedException({ checkIn: "2026-09-22", checkOut: "2026-09-27", createdAt: "2026-08-25T07:15:13.545Z" })).toBe(true);
+  });
+
+  it("ayni tarihler ama policy deploy'undan SONRA olusturulmus olsaydi istisna OLMAZDI (yeni rezervasyonlarda istisna yok)", () => {
+    expect(isPrePolicyConfirmedException({ checkIn: "2026-09-22", checkOut: "2026-09-27", createdAt: ANNUAL_SEASON_POLICY_DEPLOYED_AT })).toBe(false);
+    expect(isPrePolicyConfirmedException({ checkIn: "2026-09-22", checkOut: "2026-09-27", createdAt: "2026-09-10T00:00:00.000Z" })).toBe(false);
+  });
+
+  it("acik sezon icindeki bir rezervasyon (kapali gece yok) hicbir zaman istisna SAYILMAZ - kapali sezona tasmiyor zaten", () => {
+    expect(isPrePolicyConfirmedException({ checkIn: "2026-07-01", checkOut: "2026-07-08", createdAt: "2026-01-01T00:00:00.000Z" })).toBe(false);
   });
 });

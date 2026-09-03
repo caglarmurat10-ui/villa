@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import type { Reservation, Villa, VillaLocations } from "@/lib/types";
 import type { AdminExternalBlock } from "@/lib/ota/types";
-import { evaluateOtaBlockAgainstSeason } from "@/lib/season-policy";
+import { evaluateOtaBlockAgainstSeason, isPrePolicyConfirmedException, PRE_POLICY_EXCEPTION_LABEL } from "@/lib/season-policy";
 
 const villas: Villa[] = ["Safira", "Destan"];
 const SOURCE_LABEL: Record<AdminExternalBlock["source"], string> = { airbnb: "Airbnb", booking: "Booking.com", manual: "Manuel blok" };
@@ -62,6 +62,12 @@ function DetailSheet({ selection, locations, onClose }: { selection: Selection; 
           <div>Durum<br /><b>{r.checkOut >= today ? "Aktif" : "Tamamlandı"}</b></div>
           <div>Ödeme<br /><b style={{ color: remaining > 0 ? "#fbbf24" : "#86efac" }}>{money.format(r.paidAmount)} / {money.format(r.totalAmount)}</b></div>
         </div>
+        {isPrePolicyConfirmedException(r) ? (
+          <div className="calendar-sheet-notes">
+            <small>BİLGİ</small>
+            <p style={{ color: "#93c5fd" }}>{PRE_POLICY_EXCEPTION_LABEL} - bu rezervasyon yeni yıllık sezon kuralından önce onaylandığı için aynen korunur, tarihleri/tutarı değiştirilmez.</p>
+          </div>
+        ) : null}
         {r.notes ? <div className="calendar-sheet-notes"><small>Not</small><p>{r.notes}</p></div> : null}
         <div className="calendar-sheet-actions">
           {normalizePhone(r.phone) ? <a className="ops-button secondary" href={whatsappUrl(r.phone, guestMessage(r, r.checkIn >= today ? "Giriş" : "Çıkış", locations))} target="_blank" rel="noreferrer">WhatsApp&apos;ta aç</a> : null}

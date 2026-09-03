@@ -121,6 +121,28 @@ describe("buildExportEvents - Villa Destan cross-channel blocking + feedback-loo
     expect(destanFeed[0].startDate).toBe("2027-09-01");
   });
 
+  it("LEGACY CONFIRMED RESERVATION EXCEPTIONS - kapali sezona tasan, policy-oncesi (grandfathered) bir rezervasyon YINE DE export feed'inde gorunur (Airbnb/Booking = BLOCKED) - buildExportEvents sezon politikasina hic bakmaz, yalniz deleted_at'a bakar", async () => {
+    // Gercek bf26c751-... senaryosu: Safira 2026-09-22 -> 2026-09-27, yeni yillik kuralda kapali
+    // sezona tasiyor ama grandfathered oldugu icin silinmedi - export/availability blocking bunun
+    // "sezon disi" olmasindan tamamen bagimsiz calisir, sadece rezervasyon var mi diye bakar.
+    await insertReservation("Safira", "2026-09-22", "2026-09-27");
+    const { buildExportEvents } = await import("./export");
+
+    const airbnbFeed = await buildExportEvents("Safira", "booking");
+    const bookingFeed = await buildExportEvents("Safira", "airbnb");
+    expect(airbnbFeed).toHaveLength(1);
+    expect(bookingFeed).toHaveLength(1);
+  });
+
+  it("SIRADAN kapali sezon tarihli bir rezervasyon da (grandfathered olsun olmasin) ayni sekilde export feed'inde gorunur - kapali sezon zaten unavailable, ama rezervasyon gercegi audit trail'de korunur", async () => {
+    await insertReservation("Destan", "2027-10-01", "2027-10-08");
+    const { buildExportEvents } = await import("./export");
+
+    const airbnbFeed = await buildExportEvents("Destan", "booking");
+    expect(airbnbFeed).toHaveLength(1);
+    expect(airbnbFeed[0].startDate).toBe("2027-10-01");
+  });
+
   it("silinmis (deleted_at dolu) bir rezervasyon export feed'inde GORUNMEZ", async () => {
     const id = await insertReservation("Destan", "2027-07-01", "2027-07-08");
     await db.prepare("UPDATE reservations SET deleted_at = ? WHERE id = ?").bind(new Date().toISOString(), id).run();

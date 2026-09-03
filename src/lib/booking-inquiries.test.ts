@@ -117,6 +117,15 @@ describe("createBookingInquiry (public inquiry - canonical price engine + min st
       .rejects.toBeInstanceOf(BookingInquiryConflictError);
   });
 
+  it("LEGACY CONFIRMED RESERVATION EXCEPTIONS - grandfathered bir eski rezervasyonla AYNI tarihler icin YENI bir talep yine REDDEDILIR (istisna gecmise ozeldir, yeni taleplere hic uygulanmaz)", async () => {
+    // bf26c751-...'in gercek tarihleri (Safira 2026-09-22 -> 2026-09-27) - o rezervasyon
+    // policy deploy'undan once onaylandigi icin korunuyor, ama BUGUN gelen yeni bir talep
+    // ayni tarihler icin olsa bile hasClosedSeasonNight istisnasiz uygulanmaya devam eder.
+    const { createBookingInquiry, BookingInquiryConflictError } = await import("./booking-inquiries");
+    await expect(createBookingInquiry({ ...BASE_INPUT, villa: "Safira", checkIn: "2026-09-22", checkOut: "2026-09-27" }))
+      .rejects.toBeInstanceOf(BookingInquiryConflictError);
+  });
+
   it("GERCEK active OTA blogu ile cakisan tarih REDDEDILIR", async () => {
     const now = new Date().toISOString();
     await db.prepare(`INSERT INTO external_blocks (id, villa, source, external_uid, start_date, end_date, status, last_synced_at, created_at, updated_at)

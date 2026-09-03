@@ -40,6 +40,32 @@ export const SEASON_2027_REFERENCE_PRICES: Record<Villa, { totalTRY: number; nig
 export const CLOSED_SEASON_MESSAGE =
   "Bu tarihlerde sezonumuz kapalıdır. Rezervasyon sezonumuz her yıl 15 Haziran – 15 Eylül arasındadır.";
 
+// LEGACY CONFIRMED RESERVATION EXCEPTIONS (2026-09-03 kararı) - yıllık kural devreye girmeden ÖNCE
+// alınmış, gerçek/aktif rezervasyonlar geriye dönük olarak reddedilmez/silinmez/kırpılmaz. Bu tarih,
+// bu modülün mevcut (yıllık, 09-15/06-15) sürümünün production'a deploy edildiği andır - yalnız BU
+// sabitten ÖNCE oluşturulmuş rezervasyonlar "eski politika altında onaylanmış" sayılır. YENİ hiçbir
+// talep/rezervasyon (bu tarihten sonra oluşturulan) hiçbir zaman bu istisnadan yararlanmaz - bkz.
+// booking-inquiries.ts createBookingInquiry, bu sabiti hiç import ETMEZ, hasClosedSeasonNight kuralı
+// yeni talepler için istisnasız uygulanmaya devam eder.
+export const ANNUAL_SEASON_POLICY_DEPLOYED_AT = "2026-09-03T00:00:00.000Z";
+
+export const PRE_POLICY_EXCEPTION_LABEL = "Önceki sezon politikasında onaylanmış rezervasyon";
+
+export interface PrePolicyReservationLike {
+  checkIn: string;
+  checkOut: string;
+  createdAt: string;
+}
+
+// true dönmesi: bu rezervasyon PRE_POLICY_CONFIRMED_EXCEPTION'dır - kapalı sezona taşan bir gece
+// içeriyor AMA yıllık kural deploy edilmeden ÖNCE oluşturulmuş, dolayısıyla geriye dönük olarak
+// geçersiz/hatalı SAYILMAZ (bkz. dosya başı not). Yalnız GÖSTERİM/sınıflandırma amaçlıdır - hiçbir
+// zaman bir rezervasyonu değiştirmek, silmek veya yeniden fiyatlandırmak için KULLANILMAZ; çağıran
+// taraf zaten değişmeyen stored total/checkIn/checkOut alanlarını okumaya devam eder.
+export function isPrePolicyConfirmedException(reservation: PrePolicyReservationLike): boolean {
+  return hasClosedSeasonNight(reservation.checkIn, reservation.checkOut) && reservation.createdAt < ANNUAL_SEASON_POLICY_DEPLOYED_AT;
+}
+
 function monthDay(dateIso: string): string {
   return dateIso.slice(5, 10); // "MM-DD"
 }
