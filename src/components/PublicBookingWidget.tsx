@@ -5,6 +5,7 @@ import { FormEvent, useMemo, useState } from "react";
 import type { PriceRange, Reservation, Villa } from "@/lib/types";
 import { toVillaId, trackCheckAvailability, trackGenerateLead } from "@/lib/analytics";
 import { computePriceQuote, type PriceSegment } from "@/lib/price-engine";
+import { validateBookingPrefill } from "@/lib/booking-prefill";
 import VillaAvailabilityCalendar from "./VillaAvailabilityCalendar";
 import styles from "./PublicBookingWidget.module.css";
 
@@ -71,17 +72,28 @@ export default function PublicBookingWidget({
   reservations,
   prices,
   initialVilla,
+  initialCheckIn,
+  initialCheckOut,
+  initialGuestCount,
 }: {
   reservations: BookingReservation[];
   prices: BookingPrice[];
   initialVilla?: Villa;
+  // Google Vacation Rentals/GBP booking link gibi dış kaynaklardan gelen tarih/kişi sayısı
+  // query param'ları - doğrulanmadan güvenilmez (gerçek olmayan bir tarih formatı sessizce
+  // yok sayılır, forma hiç yansımaz).
+  initialCheckIn?: string;
+  initialCheckOut?: string;
+  initialGuestCount?: string;
 }) {
+  const prefill = validateBookingPrefill({ checkIn: initialCheckIn, checkOut: initialCheckOut, guestCount: initialGuestCount });
+
   const [villa, setVilla] = useState<Villa>(initialVilla ?? "Safira");
-  const [checkIn, setCheckIn] = useState("");
-  const [checkOut, setCheckOut] = useState("");
+  const [checkIn, setCheckIn] = useState(prefill.checkIn);
+  const [checkOut, setCheckOut] = useState(prefill.checkOut);
   const [guestName, setGuestName] = useState("");
   const [phone, setPhone] = useState("");
-  const [guestCount, setGuestCount] = useState("2");
+  const [guestCount, setGuestCount] = useState(prefill.guestCount);
   const [note, setNote] = useState("");
   const [website, setWebsite] = useState("");
   const [requestState, setRequestState] = useState<RequestState>({ kind: "idle", message: "" });

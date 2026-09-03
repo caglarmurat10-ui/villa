@@ -54,8 +54,10 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   };
 }
 
-export default async function VillaDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function VillaDetailPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { slug } = await params;
+  const query = await searchParams;
+  const firstParam = (value: string | string[] | undefined) => (Array.isArray(value) ? value[0] : value);
   if (!(slug in villas)) notFound();
   const villa = villas[slug as VillaSlug];
   const [reservations, prices, locations, googleReviews, blockedRanges, installmentCampaign] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), fetchGoogleReviews(villa.villa), listBlockedRanges(), getInstallmentCampaignReadiness()]);
@@ -362,7 +364,14 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
       <section className={styles.bookingBand} id="rezervasyon">
         <div className={styles.bookingWrap}>
           <div className={styles.bookingIntro}><span className={styles.kicker}>{villa.name.toUpperCase()}</span><h2>Tarihinizi<br />kontrol edin.</h2><p>Seçtiğiniz günler yönetim sistemimizdeki rezervasyonlarla karşılaştırılır. Müsaitse doğrudan rezervasyon talebi gönderebilirsiniz.</p></div>
-          <PublicBookingWidget reservations={bookingReservations} prices={bookingPrices} initialVilla={villa.villa} />
+          <PublicBookingWidget
+            reservations={bookingReservations}
+            prices={bookingPrices}
+            initialVilla={villa.villa}
+            initialCheckIn={firstParam(query.checkin)}
+            initialCheckOut={firstParam(query.checkout)}
+            initialGuestCount={firstParam(query.guests)}
+          />
         </div>
       </section>
 
