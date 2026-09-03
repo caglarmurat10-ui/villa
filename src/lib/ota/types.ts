@@ -18,6 +18,8 @@ export interface OtaConnectionStatus {
   lastError: string | null;
   activeBlockCount: number;
   conflictCount: number;
+  anomalyCount: number; // son 30 gün icinde ANOMALOUS_BLOCK_DETECTED (bkz. anomaly.ts) sayisi
+  healthScore: number; // 0-100, bkz. status.ts computeHealthScore - health (yesil/sari/kirmizi) ile ayni girdilerden turetilir
   health: OtaSyncHealth;
 }
 

@@ -2,6 +2,7 @@ import type { IntegrationCenterSnapshot } from "@/lib/integration-center";
 import { GOOGLE_ADS_CAMPAIGN_DRAFTS, GOOGLE_ADS_CONVERSION_MAPPING, GOOGLE_ADS_NEGATIVE_KEYWORDS } from "@/lib/google-ads-campaign-drafts";
 import { META_ADS_CAMPAIGN_DRAFTS, META_ADS_READINESS_NOTES } from "@/lib/meta-ads-campaign-drafts";
 import PaytrConnectivityTest from "@/components/PaytrConnectivityTest";
+import { createAirbnbPartnerAdapter, createBookingConnectivityAdapter } from "@/lib/ota/partner-adapter";
 
 type ServiceState = "PASS" | "READY" | "WARNING" | "WAITING_EXTERNAL_ACCESS" | "WAITING_USER_ACTION" | "FAIL";
 
@@ -51,19 +52,25 @@ function buildServiceRows(snapshot: IntegrationCenterSnapshot): ServiceRow[] {
     const lastCheck = rows.reduce<string | null>((latest, r) => (!r.lastSyncedAt ? latest : !latest || r.lastSyncedAt > latest ? r.lastSyncedAt : latest), null);
     const lastError = rows.map((r) => r.lastError).filter(Boolean).join(" · ") || null;
     const conflictCount = rows.reduce((sum, r) => sum + r.conflictCount, 0);
+    const anomalyCount = rows.reduce((sum, r) => sum + r.anomalyCount, 0);
+    const avgHealthScore = rows.length > 0 ? Math.round(rows.reduce((sum, r) => sum + r.healthScore, 0) / rows.length) : 0;
+    const partnerReadiness = platform === "airbnb" ? createAirbnbPartnerAdapter().readiness() : createBookingConnectivityAdapter().readiness();
+    const icalState = connected.length === 0 ? "iCal: bağlı değil" : "ICAL_READY";
     return {
-      name: platform === "airbnb" ? "Airbnb (iCal)" : "Booking.com (iCal)",
+      name: `${platform === "airbnb" ? "Airbnb (iCal)" : "Booking.com (iCal)"} · sağlık ${avgHealthScore}/100`,
       status: connected.length === 0 ? "WAITING_EXTERNAL_ACCESS" : anyRed ? "FAIL" : anyYellow ? "WARNING" : "PASS",
       lastSuccess,
       lastCheck,
       lastError,
       actionRequired: connected.length === 0
         ? "Villa başına import URL'si (KV) yapılandırılmalı"
-        : conflictCount > 0
-          ? `${conflictCount} needs_review bloğu admin takviminde incelenmeli`
-          : anyRed
-            ? "Senkron hatası - /entegrasyonlar detayına bakın"
-            : null,
+        : anomalyCount > 0
+          ? `${anomalyCount} anormal (>120 gün) blok son 30 günde tespit edildi - admin takviminde incelenmeli`
+          : conflictCount > 0
+            ? `${conflictCount} needs_review bloğu admin takviminde incelenmeli`
+            : anyRed
+              ? "Senkron hatası - /entegrasyonlar detayına bakın"
+              : `${icalState} · Partner API: ${partnerReadiness}`,
     };
   };
 
