@@ -4,7 +4,6 @@ import PublicBookingWidget from "@/components/PublicBookingWidget";
 import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
 import { VILLAS, FAQ_ITEMS, REGION_INFO, type VillaSlug } from "@/lib/villa-content";
 import { GUIDE_PLACES, GUIDE_CATEGORIES } from "@/lib/region-guide";
-import { getLatestWeather, minutesSince, toPublicReading } from "@/lib/weather";
 import { toVillaId } from "@/lib/analytics";
 import { listBlockedRanges } from "@/lib/ota/availability";
 import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
@@ -113,8 +112,7 @@ const structuredData = {
 };
 
 export default async function PublicHomePage() {
-  const [reservations, prices, locations, weatherReading, blockedRanges] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), getLatestWeather(), listBlockedRanges()]);
-  const weather = weatherReading ? toPublicReading(weatherReading) : null;
+  const [reservations, prices, locations, blockedRanges] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), listBlockedRanges()]);
   const bookingReservations = [
     ...reservations.map(({ villa, checkIn, checkOut }) => ({ villa, checkIn, checkOut })),
     ...blockedRanges,
@@ -251,38 +249,6 @@ export default async function PublicHomePage() {
             );
           })}
         </div>
-      </section>
-
-      <section className={styles.weatherBand} id="hava-durumu">
-        <span className={styles.kicker}>PATARA&apos;DA ŞU AN</span>
-        <p className={styles.weatherSubtitle}>Villa Safira ve Villa Destan yakınındaki yerel hava istasyonundan son ölçüm.</p>
-        {weather && weather.freshness !== "stale" ? (
-          <div className={styles.weatherCard}>
-            <div className={styles.weatherMain}>
-              <strong>{Math.round(weather.temperatureC)}°C</strong>
-              {weather.apparentTemperatureC !== null && <span>Hissedilen {Math.round(weather.apparentTemperatureC)}°C</span>}
-            </div>
-            <div className={styles.weatherCompass}>
-              <span className={styles.weatherCompassArrow} style={{ transform: `rotate(${weather.windDirection.degrees}deg)` }} />
-              <small>{weather.windDirection.abbr} · {weather.windDirection.name}</small>
-            </div>
-            <div className={styles.weatherGrid}>
-              <div><small>Nem</small><span>%{Math.round(weather.humidityPct)}</span></div>
-              <div><small>Rüzgar</small><span>{weather.windSpeedKmh !== null ? `${Math.round(weather.windSpeedKmh)} km/s` : "—"}</span></div>
-              <div><small>Ani rüzgar</small><span>{weather.gustSpeedKmh !== null ? `${Math.round(weather.gustSpeedKmh)} km/s` : "—"}</span></div>
-              <div><small>Basınç</small><span>{Math.round(weather.pressureHpa)} hPa</span></div>
-              <div><small>UV</small><span>{weather.uvIndex.toFixed(1)}</span></div>
-              <div><small>Yağış</small><span>{weather.raining ? "Yağmurlu" : weather.precipitationMm !== null ? `${weather.precipitationMm.toFixed(1)} mm` : "—"}</span></div>
-            </div>
-            <p className={styles.weatherMeta}>
-              {weather.freshness === "live"
-                ? `Canlı ölçüm · ${new Intl.DateTimeFormat("tr-TR", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Istanbul" }).format(new Date(weather.observedAt))}`
-                : `Son ölçüm: ${Math.round(minutesSince(weather.observedAt))} dk önce`}
-            </p>
-          </div>
-        ) : (
-          <p className={styles.weatherFallback}>Veri geçici olarak güncellenemiyor.</p>
-        )}
       </section>
 
       <section className={styles.locationBlock}>

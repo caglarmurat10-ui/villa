@@ -286,7 +286,6 @@ export default async function VillaDetailPage({ params, searchParams }: { params
           <span className={styles.factChip}>Sigara: {POLICY_SUMMARY.smoking}</span>
         </div>
         <Link className={styles.experienceLink} href="/rezervasyon-kosullari">Rezervasyon ve Konaklama Koşullarını İncele →</Link>
-        <Link className={styles.experienceLink} href="/#hava-durumu">Patara’da Şu An: Yerel Hava Durumu →</Link>
       </section>
 
       {googleReviews && googleReviews.reviews.length > 0 && (

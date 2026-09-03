@@ -12,8 +12,6 @@ const PUBLIC_API_PATHS = new Set([
   "/api/health",
   "/api/system/version",
   "/api/public/booking-inquiries",
-  "/api/weather/ingest",
-  "/api/weather/current",
   "/api/payments/checkout",
   "/api/payments/paytr/callback",
 ]);

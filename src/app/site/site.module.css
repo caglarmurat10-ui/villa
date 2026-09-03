@@ -427,80 +427,6 @@ a.secondary {
 .points b { font-size: 9px; }
 .points span { font-family: Georgia, 'Times New Roman', serif; font-size: 18px; }
 
-.weatherBand {
-  max-width: 780px;
-  margin: 0 auto;
-  padding: 0 5vw 96px;
-  text-align: center;
-}
-.weatherBand .kicker { display: block; color: #6b6459; margin-bottom: 10px; }
-.weatherSubtitle { font-size: 13px; color: var(--muted); margin: 0 0 24px; }
-.weatherCard {
-  border: 1px solid #d6cbb6;
-  background: var(--paper);
-  padding: 36px 30px;
-  border-radius: 6px;
-}
-.weatherMain {
-  display: flex;
-  align-items: baseline;
-  justify-content: center;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-.weatherMain strong {
-  font-family: Georgia, 'Times New Roman', serif;
-  font-weight: 400;
-  font-size: clamp(48px, 6vw, 68px);
-}
-.weatherMain span { font-size: 13px; color: var(--muted); }
-.weatherCompass {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  margin: 0 auto 24px;
-}
-.weatherCompassArrow {
-  position: relative;
-  width: 34px;
-  height: 34px;
-  border: 1px solid #d6cbb6;
-  border-radius: 50%;
-  display: block;
-}
-.weatherCompassArrow::after {
-  content: "";
-  position: absolute;
-  top: 3px;
-  left: 50%;
-  width: 0;
-  height: 0;
-  border-left: 4px solid transparent;
-  border-right: 4px solid transparent;
-  border-bottom: 12px solid #8a7f6c;
-  transform: translateX(-50%);
-}
-.weatherCompass small { font-size: 11px; letter-spacing: .04em; color: var(--muted); }
-.weatherGrid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px 12px;
-  padding-top: 22px;
-  border-top: 1px solid #d6cbb6;
-}
-.weatherGrid div { text-align: center; }
-.weatherGrid small { display: block; font-size: 9px; letter-spacing: .14em; font-weight: 800; color: #8a7f6c; margin-bottom: 6px; text-transform: uppercase; }
-.weatherGrid span { font-size: 14px; color: var(--ink); }
-.weatherMeta { margin: 22px 0 0; font-size: 11px; color: var(--muted); }
-.weatherFallback {
-  padding: 30px;
-  border: 1px dashed #d6cbb6;
-  border-radius: 6px;
-  color: var(--muted);
-  font-size: 14px;
-}
-
 .locationBlock {
   max-width: 1040px;
   margin: auto;
@@ -1021,8 +947,6 @@ a.secondary {
   .highlights { width: calc(100% - 44px); padding-bottom: 86px; }
   .highlightGrid { grid-template-columns: 1fr; gap: 26px; }
   .guideTeaserGrid { grid-template-columns: 1fr 1fr; gap: 16px; }
-  .weatherCard { padding: 26px 20px; }
-  .weatherGrid { grid-template-columns: 1fr 1fr; }
   .reviewsSection { width: calc(100% - 44px); padding-bottom: 86px; }
   .reviewsGrid { grid-template-columns: 1fr; gap: 18px; }
 
