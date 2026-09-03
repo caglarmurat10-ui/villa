@@ -5,8 +5,13 @@ import {
   createBookingInquiry,
   normalizeBookingPhone,
 } from "@/lib/booking-inquiries";
+import { clientIpFromHeaders, isRateLimited, recordRateLimitHit } from "@/lib/rate-limit";
 
 export const dynamic = "force-dynamic";
+
+const RATE_LIMIT_SCOPE = "PUBLIC_BOOKING_INQUIRY";
+const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000;
+const RATE_LIMIT_MAX = 8; // 15 dakikada IP başına 8 deneme - gerçek bir aile birkaç kez dener, spam flood bunu hızla aşar
 
 const schema = z.object({
   villa: z.enum(["Safira", "Destan"]),
@@ -33,6 +38,12 @@ export async function POST(request: NextRequest) {
   if (!contentType.toLowerCase().includes("application/json")) {
     return NextResponse.json({ error: "Geçersiz istek biçimi." }, { status: 415 });
   }
+
+  const ip = clientIpFromHeaders(request.headers);
+  if (await isRateLimited(ip, RATE_LIMIT_SCOPE, RATE_LIMIT_WINDOW_MS, RATE_LIMIT_MAX)) {
+    return NextResponse.json({ error: "Çok fazla istek gönderildi. Lütfen daha sonra tekrar deneyin." }, { status: 429 });
+  }
+  await recordRateLimitHit(ip, RATE_LIMIT_SCOPE);
 
   const payload = await request.json().catch(() => null);
   const parsed = schema.safeParse(payload);
