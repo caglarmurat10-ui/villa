@@ -4,6 +4,15 @@ import type { Reservation } from "@/lib/types";
 import { gbpContentLibrary } from "@/lib/google-business-content";
 import { getReviewRequestMessage, reservationsEligibleForReviewRequest } from "@/lib/social-engagement";
 import GbpLocationPicker from "@/components/GbpLocationPicker";
+import { FUNNEL_STEPS } from "@/lib/google-analytics";
+
+const FUNNEL_STEP_LABELS: Array<[typeof FUNNEL_STEPS[number], string]> = [
+  ["view_item", "Villa görüntüleme"],
+  ["check_availability", "Müsaitlik sorgusu"],
+  ["generate_lead", "Rezervasyon talebi"],
+  ["begin_checkout", "Ödeme başlatıldı"],
+  ["payment_success", "Ödeme tamamlandı"],
+];
 
 const STATE_COLOR: Record<string, string> = {
   GOOGLE_READY: "#86efac",
@@ -159,6 +168,18 @@ export default function GoogleVisibilityPanel({
           {box("Etkileşimli oturum", formatNumber(ga.engagedSessions))}
         </div>
         <small style={{display:"block",marginTop:7,fontSize:9,color:"#8fa4bd"}}>Son 28 tamamlanmış gün · {ga.propertyDisplayName} · {ga.streamDisplayName}</small>
+        {ga.eventKpis.length > 0 ? <div style={{marginTop:9,padding:"9px 10px",border:"1px solid #1f5f3b",borderRadius:9,background:"#071b16"}}>
+          <b style={{fontSize:10,color:"#bbf7d0"}}>Dönüşüm funnel&apos;ı (gerçek event sayıları)</b>
+          <div style={{display:"flex",gap:4,marginTop:6,flexWrap:"wrap",alignItems:"center"}}>
+            {FUNNEL_STEP_LABELS.map(([eventName, label], index) => {
+              const count = ga.eventKpis.find((item) => item.eventName === eventName)?.count ?? 0;
+              return <span key={eventName} style={{display:"flex",alignItems:"center",gap:4}}>
+                {index > 0 ? <span style={{color:"#3f5872",fontSize:9}}>→</span> : null}
+                <span style={{padding:"4px 7px",borderRadius:99,background:count > 0 ? "#0d2a27" : "#1a1408",color:count > 0 ? "#86efac" : "#fbbf24",fontSize:9,fontWeight:800}}>{label}: {formatNumber(count)}</span>
+              </span>;
+            })}
+          </div>
+        </div> : null}
         {ga.eventKpis.length > 0 ? <div style={{marginTop:9,padding:"9px 10px",border:"1px solid #1f5f3b",borderRadius:9,background:"#071b16"}}>
           <b style={{fontSize:10,color:"#bbf7d0"}}>Etkileşim event&apos;leri (GTM-KFZ62MJG)</b>
           <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(130px,1fr))",gap:6,marginTop:6}}>

@@ -6,15 +6,25 @@ const CACHE_TTL_SECONDS = 15 * 60;
 const TARGET_DOMAIN = "safiradestan.com";
 
 // analytics.ts'in dataLayer'a push ettigi event isimleriyle birebir eslesir (bkz. src/lib/analytics.ts
-// trackWhatsappClick/trackPhoneClick/trackMapsClick vb.) - GTM-KFZ62MJG konteynerinin bu event'leri
-// GA4'e gercekten ilettigini dogrulamanin tek yolu, GA4 Data API'den geri okumak.
+// trackWhatsappClick/trackPhoneClick/trackMapsClick/trackViewItem/trackBeginCheckout/trackPaymentResult
+// vb.) - GTM-KFZ62MJG konteynerinin bu event'leri GA4'e gercekten ilettigini dogrulamanin tek yolu,
+// GA4 Data API'den geri okumak. view_item/begin_checkout/payment_success ayrica funnel siralamasinda
+// da kullanilir (bkz. FUNNEL_STEPS) - burada TEK bir runReport cagrisiyla ikisi de karsilanir.
 const TRACKED_EVENT_NAMES = [
-  "generate_lead",
+  "view_item",
   "check_availability",
+  "generate_lead",
+  "begin_checkout",
+  "payment_success",
   "whatsapp_click",
   "phone_click",
   "maps_click",
 ] as const;
+
+// Gercek funnel adimlari - yalniz TRACKED_EVENT_NAMES icindeki gercek event isimlerinden olusur,
+// GA4'un ayri/karmasik "funnel exploration" API'si (beta) kullanilmadan, ayni eventCount verisinden
+// tek gecerli bir gosterim sirasi uretir. Veri yoksa (event hic ates etmemisse) 0 gosterilir, UYDURULMAZ.
+export const FUNNEL_STEPS = ["view_item", "check_availability", "generate_lead", "begin_checkout", "payment_success"] as const;
 
 export type Ga4EventKpi = { eventName: string; count: number };
 
