@@ -10,6 +10,7 @@ import CookiePreferencesButton from "@/components/analytics/CookiePreferencesBut
 import TrackedMapsLink from "@/components/analytics/TrackedMapsLink";
 import TrackedSocialLink from "@/components/analytics/TrackedSocialLink";
 import TrackedWhatsappLink from "@/components/analytics/TrackedWhatsappLink";
+import TrackedDatesPriceLink from "@/components/analytics/TrackedDatesPriceLink";
 import TrackedPhoneLink from "@/components/analytics/TrackedPhoneLink";
 import { whatsappLink, WHATSAPP_PHONE_INTL, WHATSAPP_PHONE_DISPLAY_TR } from "@/lib/contact";
 import styles from "./site.module.css";
@@ -318,6 +319,11 @@ export default async function PublicHomePage() {
           <CookiePreferencesButton className={styles.footerCookieBtn} />
         </div>
       </footer>
+
+      <div className={styles.stickyCta}>
+        <TrackedDatesPriceLink href="#musaitlik" ctaLocation="home_sticky_cta">Tarih &amp; Fiyat</TrackedDatesPriceLink>
+        <TrackedWhatsappLink className={styles.stickyCtaWhatsapp} href={whatsappLink("Merhaba, Villa Safira ve Villa Destan hakkında bilgi almak istiyorum.")} target="_blank" rel="noopener noreferrer" ctaLocation="home_sticky_cta">WhatsApp</TrackedWhatsappLink>
+      </div>
     </main>
   );
 }

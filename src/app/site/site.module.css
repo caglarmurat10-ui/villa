@@ -993,6 +993,11 @@ a.secondary {
     font-size: 14px;
     font-weight: 800;
   }
+  .stickyCtaWhatsapp {
+    background: transparent !important;
+    border: 1.5px solid var(--ink);
+    color: var(--ink) !important;
+  }
 }
 
 @media (max-width: 520px) {

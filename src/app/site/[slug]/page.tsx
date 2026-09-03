@@ -16,6 +16,7 @@ import TrackedMapsLink from "@/components/analytics/TrackedMapsLink";
 import TrackedOtaLink from "@/components/analytics/TrackedOtaLink";
 import TrackedSocialLink from "@/components/analytics/TrackedSocialLink";
 import TrackedWhatsappLink from "@/components/analytics/TrackedWhatsappLink";
+import TrackedDatesPriceLink from "@/components/analytics/TrackedDatesPriceLink";
 import { whatsappLink, WHATSAPP_PHONE_DISPLAY_INTL } from "@/lib/contact";
 import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
 import { listBlockedRanges } from "@/lib/ota/availability";
@@ -401,8 +402,8 @@ export default async function VillaDetailPage({ params, searchParams }: { params
       <footer className={styles.footer}><div className={styles.footerBrand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></div><div className={styles.footerBottom}><span>Patara · Kaş · Antalya · <Link href="/rezervasyon-kosullari">Rezervasyon ve Konaklama Koşulları</Link></span><span>safiradestan.com</span><CookiePreferencesButton className={styles.footerCookieBtn} /></div></footer>
 
       <div className={styles.stickyCta}>
-        <a href="#rezervasyon">Tarih kontrol et</a>
-        <TrackedWhatsappLink href={whatsappLink(villa.whatsappMessage)} target="_blank" rel="noopener noreferrer" villaId={toVillaId(villa.villa)} villaName={villa.name} ctaLocation="villa_sticky_cta">WhatsApp</TrackedWhatsappLink>
+        <TrackedDatesPriceLink href="#rezervasyon" villaId={toVillaId(villa.villa)} ctaLocation="villa_sticky_cta">Tarih &amp; Fiyat</TrackedDatesPriceLink>
+        <TrackedWhatsappLink className={styles.stickyCtaWhatsapp} href={whatsappLink(villa.whatsappMessage)} target="_blank" rel="noopener noreferrer" villaId={toVillaId(villa.villa)} villaName={villa.name} ctaLocation="villa_sticky_cta">WhatsApp</TrackedWhatsappLink>
       </div>
     </main>
   );

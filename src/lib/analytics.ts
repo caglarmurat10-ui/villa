@@ -138,6 +138,14 @@ export function trackWhatsappClick(params: { villa_id?: VillaId; villa_name?: st
   pushEvent("whatsapp_click", { ...params, contact_method: "whatsapp" });
 }
 
+// Mobil sticky conversion bar'daki "Tarih & Fiyat" aksiyonu - takvim/fiyat bölümüne scroll eden
+// birincil CTA. villa_id yalnız villa detay sayfasında dolu gelir (bkz. cta_location: home_sticky_cta
+// vs villa_sticky_cta - hangi sayfadan tıklandığı "source" bilgisini ayrıca kodlamaya gerek kalmadan
+// bu iki değerden çıkarılabilir).
+export function trackDatesPriceClick(params: { villa_id?: VillaId; cta_location: string }) {
+  pushEvent("dates_price_click", { ...params });
+}
+
 export function trackPhoneClick(params: { villa_id?: VillaId; cta_location: string }) {
   pushEvent("phone_click", { ...params, contact_method: "phone" });
 }
