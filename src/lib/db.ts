@@ -201,15 +201,27 @@ export async function addPriceRange(input: Omit<PriceRange, "id">): Promise<Pric
     .bind(input.villa, input.endDate, input.startDate).first();
   if (overlap) throw new Error("Bu villa için çakışan bir fiyat dönemi var.");
   const range = { id: crypto.randomUUID(), ...input };
-  await db.prepare("INSERT INTO price_ranges (id, villa, start_date, end_date, nightly_rate, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-    .bind(range.id, range.villa, range.startDate, range.endDate, range.nightlyRate, new Date().toISOString()).run();
+  const now = new Date().toISOString();
+  await db.batch([
+    db.prepare("INSERT INTO price_ranges (id, villa, start_date, end_date, nightly_rate, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .bind(range.id, range.villa, range.startDate, range.endDate, range.nightlyRate, now),
+    db.prepare("INSERT INTO audit_log (entity_id, action, payload, created_at) VALUES (?, 'PRICE_RANGE_CREATE', ?, ?)")
+      .bind(range.id, JSON.stringify(range), now),
+  ]);
   return range;
 }
 
 export async function deletePriceRange(id: string): Promise<boolean> {
   const db = await database();
-  const result = await db.prepare("DELETE FROM price_ranges WHERE id = ?").bind(id).run();
-  return (result.meta.changes ?? 0) > 0;
+  const existing = await db.prepare("SELECT id, villa, start_date, end_date, nightly_rate FROM price_ranges WHERE id = ?").bind(id).first<PriceRangeRow>();
+  if (!existing) return false;
+  const now = new Date().toISOString();
+  const result = await db.batch([
+    db.prepare("DELETE FROM price_ranges WHERE id = ?").bind(id),
+    db.prepare("INSERT INTO audit_log (entity_id, action, payload, created_at) VALUES (?, 'PRICE_RANGE_DELETE', ?, ?)")
+      .bind(id, JSON.stringify({ villa: existing.villa, startDate: existing.start_date, endDate: existing.end_date, nightlyRate: existing.nightly_rate }), now),
+  ]);
+  return (result[0].meta.changes ?? 0) > 0;
 }
 
 // price-engine.ts'teki SAF computePriceQuote'a delege eder - sunucu tarafı canonical hesaplama

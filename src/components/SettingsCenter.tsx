@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import type { PriceRange, Villa, VillaLocations } from "@/lib/types";
+import type { PriceCoverageReport } from "@/lib/price-engine";
 
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
 const villas: Villa[] = ["Safira", "Destan"];
@@ -14,7 +15,7 @@ function sortPrices(rows: PriceRange[]) {
   return [...rows].sort((a, b) => a.villa.localeCompare(b.villa, "tr-TR") || a.startDate.localeCompare(b.startDate));
 }
 
-export default function SettingsCenter({ initialCommission, initialPrices, initialLocations }: { initialCommission: number; initialPrices: PriceRange[]; initialLocations: VillaLocations }) {
+export default function SettingsCenter({ initialCommission, initialPrices, initialLocations, priceCoverage }: { initialCommission: number; initialPrices: PriceRange[]; initialLocations: VillaLocations; priceCoverage?: Record<Villa, PriceCoverageReport> }) {
   const [commission, setCommission] = useState(initialCommission);
   const [prices, setPrices] = useState(() => sortPrices(initialPrices));
   const [locations, setLocations] = useState(initialLocations);
@@ -22,6 +23,12 @@ export default function SettingsCenter({ initialCommission, initialPrices, initi
   const [error, setError] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [health, setHealth] = useState<"checking" | "healthy" | "unhealthy">("checking");
+  const [prefill, setPrefill] = useState<{ villa: Villa; nightlyRate: number } | null>(null);
+
+  function copyAsTemplate(price: PriceRange) {
+    setPrefill({ villa: price.villa, nightlyRate: price.nightlyRate });
+    document.getElementById("yeni-fiyat-donemi")?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }
 
   const currentDate = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
   const activePrice = useMemo(() => Object.fromEntries(villas.map((villa) => [villa, prices.find((p) => p.villa === villa && p.startDate <= currentDate && p.endDate >= currentDate) ?? null])) as Record<Villa, PriceRange | null>, [prices, currentDate]);
@@ -75,7 +82,7 @@ export default function SettingsCenter({ initialCommission, initialPrices, initi
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "Fiyat dönemi eklenemedi.");
       setPrices((current) => sortPrices([...current, data.price]));
-      formElement.reset(); setNotice("Yeni fiyat dönemi eklendi.");
+      formElement.reset(); setPrefill(null); setNotice("Yeni fiyat dönemi eklendi.");
     } catch (err) { setError(err instanceof Error ? err.message : "Fiyat dönemi eklenemedi."); }
     finally { setBusy(null); }
   }
@@ -115,11 +122,12 @@ export default function SettingsCenter({ initialCommission, initialPrices, initi
         <button className="settings-save" disabled={busy === "locations"}>{busy === "locations" ? "Kaydediliyor…" : "Konumları kaydet"}</button>
       </form>
 
-      <form className="settings-box price-create" onSubmit={addPrice}>
+      <form id="yeni-fiyat-donemi" className="settings-box price-create" onSubmit={addPrice}>
         <span className="ops-eyebrow">FİYATLANDIRMA</span><h2>Yeni fiyat dönemi</h2><p>Aynı villa için tarih aralıkları çakışamaz. Rezervasyon toplamı bu dönemlerden otomatik hesaplanır.</p>
-        <label>Villa<select name="villa" required><option>Safira</option><option>Destan</option></select></label>
+        {prefill ? <p className="settings-prefill-note">Villa {prefill.villa} · {money.format(prefill.nightlyRate)} değerleri kopyalandı - yalnız yeni tarihleri girin.</p> : null}
+        <label>Villa<select name="villa" defaultValue={prefill?.villa} required key={prefill?.villa}><option>Safira</option><option>Destan</option></select></label>
         <div className="settings-two"><label>Başlangıç<input name="startDate" type="date" required /></label><label>Bitiş<input name="endDate" type="date" required /></label></div>
-        <label>Gecelik fiyat (₺)<input name="nightlyRate" type="number" min="1" step="1" required /></label>
+        <label>Gecelik fiyat (₺)<input name="nightlyRate" type="number" min="1" step="1" defaultValue={prefill?.nightlyRate} required key={`rate-${prefill?.nightlyRate}`} /></label>
         <button className="settings-save" disabled={busy === "price"}>{busy === "price" ? "Ekleniyor…" : "Fiyat dönemini ekle"}</button>
       </form>
 
@@ -129,11 +137,33 @@ export default function SettingsCenter({ initialCommission, initialPrices, initi
       </section>
     </div>
 
+    {priceCoverage ? (
+      <section className="settings-box price-gap-section">
+        <span className="ops-eyebrow">FİYAT KAPSAMI</span><h2>Önümüzdeki {priceCoverage.Safira.totalDays} gün — PRICE_GAP</h2>
+        <div className="settings-two">
+          {villas.map((villa) => {
+            const report = priceCoverage[villa];
+            const ok = report.gapDays === 0;
+            return <div key={villa} className={`price-gap-card ${ok ? "ok" : "warn"}`}>
+              <strong>Villa {villa}</strong>
+              <span>{report.coveredDays}/{report.totalDays} gün fiyatlı{ok ? "" : ` · ${report.gapDays} gün PRICE_GAP`}</span>
+              {!ok && (
+                <ul>
+                  {report.gapRanges.slice(0, 6).map((gap) => <li key={gap.startDate}>{fmt(gap.startDate)} – {fmt(gap.endDate)}</li>)}
+                  {report.gapRanges.length > 6 ? <li>… ve {report.gapRanges.length - 6} dönem daha</li> : null}
+                </ul>
+              )}
+            </div>;
+          })}
+        </div>
+      </section>
+    ) : null}
+
     <section className="settings-price-section">
       <div className="settings-section-head"><div><span className="ops-eyebrow">DÖNEMSEL FİYATLAR</span><h2>Fiyat takvimi</h2></div><b>{prices.length} dönem</b></div>
       <div className="settings-price-columns">{villas.map((villa) => {
         const rows = prices.filter((price) => price.villa === villa);
-        return <div className="settings-price-column" key={villa}><h3>Villa {villa}</h3>{rows.length === 0 ? <div className="ops-empty">Fiyat dönemi tanımlı değil.</div> : rows.map((price) => <article className={price.startDate <= currentDate && price.endDate >= currentDate ? "current" : ""} key={price.id}><div><strong>{money.format(price.nightlyRate)} <small>/ gece</small></strong><span>{fmt(price.startDate)} – {fmt(price.endDate)}</span>{price.startDate <= currentDate && price.endDate >= currentDate ? <em>Şu an aktif</em> : null}</div><button type="button" disabled={busy === price.id} onClick={() => void removePrice(price)}>{busy === price.id ? "…" : "Sil"}</button></article>)}</div>;
+        return <div className="settings-price-column" key={villa}><h3>Villa {villa}</h3>{rows.length === 0 ? <div className="ops-empty">Fiyat dönemi tanımlı değil.</div> : rows.map((price) => <article className={price.startDate <= currentDate && price.endDate >= currentDate ? "current" : ""} key={price.id}><div><strong>{money.format(price.nightlyRate)} <small>/ gece</small></strong><span>{fmt(price.startDate)} – {fmt(price.endDate)}</span>{price.startDate <= currentDate && price.endDate >= currentDate ? <em>Şu an aktif</em> : null}</div><div className="settings-price-actions"><button type="button" onClick={() => copyAsTemplate(price)}>Kopyala</button><button type="button" disabled={busy === price.id} onClick={() => void removePrice(price)}>{busy === price.id ? "…" : "Sil"}</button></div></article>)}</div>;
       })}</div>
     </section>
   </div>;
