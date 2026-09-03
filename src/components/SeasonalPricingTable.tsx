@@ -5,7 +5,7 @@ type BookingPrice = Pick<PriceRange, "villa" | "startDate" | "endDate" | "nightl
 
 const money = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", maximumFractionDigits: 0 });
 const moneyPrecise = new Intl.NumberFormat("tr-TR", { style: "currency", currency: "TRY", minimumFractionDigits: 2, maximumFractionDigits: 2 });
-const dateFmt = new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "long" });
+const dateFmt = new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "long", year: "numeric" });
 function formatRange(start: string, end: string) {
   return `${dateFmt.format(new Date(`${start}T00:00:00Z`))} – ${dateFmt.format(new Date(`${end}T00:00:00Z`))}`;
 }
