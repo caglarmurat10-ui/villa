@@ -21,8 +21,30 @@ export const metadata: Metadata = {
 };
 
 export default function ReservationPolicyPage() {
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Ana sayfa", item: ORIGIN },
+          { "@type": "ListItem", position: 2, name: "Rezervasyon ve Konaklama Koşulları", item: CANONICAL },
+        ],
+      },
+      {
+        "@type": "WebPage",
+        "@id": `${CANONICAL}/#webpage`,
+        url: CANONICAL,
+        name: TITLE,
+        description: DESCRIPTION,
+        isPartOf: { "@type": "WebSite", "@id": `${ORIGIN}/#website` },
+      },
+    ],
+  };
+
   return (
     <main className={styles.page}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       <a href="#policy-icerik" className={styles.skipLink}>İçeriğe atla</a>
       <section className={styles.policyHead}>
         <nav className={styles.nav} aria-label="Ana menü">

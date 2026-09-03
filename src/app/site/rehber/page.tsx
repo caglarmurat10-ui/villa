@@ -22,8 +22,30 @@ export const metadata: Metadata = {
 };
 
 export default function RegionGuidePage() {
+  const structuredData = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "BreadcrumbList",
+        itemListElement: [
+          { "@type": "ListItem", position: 1, name: "Ana sayfa", item: ORIGIN },
+          { "@type": "ListItem", position: 2, name: "Bölge Rehberi", item: CANONICAL },
+        ],
+      },
+      {
+        "@type": "WebPage",
+        "@id": `${CANONICAL}/#webpage`,
+        url: CANONICAL,
+        name: TITLE,
+        description: DESCRIPTION,
+        isPartOf: { "@type": "WebSite", "@id": `${ORIGIN}/#website` },
+      },
+    ],
+  };
+
   return (
     <main className={styles.page}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       <a href="#rehber-icerik" className={styles.skipLink}>İçeriğe atla</a>
       <section className={styles.policyHead}>
         <nav className={styles.nav} aria-label="Ana menü">
