@@ -3,6 +3,7 @@ import SecuritySettingsCard from "@/components/SecuritySettingsCard";
 import { getCommissionRate, getVillaLocations, listPriceRanges } from "@/lib/db";
 import { computePriceCoverage } from "@/lib/price-engine";
 import type { PriceCoverageReport } from "@/lib/price-engine";
+import { isClosedSeasonDate } from "@/lib/season-policy";
 import type { Villa } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +20,7 @@ export default async function AyarlarPage() {
   const todayIso = new Date().toISOString().slice(0, 10);
   const villas: Villa[] = ["Safira", "Destan"];
   const priceCoverage = Object.fromEntries(
-    villas.map((villa) => [villa, computePriceCoverage(prices.filter((p) => p.villa === villa), todayIso, COVERAGE_WINDOW_DAYS)]),
+    villas.map((villa) => [villa, computePriceCoverage(prices.filter((p) => p.villa === villa), todayIso, COVERAGE_WINDOW_DAYS, isClosedSeasonDate)]),
   ) as Record<Villa, PriceCoverageReport>;
 
   return <main className="ops-page">

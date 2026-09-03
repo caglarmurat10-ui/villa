@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computePriceCoverage, computePriceQuote, splitEvenInstallments, splitEvenMinor, type PriceRangeInput } from "./price-engine";
+import { isClosedSeasonDate } from "./season-policy";
 
 // 2027-06-15 -> 2027-09-15 kullanıcı kararı (2026-09-03): Destan 130000 TRY / Safira 110000 TRY,
 // 7 gecelik esas fiyat, minimum 4 gece. Gerçek production D1 kayıtlarıyla birebir aynı değerler.
@@ -130,6 +131,27 @@ describe("computePriceCoverage", () => {
     const report = computePriceCoverage(ranges, "2026-06-01", 30); // 06-01..06-30
     // 06-01..06-09 gap, 06-10..06-20 kapli, 06-21..06-30 gap -> 2 ayri gap araligi
     expect(report.gapRanges).toHaveLength(2);
+  });
+
+  it("isClosedSeasonDate VERILMEDIGINDE eski davranis birebir korunur (geriye donuk uyumluluk)", () => {
+    const ranges: PriceRangeInput[] = [{ startDate: "2026-04-01", endDate: "2026-09-30", nightlyRate: 5714 }];
+    const report = computePriceCoverage(ranges, "2026-09-03", 330);
+    expect(report.closedSeasonDays).toBe(0);
+    expect(report.closedSeasonRanges).toEqual([]);
+    expect(report.gapDays).toBe(330 - report.coveredDays); // eski formul: gapDays = totalDays - coveredDays
+  });
+
+  it("KESIN SEZON POLITIKASI - gercek production kapsamiyla (2027 canonical + kapali sezon disi) closedSeasonDays PRICE_GAP'ten AYRI sayilir, yanlis '330 gunluk fiyat eksik' uretmez", () => {
+    const ranges: PriceRangeInput[] = [
+      { startDate: "2026-04-01", endDate: "2026-09-30", nightlyRate: 5714 }, // 2026 acik sezon (audit sonrasi gercek D1 durumu)
+      { startDate: "2027-06-15", endDate: "2027-09-15", nightlyRate: 15714.29, basePriceMinor: 11000000, baseNights: 7, minimumNights: 4 }, // 2027 canonical
+    ];
+    const report = computePriceCoverage(ranges, "2026-09-03", 330, isClosedSeasonDate);
+    // 2026-09-03..2026-09-30 kapli, 2026-10-01..2027-06-14 CLOSED_SEASON (gap DEGIL),
+    // 2027-06-15 sonrasi (pencere sinirina kadar) kapli - pencere 2027-07-30'da bitiyor (330 gun).
+    expect(report.gapDays).toBe(0);
+    expect(report.closedSeasonDays).toBeGreaterThan(0);
+    expect(report.closedSeasonRanges.some((r) => r.startDate === "2026-10-01")).toBe(true);
   });
 });
 

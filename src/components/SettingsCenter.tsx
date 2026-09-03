@@ -153,6 +153,9 @@ export default function SettingsCenter({ initialCommission, initialPrices, initi
                   {report.gapRanges.length > 6 ? <li>… ve {report.gapRanges.length - 6} dönem daha</li> : null}
                 </ul>
               )}
+              {report.closedSeasonDays > 0 && (
+                <p className="price-gap-closed-season">{report.closedSeasonDays} gün CLOSED_SEASON (bilinçli kapalı sezon — uyarı değil)</p>
+              )}
             </div>;
           })}
         </div>

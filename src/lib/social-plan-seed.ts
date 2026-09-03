@@ -7,6 +7,7 @@ import { listSocialPostMedia, replaceSocialPostMedia } from "./social-media-stor
 import { planRolling30Days, type ExistingPost, type PlannedSlot } from "./social-content-planner";
 import type { RecentPost } from "./social-duplicate-guard";
 import { buildVirtualTemplates } from "./social-content-virtual-templates";
+import { isClosedSeasonDate } from "./season-policy";
 
 function istanbulToday() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
@@ -188,6 +189,7 @@ export async function ensureRolling30DayPlan(dailyTarget = 1) {
     pool,
     existingScheduled,
     recentPosts,
+    isClosedSeasonDate,
   });
 
   const templateById = new Map(pool.map((t) => [t.id, t]));

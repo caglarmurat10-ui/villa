@@ -2,6 +2,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
 import type { Villa } from "./types";
 import { computePriceQuote, type PriceRangeInput } from "./price-engine";
+import { CLOSED_SEASON_MESSAGE, hasClosedSeasonNight } from "./season-policy";
 
 export type BookingInquiryStatus = "Yeni" | "İletişime geçildi" | "Kapatıldı";
 
@@ -196,6 +197,13 @@ async function findBookingInquiry(db: D1Database, id: string) {
 }
 
 export async function createBookingInquiry(input: BookingInquiryInput) {
+  // Sezon kapalıyken doğrudan API çağrısıyla (client-tarafı VillaAvailabilityCalendar/
+  // PublicBookingWidget kontrollerini atlayarak) gelen talepler de aynı şekilde reddedilir -
+  // client-side kontrol tek savunma hattı DEĞİLDİR (bkz. season-policy.ts).
+  if (hasClosedSeasonNight(input.checkIn, input.checkOut)) {
+    throw new BookingInquiryConflictError(CLOSED_SEASON_MESSAGE);
+  }
+
   const db = await database();
   await ensureBookingInquiriesTable(db);
 

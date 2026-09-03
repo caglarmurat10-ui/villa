@@ -66,4 +66,27 @@ describe("getGoogleVrReadiness (gercek SQLite entegrasyon testi)", () => {
     const readiness = await getGoogleVrReadiness();
     expect(readiness.missing.some((m) => m.includes("GBP location eşlemesi"))).toBe(true);
   });
+
+  it("KESIN SEZON POLITIKASI - gercek production kapsamiyla (2026 acik sezon + 2027 canonical fiyat) kapali sezon PRICE_GAP olarak raporlanmaz", async () => {
+    const now = new Date().toISOString();
+    // Gercek 2026-09-03 audit sonrasi production durumu: 2026 acik sezonu bugune kadar (dahil
+    // 2026-09-30'a kadar) fiyatli, 2027-06-15 -> 2027-09-15 canonical satiri var, kapali sezon icin
+    // (2026-10-01 -> 2027-06-14) HICBIR satir yok.
+    await db.prepare(
+      `INSERT INTO price_ranges (id, villa, start_date, end_date, nightly_rate, created_at)
+       VALUES ('p0', 'Safira', '2026-01-01', '2026-09-30', 5714, ?)`,
+    ).bind(now).run();
+    await db.prepare(
+      `INSERT INTO price_ranges (id, villa, start_date, end_date, nightly_rate, base_nights, base_price_minor, minimum_nights, created_at)
+       VALUES ('p1', 'Safira', '2027-06-15', '2027-09-15', 15714.29, 7, 11000000, 4, ?)`,
+    ).bind(now).run();
+
+    const { getGoogleVrReadiness } = await import("./readiness");
+    const readiness = await getGoogleVrReadiness();
+    const safira = readiness.villas.find((v) => v.villa === "Safira")!;
+
+    expect(safira.priceCoverage.closedSeasonDays).toBeGreaterThan(0);
+    expect(safira.priceCoverage.gapDays).toBe(0); // kapali sezon PRICE_GAP'e KARISMAZ
+    expect(readiness.missing.some((m) => m.includes("Safira") && m.includes("PRICE_GAP"))).toBe(false);
+  });
 });

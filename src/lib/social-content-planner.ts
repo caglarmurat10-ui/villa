@@ -73,6 +73,11 @@ export interface PlannerInput {
   pool: SocialContentTemplate[];
   existingScheduled: ExistingPost[]; // ufuk penceresindeki (today..today+horizon) mevcut Planlandı kayıtları
   recentPosts: RecentPost[]; // son 60 gün - duplicate guard için
+  // Verilirse (bkz. season-policy.ts isClosedSeasonDate), "Satış/Müsaitlik" kategorisi (fiyat/
+  // müsaitlik/son boş günler iddiası taşıyan şablonlar) kapalı sezon günlerine HİÇ planlanmaz -
+  // slot başka bir kategoriyle doldurulur, günün toplam gönderi sayısı ETKİLENMEZ. Verilmezse
+  // (mevcut çağrılar/testler) davranış öncekiyle birebir aynıdır.
+  isClosedSeasonDate?: (dateIso: string) => boolean;
 }
 
 export interface PlannedSlot {
@@ -121,6 +126,7 @@ export function planRolling30Days(input: PlannerInput): { planned: PlannedSlot[]
 
   for (let offset = 0; offset < input.horizonDays; offset += 1) {
     const date = addDays(input.todayIso, offset);
+    const closedSeason = input.isClosedSeasonDate?.(date) ?? false;
     const alreadyScheduled = input.existingScheduled.filter((p) => p.scheduledDate === date).length;
     const alreadyPlannedToday = planned.filter((p) => p.date === date).length;
     let remaining = input.dailyTarget - alreadyScheduled - alreadyPlannedToday;
@@ -145,6 +151,7 @@ export function planRolling30Days(input: PlannerInput): { planned: PlannedSlot[]
       const total = cumulative.length || 1;
       return categories
         .filter((c) => c !== "Satış/Müsaitlik" || lastFilledCategory !== "Satış/Müsaitlik")
+        .filter((c) => c !== "Satış/Müsaitlik" || !closedSeason)
         .sort((a, b) => {
           const deficitA = CONTENT_MIX_TARGETS[a] - ((counts.get(a) ?? 0) / total) * 100;
           const deficitB = CONTENT_MIX_TARGETS[b] - ((counts.get(b) ?? 0) / total) * 100;

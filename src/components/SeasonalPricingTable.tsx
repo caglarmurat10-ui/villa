@@ -20,11 +20,19 @@ export default function SeasonalPricingTable({ villa, prices, todayIso }: { vill
 
   if (upcoming.length === 0) return null;
 
+  // Şu an hiçbir dönem "geçerli" değilse (bugün, listelenen dönemlerin hiçbirinin içinde değil)
+  // gösterilen ilk dönemle bugün arasında bir boşluk (kapalı sezon) var demektir - müşteri bunu
+  // "neden ilk fiyatlı dönem bu kadar uzakta" diye sormasın diye kısa bir açıklama eklenir.
+  const hasCurrent = upcoming.some((p) => p.startDate <= todayIso && p.endDate >= todayIso);
+
   return (
     <section className={styles.section} id="donemsel-fiyatlar">
       <span className={styles.kicker}>DÖNEMSEL FİYATLAR</span>
       <h2>Villa {villa} gecelik fiyatları</h2>
       <p className={styles.note}>Aşağıdaki fiyatlar yönetim panelindeki güncel fiyat kayıtlarından gelir.</p>
+      {!hasCurrent && (
+        <p className={styles.note}>{`${villa} için ${formatRange(upcoming[0].startDate, upcoming[0].endDate)} tarihleri arasındaki sezon açıktır.`}</p>
+      )}
       <div className={styles.grid}>
         {upcoming.map((range) => {
           const isCurrent = range.startDate <= todayIso && range.endDate >= todayIso;

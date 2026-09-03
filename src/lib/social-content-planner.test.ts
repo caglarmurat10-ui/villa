@@ -3,6 +3,7 @@ import { classifyContentSafety, planRolling30Days, type ExistingPost, type Plann
 import { socialContentTemplates } from "./social-content-library";
 import type { SocialContentTemplate } from "./social-content-library";
 import type { RecentPost } from "./social-duplicate-guard";
+import { isClosedSeasonDate } from "./season-policy";
 
 function template(overrides: Partial<SocialContentTemplate> & { id: string }): SocialContentTemplate {
   return {
@@ -112,6 +113,30 @@ describe("planRolling30Days", () => {
     // Birinci gün bir Satış/Müsaitlik şablonuyla dolar (başka kategori yok), ikinci gün ise
     // kural gereği Satış/Müsaitlik hariç tutulur ve havuzda başka kategori kalmadığı için BOŞ kalır.
     expect(planned.filter((p) => p.category === "Satış/Müsaitlik")).toHaveLength(1);
+  });
+
+  it("KESIN SEZON POLITIKASI - isClosedSeasonDate verildiginde Satış/Müsaitlik kategorisi kapali sezon gunune HIC planlanmaz, gunluk hedef yine baska kategoriyle doldurulur", () => {
+    const input: PlannerInput = {
+      todayIso: "2026-09-29", horizonDays: 3, dailyTarget: 1, // 09-29 (acik), 09-30 (acik), 10-01 (KAPALI)
+      pool: basePool, existingScheduled: [], recentPosts: [],
+      isClosedSeasonDate,
+    };
+    const { planned } = planRolling30Days(input);
+    const closedDaySlots = planned.filter((p) => p.date === "2026-10-01");
+    expect(closedDaySlots.every((p) => p.category !== "Satış/Müsaitlik")).toBe(true);
+    // Gün yine doldu (baska kategoriyle) - kapali sezon nedeniyle icerik uretimi tamamen DURMAZ.
+    expect(closedDaySlots.length).toBe(1);
+  });
+
+  it("KESIN SEZON POLITIKASI - gercek 60 sablonluk havuz + gercek bugunku tarih (2026-09-03, 30 gunluk ufuk 2026-10-01/02/03'e tasiyor) ile HICBIR Satış/Müsaitlik gonderisi kapali sezon gunlerine planlanmaz", () => {
+    const input: PlannerInput = {
+      todayIso: "2026-09-03", horizonDays: 30, dailyTarget: 2,
+      pool: socialContentTemplates, existingScheduled: [], recentPosts: [],
+      isClosedSeasonDate,
+    };
+    const { planned } = planRolling30Days(input);
+    const closedSeasonSalesSlots = planned.filter((p) => isClosedSeasonDate(p.date) && p.category === "Satış/Müsaitlik");
+    expect(closedSeasonSalesSlots).toHaveLength(0);
   });
 
   it("gerçek üretim içerik havuzuyla (60 şablon) 30 günlük ufku, aynı medyayı tekrar kullanmadan güvenle doldurabildiği kadar doldurur", () => {

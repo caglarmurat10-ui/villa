@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import type { Villa } from "@/lib/types";
+import { hasClosedSeasonNight, isClosedSeasonDate } from "@/lib/season-policy";
 import styles from "./VillaAvailabilityCalendar.module.css";
 
 type BookingReservation = { villa: Villa; checkIn: string; checkOut: string };
@@ -87,7 +88,7 @@ export default function VillaAvailabilityCalendar({
       onChange({ checkIn: iso, checkOut: "" });
       return;
     }
-    if (hasBookedBetween(checkIn, iso)) {
+    if (hasBookedBetween(checkIn, iso) || hasClosedSeasonNight(checkIn, iso)) {
       onChange({ checkIn: iso, checkOut: "" });
       return;
     }
@@ -97,10 +98,11 @@ export default function VillaAvailabilityCalendar({
   function dayState(iso: string) {
     const past = iso < todayISO;
     const booked = isBooked(iso, villa, reservations);
+    const closedSeason = isClosedSeasonDate(iso);
     const isCheckIn = iso === checkIn;
     const isCheckOut = iso === checkOut;
     const inRange = Boolean(checkIn && checkOut && iso > checkIn && iso < checkOut);
-    return { past, booked, isCheckIn, isCheckOut, inRange, disabled: past || booked };
+    return { past, booked, closedSeason, isCheckIn, isCheckOut, inRange, disabled: past || booked || closedSeason };
   }
 
   return (
@@ -138,8 +140,8 @@ export default function VillaAvailabilityCalendar({
                     disabled={state.disabled}
                     onClick={() => handleDayClick(cell.iso)}
                     aria-pressed={state.isCheckIn || state.isCheckOut}
-                    aria-label={`${cell.day} ${MONTH_LABELS[m.month]}${state.booked ? " — dolu" : ""}`}
-                    title={state.booked ? "Bu tarih dolu" : undefined}
+                    aria-label={`${cell.day} ${MONTH_LABELS[m.month]}${state.booked ? " — dolu" : state.closedSeason ? " — sezon dışı" : ""}`}
+                    title={state.booked ? "Bu tarih dolu" : state.closedSeason ? "Sezon dışı - rezervasyona kapalı" : undefined}
                   >
                     {cell.day}
                   </button>

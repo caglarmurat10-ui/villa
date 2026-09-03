@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { computePriceQuote, type PriceRangeInput } from "../price-engine";
+import { isClosedSeasonDate } from "../season-policy";
 import { computeGoogleVrQuote } from "./feed";
 
 const RANGES: PriceRangeInput[] = [
@@ -80,5 +81,28 @@ describe("computeGoogleVrQuote - 2027-06-15 -> 2027-09-15 haftalık esas fiyat (
   it("minimumNights alanı ilgili dönemden doğru okunur (available=true durumda da)", () => {
     const quote = computeGoogleVrQuote("DESTAN", "2027-06-15", "2027-06-22", 6, { priceRanges: [DESTAN_2027], isOccupied: false });
     expect(quote.minimumNights).toBe(4);
+  });
+});
+
+describe("computeGoogleVrQuote - KESIN SEZON POLITIKASI: kapali sezon asla bookable/fiyatli gorunmez", () => {
+  // Gercek production D1 durumu (2026-09-03 audit sonrasi): kapali sezon icin (2026-10-01 ->
+  // 2027-06-14, 2027-09-16 sonrasi) HICBIR price_ranges satiri yok - tek gercek kaynak budur, feed
+  // katmani ayrica bir "kapali sezon" kontrolu YAPMAZ, price-engine'in "gap" mekanizmasina guvenir.
+  const REAL_RANGES: PriceRangeInput[] = [
+    { startDate: "2027-06-15", endDate: "2027-09-15", nightlyRate: 15714.29, basePriceMinor: 11000000, baseNights: 7, minimumNights: 4 },
+  ];
+
+  it("kapali sezon icindeki (isClosedSeasonDate=true) bir tarih icin fiyat satiri yok -> available:false, totalMinor:null, fiyat UYDURULMAZ", () => {
+    expect(isClosedSeasonDate("2026-11-01")).toBe(true); // on-kosul dogrulamasi
+    const quote = computeGoogleVrQuote("SAFIRA", "2026-11-01", "2026-11-08", 2, { priceRanges: REAL_RANGES, isOccupied: false });
+    expect(quote.available).toBe(false);
+    expect(quote.totalMinor).toBeNull();
+    expect(quote.nightlyBreakdown).toEqual([]);
+  });
+
+  it("2027 acik sezon penceresi icinde (min-stay karsilaniyor) -> available:true, gercek canonical fiyatla bookable", () => {
+    const quote = computeGoogleVrQuote("SAFIRA", "2027-06-15", "2027-06-22", 2, { priceRanges: REAL_RANGES, isOccupied: false });
+    expect(quote.available).toBe(true);
+    expect(quote.totalMinor).toBe(11000000);
   });
 });

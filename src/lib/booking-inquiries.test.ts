@@ -83,11 +83,36 @@ describe("createBookingInquiry (public inquiry - canonical price engine + min st
     expect(result.inquiry.quotedTotal).toBe(Math.round((13000000 * 4) / 7) / 100);
   });
 
-  it("fiyati tanimsiz (gap) donem icin inquiry yine de olusturulur, quotedTotal null kalir (uydurma yok)", async () => {
+  it("fiyati tanimsiz (gap, kapali sezon DEGIL) donem icin inquiry yine de olusturulur, quotedTotal null kalir (uydurma yok)", async () => {
+    // 2026-01-01, kesin sezon politikasinin (bkz. season-policy.ts) kapsami DISINDA (<= 2026-09-30)
+    // - bu tarihte fiyat tanimsiz olmasi bir CLOSED_SEASON degil, gercek bir PRICE_GAP senaryosudur.
     const { createBookingInquiry } = await import("./booking-inquiries");
-    const result = await createBookingInquiry({ ...BASE_INPUT, villa: "Destan", checkIn: "2028-01-01", checkOut: "2028-01-08" });
+    const result = await createBookingInquiry({ ...BASE_INPUT, villa: "Destan", checkIn: "2026-01-01", checkOut: "2026-01-08" });
     expect(result.inquiry.quotedTotal).toBeNull();
     expect(result.duplicate).toBe(false);
+  });
+
+  it("KESIN SEZON POLITIKASI - kapali sezon (2026-10-01 -> 2027-06-14) tarihleri icin inquiry REDDEDILIR", async () => {
+    const { createBookingInquiry, BookingInquiryConflictError } = await import("./booking-inquiries");
+    await expect(createBookingInquiry({ ...BASE_INPUT, villa: "Destan", checkIn: "2026-11-01", checkOut: "2026-11-08" }))
+      .rejects.toBeInstanceOf(BookingInquiryConflictError);
+    try {
+      await createBookingInquiry({ ...BASE_INPUT, villa: "Destan", checkIn: "2026-11-01", checkOut: "2026-11-08" });
+    } catch (error) {
+      expect((error as Error).message).toBe("Bu tarihlerde sezonumuz kapalıdır. 2027 sezonu için rezervasyonlarımız 15 Haziran – 15 Eylül tarihleri arasında açıktır.");
+    }
+  });
+
+  it("KESIN SEZON POLITIKASI - 2027-09-16 sonrasi (kapali sezon) icin inquiry REDDEDILIR", async () => {
+    const { createBookingInquiry, BookingInquiryConflictError } = await import("./booking-inquiries");
+    await expect(createBookingInquiry({ ...BASE_INPUT, villa: "Safira", checkIn: "2027-09-16", checkOut: "2027-09-20" }))
+      .rejects.toBeInstanceOf(BookingInquiryConflictError);
+  });
+
+  it("KESIN SEZON POLITIKASI - girisi acik sezonda, cikisi kapali sezona tasan talep de REDDEDILIR (kismi kabul yok)", async () => {
+    const { createBookingInquiry, BookingInquiryConflictError } = await import("./booking-inquiries");
+    await expect(createBookingInquiry({ ...BASE_INPUT, villa: "Safira", checkIn: "2027-09-12", checkOut: "2027-09-18" }))
+      .rejects.toBeInstanceOf(BookingInquiryConflictError);
   });
 
   it("GERCEK active OTA blogu ile cakisan tarih REDDEDILIR", async () => {

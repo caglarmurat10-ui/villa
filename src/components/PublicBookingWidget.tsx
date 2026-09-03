@@ -6,6 +6,7 @@ import type { PriceRange, Reservation, Villa } from "@/lib/types";
 import { toVillaId, trackCheckAvailability, trackGenerateLead } from "@/lib/analytics";
 import { computePriceQuote, splitEvenInstallments, type PriceSegment } from "@/lib/price-engine";
 import { validateBookingPrefill } from "@/lib/booking-prefill";
+import { CLOSED_SEASON_MESSAGE, hasClosedSeasonNight } from "@/lib/season-policy";
 import VillaAvailabilityCalendar from "./VillaAvailabilityCalendar";
 import styles from "./PublicBookingWidget.module.css";
 
@@ -40,7 +41,7 @@ type BookingReservation = Pick<Reservation, "villa" | "checkIn" | "checkOut">;
 type BookingPrice = Pick<PriceRange, "villa" | "startDate" | "endDate" | "nightlyRate" | "basePriceMinor" | "baseNights" | "minimumNights">;
 
 type AvailabilityResult = {
-  kind: "available" | "busy" | "error" | "price_gap" | "min_stay";
+  kind: "available" | "busy" | "error" | "price_gap" | "min_stay" | "closed_season";
   title: string;
   detail: string;
   total?: number;
@@ -135,6 +136,14 @@ export default function PublicBookingWidget({
       return { kind: "error", title: "Tarihleri kontrol edin", detail: "Çıkış tarihi girişten sonra olmalı." };
     }
 
+    if (hasClosedSeasonNight(checkIn, checkOut)) {
+      return {
+        kind: "closed_season",
+        title: "Sezon kapalı",
+        detail: CLOSED_SEASON_MESSAGE,
+      };
+    }
+
     if (isOccupied(reservations, villa, checkIn, checkOut)) {
       const alternative: Villa = villa === "Safira" ? "Destan" : "Safira";
       const alternativeAvailable = !isOccupied(reservations, alternative, checkIn, checkOut);
@@ -182,7 +191,7 @@ export default function PublicBookingWidget({
   }, [checkIn, checkOut, prices, reservations, villa]);
 
   const alternativeHref = result?.alternative === "Safira" ? "/villa-safira" : "/villa-destan";
-  const resultClass = result?.kind === "available" ? styles.available : result?.kind === "busy" ? styles.busy : result?.kind === "error" ? styles.error : result?.kind === "price_gap" || result?.kind === "min_stay" ? styles.priceGap : "";
+  const resultClass = result?.kind === "available" ? styles.available : result?.kind === "busy" || result?.kind === "closed_season" ? styles.busy : result?.kind === "error" ? styles.error : result?.kind === "price_gap" || result?.kind === "min_stay" ? styles.priceGap : "";
   const resultIcon = result?.kind === "available" ? "✓" : result?.kind === "price_gap" || result?.kind === "min_stay" ? "!" : result ? "✕" : "";
   const canSubmitInquiry = result?.kind === "available" || result?.kind === "price_gap";
 

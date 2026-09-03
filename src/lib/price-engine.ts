@@ -112,24 +112,38 @@ export function computePriceQuote(
 
 // price_ranges'ın gelecek `windowDays` gün içindeki kapsamını (kaç gün fiyatlı, hangi tarihler
 // PRICE_GAP) hesaplar - admin uyarısı ve Google VR 330-gün coverage raporu için ortak kaynak.
+// isClosedSeasonDate (opsiyonel, bkz. season-policy.ts) verilirse fiyatsız günler ikiye ayrılır:
+// CLOSED_SEASON (bilinçli olarak kiralama yapılmayan, uyarı ÜRETMEMESİ gereken dönem) ve gerçek
+// PRICE_GAP (normalde açık olması beklenip fiyatı eksik dönem). Verilmezse (mevcut çağrılar/testler)
+// davranış AYNEN öncekiyle birebir aynıdır - tüm fiyatsız günler gapDays'e sayılır.
 export interface PriceCoverageReport {
   windowStart: string;
   windowEnd: string; // hariç
   totalDays: number;
   coveredDays: number;
+  closedSeasonDays: number;
   gapDays: number;
   gapRanges: Array<{ startDate: string; endDate: string }>; // hariç-uçlu, ardışık gap günleri birleştirilmiş
+  closedSeasonRanges: Array<{ startDate: string; endDate: string }>; // hariç-uçlu, ardışık closed-season günleri birleştirilmiş
 }
 
-export function computePriceCoverage(ranges: PriceRangeInput[], todayIso: string, windowDays: number): PriceCoverageReport {
+export function computePriceCoverage(
+  ranges: PriceRangeInput[],
+  todayIso: string,
+  windowDays: number,
+  isClosedSeasonDate?: (dateIso: string) => boolean,
+): PriceCoverageReport {
   const windowStart = todayIso;
   const end = new Date(`${todayIso}T00:00:00Z`);
   end.setUTCDate(end.getUTCDate() + windowDays);
   const windowEnd = end.toISOString().slice(0, 10);
 
   let coveredDays = 0;
+  let closedSeasonDays = 0;
   const gapRanges: Array<{ startDate: string; endDate: string }> = [];
+  const closedSeasonRanges: Array<{ startDate: string; endDate: string }> = [];
   let openGap: { startDate: string; endDate: string } | null = null;
+  let openClosedSeason: { startDate: string; endDate: string } | null = null;
 
   for (let cursor = new Date(`${todayIso}T00:00:00Z`); cursor < end; cursor.setUTCDate(cursor.getUTCDate() + 1)) {
     const date = cursor.toISOString().slice(0, 10);
@@ -137,7 +151,22 @@ export function computePriceCoverage(ranges: PriceRangeInput[], todayIso: string
     if (covered) {
       coveredDays += 1;
       openGap = null;
-    } else if (openGap && openGap.endDate === date) {
+      openClosedSeason = null;
+      continue;
+    }
+    if (isClosedSeasonDate?.(date)) {
+      closedSeasonDays += 1;
+      openGap = null;
+      if (openClosedSeason && openClosedSeason.endDate === date) {
+        openClosedSeason.endDate = nextDay(date);
+      } else {
+        openClosedSeason = { startDate: date, endDate: nextDay(date) };
+        closedSeasonRanges.push(openClosedSeason);
+      }
+      continue;
+    }
+    openClosedSeason = null;
+    if (openGap && openGap.endDate === date) {
       openGap.endDate = nextDay(date);
     } else {
       openGap = { startDate: date, endDate: nextDay(date) };
@@ -145,7 +174,16 @@ export function computePriceCoverage(ranges: PriceRangeInput[], todayIso: string
     }
   }
 
-  return { windowStart, windowEnd, totalDays: windowDays, coveredDays, gapDays: windowDays - coveredDays, gapRanges };
+  return {
+    windowStart,
+    windowEnd,
+    totalDays: windowDays,
+    coveredDays,
+    closedSeasonDays,
+    gapDays: windowDays - coveredDays - closedSeasonDays,
+    gapRanges,
+    closedSeasonRanges,
+  };
 }
 
 // Bir tam sayı tutarı N eşit parçaya böler - floating point sürüklenmesi YOK: kalan (remainder)

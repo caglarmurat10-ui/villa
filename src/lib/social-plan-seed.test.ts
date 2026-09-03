@@ -96,6 +96,24 @@ describe("ensureRolling30DayPlan (gerçek D1 entegrasyon testi)", () => {
     }
   });
 
+  it("KESIN SEZON POLITIKASI - 30 gunluk ufuk kapali sezona (2026-10-01) tastigi icin, o gune HICBIR Satış/Müsaitlik temali gercek sablon planlanmaz", async () => {
+    const { ensureRolling30DayPlan } = await import("./social-plan-seed");
+    const { socialContentTemplates } = await import("./social-content-library");
+    const { buildVirtualTemplates } = await import("./social-content-virtual-templates");
+    // Gercek havuzdaki Müsaitlik/Özel temali (Satış/Müsaitlik kategorisine eşlenen) tüm gerçek
+    // caption'lar - planlayıcının bunlardan hiçbirini kapalı sezon gününe koymadığını doğrulamak için.
+    const salesCaptions = new Set(
+      [...socialContentTemplates, ...buildVirtualTemplates()]
+        .filter((t) => t.theme === "Müsaitlik" || t.theme === "Özel")
+        .map((t) => t.caption),
+    );
+
+    await ensureRolling30DayPlan(2); // TEST_TODAY=2026-09-03 -> 30 gunluk ufuk 2026-10-03'e kadar, sinirin (2026-10-01) OTESINE gecer
+    const rows = await socialPostRows();
+    const closedSeasonRows = rows.filter((r) => r.scheduled_date >= "2026-10-01");
+    expect(closedSeasonRows.some((r) => salesCaptions.has(r.caption))).toBe(false);
+  });
+
   it("daha önce YAYINLANMIŞ (Yayınlandı) bir gönderinin caption'ı 60 gün içinde tekrar önerilmez", async () => {
     const now = new Date().toISOString();
     const publishedCaption = "Bir villayı özel yapan şey sadece odaları değil, günün nasıl aktığıdır.\n\nVilla Safira’da gün, havuz başında başlamak zorunda değil; ama çoğu zaman öyle devam etmek isteyeceksiniz. Gerçek villa görüntülerini kullanarak konaklama deneyimini olduğu gibi gösteriyoruz: sakin, ferah ve size ait.\n\nVillanın diğer gerçek fotoğrafları için profili inceleyin.\n\n#villasafirapatara #patara #kaş #villatatili #özelhavuz #antalya #tatil";

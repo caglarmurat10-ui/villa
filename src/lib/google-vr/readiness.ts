@@ -1,6 +1,7 @@
 import { listPriceRanges } from "../db";
 import { computePriceCoverage, type PriceCoverageReport } from "../price-engine";
 import { getAllGbpLocationMappings } from "../gbp/mapping";
+import { isClosedSeasonDate } from "../season-policy";
 import type { Villa } from "../types";
 
 export type GoogleVrState =
@@ -40,7 +41,7 @@ export async function getGoogleVrReadiness(): Promise<GoogleVrReadiness> {
   const villaReadiness: GoogleVrVillaReadiness[] = villas.map((villa) => ({
     villa,
     gbpLocationMapped: gbpMappings[villa] !== null,
-    priceCoverage: computePriceCoverage(prices.filter((p) => p.villa === villa), todayIso, COVERAGE_WINDOW_DAYS),
+    priceCoverage: computePriceCoverage(prices.filter((p) => p.villa === villa), todayIso, COVERAGE_WINDOW_DAYS, isClosedSeasonDate),
   }));
 
   const missing: string[] = [];

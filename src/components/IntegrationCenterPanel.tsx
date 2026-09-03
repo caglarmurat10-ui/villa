@@ -209,6 +209,9 @@ export default function IntegrationCenterPanel({ snapshot }: { snapshot: Integra
                 <p style={{ margin: "4px 0 0", color: v.priceCoverage.gapDays === 0 ? "#86efac" : "#fbbf24" }}>
                   Fiyat kapsamı: {v.priceCoverage.coveredDays}/{v.priceCoverage.totalDays} gün{v.priceCoverage.gapDays > 0 ? ` · ${v.priceCoverage.gapDays} gün PRICE_GAP` : ""}
                 </p>
+                {v.priceCoverage.closedSeasonDays > 0 && (
+                  <p style={{ margin: "4px 0 0", color: "#9fb0c5" }}>{v.priceCoverage.closedSeasonDays} gün CLOSED_SEASON (bilinçli kapalı — PRICE_GAP değil)</p>
+                )}
               </div>
             ))}
             <div style={{ padding: "8px 10px", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728", fontSize: 9, color: "#9fb0c5" }}>
