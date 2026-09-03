@@ -423,7 +423,7 @@ export default function PublicBookingWidget({
           </p>
 
           {requestState.kind !== "idle" && (
-            <div className={`${styles.requestStatus} ${requestState.kind === "success" ? styles.requestSuccess : requestState.kind === "error" ? styles.requestError : ""}`} aria-live="polite">
+            <div className={`${styles.requestStatus} ${requestState.kind === "error" ? styles.requestError : ""}`} aria-live="polite">
               {requestState.message}
             </div>
           )}
