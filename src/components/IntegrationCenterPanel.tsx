@@ -170,6 +170,25 @@ export default function IntegrationCenterPanel({ snapshot }: { snapshot: Integra
           <PaytrConnectivityTest />
         </details>
 
+        <details style={{ marginTop: 10, paddingTop: 13, borderTop: "1px solid #203954" }}>
+          <summary style={{ fontSize: 11, color: "#93c5fd", fontWeight: 800, cursor: "pointer" }}>
+            &quot;Peşin Fiyatına 6 Taksit&quot; kampanya doğrulaması ({snapshot.installmentCampaign.state})
+          </summary>
+          <div style={{ display: "grid", gap: 6, marginTop: 10 }}>
+            {snapshot.installmentCampaign.checklist.map((item) => (
+              <div key={item.label} style={{ padding: "8px 10px", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728", fontSize: 9 }}>
+                <b style={{ color: item.status === "VERIFIED" ? "#86efac" : item.status === "NOT_VERIFIED" ? "#fca5a5" : "#dbeafe" }}>
+                  {item.status === "VERIFIED" ? "✓" : item.status === "NOT_VERIFIED" ? "✗" : "○"} {item.label}
+                </b>
+                <p style={{ margin: "4px 0 0", color: "#9fb0c5" }}>{item.note}</p>
+              </div>
+            ))}
+          </div>
+          {snapshot.installmentCampaign.state !== "INSTALLMENT_CAMPAIGN_VERIFIED" ? (
+            <p style={{ marginTop: 8, fontSize: 9, color: "#fbbf24" }}>Doğrulanmadan public sitede &quot;peşin fiyatına&quot; iddiası gösterilmez - kampanya banner&apos;ı bu durumda otomatik gizli kalır.</p>
+          ) : null}
+        </details>
+
         <details style={{ marginTop: 14, paddingTop: 13, borderTop: "1px solid #203954" }}>
           <summary style={{ fontSize: 11, color: "#93c5fd", fontWeight: 800, cursor: "pointer" }}>
             Google Ads — {snapshot.googleAds.state} · {GOOGLE_ADS_CAMPAIGN_DRAFTS.length} DRAFT kampanya (hiçbiri gönderilmedi)

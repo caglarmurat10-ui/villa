@@ -3,8 +3,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import PublicBookingWidget from "@/components/PublicBookingWidget";
 import SeasonalPricingTable from "@/components/SeasonalPricingTable";
+import InstallmentCampaignBanner from "@/components/InstallmentCampaignBanner";
 import VillaGalleryLightbox from "@/components/VillaGalleryLightbox";
 import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
+import { getInstallmentCampaignReadiness } from "@/lib/payments/installment-campaign";
 import { VILLAS, FAQ_ITEMS, REGION_INFO, formatAddress, type VillaSlug } from "@/lib/villa-content";
 import { POLICY_SUMMARY } from "@/lib/reservation-policy";
 import { fetchGoogleReviews } from "@/lib/google-reviews";
@@ -56,7 +58,7 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
   const { slug } = await params;
   if (!(slug in villas)) notFound();
   const villa = villas[slug as VillaSlug];
-  const [reservations, prices, locations, googleReviews, blockedRanges] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), fetchGoogleReviews(villa.villa), listBlockedRanges()]);
+  const [reservations, prices, locations, googleReviews, blockedRanges, installmentCampaign] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), fetchGoogleReviews(villa.villa), listBlockedRanges(), getInstallmentCampaignReadiness()]);
   const bookingReservations = [
     ...reservations.map(({ villa: itemVilla, checkIn, checkOut }) => ({ villa: itemVilla, checkIn, checkOut })),
     ...blockedRanges,
@@ -351,6 +353,11 @@ export default async function VillaDetailPage({ params }: { params: Promise<{ sl
       )}
 
       <SeasonalPricingTable villa={villa.villa} prices={bookingPrices} todayIso={todayIso} />
+      {installmentCampaign.state === "INSTALLMENT_CAMPAIGN_VERIFIED" ? (
+        <div style={{ width: "min(90vw, 700px)", margin: "0 auto 60px" }}>
+          <InstallmentCampaignBanner readiness={installmentCampaign} />
+        </div>
+      ) : null}
 
       <section className={styles.bookingBand} id="rezervasyon">
         <div className={styles.bookingWrap}>
