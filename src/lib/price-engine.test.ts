@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computePriceCoverage, computePriceQuote, type PriceRangeInput } from "./price-engine";
+import { computePriceCoverage, computePriceQuote, splitEvenInstallments, type PriceRangeInput } from "./price-engine";
 
 const SINGLE_SEASON: PriceRangeInput[] = [
   { startDate: "2026-06-01", endDate: "2026-08-31", nightlyRate: 10000 },
@@ -119,5 +119,30 @@ describe("computePriceCoverage", () => {
     const report = computePriceCoverage(ranges, "2026-06-01", 30); // 06-01..06-30
     // 06-01..06-09 gap, 06-10..06-20 kapli, 06-21..06-30 gap -> 2 ayri gap araligi
     expect(report.gapRanges).toHaveLength(2);
+  });
+});
+
+describe("splitEvenInstallments", () => {
+  it("tam bolunen tutarda hepsi esit doner", () => {
+    expect(splitEvenInstallments(60000, 6)).toEqual([10000, 10000, 10000, 10000, 10000, 10000]);
+  });
+
+  it("bolunmeyen tutarda kalan ilk taksitlere +1 TL olarak dagitilir, toplam asla kaymaz", () => {
+    const result = splitEvenInstallments(70001, 6);
+    expect(result).toEqual([11667, 11667, 11667, 11667, 11667, 11666]);
+    expect(result.reduce((sum, n) => sum + n, 0)).toBe(70001);
+  });
+
+  it("kesirli/float toplamlarda bile satir toplami girdiye esit kalir (float surklenmesi yok)", () => {
+    for (const total of [1, 7, 99, 1000.4, 33333, 123456.6, 999999]) {
+      const result = splitEvenInstallments(total, 6);
+      const sum = result.reduce((acc, n) => acc + n, 0);
+      expect(sum).toBe(Math.round(total));
+      expect(result.every((n) => Number.isInteger(n))).toBe(true);
+    }
+  });
+
+  it("installmentCount <= 0 icin bos dizi doner", () => {
+    expect(splitEvenInstallments(1000, 0)).toEqual([]);
   });
 });

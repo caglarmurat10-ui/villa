@@ -101,3 +101,16 @@ export function computePriceCoverage(ranges: PriceRangeInput[], todayIso: string
 
   return { windowStart, windowEnd, totalDays: windowDays, coveredDays, gapDays: windowDays - coveredDays, gapRanges };
 }
+
+// TRY tutarını N eşit taksite böler - floating point sürüklenmesi YOK: tam sayı TL üzerinde
+// çalışır, kalan (remainder) ilk taksitlere +1 TL olarak dağıtılır, böylece dizinin toplamı
+// HER ZAMAN girdi tutarına birebir eşittir (installments.reduce(sum) === totalTRY). Bankanın
+// gerçek taksit tutarı (vade farkı vb.) bundan farklı olabilir - bu yalnız bizim tarafımızdan
+// gösterilen "yaklaşık" referans değerdir, ödeme ekranındaki gerçek tutarın yerine geçmez.
+export function splitEvenInstallments(totalTRY: number, installmentCount: number): number[] {
+  if (installmentCount <= 0) return [];
+  const total = Math.round(totalTRY);
+  const base = Math.floor(total / installmentCount);
+  const remainder = total - base * installmentCount;
+  return Array.from({ length: installmentCount }, (_, index) => base + (index < remainder ? 1 : 0));
+}

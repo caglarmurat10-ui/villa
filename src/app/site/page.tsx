@@ -174,7 +174,12 @@ export default async function PublicHomePage() {
       <section className={styles.bookingBand} id="musaitlik">
         <div className={styles.bookingWrap}>
           <div className={styles.bookingIntro}><span className={styles.kicker}>CANLI TAKVİM</span><h2>Tatil tarihiniz<br />müsait mi?</h2><p>Takvim doğrudan yönetim sistemindeki rezervasyonlarla kontrol edilir.</p></div>
-          <PublicBookingWidget reservations={bookingReservations} prices={bookingPrices} />
+          <PublicBookingWidget
+            reservations={bookingReservations}
+            prices={bookingPrices}
+            installmentVerified={installmentCampaign.state === "INSTALLMENT_CAMPAIGN_VERIFIED"}
+            maxInstallment={installmentCampaign.maxInstallment}
+          />
         </div>
       </section>
 

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import type { PriceRange, Reservation, Villa } from "@/lib/types";
 import { toVillaId, trackCheckAvailability, trackGenerateLead } from "@/lib/analytics";
-import { computePriceQuote, type PriceSegment } from "@/lib/price-engine";
+import { computePriceQuote, splitEvenInstallments, type PriceSegment } from "@/lib/price-engine";
 import { validateBookingPrefill } from "@/lib/booking-prefill";
 import VillaAvailabilityCalendar from "./VillaAvailabilityCalendar";
 import styles from "./PublicBookingWidget.module.css";
@@ -67,6 +67,14 @@ function isOccupied(reservations: BookingReservation[], villa: Villa, checkIn: s
   );
 }
 
+// Fiyattan bağımsız, saf takvim gece sayısı - sonuç kartındaki VILLA/TARİH/GECE recap satırı
+// için (fiyat "gap"/hata olsa bile giriş-çıkış arasındaki gece sayısı gösterilebilir olmalı).
+function nightsBetween(checkIn: string, checkOut: string): number {
+  const start = new Date(`${checkIn}T00:00:00Z`).getTime();
+  const end = new Date(`${checkOut}T00:00:00Z`).getTime();
+  return Math.round((end - start) / (24 * 60 * 60 * 1000));
+}
+
 
 export default function PublicBookingWidget({
   reservations,
@@ -75,6 +83,8 @@ export default function PublicBookingWidget({
   initialCheckIn,
   initialCheckOut,
   initialGuestCount,
+  installmentVerified = false,
+  maxInstallment = 6,
 }: {
   reservations: BookingReservation[];
   prices: BookingPrice[];
@@ -85,6 +95,11 @@ export default function PublicBookingWidget({
   initialCheckIn?: string;
   initialCheckOut?: string;
   initialGuestCount?: string;
+  // getInstallmentCampaignReadiness() sonucundan gelir - false iken taksit satırı hiç render
+  // edilmez (bkz. src/lib/payments/installment-campaign.ts, merchant doğrulaması tamamlanmadan
+  // public'e asla çıkmaz).
+  installmentVerified?: boolean;
+  maxInstallment?: number;
 }) {
   const prefill = validateBookingPrefill({ checkIn: initialCheckIn, checkOut: initialCheckOut, guestCount: initialGuestCount });
 
@@ -229,11 +244,21 @@ export default function PublicBookingWidget({
       <div className={`${styles.result} ${resultClass}`} aria-live="polite">
         {result ? (
           <>
+            <div className={styles.resultRecap}>
+              Villa {villa} · {formatDateLabel(checkIn)} – {formatDateLabel(checkOut)} · {nightsBetween(checkIn, checkOut)} gece
+            </div>
             <div className={styles.resultTop}>
               <strong>{result.title}</strong>
               {typeof result.total === "number" && <b>{money.format(result.total)}</b>}
             </div>
             <p>{result.detail}</p>
+            {result.kind === "available" && installmentVerified && typeof result.total === "number" && maxInstallment > 0 && (
+              <div className={styles.installment}>
+                <strong>Peşin fiyatına {maxInstallment} taksit</strong>
+                <span>{maxInstallment} × yaklaşık {money.format(splitEvenInstallments(result.total, maxInstallment)[0])}</span>
+                <small>Taksit seçenekleri kart ve banka koşullarına göre ödeme ekranında görüntülenir.</small>
+              </div>
+            )}
             {result.segments && result.segments.length > 1 ? (
               <div className={styles.breakdown}>
                 <table>
@@ -322,6 +347,7 @@ export default function PublicBookingWidget({
       <div className={styles.trust}>
         <span>✓ Canlı müsaitlik</span>
         <span>✓ Dönemsel fiyat</span>
+        <span>✓ Ödeme sırasında işletme komisyonu eklenmez</span>
         <span>✓ Doğrudan rezervasyon</span>
       </div>
     </div>

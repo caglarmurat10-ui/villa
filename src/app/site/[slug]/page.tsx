@@ -371,6 +371,8 @@ export default async function VillaDetailPage({ params, searchParams }: { params
             initialCheckIn={firstParam(query.checkin)}
             initialCheckOut={firstParam(query.checkout)}
             initialGuestCount={firstParam(query.guests)}
+            installmentVerified={installmentCampaign.state === "INSTALLMENT_CAMPAIGN_VERIFIED"}
+            maxInstallment={installmentCampaign.maxInstallment}
           />
         </div>
       </section>
