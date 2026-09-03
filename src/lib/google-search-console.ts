@@ -1,5 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { getGoogleAccessToken, hasGoogleConnection } from "./google-api";
+import { computeSearchConsoleOpportunities, type SearchConsoleOpportunities } from "./search-console-opportunities";
 
 const CACHE_KEY = "cache:search_console:summary:v1";
 const CACHE_TTL_SECONDS = 15 * 60;
@@ -31,6 +32,7 @@ export type SearchConsoleSummary = {
   position: number;
   topQueries: SearchConsoleTopQuery[];
   topPages: SearchConsoleTopPage[];
+  opportunities: SearchConsoleOpportunities;
 };
 
 export type SearchConsoleProbe = {
@@ -114,10 +116,12 @@ async function loadLiveSummary(): Promise<SearchConsoleSummary> {
   if (!siteUrl) throw new Error("SEARCH_CONSOLE_SITE_NOT_FOUND");
 
   const { startDate, endDate } = complete28DayRange();
-  const [aggregate, topQueriesResponse, topPagesResponse] = await Promise.all([
+  const [aggregate, topQueriesResponse, topPagesResponse, opportunityQueriesResponse] = await Promise.all([
     searchAnalytics(accessToken, siteUrl, { startDate, endDate, rowLimit: 1 }),
     searchAnalytics(accessToken, siteUrl, { startDate, endDate, dimensions: ["query"], rowLimit: 5 }),
     searchAnalytics(accessToken, siteUrl, { startDate, endDate, dimensions: ["page"], rowLimit: 5 }),
+    // Firsat motoru icin daha genis bir sorgu kumesi - UI'da gosterilen "top 5" ile karistirilmaz.
+    searchAnalytics(accessToken, siteUrl, { startDate, endDate, dimensions: ["query"], rowLimit: 25 }),
   ]);
 
   const row = aggregate.rows?.[0];
@@ -136,16 +140,27 @@ async function loadLiveSummary(): Promise<SearchConsoleSummary> {
     position: Number(item.position ?? 0),
   })).filter((item) => item.page);
 
+  const aggregateCtr = Number(row?.ctr ?? 0);
+  const opportunityRows = (opportunityQueriesResponse.rows ?? []).map((item) => ({
+    query: item.keys?.[0] ?? "",
+    clicks: Number(item.clicks ?? 0),
+    impressions: Number(item.impressions ?? 0),
+    ctr: Number(item.ctr ?? 0),
+    position: Number(item.position ?? 0),
+  })).filter((item) => item.query);
+  const opportunities = computeSearchConsoleOpportunities(opportunityRows, aggregateCtr);
+
   return {
     siteUrl,
     startDate,
     endDate,
     clicks: Number(row?.clicks ?? 0),
     impressions: Number(row?.impressions ?? 0),
-    ctr: Number(row?.ctr ?? 0),
+    ctr: aggregateCtr,
     position: Number(row?.position ?? 0),
     topQueries,
     topPages,
+    opportunities,
   };
 }
 

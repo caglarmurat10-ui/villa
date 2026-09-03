@@ -125,6 +125,24 @@ export default function GoogleVisibilityPanel({
             </div>)}
           </div>
         </div> : null}
+        <div style={{marginTop:9,padding:"9px 10px",border:"1px solid #223a57",borderRadius:9,background:"#0b1728"}}>
+          <b style={{fontSize:10,color:"#93c5fd"}}>SEO fırsat önerileri (son 28 gün, gerçek veri)</b>
+          {!sc.opportunities.hasEnoughData ? (
+            <p style={{margin:"6px 0 0",fontSize:9,color:"#8fa4bd"}}>Hesaplamak için yeterli Search Console verisi yok.</p>
+          ) : sc.opportunities.opportunities.length === 0 ? (
+            <p style={{margin:"6px 0 0",fontSize:9,color:"#86efac"}}>Belirgin bir fırsat tespit edilmedi - mevcut sorgular CTR/pozisyon açısından sağlıklı görünüyor.</p>
+          ) : (
+            <div style={{display:"grid",gap:5,marginTop:6}}>
+              {sc.opportunities.opportunities.map((item, index) => (
+                <div key={`${item.type}-${item.query}-${index}`} style={{fontSize:9,color:"#c8d3e3"}}>
+                  <span style={{color: item.type === "high_impression_low_ctr" ? "#fbbf24" : "#93c5fd", fontWeight:800}}>
+                    {item.type === "high_impression_low_ctr" ? "Düşük CTR" : "Orta pozisyon"}
+                  </span> — {item.suggestion}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       </div> : snapshot.searchConsoleError ? <div style={{marginTop:12,padding:"10px 12px",border:"1px solid #a1620755",borderRadius:10,background:"#241a06",color:"#fbbf24",fontSize:10}}>
         {snapshot.searchConsoleError}
       </div> : null}
