@@ -1,5 +1,10 @@
 import { parseNotificationForm, verifyNotificationHash } from "@/lib/payments/paytr/callback";
 import { getPaymentByMerchantOid, markPaymentFailedIfPending, markPaymentPaidIfPending, flagPaymentAmountMismatch } from "@/lib/payments/db";
+import {
+  extendLivePaymentHold,
+  finalizeLiveBookingPayment,
+  releaseLivePaymentHold,
+} from "@/lib/payments/live-booking";
 import { logPaymentAudit } from "@/lib/payments/audit";
 
 export const dynamic = "force-dynamic";
@@ -12,10 +17,10 @@ function okResponse() {
 // Hash doğrulanmadan HİÇBİR D1 state değişikliği yapılmaz. Ham form body/hash/secret asla loglanmaz -
 // yalnız audit.ts'in izin verdiği güvenli alanlar.
 //
-// "İlk notification kazanır" kuralı burada D1 SEVİYESİNDE garanti edilir: markPaymentPaidIfPending/
-// markPaymentFailedIfPending, yalnız o anda GERÇEKTEN status='pending' olan satırı etkileyen koşullu
-// UPDATE'lerdir (application kodunda "önce oku, sonra karar ver" YOK). İki eşzamanlı callback aynı
-// payment'ı işlemeye çalışırsa yalnız biri affected-row=1 görür; kaybeden state'i değiştirmez.
+// "İlk notification kazanır" kuralı burada D1 SEVİYESİNDE garanti edilir. Test/admin payment'larda
+// markPaymentPaidIfPending/markPaymentFailedIfPending koşullu UPDATE'leri kullanılır. Public CANLI
+// payment'ta başarılı callback, live-booking.ts içinde payment + inquiry + tarih hold + reservation'ı
+// aynı D1 batch/transaction içinde sonuçlandırır.
 export async function POST(request: Request) {
   const rawBody = await request.text();
   let form: URLSearchParams;
@@ -60,6 +65,11 @@ export async function POST(request: Request) {
         payment.id,
         `Tutar uyuşmazlığı - inceleme gerekiyor (bildirilen: ${notification.totalAmountMinor}, beklenen: ${payment.requestedAmountMinor}).`,
       );
+      if (!payment.testMode) {
+        // Gerçek para bildirimi geldi ama tutar doğrulanamadıysa tarihleri hemen yeniden satışa
+        // açmayız; manuel inceleme için 24 saat daha kilitli tutarız.
+        await extendLivePaymentHold(payment.id, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+      }
       await logPaymentAudit("PAYMENT_CALLBACK_AMOUNT_MISMATCH", {
         paymentId: payment.id,
         reservationId: payment.reservationId,
@@ -71,21 +81,64 @@ export async function POST(request: Request) {
       return okResponse();
     }
 
-    const won = await markPaymentPaidIfPending(payment, notification.totalAmountMinor);
-    if (!won) {
-      // Bu callback "ilk kazanan" değildi - payment zaten terminal bir duruma ulaşmıştı (paid ile
-      // duplicate, ya da failed/cancelled sonrası geç gelen bir success). Kural: ilk sonuç kalıcıdır.
-      await logPaymentAudit("PAYMENT_CALLBACK_TERMINAL_IGNORED", { paymentId: payment.id, reservationId: payment.reservationId, villa: payment.villa, status: payment.status });
-      return okResponse();
-    }
+    if (!payment.testMode) {
+      if (payment.status !== "pending") {
+        await logPaymentAudit("PAYMENT_CALLBACK_TERMINAL_IGNORED", {
+          paymentId: payment.id,
+          reservationId: payment.reservationId,
+          villa: payment.villa,
+          status: payment.status,
+        });
+        return okResponse();
+      }
 
-    await logPaymentAudit("PAYMENT_PAID", {
-      paymentId: payment.id,
-      reservationId: payment.reservationId,
-      villa: payment.villa,
-      paymentType: payment.paymentType,
-      amountMinor: notification.totalAmountMinor,
-    });
+      // Başarılı gerçek tahsilat artık geri döndürülemez bir olaydır. Callback retry/DB hatası
+      // sırasında tarihlerin serbest kalmaması için hold'u önce 24 saat uzat; finalizer başarıyla
+      // biterse aynı transaction içinde status='paid' yapar ve kilit aktif olmaktan çıkar.
+      await extendLivePaymentHold(payment.id, new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString());
+
+      try {
+        const finalized = await finalizeLiveBookingPayment(payment, notification.totalAmountMinor);
+        if (finalized.alreadyFinalized) {
+          await logPaymentAudit("PAYMENT_CALLBACK_TERMINAL_IGNORED", {
+            paymentId: payment.id,
+            reservationId: finalized.reservationId,
+            villa: payment.villa,
+            status: "paid",
+          });
+          return okResponse();
+        }
+
+        await logPaymentAudit("PAYMENT_PAID", {
+          paymentId: payment.id,
+          reservationId: finalized.reservationId,
+          villa: payment.villa,
+          paymentType: payment.paymentType,
+          amountMinor: notification.totalAmountMinor,
+        });
+      } catch (error) {
+        // PayTR yalnız düz "OK" görünce retry'ı bırakır. Gerçek tahsilat geldiği halde rezervasyon
+        // transaction'ı tamamlanamadıysa 500 dönerek provider'ın bildirimi tekrar göndermesini isteriz.
+        // Secret/hash/form body loglanmaz; yalnız güvenli payment id + hata mesajı.
+        console.error(`[PayTR callback] live finalize failed for ${payment.id}: ${error instanceof Error ? error.message : "unknown error"}`);
+        return new Response("Retry", { status: 500, headers: { "Content-Type": "text/plain" } });
+      }
+    } else {
+      const won = await markPaymentPaidIfPending(payment, notification.totalAmountMinor);
+      if (!won) {
+        // Bu callback "ilk kazanan" değildi - payment zaten terminal bir duruma ulaşmıştı.
+        await logPaymentAudit("PAYMENT_CALLBACK_TERMINAL_IGNORED", { paymentId: payment.id, reservationId: payment.reservationId, villa: payment.villa, status: payment.status });
+        return okResponse();
+      }
+
+      await logPaymentAudit("PAYMENT_PAID", {
+        paymentId: payment.id,
+        reservationId: payment.reservationId,
+        villa: payment.villa,
+        paymentType: payment.paymentType,
+        amountMinor: notification.totalAmountMinor,
+      });
+    }
   } else {
     const safeReason = notification.failedReasonMsg ? notification.failedReasonMsg.slice(0, 200) : "Ödeme başarısız.";
     const won = await markPaymentFailedIfPending(payment.id, safeReason);
@@ -93,6 +146,7 @@ export async function POST(request: Request) {
       await logPaymentAudit("PAYMENT_CALLBACK_TERMINAL_IGNORED", { paymentId: payment.id, reservationId: payment.reservationId, villa: payment.villa, status: payment.status });
       return okResponse();
     }
+    if (!payment.testMode) await releaseLivePaymentHold(payment.id);
     await logPaymentAudit("PAYMENT_FAILED", { paymentId: payment.id, reservationId: payment.reservationId, villa: payment.villa, paymentType: payment.paymentType });
   }
 
