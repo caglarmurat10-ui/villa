@@ -67,7 +67,7 @@ jobs:
           echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
           echo "Expected production Worker version: $version_id"
 
-      - name: Wait for production propagation
+      - name: Ensure expected version is active
         if: steps.credentials.outputs.ready == 'yes'
         shell: bash
         env:
@@ -75,19 +75,48 @@ jobs:
         run: |
           set -euo pipefail
           BASE="https://safiradestan.com"
+
+          echo "Current Cloudflare deployment state:"
+          npx wrangler deployments status --name villa-yonetim --config wrangler.jsonc --json || true
+
+          matched="no"
+          for attempt in $(seq 1 3); do
+            bust="pre=${GITHUB_SHA}-${attempt}"
+            version_json="$(curl --fail --silent --show-error --retry 2 --retry-delay 2 -H 'Cache-Control: no-cache' "$BASE/api/system/version?$bust" || true)"
+            echo "Initial routing check $attempt/3: $version_json"
+            if grep -Fq "\"versionId\":\"$EXPECTED_VERSION_ID\"" <<<"$version_json"; then
+              matched="yes"
+              break
+            fi
+            sleep 3
+          done
+
+          if [ "$matched" != "yes" ]; then
+            echo "wrangler deploy created version $EXPECTED_VERSION_ID but the custom domain is still on another deployment. Promoting the exact version to 100% traffic."
+            npx wrangler versions deploy "${EXPECTED_VERSION_ID}@100%" \
+              --name villa-yonetim \
+              --config wrangler.jsonc \
+              --message "GitHub Actions explicit production promotion ${GITHUB_SHA}" \
+              -y
+          fi
+
           matched="no"
           for attempt in $(seq 1 30); do
-            bust="version=${GITHUB_SHA}-${attempt}"
+            bust="post=${GITHUB_SHA}-${attempt}"
             version_json="$(curl --fail --silent --show-error --retry 2 --retry-delay 2 -H 'Cache-Control: no-cache' "$BASE/api/system/version?$bust" || true)"
-            echo "Propagation check $attempt/30: $version_json"
+            echo "Production routing check $attempt/30: $version_json"
             if grep -Fq "\"versionId\":\"$EXPECTED_VERSION_ID\"" <<<"$version_json"; then
               matched="yes"
               break
             fi
             sleep 5
           done
+
+          echo "Final Cloudflare deployment state:"
+          npx wrangler deployments status --name villa-yonetim --config wrangler.jsonc --json || true
+
           if [ "$matched" != "yes" ]; then
-            echo "Custom domain did not begin serving expected Worker version $EXPECTED_VERSION_ID within the propagation window."
+            echo "Custom domain did not serve expected Worker version $EXPECTED_VERSION_ID even after explicit 100% promotion."
             exit 1
           fi
           echo "Custom domain is serving expected Worker version $EXPECTED_VERSION_ID."
