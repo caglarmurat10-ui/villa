@@ -1,0 +1,74 @@
+name: Temporary Legal Footer Rollout
+
+on:
+  push:
+    branches:
+      - agent/cloudflare-migration
+    paths:
+      - ".github/workflows/legal-footer-rollout-temporary.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  rollout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: agent/cloudflare-migration
+
+      - name: Add legal links to public footer
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("src/app/site/page.tsx")
+          text = path.read_text(encoding="utf-8")
+          old = '''          <div><small>REZERVASYON</small><p>Müsaitlik kontrolünü yukarıdaki canlı takvimden yapabilirsiniz.<br /><Link href="/rezervasyon-kosullari">Rezervasyon ve Konaklama Koşulları</Link></p></div>'''
+          new = '''          <div>
+            <small>REZERVASYON &amp; YASAL</small>
+            <p>
+              Müsaitlik kontrolünü yukarıdaki canlı takvimden yapabilirsiniz.<br />
+              <Link href="/rezervasyon-kosullari">Rezervasyon ve Konaklama Koşulları</Link><br />
+              <Link href="/rezervasyon-kosullari#hakkimizda">Hakkımızda</Link><br />
+              <Link href="/rezervasyon-kosullari#teslimat-iade">Teslimat, İptal ve İade</Link><br />
+              <Link href="/rezervasyon-kosullari#gizlilik">Gizlilik Politikası</Link><br />
+              <Link href="/rezervasyon-kosullari#kvkk">KVKK Aydınlatma Metni</Link><br />
+              <Link href="/rezervasyon-kosullari#mesafeli-hizmet-sozlesmesi">Mesafeli Hizmet Sözleşmesi</Link><br />
+              <Link href="/rezervasyon-kosullari#on-bilgilendirme">Ön Bilgilendirme Formu</Link><br />
+              <Link href="/rezervasyon-kosullari#odeme-guvenligi">SSL ve Ödeme Güvenliği</Link>
+            </p>
+          </div>'''
+          if old not in text:
+              raise SystemExit("Expected homepage footer block not found; refusing unsafe edit")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit validated footer change
+        run: |
+          git config user.name "caglarmurat10-ui"
+          git config user.email "caglarmurat10@gmail.com"
+          git add src/app/site/page.tsx
+          if git diff --cached --quiet; then
+            echo "No footer changes to commit"
+          else
+            git commit -m "Expose payment compliance links in public footer"
+            git push origin HEAD:agent/cloudflare-migration
+          fi
