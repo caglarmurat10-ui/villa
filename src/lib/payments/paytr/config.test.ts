@@ -21,14 +21,14 @@ describe("getPaytrReadiness", () => {
     expect(readiness.merchantPanelChecklist.every((item) => item.status !== "VERIFIED")).toBe(true);
   });
 
-  it("secretler varken ve PAYTR_TEST_MODE=true (kod sabiti) iken PAYTR_TEST_MODE_ONLY doner", async () => {
+  it("secretler varken ve PAYTR_TEST_MODE=false (kod sabiti) iken PAYTR_READY doner", async () => {
     mockEnv = { PAYTR_MERCHANT_ID: "x", PAYTR_MERCHANT_KEY: "y", PAYTR_MERCHANT_SALT: "z" };
     const { getPaytrReadiness } = await import("./config");
     const readiness = await getPaytrReadiness();
     expect(readiness.configured).toBe(true);
-    expect(readiness.testMode).toBe(true); // types.ts: PAYTR_TEST_MODE = true (hardcoded)
-    expect(readiness.state).toBe("PAYTR_TEST_MODE_ONLY");
-    expect(readiness.state).not.toBe("PAYTR_READY"); // asla otomatik READY olmaz
+    expect(readiness.testMode).toBe(false); // types.ts: PAYTR_TEST_MODE = false (hardcoded)
+    expect(readiness.state).toBe("PAYTR_READY");
+    expect(readiness.state).not.toBe("PAYTR_TEST_MODE_ONLY");
   });
 
   it("'Canliya izin verildi' maddesi disindaki HICBIR checklist maddesi otomatik VERIFIED olamaz", async () => {
