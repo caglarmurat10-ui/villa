@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { SocialPost } from "@/lib/types";
 import type { ContentLibrarySummary } from "@/lib/social-library-summary";
 import type { SocialCronHeartbeat } from "@/lib/social-cron-health";
+import { isMetaTargetHardBlocked } from "@/lib/social-account-policy";
 
 function formatTime(value?: string | null) {
   if (!value) return "Henüz denenmedi";
@@ -56,18 +57,22 @@ export default function SocialPublishHealth({ posts, autoPublishEnabled, content
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState("");
 
-  const ready = useMemo(() => items.filter((post) => post.status === "Planlandı" && post.approvalStatus === "Onaylandı" && !post.lastPublishError), [items]);
+  // Operasyonel sağlık sayaçları yalnız gerçekten yayınlanabilir Meta hedeflerini kapsar.
+  // Destan Instagram ayrı HARD BLOCK kartında izlenir; aksi halde bu bekleyen satırlar
+  // "Yayına hazır" ve "Hatalı" sayılarını yapay olarak şişirir.
+  const activeItems = useMemo(() => items.filter((post) => !isMetaTargetHardBlocked(post.villa, post.platform)), [items]);
+  const ready = useMemo(() => activeItems.filter((post) => post.status === "Planlandı" && post.approvalStatus === "Onaylandı" && !post.lastPublishError), [activeItems]);
   const readyQueue = useMemo(() => [...ready]
     .sort((a, b) => a.scheduledDate.localeCompare(b.scheduledDate) || (a.approvedAt ?? a.createdAt ?? "").localeCompare(b.approvedAt ?? b.createdAt ?? ""))
     .slice(0, 12), [ready]);
   const today = todayIstanbul();
   const dueReady = ready.filter((post) => post.scheduledDate <= today);
-  const failed = items.filter((post) => post.status === "Planlandı" && Boolean(post.lastPublishError));
-  const todayScheduled = items.filter((post) => post.status === "Planlandı" && post.scheduledDate === today);
-  const todayPublished = items.filter((post) => post.status === "Yayınlandı" && (post.publishedAt ?? "").slice(0, 10) === today);
-  const destanIgWaiting = items.filter((post) => post.villa === "Destan" && post.platform === "Instagram" && post.status === "Planlandı");
-  const attempted = items.filter((post) => (post.publishAttemptCount ?? 0) > 0);
-  const publishedTracked = items.filter((post) => post.status === "Yayınlandı" && Boolean(post.platformPostId));
+  const failed = activeItems.filter((post) => post.status === "Planlandı" && Boolean(post.lastPublishError));
+  const todayScheduled = activeItems.filter((post) => post.status === "Planlandı" && post.scheduledDate === today);
+  const todayPublished = activeItems.filter((post) => post.status === "Yayınlandı" && (post.publishedAt ?? "").slice(0, 10) === today);
+  const destanIgWaiting = items.filter((post) => isMetaTargetHardBlocked(post.villa, post.platform) && post.status === "Planlandı");
+  const attempted = activeItems.filter((post) => (post.publishAttemptCount ?? 0) > 0);
+  const publishedTracked = activeItems.filter((post) => post.status === "Yayınlandı" && Boolean(post.platformPostId));
   const recent = [...attempted]
     .sort((a, b) => (b.lastPublishAttemptAt ?? "").localeCompare(a.lastPublishAttemptAt ?? ""))
     .slice(0, 6);
@@ -141,7 +146,7 @@ export default function SocialPublishHealth({ posts, autoPublishEnabled, content
           <div style={{padding:"8px 10px",border:"1px solid #223a57",borderRadius:9,background:"#0b1728"}}>Zamanlandı<br /><b style={{fontSize:15}}>{todayScheduled.length}</b></div>
           <div style={{padding:"8px 10px",border:"1px solid #1f5f3b",borderRadius:9,background:"#071b16",color:"#86efac"}}>Yayınlandı<br /><b style={{fontSize:15}}>{todayPublished.length}</b></div>
           <div style={{padding:"8px 10px",border:"1px solid #451a1a",borderRadius:9,background:"#2a0a0a",color:"#fca5a5"}}>Hatalı<br /><b style={{fontSize:15}}>{failed.length}</b></div>
-          <div style={{padding:"8px 10px",border:"1px solid #a16207",borderRadius:9,background:"#241a06",color:"#fbbf24"}}>Bağlantı bekliyor (Destan IG)<br /><b style={{fontSize:15}}>{destanIgWaiting.length}</b></div>
+          <div style={{padding:"8px 10px",border:"1px solid #a16207",borderRadius:9,background:"#241a06",color:"#fbbf24"}}>HARD BLOCK (Destan IG)<br /><b style={{fontSize:15}}>{destanIgWaiting.length}</b></div>
           <div style={{padding:"8px 10px",border:"1px solid #47617f",borderRadius:9,background:"#102238",color:"#dbeafe"}}>İnceleme gerekiyor<br /><b style={{fontSize:15}}>{contentLibrarySummary.reviewRequired}</b></div>
           <div style={{padding:"8px 10px",border:"1px solid #451a1a",borderRadius:9,background:"#1a0a0a",color:"#f87171"}}>Bloklandı<br /><b style={{fontSize:15}}>{contentLibrarySummary.blocked}</b></div>
         </div>
@@ -149,7 +154,7 @@ export default function SocialPublishHealth({ posts, autoPublishEnabled, content
 
       {destanIgWaiting.length > 0 ? (
         <div style={{marginTop:10,padding:"10px 12px",border:"1px solid #a16207",borderRadius:11,background:"#241a06",color:"#fbbf24",fontSize:10,fontWeight:700}}>
-          ⚠ Villa Destan Instagram: Bağlantı/sahiplik çözümü bekleniyor — otomatik yayın kapalı. {destanIgWaiting.length} içerik kuyrukta bekliyor, hiçbiri yayına gönderilmiyor.
+          ⚠ Villa Destan Instagram: Bağlantı/sahiplik çözümü bekleniyor — otomatik yayın kapalı. {destanIgWaiting.length} içerik HARD BLOCK altında bekliyor; yayına hazır/hatalı sayaçlarına dahil edilmiyor ve hiçbiri yayına gönderilmiyor.
         </div>
       ) : null}
 
