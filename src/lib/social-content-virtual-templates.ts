@@ -19,6 +19,7 @@ import type { Villa } from "@/lib/types";
 
 const VILLA_NAMES: Villa[] = ["Safira", "Destan"];
 const DISCOVERY_THEMES = new Set(["Bölge", "Gezi", "Tarih-Doğa", "Yerel İpucu", "Rota"]);
+const VILLA_CAROUSEL_COUNT = 4;
 
 function villaSlug(villa: Villa): "safira" | "destan" {
   return villa === "Safira" ? "safira" : "destan";
@@ -77,10 +78,16 @@ function baseTemplate(id: string, villa: Villa, theme: string, hook: string, cap
   };
 }
 
-function imageCarouselAssets(villa: Villa, seedKey: string, count = 4): DriveMediaAsset[] {
+// Dört carousel'in her biri aynı villanın fotoğraf havuzunda farklı bir başlangıç noktasına sahip
+// olur. Başlangıçlar havuza eşitçe yayılır; böylece hash çakışması yüzünden aynı 4 fotoğraf seti
+// farklı caption'larla tekrar kullanılamaz. Seçim yine deterministiktir ve yalnız yönetilen gerçek
+// Drive görsellerini kullanır.
+function imageCarouselAssets(villa: Villa, carouselIndex: number, count = 4): DriveMediaAsset[] {
   const pool = socialDriveMedia.filter((asset) => asset.villa === villa && asset.mediaKind === "image");
   if (pool.length < 2) return [];
-  const start = stableSeed(seedKey) % pool.length;
+  const spacing = Math.max(1, Math.floor(pool.length / VILLA_CAROUSEL_COUNT));
+  const base = stableSeed(villa) % pool.length;
+  const start = (base + carouselIndex * spacing) % pool.length;
   const result: DriveMediaAsset[] = [];
   for (let offset = 0; offset < pool.length && result.length < count; offset += 1) {
     const asset = pool[(start + offset) % pool.length];
@@ -92,11 +99,12 @@ function imageCarouselAssets(villa: Villa, seedKey: string, count = 4): DriveMed
 function baseVillaCarousel(
   id: string,
   villa: Villa,
+  carouselIndex: number,
   hook: string,
   caption: string,
   ctaStyle: "soru" | "kaydet" | "paylas" | "profil-incele",
 ): SocialContentTemplate | null {
-  const assets = imageCarouselAssets(villa, id, 4);
+  const assets = imageCarouselAssets(villa, carouselIndex, 4);
   if (assets.length < 2) return null;
   const seed = stableSeed(id);
   const mediaUrls = assets.map((asset) => asset.proxyPath);
@@ -177,9 +185,10 @@ function villaCarouselTemplates(villa: Villa): SocialContentTemplate[] {
   ];
 
   return definitions
-    .map((definition) => baseVillaCarousel(
+    .map((definition, carouselIndex) => baseVillaCarousel(
       `villa-carousel-${villaSlug(villa)}-${definition.key}`,
       villa,
+      carouselIndex,
       definition.hook,
       definition.caption,
       definition.cta,
