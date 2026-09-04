@@ -1,8 +1,20 @@
 import { z } from "zod";
-import { getPayment, claimPaymentForCheckout, markPaymentFailedIfPending, maybeExpirePayment } from "@/lib/payments/db";
+import {
+  getPayment,
+  claimPaymentForCheckout,
+  markPaymentCancelled,
+  markPaymentFailedIfPending,
+  maybeExpirePayment,
+} from "@/lib/payments/db";
 import { hasPaymentTimeConflict } from "@/lib/payments/availability";
+import {
+  extendLivePaymentHold,
+  hasValidLivePaymentHold,
+  releaseLivePaymentHold,
+} from "@/lib/payments/live-booking";
 import { requestPaytrToken } from "@/lib/payments/paytr/token";
 import { logPaymentAudit } from "@/lib/payments/audit";
+import { EXPIRY_GRACE_MINUTES } from "@/lib/payments/types";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +49,10 @@ export async function POST(request: Request) {
   }
   payment = await maybeExpirePayment(payment);
 
+  if (!payment.testMode && (payment.status === "failed" || payment.status === "cancelled")) {
+    await releaseLivePaymentHold(payment.id);
+  }
+
   if (payment.status !== "created") {
     const message = payment.status === "paid"
       ? "Bu ödeme zaten tamamlandı."
@@ -46,18 +62,27 @@ export async function POST(request: Request) {
     return Response.json({ ok: false, error: message }, { status: 409 });
   }
 
+  // Gerçek public self-service ödeme, token istenmeden önce kendi D1 tarih hold'unu kanıtlamak
+  // zorunda. Hold yoksa/sona ermişse PayTR'a hiçbir canlı tahsilat isteği gönderilmez.
+  if (!payment.testMode && !(await hasValidLivePaymentHold(payment))) {
+    return Response.json({
+      ok: false,
+      error: "Ödeme için ayrılan süre sona erdi veya tarihler artık kullanılamıyor. Lütfen tarihleri yeniden seçin.",
+    }, { status: 409 });
+  }
+
   // Kaynak-doğruluk YALNIZ D1'deki payments.test_mode - istemciden gelen hiçbir alan (query/body)
-  // bu kontrolü etkilemez. PAYTR_TEST_MODE=false olduğunda GERÇEK ödemeler için bu guard'ın hiçbir
-  // dalı atlanmaz - bypass yalnız test_mode=1 kaydına bağlıdır, global bir env/flag değil.
+  // bu kontrolü etkilemez. Gerçek ödemeler için aşağıdaki conflict guard'ın hiçbir dalı atlanmaz;
+  // bypass yalnız test_mode=1 kaydına bağlıdır.
   const conflict = await hasPaymentTimeConflict(payment.villa, payment.checkIn, payment.checkOut, payment.reservationId);
   if (conflict) {
     if (!payment.testMode) {
+      await releaseLivePaymentHold(payment.id);
       await logPaymentAudit("PAYMENT_CONFLICT_BLOCKED", { paymentId, reservationId: payment.reservationId, villa: payment.villa });
-      return Response.json({ ok: false, error: "Bu tarihler için müsaitlik durumu değişti. Lütfen bizimle iletişime geçin." }, { status: 409 });
+      return Response.json({ ok: false, error: "Bu tarihler için müsaitlik durumu değişti. Lütfen başka tarih seçin." }, { status: 409 });
     }
     // Yalnız test payment - PayTR sağlayıcı bağlantısını uçtan uca test edebilmek için müsaitlik
-    // çakışması testi engellemez. Gerçek finansı hiçbir zaman etkilemez (testMode=true zaten
-    // markPaymentPaidIfPending'de reservations.paid_amount güncellemesini atlıyor).
+    // çakışması testi engellemez. Gerçek finansı hiçbir zaman etkilemez.
     await logPaymentAudit("PAYMENT_TEST_CONFLICT_BYPASSED", { paymentId, reservationId: payment.reservationId, villa: payment.villa });
   }
 
@@ -76,6 +101,18 @@ export async function POST(request: Request) {
   const claimed = await claimPaymentForCheckout(paymentId, provisionalExpiresAt);
   if (!claimed) {
     return Response.json({ ok: false, error: "Bu ödeme için bir işlem zaten sürüyor. Sayfayı yenileyip tekrar deneyin." }, { status: 409 });
+  }
+
+  if (!payment.testMode) {
+    const holdExpiresAt = new Date(
+      Date.parse(provisionalExpiresAt) + EXPIRY_GRACE_MINUTES * 60 * 1000,
+    ).toISOString();
+    const extended = await extendLivePaymentHold(paymentId, holdExpiresAt);
+    if (!extended) {
+      await markPaymentCancelled(paymentId);
+      await releaseLivePaymentHold(paymentId);
+      return Response.json({ ok: false, error: "Ödeme için tarih kilidi korunamadı. Lütfen tekrar deneyin." }, { status: 409 });
+    }
   }
 
   const result = await requestPaytrToken({
@@ -97,9 +134,9 @@ export async function POST(request: Request) {
 
   if (!result.ok || !result.iframeUrl) {
     // Claim'i geri al - CAS (yalnız hâlâ pending ise), çünkü bu sırada bir callback aynı payment'ı
-    // paid/failed yapmış olabilir (mümkün değil normalde, token hiç üretilmediği için, ama savunma).
-    // last_error'a PayTR'ın ham "reason"ı yazılır (admin/D1-only) - müşteriye dönen `error` jenerik kalır.
+    // paid/failed yapmış olabilir. Canlı public ödeme ise tarih hold'u da bırakılır.
     await markPaymentFailedIfPending(paymentId, result.providerReason ?? result.error ?? "Token alınamadı.");
+    if (!payment.testMode) await releaseLivePaymentHold(paymentId);
     await logPaymentAudit("PAYMENT_TOKEN_FAILED", { paymentId, reservationId: payment.reservationId, villa: payment.villa });
     return Response.json({ ok: false, error: result.error ?? "Ödeme oturumu başlatılamadı." }, { status: 502 });
   }
