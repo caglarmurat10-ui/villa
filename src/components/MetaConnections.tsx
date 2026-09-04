@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { MetaSocialAccount } from "@/lib/meta-store";
+import { DESTAN_INSTAGRAM_HARD_BLOCK, isMetaTargetHardBlocked } from "@/lib/social-account-policy";
 import type { Villa } from "@/lib/types";
 
 const villas: Villa[] = ["Destan", "Safira"];
@@ -84,10 +85,18 @@ export default function MetaConnections({ initialAccounts }: { initialAccounts: 
   }
 
   return <section className="meta-connect-box">
-    <div className="meta-connect-head"><div><span className="eyebrow">META BAĞLANTILARI</span><h2>Instagram ve Facebook hesaplarını Villa Yönetim'e bağla</h2><p>Instagram hesapları villa bazında ayrı tutulur. Facebook ise Safira ve Destan için tek ortak Meta OAuth oturumuyla bağlanır; iki Sayfa aynı ekranda açıkça eşleştirilir ve iki güncel Page tokenı birlikte private KV'ye yazılır. Otomatik isim eşleştirmesi yapılmaz.</p></div></div>
+    <div className="meta-connect-head"><div><span className="eyebrow">META BAĞLANTILARI</span><h2>Instagram ve Facebook hesaplarını Villa Yönetim'e bağla</h2><p>Safira Instagram ayrı tutulur. Facebook ise Safira ve Destan için tek ortak Meta OAuth oturumuyla bağlanır; iki Sayfa aynı ekranda açıkça eşleştirilir ve iki güncel Page tokenı birlikte private KV'ye yazılır. Otomatik isim eşleştirmesi yapılmaz.</p></div></div>
     {notice ? <p className="message">{notice}</p> : null}
     <div className="meta-account-grid">{villas.flatMap((villa) => platforms.map((platform) => {
       const account = accounts.find((item) => item.villa === villa && item.platform === platform);
+      if (isMetaTargetHardBlocked(villa, platform)) {
+        return <article key={`${villa}-${platform}`}>
+          <div><strong>Villa {villa}</strong><span>{platform}</span></div>
+          <p><strong>HARD BLOCK · bağlantı ve yayın kapalı</strong></p>
+          <p>{DESTAN_INSTAGRAM_HARD_BLOCK.reason}</p>
+        </article>;
+      }
+
       const connectHref = platform === "Instagram"
         ? `/api/meta/instagram/connect?villa=${villa}`
         : "/api/meta/facebook/connect?villa=Safira";
