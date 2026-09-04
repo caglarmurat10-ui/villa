@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: villa-cloudflare-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -76,3 +80,31 @@ jobs:
             /robots.txt; do
             curl --fail --silent --show-error --retry 5 --retry-delay 3 --output /dev/null "$BASE$path"
           done
+
+      - name: Verify deployed public content
+        if: steps.credentials.outputs.ready == 'yes'
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="https://safiradestan.com"
+          BUST="deploy=${GITHUB_SHA}"
+
+          version_json="$(curl --fail --silent --show-error --retry 5 --retry-delay 3 "$BASE/api/system/version?$BUST")"
+          echo "Production Worker: $version_json"
+
+          home_html="$(curl --fail --silent --show-error --retry 5 --retry-delay 3 -H 'Cache-Control: no-cache' "$BASE/?$BUST")"
+          safira_html="$(curl --fail --silent --show-error --retry 5 --retry-delay 3 -H 'Cache-Control: no-cache' "$BASE/villa-safira?$BUST")"
+          destan_html="$(curl --fail --silent --show-error --retry 5 --retry-delay 3 -H 'Cache-Control: no-cache' "$BASE/villa-destan?$BUST")"
+
+          grep -Fq "Patara Kaş'ta Villa Safira ve Villa Destan. Gerçek fotoğrafları inceleyin" <<<"$home_html"
+          grep -Fq "Villa Safira Resmi Site | Patara Kaş 5 Kişilik Villa" <<<"$safira_html"
+          grep -Fq "Villa Safira resmi sitesi. Patara Kaş'ta 5 kişilik, 2 yatak odalı özel havuzlu villa." <<<"$safira_html"
+          grep -Fq "Villa Destan Resmi Site | Patara Kaş 6 Kişilik Villa" <<<"$destan_html"
+          grep -Fq "Villa Destan resmi sitesi. Patara Kaş'ta 6 kişilik, 3 yatak odalı özel havuzlu villa." <<<"$destan_html"
+
+          if grep -Fq '"@type":"Organization"' <<<"$home_html"; then
+            echo "Unexpected standalone Organization schema remains on homepage."
+            exit 1
+          fi
+
+          echo "Production content verification passed."
