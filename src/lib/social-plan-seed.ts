@@ -4,6 +4,7 @@ import { socialContentTemplates, type SocialContentTemplate } from "./social-con
 import { seedSocialPosts } from "./social-db";
 import { approvedProxyMediaAsset } from "./social-drive-media";
 import { listSocialPostMedia, replaceSocialPostMedia } from "./social-media-store";
+import { occupiesRollingFutureSlot } from "./social-plan-occupancy";
 import { planRolling30Days, type ExistingPost, type PlannedSlot } from "./social-content-planner";
 import type { RecentPost } from "./social-duplicate-guard";
 import { buildVirtualTemplates } from "./social-content-virtual-templates";
@@ -134,13 +135,11 @@ export async function ensureDefaultSocialPlan() {
 // KENDİ scheduledDate'ini olduğu gibi seed eder; bu fonksiyon ise şablonları YENİDEN TARİHLEYEREK
 // bir rotasyon havuzu gibi kullanır - takvim asla boş kalmasın diye.
 //
-// GÜVENLİK: planRolling30Days'in AUTO_SAFE dediği adaylar dahi seedSocialPosts() üzerinden
-// approval_status='İnsan onayı' ile eklenir - TÜM diğer oluşturma yollarıyla (admin formu,
-// ensureDefaultSocialPlan) BİREBİR aynı davranış. AUTO_SAFE/REVIEW_REQUIRED/BLOCKED yalnız
-// "bu içerik takvime otomatik ÖNERİLSİN mi" sorusuna cevap verir - "cron'un onaysız yayınlayıp
-// yayınlamayacağı" sorusuna DEĞİL (o soru zaten ayrı, değişmemiş bir kapı: duePosts()
-// approval_status='Onaylandı' şartı + Destan/Instagram HARD BLOCK). REVIEW_REQUIRED/BLOCKED
-// adaylar HİÇBİR ZAMAN seedSocialPosts()'a gönderilmez, yalnız raporlanır.
+// GÜVENLİK: planRolling30Days yalnız AUTO_SAFE adayları `planned` dizisine alır; bu kayıtlar
+// seedSocialPosts(..., { autoApproveNewRows: true }) üzerinden approval_status='Onaylandı' olarak
+// yazılır. REVIEW_REQUIRED/BLOCKED adaylar HİÇBİR ZAMAN seedSocialPosts()'a gönderilmez, yalnız
+// raporlanır. Cron tarafında duePosts() approval_status='Onaylandı' şartı ve Destan/Instagram
+// HARD BLOCK ayrıca bağımsız yayın güvenlik kapıları olarak kalır.
 const ROLLING_HORIZON_DAYS = 30;
 const ROLLING_LOOKBACK_DAYS = 60;
 
@@ -157,15 +156,21 @@ export async function ensureRolling30DayPlan(dailyTarget = 1) {
   const lookbackStart = new Date(Date.parse(`${today}T00:00:00Z`) - ROLLING_LOOKBACK_DAYS * 86_400_000).toISOString().slice(0, 10);
   const horizonEnd = new Date(Date.parse(`${today}T00:00:00Z`) + ROLLING_HORIZON_DAYS * 86_400_000).toISOString().slice(0, 10);
 
-  // status IN ('Planlandı','Yayınlandı') - Faz 5 son denetim düzeltmesi: daha önce YAYINLANMIŞ
-  // içerikler de 60 günlük duplicate lookback'e dahil olmalı, yalnız hâlâ 'Planlandı' olanlar değil
-  // (aksi halde aynı caption/medya, yayınlandıktan hemen sonra "tekrar değil" sayılıp yeniden
-  // önerilebilirdi). Gelecek pencerede (scheduled_date >= today) pratikte yalnız 'Planlandı' satır
-  // olur - 'Yayınlandı' bir satırın scheduled_date'i tanım gereği geçmişte kalır.
+  // Geçmiş 60 günlük duplicate history için Planlandı + Yayınlandı satırları korunur. Gelecek
+  // slot işgalinde ise yalnız gerçekten yayınlanmış veya otomatik yayına uygun şekilde Onaylandı
+  // olan Planlandı satırlar sayılır. Böylece quarantined legacy `Planlandı + İnsan onayı` kayıtları
+  // otomatik rolling planın gelecekteki bir gününü yanlışlıkla dolu göstermez.
   const rows = await env.DB.prepare(
-    `SELECT villa, scheduled_date, caption, media_url FROM social_posts
+    `SELECT villa, scheduled_date, caption, media_url, status, approval_status FROM social_posts
      WHERE status IN ('Planlandı', 'Yayınlandı') AND scheduled_date >= ? AND scheduled_date < ?`,
-  ).bind(lookbackStart, horizonEnd).all<{ villa: "Safira" | "Destan"; scheduled_date: string; caption: string; media_url: string | null }>();
+  ).bind(lookbackStart, horizonEnd).all<{
+    villa: "Safira" | "Destan";
+    scheduled_date: string;
+    caption: string;
+    media_url: string | null;
+    status: string;
+    approval_status: string | null;
+  }>();
 
   // Havuz: gerçek 60 statik şablon (fotoğraflı) + region-guide.ts'ten türetilen "sanal" şablonlar
   // (Destination/Activity/Travel Tip - Social Design Engine ile gerçek zamanlı render edilir).
@@ -178,7 +183,9 @@ export async function ensureRolling30DayPlan(dailyTarget = 1) {
   const recentPosts: RecentPost[] = [];
   for (const row of rows.results) {
     if (row.scheduled_date >= today) {
-      existingScheduled.push({ scheduledDate: row.scheduled_date, villa: row.villa, theme: themeOf(row.caption) });
+      if (occupiesRollingFutureSlot({ status: row.status, approvalStatus: row.approval_status })) {
+        existingScheduled.push({ scheduledDate: row.scheduled_date, villa: row.villa, theme: themeOf(row.caption) });
+      }
     } else {
       recentPosts.push({ villa: row.villa, caption: row.caption, mediaFile: row.media_url ?? "", scheduledDate: row.scheduled_date });
     }
