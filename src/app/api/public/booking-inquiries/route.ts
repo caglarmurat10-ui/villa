@@ -8,6 +8,7 @@ import {
 import { createPayment, getActivePaymentForReservation } from "@/lib/payments/db";
 import { upsertBookingGuestDetails } from "@/lib/booking-guest-details";
 import { isPaytrConfigured } from "@/lib/payments/paytr/config";
+import { createLivePaymentForInquiry } from "@/lib/payments/live-booking";
 import { FULL_PAYMENT_MAX_INSTALLMENT, PAYTR_TEST_MODE } from "@/lib/payments/types";
 import { clientIpFromHeaders, isRateLimited, recordRateLimitHit } from "@/lib/rate-limit";
 
@@ -88,30 +89,41 @@ export async function POST(request: NextRequest) {
     let paymentMessage = "";
     const paytrConfigured = await isPaytrConfigured();
 
-    // Bu public self-service ödeme adımı bilinçli olarak yalnız TEST MODUNDA çalışır.
-    // PAYTR_TEST_MODE=false olduğunda bu endpoint ödeme kaydı/iframe üretmez; gerçek canlı tahsilat
-    // için ayrıca açık kullanıcı onayı + merchant doğrulaması + ayrı deploy gerekir.
-    if (result.inquiry.quotedTotal !== null && paytrConfigured && PAYTR_TEST_MODE) {
-      let payment = await getActivePaymentForReservation(result.inquiry.id);
+    if (result.inquiry.quotedTotal !== null && paytrConfigured) {
+      const totalMinor = Math.round(result.inquiry.quotedTotal * 100);
 
-      if (!payment) {
-        const totalMinor = Math.round(result.inquiry.quotedTotal * 100);
-        payment = await createPayment({
-          reservationId: result.inquiry.id,
-          paymentType: "full_payment",
-          reservationTotalMinor: totalMinor,
-          requestedAmountMinor: totalMinor,
-          noInstallment: false,
-          maxInstallment: FULL_PAYMENT_MAX_INSTALLMENT,
-          testMode: true,
-        });
+      if (PAYTR_TEST_MODE) {
+        // Test yolu geriye dönük olarak korunur; canlı yol aşağıdaki D1 hold servisini kullanır.
+        let payment = await getActivePaymentForReservation(result.inquiry.id);
+
+        if (!payment) {
+          payment = await createPayment({
+            reservationId: result.inquiry.id,
+            paymentType: "full_payment",
+            reservationTotalMinor: totalMinor,
+            requestedAmountMinor: totalMinor,
+            noInstallment: false,
+            maxInstallment: FULL_PAYMENT_MAX_INSTALLMENT,
+            testMode: true,
+          });
+        }
+
+        paymentId = payment?.status === "created" ? payment.id : null;
+        if (payment?.status === "pending") paymentMessage = "Bu rezervasyon için test kart ödeme işlemi zaten sürüyor.";
+      } else {
+        // CANLI self-service: gerçek payment kaydı yalnız aynı transaction içinde tarih hold'u
+        // başarıyla alınabilirse doğar. Başka reservation/OTA/aktif ödeme hold'u varsa para çekimine
+        // hiç geçilmez.
+        const live = await createLivePaymentForInquiry(result.inquiry.id, totalMinor);
+        if (live.ok) {
+          paymentId = live.status === "created" ? live.paymentId : null;
+          if (live.status === "pending") {
+            paymentMessage = "Bu rezervasyon için güvenli kart ödeme işlemi zaten sürüyor.";
+          }
+        } else {
+          paymentMessage = live.message;
+        }
       }
-
-      // Pending ödeme zaten PayTR'da sürüyor; aynı payment için ikinci iframe başlatmayız.
-      paymentId = payment?.status === "created" ? payment.id : null;
-      if (payment?.status === "pending") paymentMessage = "Bu rezervasyon için test kart ödeme işlemi zaten sürüyor.";
-    } else if (!PAYTR_TEST_MODE) {
-      paymentMessage = "Rezervasyon bilgileriniz alındı. Canlı kart ödeme adımı henüz etkinleştirilmedi.";
     }
 
     const defaultMessage = result.duplicate
