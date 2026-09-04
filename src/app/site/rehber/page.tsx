@@ -64,6 +64,10 @@ export default function RegionGuidePage() {
       </section>
 
       <section className={styles.policyBody}>
+        <h2>Patara ve Kaş çevresini planlamak</h2>
+        <p>Bu rehber, Villa Safira ve Villa Destan'da konaklarken çevrede görmek isteyebileceğiniz yerleri tek noktada toplar. Patara Antik Kenti ve Patara Plajı gibi birbirine bağlı durakların yanında Kaş, Kalkan, Kaputaş Plajı, Xanthos ve Saklıkent Kanyonu gibi farklı gezi seçeneklerini de inceleyebilirsiniz. Amacımız değişebilen saat, ücret ve yol süresi bilgilerini sabitlemek yerine, bölgenin kalıcı özelliklerini ve hangi durakların birbiriyle anlamlı bir rota oluşturduğunu anlatmaktır.</p>
+        <p>Ziyaret gününde çalışma saatleri, giriş kuralları, koruma uygulamaları ve yol koşulları değişebileceği için ayrıntıları resmi kaynaklardan ve güncel harita verilerinden kontrol etmenizi öneririz. Aşağıdaki detaylı rehberler Patara, plaj, antik kent, Kaş ve Kalkan için ayrı ayrı hazırlanmıştır; her sayfadan diğer rehberlere ve villa sayfalarına geçerek tatil planınızı kendi temponuza göre oluşturabilirsiniz.</p>
+
         <h2>Detaylı rehberler</h2>
         <ul>
           {REGION_GUIDE_PAGE_SLUGS.map((slug) => (
