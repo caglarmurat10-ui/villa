@@ -1,0 +1,69 @@
+name: Mobile iOS Unsigned IPA
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/cloudflare-migration
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-ios-unsigned-ipa.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  build-ios-unsigned:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install mobile dependencies
+        run: npm ci
+
+      - name: TypeScript and Vite build
+        run: npm run build
+
+      - name: Sync Capacitor iOS
+        run: npx cap sync ios
+
+      - name: Build unsigned iPhone Release app
+        run: |
+          xcodebuild \
+            -project ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ios/device-build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
+
+      - name: Package unsigned IPA
+        run: |
+          rm -rf ios/ipa-stage
+          mkdir -p ios/ipa-stage/Payload
+          cp -R ios/device-build/Build/Products/Release-iphoneos/App.app ios/ipa-stage/Payload/
+          cd ios/ipa-stage
+          zip -qry ../Villa-Yonetim-iOS-unsigned.ipa Payload
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: Villa-Yonetim-iOS-unsigned
+          path: mobile/ios/Villa-Yonetim-iOS-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 3
