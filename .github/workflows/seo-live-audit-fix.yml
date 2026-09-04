@@ -1,0 +1,77 @@
+name: Temporary SEO Live Audit Fix
+
+on:
+  push:
+    branches:
+      - agent/cloudflare-migration
+    paths:
+      - ".github/workflows/seo-live-audit-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/cloudflare-migration
+          fetch-depth: 0
+
+      - name: Patch live SEO audit findings
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path("src/app/site/page.tsx")
+          s = p.read_text(encoding="utf-8")
+
+          old_desc = '  description: "Patara, Kaş\'ta Villa Safira ve Villa Destan. Özel havuzlu villa tatili için gerçek fotoğrafları inceleyin, canlı müsaitlik ve fiyat kontrolü yapın, doğrudan rezervasyon talebi gönderin.",'
+          new_desc = '  description: "Patara Kaş\'ta Villa Safira ve Villa Destan. Gerçek fotoğrafları inceleyin, canlı müsaitlik ve dönemsel fiyatı kontrol edip doğrudan talep gönderin.",'
+          if old_desc not in s:
+              raise SystemExit("homepage meta description target not found")
+          s = s.replace(old_desc, new_desc, 1)
+
+          old_graph = '''    {
+              "@type": "WebSite",
+              "@id": `${ORIGIN}/#website`,
+              url: ORIGIN,
+              name: "Safira & Destan Villas",
+              inLanguage: "tr-TR",
+            },
+            {
+              "@type": "Organization",
+              "@id": `${ORIGIN}/#organization`,
+              name: "Safira & Destan Villas",
+              url: ORIGIN,
+              sameAs: SOCIAL_LINKS,
+            },'''
+          new_graph = '''    {
+              "@type": "WebSite",
+              "@id": `${ORIGIN}/#website`,
+              url: ORIGIN,
+              name: "Safira & Destan Villas",
+              inLanguage: "tr-TR",
+              sameAs: SOCIAL_LINKS,
+            },'''
+          if old_graph not in s:
+              raise SystemExit("Organization schema target not found")
+          s = s.replace(old_graph, new_graph, 1)
+
+          p.write_text(s, encoding="utf-8")
+          PY
+
+      - name: Commit patch
+        shell: bash
+        run: |
+          if git diff --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "caglarmurat10-ui"
+          git config user.email "caglarmurat10@gmail.com"
+          git add src/app/site/page.tsx
+          git commit -m "Fix live SEO audit findings"
+          git push origin HEAD:agent/cloudflare-migration
