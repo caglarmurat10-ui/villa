@@ -1,0 +1,79 @@
+name: Temporary Legal Pages Consent Rollout 2
+
+on:
+  push:
+    branches:
+      - agent/cloudflare-migration
+    paths:
+      - ".github/workflows/legal-pages-consent-rollout-temporary-2.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  rollout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: agent/cloudflare-migration
+
+      - name: Apply corrected rollout script
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          workflow = Path(".github/workflows/legal-pages-consent-rollout-temporary.yml").read_text(encoding="utf-8")
+          start = workflow.index("          python <<'PY'\n") + len("          python <<'PY'\n")
+          end = workflow.index("          PY\n", start)
+          lines = workflow[start:end].splitlines()
+          script = "\n".join(line[10:] if line.startswith("          ") else line for line in lines)
+
+          block_start = script.index('replace_once("src/app/site/page.tsx",')
+          block_end = script.index('replace_once("src/middleware.ts",', block_start)
+          corrected = '''for old_href, new_href in {
+              "/rezervasyon-kosullari#hakkimizda": "/hakkimizda",
+              "/rezervasyon-kosullari#teslimat-iade": "/teslimat-iade",
+              "/rezervasyon-kosullari#gizlilik": "/gizlilik",
+              "/rezervasyon-kosullari#kvkk": "/kvkk",
+              "/rezervasyon-kosullari#mesafeli-hizmet-sozlesmesi": "/mesafeli-hizmet-sozlesmesi",
+              "/rezervasyon-kosullari#on-bilgilendirme": "/on-bilgilendirme",
+              "/rezervasyon-kosullari#odeme-guvenligi": "/odeme-guvenligi",
+          }.items():
+              replace_once("src/app/site/page.tsx", f'href="{old_href}"', f'href="{new_href}"')
+
+          '''
+          script = script[:block_start] + corrected + script[block_end:]
+          exec(compile(script, "legal-rollout", "exec"))
+          PY
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit validated legal and consent changes
+        run: |
+          git config user.name "caglarmurat10-ui"
+          git config user.email "caglarmurat10@gmail.com"
+          git add src custom-worker.mjs
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No source changes to commit"
+          else
+            git commit -m "Add standalone legal pages and enforce checkout consent"
+            git push origin HEAD:agent/cloudflare-migration
+          fi
