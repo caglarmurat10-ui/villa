@@ -8,30 +8,31 @@ export type CtaStyle = "soru" | "kaydet" | "paylas" | "dm" | "profil-incele";
 
 export const ctaTemplates: Record<CtaStyle, string[]> = {
   soru: [
-    "Siz olsanız hangisini seçerdiniz?",
-    "Bu manzarayı gördünüz mü hiç?",
+    "Siz olsanız hangisini seçerdiniz? Yorumlara yazın.",
+    "Bu manzarayı gördünüz mü? Yorumlarda favori Patara–Kaş noktanızı paylaşın.",
   ],
   kaydet: [
-    "Bu fikri kaydedin; konaklama için güncel müsaitliği sorun.",
-    "Patara–Kaş tatil planınız için gönderiyi kaydedin.",
+    "Patara–Kaş tatil planınız için bu gönderiyi kaydedin.",
+    "Bu rehberi kaydedin; bölge planınızı yaparken sonra tekrar açın.",
   ],
   paylas: [
-    "Tatil planınızdaki birine gösterin.",
-    "Birlikte tatile çıkacağınız birine paylaşın.",
+    "Birlikte tatile çıkacağınız kişiye gönderin.",
+    "Patara planı yapan bir arkadaşınızla paylaşın.",
   ],
   dm: [
     "Tarihlerinizi gönderin; güncel müsaitliği kontrol edelim.",
     "Detay ve güncel müsaitlik için DM veya WhatsApp'tan yazın.",
   ],
   "profil-incele": [
-    "Villanın diğer gerçek fotoğrafları için profili inceleyin.",
-    "Villanın diğer detayları için profili inceleyin.",
+    "Patara, Kaş ve villa rehberlerinin devamı için profili takip edin.",
+    "Villaların gerçek fotoğrafları ve bölge rehberleri için profili inceleyin.",
   ],
 };
 
-// Rotasyon sırası - aynı stil art arda kullanılmasın diye basit round-robin. Her post CTA ile
-// boğulmasın diye bilerek TEK cümlelik, mevcut caption yapısının sonuna eklenen bir satır.
-const ROTATION_ORDER: CtaStyle[] = ["dm", "kaydet", "profil-incele", "soru", "paylas"];
+// Varsayılan organik rotasyonun hedefi satış baskısı değil; kaydetme, paylaşma, yorum ve profil/
+// takip sinyallerini düzenli biçimde çeşitlendirmek. `dm` stili bilinçli olarak burada YOK; dönüşüm
+// odaklı bir içerikte explicit olarak pickCtaLine("dm", ...) ile hâlâ kullanılabilir.
+const ROTATION_ORDER: CtaStyle[] = ["kaydet", "paylas", "soru", "profil-incele"];
 
 export function ctaStyleForIndex(index: number): CtaStyle {
   return ROTATION_ORDER[index % ROTATION_ORDER.length];
