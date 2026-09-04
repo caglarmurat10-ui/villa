@@ -13,6 +13,7 @@ export interface RegionGuidePageFaq {
 export interface RegionGuidePage {
   slug: RegionGuidePageSlug;
   title: string;
+  seoTitle: string;
   metaDescription: string;
   kicker: string;
   intro: string;
@@ -25,6 +26,7 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
   patara: {
     slug: "patara",
     title: "Patara Rehberi — Antik Kent, Plaj ve Doğa",
+    seoTitle: "Patara Rehberi: Antik Kent ve Plaj | Safira & Destan",
     metaDescription: "Patara'da görülecek yerler: Patara Antik Kenti, Patara Plajı, kum tepeleri ve deniz feneri. Villa Safira ve Villa Destan'a yakın bölge rehberi.",
     kicker: "PATARA REHBERİ",
     intro: "Patara, Likya uygarlığının izlerini taşıyan bir antik kentle Akdeniz'in en uzun kumsallarından birini aynı koyda bir araya getiren nadir bir bölge. Villa Safira ve Villa Destan, bu bölgede, hem tarihe hem denize kolay erişimin mümkün olduğu bir konumda yer alıyor.",
@@ -36,6 +38,14 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
       {
         heading: "Patara Plajı",
         body: "İnce kumlu, uzun bir sahil şeridi olan Patara Plajı, Caretta caretta deniz kaplumbağalarının yuvalama alanlarından biri olduğu için koruma altında. Sahil boyunca uzanan doğal kum tepeleri, rüzgârın şekillendirdiği bir peyzaj oluşturuyor.",
+      },
+      {
+        heading: "Patara'da geziyi birleştirmek",
+        body: "Patara'nın en güçlü yanı, tarih ve doğa duraklarının aynı bölgede birbirini tamamlaması. Antik kenti gezerken Meclis Binası ve deniz feneri gibi yapıları görebilir, ardından Patara Plajı ve kum tepelerini aynı bölge gezisinin devamı olarak değerlendirebilirsiniz. Böylece farklı yerlere yetişmeye çalışmak yerine Patara'nın tarih, sahil ve doğal peyzajını tek bir rota içinde keşfedebilirsiniz.",
+      },
+      {
+        heading: "Ziyaret öncesi planlama",
+        body: "Ören yeri ve koruma altındaki plaj için geçerli kurallar dönemsel olarak değişebileceğinden, ziyaret gününde güncel giriş koşullarını ve uygulamaları kontrol etmek en sağlıklı yaklaşım. Rehberimiz kalıcı bölge bilgisini bir araya getirir; çalışma saati, ücret veya yol süresi gibi değişebilen bilgiler için resmi kaynakları ve güncel harita verisini kullanmanızı öneririz.",
       },
       {
         heading: "Villadan Patara'ya",
@@ -51,6 +61,7 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
   "patara-plaji": {
     slug: "patara-plaji",
     title: "Patara Plajı — Kum Tepeleri ve Koruma Alanı",
+    seoTitle: "Patara Plajı Rehberi | Safira & Destan",
     metaDescription: "Patara Plajı hakkında: uzunluğu, Caretta caretta koruma alanı, doğal kum tepeleri ve girişin Patara Antik Kenti üzerinden yapılması.",
     kicker: "PATARA PLAJI",
     intro: "Patara Plajı, Akdeniz'in en uzun kumsallarından biri olarak bilinir ve aynı zamanda doğa koruma alanı statüsündedir. İnce kumu, geniş sahil şeridi ve arkasındaki doğal kum tepeleriyle bölgenin en belirgin doğal miraslarından biridir.",
@@ -67,6 +78,14 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
         heading: "Girişi ve konumu",
         body: "Patara Plajı'na giriş, Patara Antik Kenti ören yeri üzerinden yapılır — yani plaja gitmeden önce antik kentin bir bölümünden geçilir. Bu da tek bir ziyarette hem tarihi hem doğal güzelliği görme imkânı sunar.",
       },
+      {
+        heading: "Plaj ziyaretini nasıl planlamalı?",
+        body: "Patara Plajı yalnızca denize girilen bir sahil değil, aynı zamanda korunan doğal alanın parçası. Bu nedenle ziyaretinizi planlarken sahadaki güncel yönlendirmelere ve koruma kurallarına uymak önemli. Giriş uygulamaları, erişim koşulları ve dönemsel kurallar değişebileceği için yola çıkmadan önce güncel resmi bilgiyi kontrol etmek, rehberdeki kalıcı bilgilerle en doğru kombinasyonu sağlar.",
+      },
+      {
+        heading: "Antik kent ve plajı aynı rotada görmek",
+        body: "Plaja antik kent üzerinden erişilmesi, Patara'nın iki temel değerini aynı gezi içinde birleştirme fırsatı veriyor. Önce Likya ve Roma döneminden kalan yapıları inceleyip ardından sahil ve kum tepelerine geçebilirsiniz. Bölgenin karakterini anlamak isteyen ziyaretçiler için bu birliktelik, Patara'yı yalnızca bir plaj ya da yalnızca bir ören yeri olmaktan çıkarıyor.",
+      },
     ],
     relatedPlaceIds: ["patara-plaji", "patara-kum-tepeleri", "patara-antik-kenti"],
     faq: [
@@ -77,6 +96,7 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
   "patara-antik-kenti": {
     slug: "patara-antik-kenti",
     title: "Patara Antik Kenti — Likya Birliği'nin Merkezi",
+    seoTitle: "Patara Antik Kenti | Safira & Destan",
     metaDescription: "Patara Antik Kenti: Likya Birliği'nin yönetim merkezi, Bouleuterion (Meclis Binası) ve Roma dönemi deniz feneri hakkında bilgiler.",
     kicker: "PATARA ANTİK KENTİ",
     intro: "Patara Antik Kenti, Likya Birliği'nin yönetim merkezi olarak tarih sahnesinde önemli bir yere sahip. Kalıntıları MÖ 8. yüzyıla kadar uzanan geniş bir ören yeri, bugün hem tarih meraklıları hem de Patara Plajı'na gidenler için bir geçiş noktası.",
@@ -94,8 +114,12 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
         body: "Roma İmparatoru Nero döneminde MS 64/65'te inşa edilen Patara Deniz Feneri, dünyanın ayakta kalan en eski deniz fenerlerinden biri olarak kabul edilir.",
       },
       {
+        heading: "Ören yerini anlamak için rota",
+        body: "Patara'yı gezerken tek tek kalıntılara bakmak yerine kentin yönetim ve denizcilik geçmişini birlikte okumak daha anlamlı bir deneyim sunar. Meclis Binası Likya Birliği'nin siyasal rolünü, deniz feneri ise Patara'nın kıyıyla kurduğu ilişkiyi görünür kılar. Bu iki odak, geniş ören yerinin neden bölgesel ölçekte önemli olduğunu anlamak için iyi bir başlangıç noktasıdır.",
+      },
+      {
         heading: "Plaja komşuluk",
-        body: "Patara Antik Kenti'nin bir diğer özelliği, Patara Plajı'na girişin bu ören yeri üzerinden yapılmasıdır — tarihi ve doğal güzelliği aynı ziyarette birleştirir.",
+        body: "Patara Antik Kenti'nin bir diğer özelliği, Patara Plajı'na girişin bu ören yeri üzerinden yapılmasıdır — tarihi ve doğal güzelliği aynı ziyarette birleştirir. Ziyaret günündeki çalışma saatleri, ücretler ve erişim uygulamaları değişebileceğinden bu ayrıntıları güncel resmi kaynaklardan kontrol etmek en güvenli yöntemdir.",
       },
     ],
     relatedPlaceIds: ["patara-antik-kenti", "patara-meclis-binasi", "patara-deniz-feneri", "patara-plaji"],
@@ -107,6 +131,7 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
   kas: {
     slug: "kas",
     title: "Kaş Gezi Rehberi — Merkez ve Kaputaş Plajı",
+    seoTitle: "Kaş Gezi Rehberi | Safira & Destan",
     metaDescription: "Kaş'ta görülecek yerler: tarihi liman, Likya lahitleri, antik tiyatro ve yakınındaki Kaputaş Plajı. Villa Safira ve Villa Destan'a yakın bölge rehberi.",
     kicker: "KAŞ REHBERİ",
     intro: "Kaş, tarihi limanı ve Likya dönemine ait kalıntılarıyla bilinen bir Akdeniz sahil kasabası. Villa Safira ve Villa Destan'ın bulunduğu Patara/Gelemiş bölgesine yakınlığıyla, tatilinizde gezi rotanıza dahil edebileceğiniz bir durak.",
@@ -118,6 +143,14 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
       {
         heading: "Kaputaş Plajı",
         body: "Kaş ile Kalkan arasında yer alan Kaputaş Plajı, karayolundan merdivenlerle inilen bir kanyon ağzı plajıdır. Turkuaz ve berrak suyuyla bölgenin en bilinen plajlarından biridir.",
+      },
+      {
+        heading: "Kaş'ta geziyi çeşitlendirmek",
+        body: "Kaş merkez ile Kaputaş Plajı farklı deneyimler sunduğu için aynı bölge gezisini şehir dokusu ve sahil durağı olarak iki parçaya ayırabilirsiniz. Merkezde liman, Likya izleri ve antik tiyatro çevresini keşfederken; Kaputaş'ta bölgenin karakteristik kıyı manzarasını görebilirsiniz. Günün akışını sabit süreler yerine kendi temponuza ve güncel ulaşım koşullarına göre kurmak daha esnek olur.",
+      },
+      {
+        heading: "Patara konaklamasından Kaş günü",
+        body: "Villa Safira ve Villa Destan'ın Patara/Gelemiş konumu, tatilinizi yalnızca tek bir noktada geçirmek zorunda bırakmadan çevreyi keşfetmenize imkân verir. Kaş'a ayırdığınız bir günde çıkış saatinizi, yol koşullarını ve ziyaret etmek istediğiniz durakları güncel harita verisine göre planlayabilirsiniz; böylece değişken trafik veya sezon koşullarına ilişkin eski bir süre bilgisine bağlı kalmazsınız.",
       },
       {
         heading: "Villadan Kaş'a",
@@ -133,6 +166,7 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
   kalkan: {
     slug: "kalkan",
     title: "Kalkan Gezi Rehberi — Şık Bir Sahil Kasabası",
+    seoTitle: "Kalkan Gezi Rehberi | Safira & Destan",
     metaDescription: "Kalkan hakkında: eski Rum balıkçı köyü geçmişi, beyaz badanalı evleri ve marinası. Villa Safira ve Villa Destan'a yakın bölge rehberi.",
     kicker: "KALKAN REHBERİ",
     intro: "Kalkan, eski bir Rum balıkçı köyünden gelişerek bugünkü şık sahil kasabası halini almış bir yerleşim. Beyaz badanalı evleri ve marinasıyla, Patara/Gelemiş bölgesinde tatil yapan ziyaretçilerin gezi rotasına dahil edebileceği bir diğer durak.",
@@ -144,6 +178,14 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
       {
         heading: "Marina ve sahil",
         body: "Beyaz badanalı evleri ve marinasıyla Kalkan, bölgenin daha şık ve sakin sahil kasabalarından biri olarak öne çıkar.",
+      },
+      {
+        heading: "Kalkan'da kısa gezi rotası",
+        body: "Kalkan'ı keşfederken kasabanın karakterini oluşturan dar sokaklar, beyaz badanalı yapı dokusu ve marina çevresini aynı yürüyüş rotasının parçaları olarak düşünebilirsiniz. Böyle bir yaklaşım, yalnızca tek bir fotoğraf noktasına gitmek yerine yerleşimin geçmişten bugüne taşıdığı sahil kasabası atmosferini daha bütünlüklü görmenizi sağlar.",
+      },
+      {
+        heading: "Patara tatiliyle Kalkan'ı birleştirmek",
+        body: "Patara/Gelemiş'te konaklarken Kalkan'ı çevre gezilerinden biri olarak planlamak, aynı tatilde farklı sahil yerleşimlerinin karakterini karşılaştırma fırsatı verir. Yol süresi ve trafik gibi bilgiler sezona ve güne göre değişebileceğinden sabit bir süre vermek yerine güncel harita uygulamasını kullanmak daha doğru olur. Böylece Kalkan gezisini kendi programınıza göre esnek biçimde yerleştirebilirsiniz.",
       },
       {
         heading: "Villadan Kalkan'a",
