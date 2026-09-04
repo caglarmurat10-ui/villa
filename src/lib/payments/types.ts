@@ -46,10 +46,10 @@ export interface Payment {
 export const FULL_PAYMENT_MAX_INSTALLMENT = 6;
 export const DEPOSIT_PERCENTAGE = 20; // reservation-policy.ts'teki POLICY_SUMMARY.deposit ("%20") ile senkron olmalı.
 
-// Bilinçli, kod-seviyesi güvenlik kilidi: gerçek PayTR credentials tanımlansa BİLE bu turda hep
-// test_mode=1 gönderilir. Canlıya geçiş yalnızca bu sabiti değiştiren AYRI bir kod değişikliği +
-// deploy + kullanıcının açık onayıyla olur - bir ortam değişkeni yanlışlıkla canlıyı açamaz.
-export const PAYTR_TEST_MODE = true;
+// Canlı tahsilat açık. Public self-service akışında test_mode=0 ödeme ancak D1 tarih hold'u başarıyla
+// oluşturulduktan sonra doğar; checkout hold'u doğrular/uzatır ve başarılı PayTR callback'i aynı
+// transaction içinde gerçek rezervasyona dönüştürür. Merchant credentials yine yalnız secret'tır.
+export const PAYTR_TEST_MODE = false;
 
 // Lazy-expiry için token_expires_at üzerine eklenen tampon süre - PayTR'ın kendi retry davranışı
 // (~1 dakikada bir, doğrulanmış OK gelene kadar) tam sınırda gelen gerçek bir callback'le
