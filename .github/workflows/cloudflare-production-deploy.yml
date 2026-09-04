@@ -53,8 +53,44 @@ jobs:
         run: npm test
 
       - name: Deploy to Cloudflare
+        id: cloudflare_deploy
         if: steps.credentials.outputs.ready == 'yes'
-        run: npm run deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run deploy 2>&1 | tee /tmp/cloudflare-deploy.log
+          version_id="$(sed -n 's/.*Current Version ID: \([0-9a-f-][0-9a-f-]*\).*/\1/p' /tmp/cloudflare-deploy.log | tail -n 1)"
+          if [ -z "$version_id" ]; then
+            echo "Could not determine the deployed Cloudflare Worker version ID."
+            exit 1
+          fi
+          echo "version_id=$version_id" >> "$GITHUB_OUTPUT"
+          echo "Expected production Worker version: $version_id"
+
+      - name: Wait for production propagation
+        if: steps.credentials.outputs.ready == 'yes'
+        shell: bash
+        env:
+          EXPECTED_VERSION_ID: ${{ steps.cloudflare_deploy.outputs.version_id }}
+        run: |
+          set -euo pipefail
+          BASE="https://safiradestan.com"
+          matched="no"
+          for attempt in $(seq 1 30); do
+            bust="version=${GITHUB_SHA}-${attempt}"
+            version_json="$(curl --fail --silent --show-error --retry 2 --retry-delay 2 -H 'Cache-Control: no-cache' "$BASE/api/system/version?$bust" || true)"
+            echo "Propagation check $attempt/30: $version_json"
+            if grep -Fq "\"versionId\":\"$EXPECTED_VERSION_ID\"" <<<"$version_json"; then
+              matched="yes"
+              break
+            fi
+            sleep 5
+          done
+          if [ "$matched" != "yes" ]; then
+            echo "Custom domain did not begin serving expected Worker version $EXPECTED_VERSION_ID within the propagation window."
+            exit 1
+          fi
+          echo "Custom domain is serving expected Worker version $EXPECTED_VERSION_ID."
 
       - name: Verify production health
         if: steps.credentials.outputs.ready == 'yes'
@@ -88,9 +124,6 @@ jobs:
           set -euo pipefail
           BASE="https://safiradestan.com"
           BUST="deploy=${GITHUB_SHA}"
-
-          version_json="$(curl --fail --silent --show-error --retry 5 --retry-delay 3 "$BASE/api/system/version?$BUST")"
-          echo "Production Worker: $version_json"
 
           home_html="$(curl --fail --silent --show-error --retry 5 --retry-delay 3 -H 'Cache-Control: no-cache' "$BASE/?$BUST")"
           safira_html="$(curl --fail --silent --show-error --retry 5 --retry-delay 3 -H 'Cache-Control: no-cache' "$BASE/villa-safira?$BUST")"
