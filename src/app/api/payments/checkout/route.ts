@@ -77,7 +77,9 @@ export async function POST(request: Request) {
   const conflict = await hasPaymentTimeConflict(payment.villa, payment.checkIn, payment.checkOut, payment.reservationId);
   if (conflict) {
     if (!payment.testMode) {
-      await releaseLivePaymentHold(payment.id);
+      // Payment henüz 'created'. Hold'u burada erken bırakmıyoruz; aynı inquiry retry edilirse aynı
+      // ödeme güvenle tekrar kullanılabilsin. Hold süresi dolunca live-booking cleanup payment'ı
+      // cancelled yapıp tarihi serbest bırakır.
       await logPaymentAudit("PAYMENT_CONFLICT_BLOCKED", { paymentId, reservationId: payment.reservationId, villa: payment.villa });
       return Response.json({ ok: false, error: "Bu tarihler için müsaitlik durumu değişti. Lütfen başka tarih seçin." }, { status: 409 });
     }
