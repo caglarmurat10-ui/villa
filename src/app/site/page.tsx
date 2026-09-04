@@ -36,7 +36,7 @@ const SOCIAL_LINKS = [
 
 export const metadata: Metadata = {
   title: "Patara Kaş Özel Havuzlu Villa | Villa Safira & Villa Destan",
-  description: "Patara, Kaş'ta Villa Safira ve Villa Destan. Özel havuzlu villa tatili için gerçek fotoğrafları inceleyin, canlı müsaitlik ve fiyat kontrolü yapın, doğrudan rezervasyon talebi gönderin.",
+  description: "Patara Kaş'ta Villa Safira ve Villa Destan. Gerçek fotoğrafları inceleyin, canlı müsaitlik ve dönemsel fiyatı kontrol edip doğrudan talep gönderin.",
   alternates: { canonical: ORIGIN },
   openGraph: {
     title: "Patara Kaş Özel Havuzlu Villa | Villa Safira & Villa Destan",
@@ -99,12 +99,6 @@ function buildStructuredData(faqItems: ReturnType<typeof getFaqItems>) {
       url: ORIGIN,
       name: "Safira & Destan Villas",
       inLanguage: "tr-TR",
-    },
-    {
-      "@type": "Organization",
-      "@id": `${ORIGIN}/#organization`,
-      name: "Safira & Destan Villas",
-      url: ORIGIN,
       sameAs: SOCIAL_LINKS,
     },
     {
