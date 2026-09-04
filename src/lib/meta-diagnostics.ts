@@ -1,5 +1,10 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { MetaSocialAccount } from "./meta-store";
+import {
+  DESTAN_INSTAGRAM_HARD_BLOCK,
+  META_ACTIVE_TARGETS,
+  metaTargetLabel,
+} from "./social-account-policy";
 
 export type MetaDiagnostic = {
   graphApiVersion: string;
@@ -26,6 +31,7 @@ export type MetaDiagnostic = {
     connected: number;
     expected: number;
     missing: string[];
+    hardBlocked: Array<{ label: string; reason: string }>;
   };
 };
 
@@ -48,13 +54,9 @@ export async function getMetaDiagnostic(accounts: MetaSocialAccount[]): Promise<
   const hasDatabase = Boolean(env.DB);
   const hasPrivateKv = Boolean(env.META_PRIVATE);
 
-  const expected = [
-    "Safira Instagram",
-    "Safira Facebook",
-    "Destan Instagram",
-    "Destan Facebook",
-  ];
+  const expected = META_ACTIVE_TARGETS.map(metaTargetLabel);
   const connected = new Set(accounts.map((item) => `${item.villa} ${item.platform}`));
+  const activeConnected = expected.filter((item) => connected.has(item));
 
   return {
     graphApiVersion: "v26.0",
@@ -78,9 +80,13 @@ export async function getMetaDiagnostic(accounts: MetaSocialAccount[]): Promise<
       facebook: ["pages_show_list", "pages_read_engagement", "pages_manage_posts", "pages_manage_metadata"],
     },
     accounts: {
-      connected: connected.size,
+      connected: activeConnected.length,
       expected: expected.length,
       missing: expected.filter((item) => !connected.has(item)),
+      hardBlocked: [{
+        label: `${DESTAN_INSTAGRAM_HARD_BLOCK.villa} ${DESTAN_INSTAGRAM_HARD_BLOCK.platform}`,
+        reason: DESTAN_INSTAGRAM_HARD_BLOCK.reason,
+      }],
     },
   };
 }
