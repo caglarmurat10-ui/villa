@@ -24,7 +24,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   const page = REGION_GUIDE_PAGES[slug];
   const canonical = `${ORIGIN}/rehber/${slug}`;
   return {
-    title: `${page.title} | Safira & Destan Villas`,
+    title: page.seoTitle,
     description: page.metaDescription,
     alternates: { canonical },
     robots: { index: true, follow: true },
@@ -39,6 +39,10 @@ export default async function RegionGuideSubPage({ params }: { params: Promise<{
   const page = REGION_GUIDE_PAGES[slug];
   const canonical = `${ORIGIN}/rehber/${slug}`;
   const relatedPlaces = page.relatedPlaceIds.map((id) => GUIDE_PLACES.find((p) => p.id === id)).filter((p): p is NonNullable<typeof p> => Boolean(p));
+  const relatedGuides = REGION_GUIDE_PAGE_SLUGS.filter((guideSlug) => guideSlug !== slug).map((guideSlug) => ({
+    slug: guideSlug,
+    label: REGION_GUIDE_PAGES[guideSlug].title.split(" — ")[0],
+  }));
 
   const structuredData = {
     "@context": "https://schema.org",
@@ -117,6 +121,15 @@ export default async function RegionGuideSubPage({ params }: { params: Promise<{
             </ul>
           </div>
         )}
+
+        <div style={{marginTop:20}}>
+          <h2>İlgili bölge rehberleri</h2>
+          <ul>
+            {relatedGuides.map((guide) => (
+              <li key={guide.slug}><Link href={`/rehber/${guide.slug}`}>{guide.label} →</Link></li>
+            ))}
+          </ul>
+        </div>
 
         {page.faq.length > 0 && (
           <div style={{marginTop:20}}>
