@@ -16,15 +16,15 @@ export type ContentMixCategory =
   | "Doğrudan Rezervasyon/Güven"
   | "Müsaitlik/Kampanya";
 
-// Kullanıcının 2026-09-03'te kesinleştirdiği hedef karma - "yaklaşık hedef, katı matematik olmak
-// zorunda değil" (kullanıcının kendi ifadesi, önceki turdan). Toplam ~%65 çevre/gezi/kültür/
-// aktivite/yerel yaşam, ~%35 villa/rezervasyon/ticari içerik.
+// 2026-09-04 organik büyüme ayarı: keşif/yerel içerik payı %65'ten %70'e çıkarıldı. Villa reklamı
+// görünümünü azaltmak için yalnız Villa/Konaklama 20 -> 15, Yerel Yaşam/Yemek/İpucu 10 -> 15
+// kaydırıldı. Güven ve gerçek müsaitlik payları korunur; satış baskısı artırılmaz.
 export const CONTENT_MIX_TARGETS: Record<ContentMixCategory, number> = {
   "Destinasyon/Bölge": 25,
   "Aktivite/Gezi": 20,
-  "Villa/Konaklama": 20,
+  "Villa/Konaklama": 15,
   "Tarih/Kültür/Doğa": 10,
-  "Yerel Yaşam/Yemek/İpucu": 10,
+  "Yerel Yaşam/Yemek/İpucu": 15,
   "Doğrudan Rezervasyon/Güven": 10,
   "Müsaitlik/Kampanya": 5,
 };
