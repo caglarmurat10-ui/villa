@@ -1,0 +1,65 @@
+name: Cloudflare Production Deploy
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/cloudflare-migration
+    paths:
+      - ".github/workflows/cloudflare-production-deploy.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - name: Check deployment credentials
+        id: credentials
+        shell: bash
+        run: |
+          if [ -n "${CLOUDFLARE_API_TOKEN:-}" ] && [ -n "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+            echo "ready=yes" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare deployment credentials are configured."
+          else
+            echo "ready=no" >> "$GITHUB_OUTPUT"
+            echo "Cloudflare deployment skipped: CLOUDFLARE_API_TOKEN and/or CLOUDFLARE_ACCOUNT_ID is not configured."
+          fi
+
+      - name: Checkout
+        if: steps.credentials.outputs.ready == 'yes'
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        if: steps.credentials.outputs.ready == 'yes'
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        if: steps.credentials.outputs.ready == 'yes'
+        run: npm ci --no-audit --no-fund
+
+      - name: Run test suite
+        if: steps.credentials.outputs.ready == 'yes'
+        run: npm test
+
+      - name: Deploy to Cloudflare
+        if: steps.credentials.outputs.ready == 'yes'
+        run: npm run deploy
+
+      - name: Verify production health
+        if: steps.credentials.outputs.ready == 'yes'
+        shell: bash
+        run: |
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 https://safiradestan.com/api/health
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --output /dev/null https://safiradestan.com/
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --output /dev/null https://safiradestan.com/villa-safira
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --output /dev/null https://safiradestan.com/villa-destan
+          curl --fail --silent --show-error --retry 5 --retry-delay 3 --output /dev/null https://safiradestan.com/rehber
