@@ -7,8 +7,8 @@ export function getPublicVillaMetadata(slug: VillaSlug): Metadata {
   const villa = VILLAS[slug];
   const canonical = `${ORIGIN}/${slug}`;
   const { maxGuests, bedroomCount } = villa.quickFacts;
-  const title = `${villa.name} | Patara Kaş ${maxGuests} Kişilik Özel Havuzlu Villa`;
-  const description = `${villa.name} resmi sitesi. Patara Kaş'ta ${maxGuests} kişilik, ${bedroomCount} yatak odalı özel havuzlu villa. Gerçek fotoğrafları görün, canlı müsaitliği kontrol edin ve doğrudan talep gönderin.`;
+  const title = `${villa.name} Resmi Site | Patara Kaş ${maxGuests} Kişilik Villa`;
+  const description = `${villa.name} resmi sitesi. Patara Kaş'ta ${maxGuests} kişilik, ${bedroomCount} yatak odalı özel havuzlu villa. Gerçek fotoğrafları görün, canlı müsaitliği kontrol edin.`;
 
   return {
     title,
