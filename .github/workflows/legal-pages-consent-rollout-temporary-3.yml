@@ -1,0 +1,115 @@
+name: Temporary Legal Pages Consent Rollout 3
+
+on:
+  push:
+    branches:
+      - agent/cloudflare-migration
+    paths:
+      - ".github/workflows/legal-pages-consent-rollout-temporary-3.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  rollout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: agent/cloudflare-migration
+
+      - name: Apply corrected rollout script
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          workflow = Path(".github/workflows/legal-pages-consent-rollout-temporary.yml").read_text(encoding="utf-8")
+          start = workflow.index("          python <<'PY'\n") + len("          python <<'PY'\n")
+          end = workflow.index("          PY\n", start)
+          lines = workflow[start:end].splitlines()
+          script = "\n".join(line[10:] if line.startswith("          ") else line for line in lines)
+
+          home_start = script.index('replace_once("src/app/site/page.tsx",')
+          home_end = script.index('replace_once("src/middleware.ts",', home_start)
+          home_fix = '''for old_href, new_href in {
+              "/rezervasyon-kosullari#hakkimizda": "/hakkimizda",
+              "/rezervasyon-kosullari#teslimat-iade": "/teslimat-iade",
+              "/rezervasyon-kosullari#gizlilik": "/gizlilik",
+              "/rezervasyon-kosullari#kvkk": "/kvkk",
+              "/rezervasyon-kosullari#mesafeli-hizmet-sozlesmesi": "/mesafeli-hizmet-sozlesmesi",
+              "/rezervasyon-kosullari#on-bilgilendirme": "/on-bilgilendirme",
+              "/rezervasyon-kosullari#odeme-guvenligi": "/odeme-guvenligi",
+          }.items():
+              replace_once("src/app/site/page.tsx", f'href="{old_href}"', f'href="{new_href}"')
+
+          '''
+          script = script[:home_start] + home_fix + script[home_end:]
+
+          pb_start = script.index('replace_once("src/components/PublicBookingWidget.tsx",')
+          pb_end = script.index('booking_css = Path("src/components/PublicBookingWidget.module.css")', pb_start)
+          pb_fix = r'''replace_once("src/components/PublicBookingWidget.tsx",
+              'import { CLOSED_SEASON_MESSAGE, hasClosedSeasonNight } from "@/lib/season-policy";\n',
+              'import { CLOSED_SEASON_MESSAGE, hasClosedSeasonNight } from "@/lib/season-policy";\nimport { LEGAL_ACCEPTANCE_VERSION, hasValidLegalConsent } from "@/lib/legal-consent";\n')
+          replace_once("src/components/PublicBookingWidget.tsx",
+              '  const [website, setWebsite] = useState("");\n',
+              '  const [website, setWebsite] = useState("");\n  const [termsAccepted, setTermsAccepted] = useState(false);\n  const [privacyNoticeAcknowledged, setPrivacyNoticeAcknowledged] = useState(false);\n')
+          replace_once("src/components/PublicBookingWidget.tsx",
+              '    if (!canSubmitInquiry) return;\n    setRequestState({ kind: "sending", message: "Bilgileriniz kaydediliyor…" });',
+              '    if (!canSubmitInquiry) return;\n    if (!hasValidLegalConsent({ termsAccepted, privacyNoticeAcknowledged, legalVersion: LEGAL_ACCEPTANCE_VERSION })) {\n      setRequestState({ kind: "error", message: "Rezervasyon ve yasal bilgilendirme onaylarını tamamlayın." });\n      return;\n    }\n    setRequestState({ kind: "sending", message: "Bilgileriniz kaydediliyor…" });')
+          replace_once("src/components/PublicBookingWidget.tsx",
+              '          source,\n        }),',
+              '          source,\n          termsAccepted,\n          privacyNoticeAcknowledged,\n          legalVersion: LEGAL_ACCEPTANCE_VERSION,\n        }),')
+          replace_once("src/components/PublicBookingWidget.tsx",
+              '          <div className={styles.submitRow}>\n            <button type="submit" disabled={requestState.kind === "sending"}>',
+              '''          <div className={styles.consentGroup}>
+            <label className={styles.consentRow}>
+              <input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} required />
+              <span><Link href="/rezervasyon-kosullari" target="_blank" rel="noopener noreferrer">Rezervasyon ve Konaklama Koşulları</Link>, <Link href="/on-bilgilendirme" target="_blank" rel="noopener noreferrer">Ön Bilgilendirme Formu</Link> ve <Link href="/mesafeli-hizmet-sozlesmesi" target="_blank" rel="noopener noreferrer">Mesafeli Hizmet Sözleşmesi</Link>&apos;ni okudum ve kabul ediyorum.</span>
+            </label>
+            <label className={styles.consentRow}>
+              <input type="checkbox" checked={privacyNoticeAcknowledged} onChange={(event) => setPrivacyNoticeAcknowledged(event.target.checked)} required />
+              <span><Link href="/gizlilik" target="_blank" rel="noopener noreferrer">Gizlilik Politikası</Link> ve <Link href="/kvkk" target="_blank" rel="noopener noreferrer">KVKK Aydınlatma Metni</Link>&apos;ni inceledim.</span>
+            </label>
+          </div>
+
+          <div className={styles.submitRow}>
+            <button type="submit" disabled={requestState.kind === "sending" || !termsAccepted || !privacyNoticeAcknowledged}>''')
+          replace_once("src/components/PublicBookingWidget.tsx",
+              '            initialAddress={address}\n            autoStart',
+              '            initialAddress={address}\n            initialTermsAccepted={termsAccepted}\n            initialPrivacyNoticeAcknowledged={privacyNoticeAcknowledged}\n            initialLegalVersion={LEGAL_ACCEPTANCE_VERSION}\n            autoStart')
+
+          '''
+          script = script[:pb_start] + pb_fix + script[pb_end:]
+          exec(compile(script, "legal-rollout", "exec"))
+          PY
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit validated legal and consent changes
+        run: |
+          git config user.name "caglarmurat10-ui"
+          git config user.email "caglarmurat10@gmail.com"
+          git add src custom-worker.mjs
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No source changes to commit"
+          else
+            git commit -m "Add standalone legal pages and enforce checkout consent"
+            git push origin HEAD:agent/cloudflare-migration
+          fi
