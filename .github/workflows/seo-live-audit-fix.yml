@@ -24,6 +24,7 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+          import re
 
           p = Path("src/app/site/page.tsx")
           s = p.read_text(encoding="utf-8")
@@ -34,31 +35,18 @@ jobs:
               raise SystemExit("homepage meta description target not found")
           s = s.replace(old_desc, new_desc, 1)
 
-          old_graph = '''    {
-              "@type": "WebSite",
-              "@id": `${ORIGIN}/#website`,
-              url: ORIGIN,
-              name: "Safira & Destan Villas",
-              inLanguage: "tr-TR",
-            },
-            {
-              "@type": "Organization",
-              "@id": `${ORIGIN}/#organization`,
-              name: "Safira & Destan Villas",
-              url: ORIGIN,
-              sameAs: SOCIAL_LINKS,
-            },'''
-          new_graph = '''    {
-              "@type": "WebSite",
-              "@id": `${ORIGIN}/#website`,
-              url: ORIGIN,
-              name: "Safira & Destan Villas",
-              inLanguage: "tr-TR",
-              sameAs: SOCIAL_LINKS,
-            },'''
-          if old_graph not in s:
-              raise SystemExit("Organization schema target not found")
-          s = s.replace(old_graph, new_graph, 1)
+          website_anchor = '      inLanguage: "tr-TR",\n'
+          if website_anchor not in s:
+              raise SystemExit("WebSite schema anchor not found")
+          s = s.replace(website_anchor, website_anchor + '      sameAs: SOCIAL_LINKS,\n', 1)
+
+          pattern = re.compile(
+              r'\n    \{\n      "@type": "Organization",\n      "@id": `\$\{ORIGIN\}/#organization`,\n      name: "Safira & Destan Villas",\n      url: ORIGIN,\n      sameAs: SOCIAL_LINKS,\n    \},',
+              re.MULTILINE,
+          )
+          s, count = pattern.subn("", s, count=1)
+          if count != 1:
+              raise SystemExit(f"Organization schema target count={count}")
 
           p.write_text(s, encoding="utf-8")
           PY
