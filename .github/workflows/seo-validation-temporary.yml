@@ -30,8 +30,8 @@ jobs:
           node-version: 22
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Install dependencies without rewriting repository lockfile
+        run: npm install --package-lock=false --no-audit --no-fund
 
       - name: Run tests
         run: npm test
