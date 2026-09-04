@@ -1,0 +1,681 @@
+name: Temporary Legal Pages Consent Rollout
+
+on:
+  push:
+    branches:
+      - agent/cloudflare-migration
+    paths:
+      - ".github/workflows/legal-pages-consent-rollout-temporary.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  rollout:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: agent/cloudflare-migration
+
+      - name: Apply standalone legal pages and consent enforcement
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def write(path: str, content: str) -> None:
+              target = Path(path)
+              target.parent.mkdir(parents=True, exist_ok=True)
+              target.write_text(content, encoding="utf-8")
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              if text.count(old) != 1:
+                  raise SystemExit(f"Unsafe patch refused for {path}: expected one match, found {text.count(old)}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          write("src/lib/legal-content.ts", r'''export const LEGAL_PAGE_SLUGS = [
+            "hakkimizda",
+            "teslimat-iade",
+            "gizlilik",
+            "kvkk",
+            "mesafeli-hizmet-sozlesmesi",
+            "on-bilgilendirme",
+            "odeme-guvenligi",
+          ] as const;
+
+          export type LegalPageSlug = (typeof LEGAL_PAGE_SLUGS)[number];
+
+          export interface LegalPageContent {
+            slug: LegalPageSlug;
+            title: string;
+            navLabel: string;
+            description: string;
+            paragraphs: string[];
+          }
+
+          export const LEGAL_PAGES: Record<LegalPageSlug, LegalPageContent> = {
+            hakkimizda: {
+              slug: "hakkimizda",
+              title: "Hakkımızda",
+              navLabel: "Hakkımızda",
+              description: "Safira & Destan Villas, Villa Safira ve Villa Destan doğrudan rezervasyon, konaklama ve iletişim bilgileri.",
+              paragraphs: [
+                "Safira & Destan Villas, Antalya'nın Kaş ilçesi Patara/Gelemiş bölgesindeki Villa Safira ve Villa Destan için doğrudan rezervasyon, konaklama ve misafir iletişim süreçlerini yürütür.",
+                "Amacımız misafirlere villaların gerçek fotoğraflarını, güncel müsaitlik durumunu, dönemsel fiyat bilgisini ve rezervasyon koşullarını açık biçimde sunmaktır. Rezervasyon talebi, ödeme ve konaklama sürecinde bu sitede yayımlanan koşullar ile işlem özelinde misafire gösterilen bilgiler esas alınır.",
+                "İletişim ve rezervasyon talepleri safiradestan.com üzerindeki kanallar üzerinden alınır. Resmî iletişim e-posta adresimiz info@safiradestan.com'dur.",
+              ],
+            },
+            "teslimat-iade": {
+              slug: "teslimat-iade",
+              title: "Teslimat, İptal ve İade Şartları",
+              navLabel: "Teslimat, İptal ve İade",
+              description: "Villa Safira ve Villa Destan konaklama hizmetinin teslimi, rezervasyon iptali, iade ve cayma hakkı bilgilendirmesi.",
+              paragraphs: [
+                "Satış konusu fiziksel bir ürün veya kargo teslimatı değildir. Hizmet, rezervasyonda seçilen Villa Safira veya Villa Destan'da, onaylanan giriş ve çıkış tarihleri arasında konaklama hizmetinin sunulmasıyla ifa edilir.",
+                "Rezervasyonun kesinleşmesi, ön ödeme, misafir tarafından iptal, no-show, erken ayrılış, işletme tarafından iptal ve iade işlem masrafları Rezervasyon ve Konaklama Koşulları hükümlerine tabidir. İşlem sırasında yazılı olarak ayrıca kararlaştırılan özel bir koşul varsa zorunlu mevzuat saklı kalmak üzere işlem özelindeki kayıt da değerlendirilir.",
+                "Belirli bir tarihte veya dönemde sunulacak konaklama hizmetlerinde mevzuattaki cayma hakkı istisnası uygulanabilir. Bu nedenle genel e-ticaret işlemlerindeki 14 gün koşulsuz iade yaklaşımı, tarihli konaklama rezervasyonlarına otomatik olarak uygulanmaz. Yürürlükteki zorunlu tüketici hakları saklıdır.",
+              ],
+            },
+            gizlilik: {
+              slug: "gizlilik",
+              title: "Gizlilik Politikası",
+              navLabel: "Gizlilik Politikası",
+              description: "Safira & Destan Villas rezervasyon, iletişim, ödeme ve site güvenliği süreçlerinde kişisel verilerin kullanımına ilişkin gizlilik politikası.",
+              paragraphs: [
+                "Rezervasyon ve iletişim süreçlerinde ad-soyad, telefon, e-posta, konaklama tarihleri, misafir sayısı, rezervasyon notları, işlem ve ödeme durumu/referansı gibi bilgiler işlenebilir. Site güvenliği ve hata teşhisi için sınırlı teknik kayıtlar da tutulabilir.",
+                "Bu bilgiler rezervasyon talebini değerlendirmek, misafirle iletişim kurmak, konaklama hizmetini yerine getirmek, ödeme durumunu eşleştirmek, güvenliği sağlamak ve yasal yükümlülükleri yerine getirmek amacıyla kullanılır. Gerektiğinde ödeme kuruluşları, barındırma/altyapı hizmet sağlayıcıları ve kanunen yetkili mercilerle, amaçla sınırlı şekilde paylaşılabilir.",
+                "Kredi veya banka kartı numarası, CVV/CVC güvenlik kodu veya kartın tam son kullanma bilgisi Safira & Destan Villas yönetim sisteminde saklanmaz. Kartlı ödeme etkinleştirildiğinde kart verisi, ilgili lisanslı ödeme kuruluşunun güvenli ödeme akışında işlenir.",
+                "Gizlilikle ilgili talepler için info@safiradestan.com adresinden bizimle iletişime geçebilirsiniz.",
+              ],
+            },
+            kvkk: {
+              slug: "kvkk",
+              title: "KVKK Aydınlatma Metni",
+              navLabel: "KVKK Aydınlatma Metni",
+              description: "6698 sayılı KVKK kapsamında Safira & Destan Villas rezervasyon ve konaklama süreçlerine ilişkin kişisel veri aydınlatma metni.",
+              paragraphs: [
+                "6698 sayılı Kişisel Verilerin Korunması Kanunu kapsamında Safira & Destan Villas işletmesi; rezervasyon, iletişim ve konaklama süreçlerinde elde edilen kişisel verileri veri sorumlusu sıfatıyla, işleme amacıyla bağlantılı, sınırlı ve ölçülü şekilde işler.",
+                "Kişisel veriler; rezervasyon ve hizmet ilişkisinin kurulması ve yürütülmesi, talep ve şikâyetlerin yönetilmesi, ödeme ve muhasebe kayıtlarının eşleştirilmesi, bilgi güvenliği, hukuki yükümlülüklerin yerine getirilmesi ve bir hakkın tesisi, kullanılması veya korunması amaçlarıyla; ilgili hukuki sebebin bulunduğu ölçüde elektronik formlar, telefon, e-posta, mesajlaşma kanalları ve ödeme/altyapı sistemleri üzerinden elde edilebilir.",
+                "Veriler, hizmetin yürütülmesi için zorunlu olduğu ölçüde ödeme ve teknik hizmet sağlayıcılarına; hukuki zorunluluk halinde yetkili kamu kurumlarına aktarılabilir. Gereksiz veya süresiz veri saklama amaçlanmaz; kayıtlar işleme amacı ve uygulanabilir yasal saklama süreleriyle sınırlı tutulur.",
+                "KVKK'nın 11. maddesi kapsamındaki haklarınız doğrultusunda kişisel verilerinizin işlenip işlenmediğini öğrenme, bilgi talep etme, düzeltme, silme veya yok etme şartlarının oluşup oluşmadığının değerlendirilmesini isteme ve kanunda yer alan diğer haklarınızı kullanmak için kimliğinizi doğrulayacak bilgilerle info@safiradestan.com adresine başvurabilirsiniz.",
+              ],
+            },
+            "mesafeli-hizmet-sozlesmesi": {
+              slug: "mesafeli-hizmet-sozlesmesi",
+              title: "Mesafeli Hizmet Sözleşmesi",
+              navLabel: "Mesafeli Hizmet Sözleşmesi",
+              description: "Villa Safira ve Villa Destan için uzaktan kurulan konaklama hizmeti sözleşmesinin tarafları, konusu, bedeli, ifası ve iptal hükümleri.",
+              paragraphs: [
+                "Taraflar: Hizmet sağlayıcı Safira & Destan Villas ile rezervasyon sırasında bilgilerini ileten misafir/tüketici arasında, uzaktan iletişim araçları kullanılarak kurulan konaklama hizmeti ilişkisini düzenler.",
+                "Sözleşmenin konusu: Rezervasyon ekranında veya yazılı teyitte belirtilen villa, giriş-çıkış tarihleri, gece sayısı, misafir sayısı ve toplam bedel karşılığında konaklama hizmetinin sunulmasıdır. İşlem özelindeki bu bilgiler sözleşmenin ayrılmaz parçasıdır.",
+                "Bedel ve ödeme: Toplam fiyat, ön ödeme tutarı, varsa kalan bakiye ve ödeme yöntemi rezervasyon onayından önce misafire gösterilir veya yazılı olarak bildirilir. Rezervasyonun kesinleşmesi için Rezervasyon ve Konaklama Koşulları'ndaki ön ödeme hükmü uygulanır.",
+                "Hizmetin ifası: Konaklama, onaylanan tarihlerde ilgili villada gerçekleştirilir. Giriş/çıkış saatleri, hasar güvence bedeli, evcil hayvan ve sigara kuralları Rezervasyon ve Konaklama Koşulları'nda belirtilmiştir.",
+                "İptal, iade ve cayma: İptal ve iade hükümleri Rezervasyon ve Konaklama Koşulları'na tabidir. Belirli tarih veya dönemde ifa edilen konaklama hizmetleri için mevzuatta öngörülen cayma hakkı istisnası saklıdır; zorunlu tüketici mevzuatından doğan haklar ortadan kaldırılmaz.",
+                "İletişim ve uyuşmazlık: Talep ve şikâyetler info@safiradestan.com üzerinden iletilebilir. Tüketicinin mevzuattan doğan hakem heyeti, mahkeme ve diğer başvuru hakları saklıdır.",
+              ],
+            },
+            "on-bilgilendirme": {
+              slug: "on-bilgilendirme",
+              title: "Ön Bilgilendirme Formu",
+              navLabel: "Ön Bilgilendirme Formu",
+              description: "Villa rezervasyonu öncesinde hizmet sağlayıcı, villa, tarihler, toplam fiyat, ödeme ve iptal koşulları hakkında ön bilgilendirme.",
+              paragraphs: [
+                "Rezervasyonun onaylanmasından ve tüketicinin ödeme yükümlülüğü altına girmesinden önce; hizmet sağlayıcının iletişim bilgileri, seçilen villa, konaklama tarihleri, misafir sayısı, toplam fiyat, ön ödeme/kalan ödeme bilgileri, ödeme yöntemi, giriş-çıkış saatleri ve uygulanabilir iptal/iade koşulları kullanıcıya gösterilir veya kalıcı bir iletişim kanalıyla bildirilir.",
+                "Misafir, rezervasyon talebini onaylamadan önce Rezervasyon ve Konaklama Koşulları, Teslimat/İptal/İade Şartları, Mesafeli Hizmet Sözleşmesi ve Gizlilik/KVKK bilgilendirmelerini inceleyebilir. İşlem özelindeki fiyat, tarih, villa ve misafir bilgileri bu genel metinlerin ayrılmaz parçası olarak değerlendirilir.",
+                "Ödeme kuruluşunun güvenli ekranına geçilmeden önce kullanıcı, ilgili sözleşme ve ön bilgilendirme metinlerini kabul ettiğini ve gizlilik/KVKK bilgilendirmelerini incelediğini açık kutucuklarla teyit eder.",
+              ],
+            },
+            "odeme-guvenligi": {
+              slug: "odeme-guvenligi",
+              title: "SSL ve Ödeme Güvenliği",
+              navLabel: "SSL ve Ödeme Güvenliği",
+              description: "Safira & Destan Villas kartlı ödeme güvenliği, HTTPS/TLS, kart verilerinin saklanmaması ve ödeme kuruluşu bilgilendirmesi.",
+              paragraphs: [
+                "safiradestan.com ile tarayıcınız arasındaki veri aktarımı HTTPS/TLS kullanılarak korunur. SSL/TLS aktarım güvenliğinin önemli bir katmanıdır; tek başına hiçbir internet işlemi için mutlak güvenlik garantisi anlamına gelmez.",
+                "Kart numarası, CVV/CVC güvenlik kodu ve kartın tam son kullanma bilgisi Safira & Destan Villas uygulamasında veya yönetim sisteminde saklanmaz.",
+                "Kartlı ödeme özelliği etkinleştirildiğinde kart bilgileri, hesabı ve entegrasyonu aktif olan ilgili lisanslı ödeme kuruluşunun güvenli ödeme akışında işlenir. Bir ödeme kuruluşu yalnız entegrasyon gerçekten hazır ve aktif olduğunda ödeme seçeneği olarak sunulur.",
+                "Şüpheli veya yetkisiz bir kart işlemi fark edilmesi halinde kartı veren banka ve ilgili ödeme kuruluşuyla gecikmeden iletişime geçilmesi önerilir.",
+              ],
+            },
+          };
+
+          export const LEGAL_PAGE_LINKS = LEGAL_PAGE_SLUGS.map((slug) => ({
+            href: `/${slug}`,
+            label: LEGAL_PAGES[slug].navLabel,
+          }));
+          ''')
+
+          write("src/lib/legal-consent.ts", r'''export const LEGAL_ACCEPTANCE_VERSION = "2026-09-04-v1";
+
+          export interface LegalConsentPayload {
+            termsAccepted: boolean;
+            privacyNoticeAcknowledged: boolean;
+            legalVersion: string;
+          }
+
+          export function hasValidLegalConsent(value: unknown): value is LegalConsentPayload {
+            if (!value || typeof value !== "object") return false;
+            const consent = value as Partial<LegalConsentPayload>;
+            return consent.termsAccepted === true
+              && consent.privacyNoticeAcknowledged === true
+              && consent.legalVersion === LEGAL_ACCEPTANCE_VERSION;
+          }
+          ''')
+
+          write("src/lib/legal-consent.test.ts", r'''import { describe, expect, it } from "vitest";
+          import { LEGAL_ACCEPTANCE_VERSION, hasValidLegalConsent } from "@/lib/legal-consent";
+
+          describe("legal consent", () => {
+            it("accepts only the current version with both explicit confirmations", () => {
+              expect(hasValidLegalConsent({
+                termsAccepted: true,
+                privacyNoticeAcknowledged: true,
+                legalVersion: LEGAL_ACCEPTANCE_VERSION,
+              })).toBe(true);
+            });
+
+            it("rejects missing, false, or stale consent", () => {
+              expect(hasValidLegalConsent(null)).toBe(false);
+              expect(hasValidLegalConsent({ termsAccepted: false, privacyNoticeAcknowledged: true, legalVersion: LEGAL_ACCEPTANCE_VERSION })).toBe(false);
+              expect(hasValidLegalConsent({ termsAccepted: true, privacyNoticeAcknowledged: false, legalVersion: LEGAL_ACCEPTANCE_VERSION })).toBe(false);
+              expect(hasValidLegalConsent({ termsAccepted: true, privacyNoticeAcknowledged: true, legalVersion: "old-version" })).toBe(false);
+            });
+          });
+          ''')
+
+          write("src/components/LegalInfoPage.tsx", r'''import type { Metadata } from "next";
+          import Link from "next/link";
+          import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
+          import { LEGAL_PAGE_LINKS, type LegalPageContent } from "@/lib/legal-content";
+          import { WHATSAPP_PHONE_DISPLAY_TR } from "@/lib/contact";
+          import styles from "@/app/site/site.module.css";
+
+          const ORIGIN = "https://safiradestan.com";
+
+          export function buildLegalMetadata(page: LegalPageContent): Metadata {
+            const canonical = `${ORIGIN}/${page.slug}`;
+            return {
+              title: `${page.title} | Safira & Destan Villas`,
+              description: page.description,
+              alternates: { canonical },
+              robots: { index: true, follow: true },
+              openGraph: { title: `${page.title} | Safira & Destan Villas`, description: page.description, url: canonical, type: "website" },
+              twitter: { card: "summary_large_image", title: `${page.title} | Safira & Destan Villas`, description: page.description },
+            };
+          }
+
+          export default function LegalInfoPage({ page }: { page: LegalPageContent }) {
+            const canonical = `${ORIGIN}/${page.slug}`;
+            const structuredData = {
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "BreadcrumbList",
+                  itemListElement: [
+                    { "@type": "ListItem", position: 1, name: "Ana sayfa", item: ORIGIN },
+                    { "@type": "ListItem", position: 2, name: page.title, item: canonical },
+                  ],
+                },
+                {
+                  "@type": "WebPage",
+                  "@id": `${canonical}/#webpage`,
+                  url: canonical,
+                  name: page.title,
+                  description: page.description,
+                  isPartOf: { "@type": "WebSite", "@id": `${ORIGIN}/#website` },
+                },
+              ],
+            };
+
+            return (
+              <main className={styles.page}>
+                <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+                <a href="#legal-icerik" className={styles.skipLink}>İçeriğe atla</a>
+                <section className={styles.policyHead}>
+                  <nav className={styles.nav} aria-label="Ana menü">
+                    <Link href="/" className={styles.brand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></Link>
+                    <div className={styles.navlinks}>
+                      <Link href="/">Ana sayfa</Link>
+                      <Link href="/rezervasyon-kosullari">Rezervasyon Koşulları</Link>
+                    </div>
+                  </nav>
+                  <div className={styles.policyHeadCopy} id="legal-icerik" tabIndex={-1}>
+                    <span className={styles.eyebrow}>SAFIRA &amp; DESTAN VILLAS</span>
+                    <h1 className={styles.policyTitle}>{page.title}</h1>
+                    <p className={styles.lead}>{page.description}</p>
+                  </div>
+                </section>
+
+                <section className={styles.policyBody}>
+                  <article className={styles.policySection}>
+                    {page.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+                    {page.slug === "hakkimizda" ? (
+                      <p><strong>İletişim:</strong> <a href="mailto:info@safiradestan.com">info@safiradestan.com</a> · {WHATSAPP_PHONE_DISPLAY_TR} · Patara/Gelemiş · Kaş · Antalya</p>
+                    ) : null}
+                  </article>
+                </section>
+
+                <section className={styles.policyCta}>
+                  <p>Rezervasyon veya ödeme işlemi öncesinde ilgili bilgilendirme metinlerinin tamamını inceleyebilirsiniz.</p>
+                  <div className={styles.policyCtaLinks}>
+                    <Link href="/rezervasyon-kosullari">Rezervasyon ve Konaklama Koşulları →</Link>
+                    {LEGAL_PAGE_LINKS.filter((item) => item.href !== `/${page.slug}`).map((item) => (
+                      <Link href={item.href} key={item.href}>{item.label} →</Link>
+                    ))}
+                  </div>
+                </section>
+
+                <footer className={styles.footer}>
+                  <div className={styles.footerBrand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></div>
+                  <div className={styles.footerBottom}>Patara · Kaş · Antalya <span>safiradestan.com</span><CookiePreferencesButton className={styles.footerCookieBtn} /></div>
+                </footer>
+              </main>
+            );
+          }
+          ''')
+
+          for slug in [
+              "hakkimizda",
+              "teslimat-iade",
+              "gizlilik",
+              "kvkk",
+              "mesafeli-hizmet-sozlesmesi",
+              "on-bilgilendirme",
+              "odeme-guvenligi",
+          ]:
+              write(f"src/app/site/{slug}/page.tsx", f'''import LegalInfoPage, {{ buildLegalMetadata }} from "@/components/LegalInfoPage";\nimport {{ LEGAL_PAGES }} from "@/lib/legal-content";\n\nconst page = LEGAL_PAGES["{slug}"];\n\nexport const metadata = buildLegalMetadata(page);\n\nexport default function Page() {{\n  return <LegalInfoPage page={{page}} />;\n}}\n''')
+
+          write("src/app/site/rezervasyon-kosullari/page.tsx", r'''import type { Metadata } from "next";
+          import Link from "next/link";
+          import { VILLAS } from "@/lib/villa-content";
+          import { POLICY_SECTIONS, POLICY_SUMMARY } from "@/lib/reservation-policy";
+          import { LEGAL_PAGE_LINKS } from "@/lib/legal-content";
+          import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
+          import styles from "../site.module.css";
+
+          const ORIGIN = "https://safiradestan.com";
+          const CANONICAL = `${ORIGIN}/rezervasyon-kosullari`;
+          const TITLE = "Rezervasyon ve Konaklama Koşulları | Safira & Destan Villas";
+          const DESCRIPTION = "Villa Safira ve Villa Destan için rezervasyon ön ödemesi, iptal ve iade, hasar güvence bedeli, giriş/çıkış ve konaklama koşulları.";
+
+          export const metadata: Metadata = {
+            title: TITLE,
+            description: DESCRIPTION,
+            alternates: { canonical: CANONICAL },
+            robots: { index: true, follow: true },
+            openGraph: { title: TITLE, description: DESCRIPTION, url: CANONICAL, type: "website" },
+            twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },
+          };
+
+          export default function ReservationPolicyPage() {
+            const structuredData = {
+              "@context": "https://schema.org",
+              "@graph": [
+                {
+                  "@type": "BreadcrumbList",
+                  itemListElement: [
+                    { "@type": "ListItem", position: 1, name: "Ana sayfa", item: ORIGIN },
+                    { "@type": "ListItem", position: 2, name: "Rezervasyon ve Konaklama Koşulları", item: CANONICAL },
+                  ],
+                },
+                {
+                  "@type": "WebPage",
+                  "@id": `${CANONICAL}/#webpage`,
+                  url: CANONICAL,
+                  name: TITLE,
+                  description: DESCRIPTION,
+                  isPartOf: { "@type": "WebSite", "@id": `${ORIGIN}/#website` },
+                },
+              ],
+            };
+
+            return (
+              <main className={styles.page}>
+                <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
+                <a href="#policy-icerik" className={styles.skipLink}>İçeriğe atla</a>
+                <section className={styles.policyHead}>
+                  <nav className={styles.nav} aria-label="Ana menü">
+                    <Link href="/" className={styles.brand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></Link>
+                    <div className={styles.navlinks}>
+                      <Link href="/">Ana sayfa</Link>
+                      <Link href="/villa-safira">Villa Safira</Link>
+                      <Link href="/villa-destan">Villa Destan</Link>
+                    </div>
+                  </nav>
+                  <div className={styles.policyHeadCopy} id="policy-icerik" tabIndex={-1}>
+                    <span className={styles.eyebrow}>SAFIRA &amp; DESTAN VILLAS</span>
+                    <h1 className={styles.policyTitle}>Rezervasyon ve Konaklama Koşulları</h1>
+                    <p className={styles.lead}>Villa Safira ve Villa Destan rezervasyonları için ön ödeme, iptal, hasar güvence bedeli ve konaklama kurallarının bağlayıcı metni.</p>
+                  </div>
+                </section>
+
+                <section className={styles.policySummary}>
+                  <div className={styles.factChips}>
+                    <span className={styles.factChip}>Giriş: {POLICY_SUMMARY.entry}</span>
+                    <span className={styles.factChip}>Çıkış: {POLICY_SUMMARY.checkout}</span>
+                    <span className={styles.factChip}>Rezervasyon Ön Ödemesi: {POLICY_SUMMARY.deposit}</span>
+                    <span className={styles.factChip}>Hasar Güvence Bedeli: {POLICY_SUMMARY.damageDeposit}</span>
+                    <span className={styles.factChip}>Evcil Hayvan: {POLICY_SUMMARY.pets}</span>
+                    <span className={styles.factChip}>Sigara: {POLICY_SUMMARY.smoking}</span>
+                  </div>
+                </section>
+
+                <section className={styles.policyBody}>
+                  {POLICY_SECTIONS.map((section) => (
+                    <article className={styles.policySection} key={section.id} id={section.id}>
+                      <h2>{section.title}</h2>
+                      {section.paragraphs.map((paragraph, index) => <p key={index}>{paragraph}</p>)}
+                    </article>
+                  ))}
+                </section>
+
+                <section className={styles.policyCta}>
+                  <p>Rezervasyon talebi veya ödeme işlemi öncesinde bu koşullarla birlikte ilgili yasal bilgilendirme metinlerini de inceleyebilirsiniz.</p>
+                  <div className={styles.policyCtaLinks}>
+                    {LEGAL_PAGE_LINKS.map((item) => <Link href={item.href} key={item.href}>{item.label} →</Link>)}
+                    <Link href="/villa-safira#rezervasyon">Villa Safira için müsaitlik ara →</Link>
+                    <Link href="/villa-destan#rezervasyon">Villa Destan için müsaitlik ara →</Link>
+                  </div>
+                </section>
+
+                <footer className={styles.footer}>
+                  <div className={styles.footerBrand}><span>SAFIRA</span><i>&</i><span>DESTAN</span></div>
+                  <div className={styles.footerBottom}>{VILLAS["villa-safira"].address.addressLocality} · {VILLAS["villa-safira"].address.addressRegion} <span>safiradestan.com</span><CookiePreferencesButton className={styles.footerCookieBtn} /></div>
+                </footer>
+              </main>
+            );
+          }
+          ''')
+
+          replace_once("src/app/site/page.tsx", '''              <Link href="/rezervasyon-kosullari#hakkimizda">Hakkımızda</Link><br />
+              <Link href="/rezervasyon-kosullari#teslimat-iade">Teslimat, İptal ve İade</Link><br />
+              <Link href="/rezervasyon-kosullari#gizlilik">Gizlilik Politikası</Link><br />
+              <Link href="/rezervasyon-kosullari#kvkk">KVKK Aydınlatma Metni</Link><br />
+              <Link href="/rezervasyon-kosullari#mesafeli-hizmet-sozlesmesi">Mesafeli Hizmet Sözleşmesi</Link><br />
+              <Link href="/rezervasyon-kosullari#on-bilgilendirme">Ön Bilgilendirme Formu</Link><br />
+              <Link href="/rezervasyon-kosullari#odeme-guvenligi">SSL ve Ödeme Güvenliği</Link>''', '''              <Link href="/hakkimizda">Hakkımızda</Link><br />
+              <Link href="/teslimat-iade">Teslimat, İptal ve İade</Link><br />
+              <Link href="/gizlilik">Gizlilik Politikası</Link><br />
+              <Link href="/kvkk">KVKK Aydınlatma Metni</Link><br />
+              <Link href="/mesafeli-hizmet-sozlesmesi">Mesafeli Hizmet Sözleşmesi</Link><br />
+              <Link href="/on-bilgilendirme">Ön Bilgilendirme Formu</Link><br />
+              <Link href="/odeme-guvenligi">SSL ve Ödeme Güvenliği</Link>''')
+
+          replace_once("src/middleware.ts", '''const REGION_GUIDE_SLUGS = ["patara", "patara-plaji", "patara-antik-kenti", "kas", "kalkan"];''', '''const REGION_GUIDE_SLUGS = ["patara", "patara-plaji", "patara-antik-kenti", "kas", "kalkan"];
+          const LEGAL_PAGE_SLUGS = ["hakkimizda", "teslimat-iade", "gizlilik", "kvkk", "mesafeli-hizmet-sozlesmesi", "on-bilgilendirme", "odeme-guvenligi"];''')
+          replace_once("src/middleware.ts", '''  ["/rezervasyon-kosullari", "/site/rezervasyon-kosullari"],
+            ["/rehber", "/site/rehber"],''', '''  ["/rezervasyon-kosullari", "/site/rezervasyon-kosullari"],
+            ...LEGAL_PAGE_SLUGS.map((slug): [string, string] => [`/${slug}`, `/site/${slug}`]),
+            ["/rehber", "/site/rehber"],''')
+          replace_once("src/middleware.ts", '''  "/site", "/site/villa-safira", "/site/villa-destan", "/site/rezervasyon-kosullari", "/site/rehber",
+            ...REGION_GUIDE_SLUGS.map((slug) => `/site/rehber/${slug}`),''', '''  "/site", "/site/villa-safira", "/site/villa-destan", "/site/rezervasyon-kosullari", "/site/rehber",
+            ...LEGAL_PAGE_SLUGS.map((slug) => `/site/${slug}`),
+            ...REGION_GUIDE_SLUGS.map((slug) => `/site/rehber/${slug}`),''')
+
+          replace_once("custom-worker.mjs", '''const REGION_GUIDE_SLUGS = ["patara", "patara-plaji", "patara-antik-kenti", "kas", "kalkan"];''', '''const REGION_GUIDE_SLUGS = ["patara", "patara-plaji", "patara-antik-kenti", "kas", "kalkan"];
+          const LEGAL_PAGE_SLUGS = ["hakkimizda", "teslimat-iade", "gizlilik", "kvkk", "mesafeli-hizmet-sozlesmesi", "on-bilgilendirme", "odeme-guvenligi"];''')
+          replace_once("custom-worker.mjs", '''  ["/rezervasyon-kosullari", "/site/rezervasyon-kosullari"],
+            ["/rehber", "/site/rehber"],''', '''  ["/rezervasyon-kosullari", "/site/rezervasyon-kosullari"],
+            ...LEGAL_PAGE_SLUGS.map((slug) => [`/${slug}`, `/site/${slug}`]),
+            ["/rehber", "/site/rehber"],''')
+
+          replace_once("src/app/sitemap.ts", '''import { REGION_GUIDE_PAGE_SLUGS } from "@/lib/region-guide-pages";''', '''import { REGION_GUIDE_PAGE_SLUGS } from "@/lib/region-guide-pages";
+          import { LEGAL_PAGE_SLUGS } from "@/lib/legal-content";''')
+          replace_once("src/app/sitemap.ts", '''    { url: "https://safiradestan.com/rezervasyon-kosullari", lastModified: BUILD_TIME, changeFrequency: "monthly", priority: 0.5 },
+              { url: "https://safiradestan.com/rehber", lastModified: BUILD_TIME, changeFrequency: "monthly", priority: 0.6 },''', '''    { url: "https://safiradestan.com/rezervasyon-kosullari", lastModified: BUILD_TIME, changeFrequency: "monthly", priority: 0.5 },
+              ...LEGAL_PAGE_SLUGS.map((slug) => ({
+                url: `https://safiradestan.com/${slug}`,
+                lastModified: BUILD_TIME,
+                changeFrequency: "monthly" as const,
+                priority: 0.4,
+              })),
+              { url: "https://safiradestan.com/rehber", lastModified: BUILD_TIME, changeFrequency: "monthly", priority: 0.6 },''')
+
+          replace_once("src/lib/payments/audit.ts", '''  | "PAYMENT_OVERCHARGE_BLOCKED";''', '''  | "PAYMENT_OVERCHARGE_BLOCKED"
+            | "LEGAL_CONSENT_ACCEPTED";''')
+          replace_once("src/lib/payments/audit.ts", '''  amountMinor?: number;
+          }''', '''  amountMinor?: number;
+            legalVersion?: string;
+            termsAccepted?: boolean;
+            privacyNoticeAcknowledged?: boolean;
+            source?: "booking_inquiry" | "checkout";
+          }''')
+          replace_once("src/lib/payments/audit.ts", '''// Yalnız güvenli metadata: payment/reservation id, villa, tip, durum, tutar. E-posta/telefon/kart/
+          // hash/token/merchant_key/merchant_salt/ham callback body ASLA bu fonksiyona geçirilmemeli.''', '''// Yalnız güvenli metadata: payment/reservation id, villa, tip, durum, tutar ve yasal onay sürümü/
+          // booleanları. E-posta/telefon/kimlik/adres/kart/hash/token/merchant_key/merchant_salt/ham callback
+          // body ASLA bu fonksiyona geçirilmemeli.''')
+
+          replace_once("src/app/api/public/booking-inquiries/route.ts", '''import { clientIpFromHeaders, isRateLimited, recordRateLimitHit } from "@/lib/rate-limit";''', '''import { clientIpFromHeaders, isRateLimited, recordRateLimitHit } from "@/lib/rate-limit";
+          import { LEGAL_ACCEPTANCE_VERSION, hasValidLegalConsent } from "@/lib/legal-consent";
+          import { logPaymentAudit } from "@/lib/payments/audit";''')
+          replace_once("src/app/api/public/booking-inquiries/route.ts", '''  source: z.string().trim().max(40).optional().default("web"),
+          }).superRefine''', '''  source: z.string().trim().max(40).optional().default("web"),
+            termsAccepted: z.literal(true),
+            privacyNoticeAcknowledged: z.literal(true),
+            legalVersion: z.literal(LEGAL_ACCEPTANCE_VERSION),
+          }).superRefine''')
+          replace_once("src/app/api/public/booking-inquiries/route.ts", '''  const payload = await request.json().catch(() => null);
+            const parsed = schema.safeParse(payload);''', '''  const payload = await request.json().catch(() => null);
+            if (!hasValidLegalConsent(payload)) {
+              return NextResponse.json({ error: "Rezervasyon ve yasal bilgilendirme onayları gereklidir." }, { status: 400 });
+            }
+            const parsed = schema.safeParse(payload);''')
+          replace_once("src/app/api/public/booking-inquiries/route.ts", '''    // Kimlik/adres/e-posta ödeme audit log'undan ve genel reservation note alanından ayrı tutulur.''', '''    await logPaymentAudit("LEGAL_CONSENT_ACCEPTED", {
+              reservationId: result.inquiry.id,
+              villa: parsed.data.villa,
+              legalVersion: parsed.data.legalVersion,
+              termsAccepted: true,
+              privacyNoticeAcknowledged: true,
+              source: "booking_inquiry",
+            });
+
+            // Kimlik/adres/e-posta ödeme audit log'undan ve genel reservation note alanından ayrı tutulur.''')
+
+          replace_once("src/app/api/payments/checkout/route.ts", '''import { EXPIRY_GRACE_MINUTES } from "@/lib/payments/types";''', '''import { EXPIRY_GRACE_MINUTES } from "@/lib/payments/types";
+          import { LEGAL_ACCEPTANCE_VERSION, hasValidLegalConsent } from "@/lib/legal-consent";''')
+          replace_once("src/app/api/payments/checkout/route.ts", '''  address: z.string().trim().min(5).max(400),
+          });''', '''  address: z.string().trim().min(5).max(400),
+            termsAccepted: z.literal(true),
+            privacyNoticeAcknowledged: z.literal(true),
+            legalVersion: z.literal(LEGAL_ACCEPTANCE_VERSION),
+          });''')
+          replace_once("src/app/api/payments/checkout/route.ts", '''export async function POST(request: Request) {
+            const parsed = schema.safeParse(await request.json().catch(() => null));''', '''export async function POST(request: Request) {
+            const payload = await request.json().catch(() => null);
+            if (!hasValidLegalConsent(payload)) {
+              return Response.json({ ok: false, error: "Ödeme öncesi sözleşme ve bilgilendirme onayları gereklidir." }, { status: 400 });
+            }
+            const parsed = schema.safeParse(payload);''')
+          replace_once("src/app/api/payments/checkout/route.ts", '''  const { paymentId, name, email, phone, address } = parsed.data;''', '''  const { paymentId, name, email, phone, address, legalVersion } = parsed.data;''')
+          replace_once("src/app/api/payments/checkout/route.ts", '''  // Kaynak-doğruluk YALNIZ D1'deki payments.test_mode''', '''  await logPaymentAudit("LEGAL_CONSENT_ACCEPTED", {
+              paymentId,
+              reservationId: payment.reservationId,
+              villa: payment.villa,
+              legalVersion,
+              termsAccepted: true,
+              privacyNoticeAcknowledged: true,
+              source: "checkout",
+            });
+
+            // Kaynak-doğruluk YALNIZ D1'deki payments.test_mode''')
+
+          replace_once("src/components/payments/CheckoutForm.tsx", '''import Script from "next/script";''', '''import Script from "next/script";
+          import Link from "next/link";''')
+          replace_once("src/components/payments/CheckoutForm.tsx", '''import { trackBeginCheckout, type PaymentTypeAnalytics, type VillaId } from "@/lib/analytics";''', '''import { trackBeginCheckout, type PaymentTypeAnalytics, type VillaId } from "@/lib/analytics";
+          import { LEGAL_ACCEPTANCE_VERSION, hasValidLegalConsent } from "@/lib/legal-consent";''')
+          replace_once("src/components/payments/CheckoutForm.tsx", '''  initialAddress = "",
+            autoStart = false,''', '''  initialAddress = "",
+            initialTermsAccepted = false,
+            initialPrivacyNoticeAcknowledged = false,
+            initialLegalVersion = LEGAL_ACCEPTANCE_VERSION,
+            autoStart = false,''')
+          replace_once("src/components/payments/CheckoutForm.tsx", '''  initialAddress?: string;
+            autoStart?: boolean;''', '''  initialAddress?: string;
+            initialTermsAccepted?: boolean;
+            initialPrivacyNoticeAcknowledged?: boolean;
+            initialLegalVersion?: string;
+            autoStart?: boolean;''')
+          replace_once("src/components/payments/CheckoutForm.tsx", '''  const [address, setAddress] = useState(initialAddress);
+            const [loading, setLoading] = useState(false);''', '''  const [address, setAddress] = useState(initialAddress);
+            const [termsAccepted, setTermsAccepted] = useState(initialTermsAccepted);
+            const [privacyNoticeAcknowledged, setPrivacyNoticeAcknowledged] = useState(initialPrivacyNoticeAcknowledged);
+            const [legalVersion] = useState(initialLegalVersion);
+            const [loading, setLoading] = useState(false);''')
+          replace_once("src/components/payments/CheckoutForm.tsx", '''  const requestCheckout = useCallback(async () => {
+              setLoading(true);
+              setError("");''', '''  const requestCheckout = useCallback(async () => {
+              const consent = { termsAccepted, privacyNoticeAcknowledged, legalVersion };
+              if (!hasValidLegalConsent(consent)) {
+                setError("Ödeme öncesinde sözleşme ve bilgilendirme onaylarını tamamlayın.");
+                return;
+              }
+              setLoading(true);
+              setError("");''')
+          replace_once("src/components/payments/CheckoutForm.tsx", '''        body: JSON.stringify({ paymentId, name, email, phone, address }),''', '''        body: JSON.stringify({ paymentId, name, email, phone, address, termsAccepted, privacyNoticeAcknowledged, legalVersion }),''')
+          replace_once("src/components/payments/CheckoutForm.tsx", '''  }, [address, email, name, paymentId, paymentType, phone, testMode, villaId, villaName]);''', '''  }, [address, email, legalVersion, name, paymentId, paymentType, phone, privacyNoticeAcknowledged, termsAccepted, testMode, villaId, villaName]);''')
+          replace_once("src/components/payments/CheckoutForm.tsx", '''      {error ? <p className={styles.error}>{error}</p> : null}
+                <button type="submit" disabled={loading}>{loading ? "Hazırlanıyor…" : "Güvenli Ödemeye Geç"}</button>''', '''      <div className={styles.consentGroup}>
+                  <label className={styles.consentRow}>
+                    <input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} required />
+                    <span><Link href="/rezervasyon-kosullari" target="_blank">Rezervasyon ve Konaklama Koşulları</Link>, <Link href="/on-bilgilendirme" target="_blank">Ön Bilgilendirme Formu</Link> ve <Link href="/mesafeli-hizmet-sozlesmesi" target="_blank">Mesafeli Hizmet Sözleşmesi</Link>&apos;ni okudum ve kabul ediyorum.</span>
+                  </label>
+                  <label className={styles.consentRow}>
+                    <input type="checkbox" checked={privacyNoticeAcknowledged} onChange={(event) => setPrivacyNoticeAcknowledged(event.target.checked)} required />
+                    <span><Link href="/gizlilik" target="_blank">Gizlilik Politikası</Link> ve <Link href="/kvkk" target="_blank">KVKK Aydınlatma Metni</Link>&apos;ni inceledim.</span>
+                  </label>
+                </div>
+                {error ? <p className={styles.error}>{error}</p> : null}
+                <button type="submit" disabled={loading || !termsAccepted || !privacyNoticeAcknowledged}>{loading ? "Hazırlanıyor…" : "Güvenli Ödemeye Geç"}</button>''')
+
+          checkout_css = Path("src/components/payments/CheckoutForm.module.css")
+          checkout_css.write_text(checkout_css.read_text(encoding="utf-8") + r'''
+
+          .consentGroup { display: grid; gap: 10px; padding: 12px 0; border-top: 1px solid #e2d9c8; border-bottom: 1px solid #e2d9c8; }
+          .form .consentRow { display: grid; grid-template-columns: 18px 1fr; align-items: start; gap: 9px; font-weight: 500; line-height: 1.55; color: #5f574b; }
+          .form .consentRow input { width: 16px; height: 16px; margin: 2px 0 0; padding: 0; accent-color: #173f2a; }
+          .consentRow a { color: #173f2a; text-decoration: underline; text-underline-offset: 2px; }
+          ''', encoding="utf-8")
+
+          replace_once("src/components/PublicBookingWidget.tsx", '''import { CLOSED_SEASON_MESSAGE, hasClosedSeasonNight } from "@/lib/season-policy";''', '''import { CLOSED_SEASON_MESSAGE, hasClosedSeasonNight } from "@/lib/season-policy";
+          import { LEGAL_ACCEPTANCE_VERSION, hasValidLegalConsent } from "@/lib/legal-consent";''')
+          replace_once("src/components/PublicBookingWidget.tsx", '''  const [website, setWebsite] = useState("");
+            const [requestState, setRequestState]''', '''  const [website, setWebsite] = useState("");
+            const [termsAccepted, setTermsAccepted] = useState(false);
+            const [privacyNoticeAcknowledged, setPrivacyNoticeAcknowledged] = useState(false);
+            const [requestState, setRequestState]''')
+          replace_once("src/components/PublicBookingWidget.tsx", '''  async function submitInquiry(event: FormEvent<HTMLFormElement>) {
+              event.preventDefault();
+              if (!canSubmitInquiry) return;
+              setRequestState''', '''  async function submitInquiry(event: FormEvent<HTMLFormElement>) {
+              event.preventDefault();
+              if (!canSubmitInquiry) return;
+              if (!hasValidLegalConsent({ termsAccepted, privacyNoticeAcknowledged, legalVersion: LEGAL_ACCEPTANCE_VERSION })) {
+                setRequestState({ kind: "error", message: "Rezervasyon ve yasal bilgilendirme onaylarını tamamlayın." });
+                return;
+              }
+              setRequestState''')
+          replace_once("src/components/PublicBookingWidget.tsx", '''          source,
+                }),''', '''          source,
+                  termsAccepted,
+                  privacyNoticeAcknowledged,
+                  legalVersion: LEGAL_ACCEPTANCE_VERSION,
+                }),''')
+          replace_once("src/components/PublicBookingWidget.tsx", '''          <div className={styles.submitRow}>
+                    <button type="submit" disabled={requestState.kind === "sending"}>''', '''          <div className={styles.consentGroup}>
+                    <label className={styles.consentRow}>
+                      <input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} required />
+                      <span><Link href="/rezervasyon-kosullari" target="_blank" rel="noopener noreferrer">Rezervasyon ve Konaklama Koşulları</Link>, <Link href="/on-bilgilendirme" target="_blank" rel="noopener noreferrer">Ön Bilgilendirme Formu</Link> ve <Link href="/mesafeli-hizmet-sozlesmesi" target="_blank" rel="noopener noreferrer">Mesafeli Hizmet Sözleşmesi</Link>&apos;ni okudum ve kabul ediyorum.</span>
+                    </label>
+                    <label className={styles.consentRow}>
+                      <input type="checkbox" checked={privacyNoticeAcknowledged} onChange={(event) => setPrivacyNoticeAcknowledged(event.target.checked)} required />
+                      <span><Link href="/gizlilik" target="_blank" rel="noopener noreferrer">Gizlilik Politikası</Link> ve <Link href="/kvkk" target="_blank" rel="noopener noreferrer">KVKK Aydınlatma Metni</Link>&apos;ni inceledim.</span>
+                    </label>
+                  </div>
+
+                  <div className={styles.submitRow}>
+                    <button type="submit" disabled={requestState.kind === "sending" || !termsAccepted || !privacyNoticeAcknowledged}>''')
+          replace_once("src/components/PublicBookingWidget.tsx", '''            initialAddress={address}
+                autoStart''', '''            initialAddress={address}
+                initialTermsAccepted={termsAccepted}
+                initialPrivacyNoticeAcknowledged={privacyNoticeAcknowledged}
+                initialLegalVersion={LEGAL_ACCEPTANCE_VERSION}
+                autoStart''')
+
+          booking_css = Path("src/components/PublicBookingWidget.module.css")
+          booking_css.write_text(booking_css.read_text(encoding="utf-8") + r'''
+
+          .consentGroup { display: grid; gap: 10px; margin-top: 14px; padding: 13px 14px; background: #f8f5ee; border: 1px solid #e0d5c1; }
+          .consentRow { display: grid; grid-template-columns: 18px 1fr; align-items: start; gap: 9px; color: #5f574b; font-size: 11px; line-height: 1.55; }
+          .consentRow input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: #173f2a; }
+          .consentRow a { color: #173f2a; text-decoration: underline; text-underline-offset: 2px; }
+          ''', encoding="utf-8")
+
+          expected_routes = [
+              "src/app/site/hakkimizda/page.tsx",
+              "src/app/site/teslimat-iade/page.tsx",
+              "src/app/site/gizlilik/page.tsx",
+              "src/app/site/kvkk/page.tsx",
+              "src/app/site/mesafeli-hizmet-sozlesmesi/page.tsx",
+              "src/app/site/on-bilgilendirme/page.tsx",
+              "src/app/site/odeme-guvenligi/page.tsx",
+          ]
+          missing = [path for path in expected_routes if not Path(path).exists()]
+          if missing:
+              raise SystemExit(f"Missing generated legal routes: {missing}")
+          PY
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run tests
+        run: npm test
+
+      - name: Production build
+        run: npm run build
+
+      - name: Commit validated legal and consent changes
+        run: |
+          git config user.name "caglarmurat10-ui"
+          git config user.email "caglarmurat10@gmail.com"
+          git add \
+            src/lib/legal-content.ts \
+            src/lib/legal-consent.ts \
+            src/lib/legal-consent.test.ts \
+            src/lib/payments/audit.ts \
+            src/components/LegalInfoPage.tsx \
+            src/components/PublicBookingWidget.tsx \
+            src/components/PublicBookingWidget.module.css \
+            src/components/payments/CheckoutForm.tsx \
+            src/components/payments/CheckoutForm.module.css \
+            src/app/api/public/booking-inquiries/route.ts \
+            src/app/api/payments/checkout/route.ts \
+            src/app/site/page.tsx \
+            src/app/site/rezervasyon-kosullari/page.tsx \
+            src/app/site/hakkimizda/page.tsx \
+            src/app/site/teslimat-iade/page.tsx \
+            src/app/site/gizlilik/page.tsx \
+            src/app/site/kvkk/page.tsx \
+            src/app/site/mesafeli-hizmet-sozlesmesi/page.tsx \
+            src/app/site/on-bilgilendirme/page.tsx \
+            src/app/site/odeme-guvenligi/page.tsx \
+            src/app/sitemap.ts \
+            src/middleware.ts \
+            custom-worker.mjs
+          git diff --cached --check
+          if git diff --cached --quiet; then
+            echo "No source changes to commit"
+          else
+            git commit -m "Add standalone legal pages and enforce checkout consent"
+            git push origin HEAD:agent/cloudflare-migration
+          fi
