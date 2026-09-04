@@ -32,3 +32,9 @@
 .iframeWrap { width: 100%; max-width: 100%; }
 .loadingNote { font-size: 12px; color: #8a7f6c; margin: 0 0 10px; }
 .autoStart { width: 100%; }
+
+
+.consentGroup { display: grid; gap: 10px; padding: 12px 0; border-top: 1px solid #e2d9c8; border-bottom: 1px solid #e2d9c8; }
+.form .consentRow { display: grid; grid-template-columns: 18px 1fr; align-items: start; gap: 9px; font-weight: 500; line-height: 1.55; color: #5f574b; }
+.form .consentRow input { width: 16px; height: 16px; margin: 2px 0 0; padding: 0; accent-color: #173f2a; }
+.consentRow a { color: #173f2a; text-decoration: underline; text-underline-offset: 2px; }

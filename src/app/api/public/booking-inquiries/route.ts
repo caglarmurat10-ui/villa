@@ -11,6 +11,8 @@ import { isPaytrConfigured } from "@/lib/payments/paytr/config";
 import { createLivePaymentForInquiry } from "@/lib/payments/live-booking";
 import { FULL_PAYMENT_MAX_INSTALLMENT, PAYTR_TEST_MODE } from "@/lib/payments/types";
 import { clientIpFromHeaders, isRateLimited, recordRateLimitHit } from "@/lib/rate-limit";
+import { LEGAL_ACCEPTANCE_VERSION, hasValidLegalConsent } from "@/lib/legal-consent";
+import { logPaymentAudit } from "@/lib/payments/audit";
 
 export const dynamic = "force-dynamic";
 
@@ -32,6 +34,9 @@ const schema = z.object({
   note: z.string().trim().max(500).default(""),
   website: z.string().max(0).optional().default(""),
   source: z.string().trim().max(40).optional().default("web"),
+  termsAccepted: z.literal(true),
+  privacyNoticeAcknowledged: z.literal(true),
+  legalVersion: z.literal(LEGAL_ACCEPTANCE_VERSION),
 }).superRefine((value, context) => {
   if (value.checkOut <= value.checkIn) {
     context.addIssue({ code: "custom", path: ["checkOut"], message: "Çıkış tarihi girişten sonra olmalı." });
@@ -55,6 +60,9 @@ export async function POST(request: NextRequest) {
   await recordRateLimitHit(ip, RATE_LIMIT_SCOPE);
 
   const payload = await request.json().catch(() => null);
+  if (!hasValidLegalConsent(payload)) {
+    return NextResponse.json({ error: "Rezervasyon ve yasal bilgilendirme onayları gereklidir." }, { status: 400 });
+  }
   const parsed = schema.safeParse(payload);
   if (!parsed.success) {
     const message = parsed.error.issues[0]?.message ?? "Bilgileri kontrol edin.";
@@ -77,7 +85,16 @@ export async function POST(request: NextRequest) {
       source: parsed.data.source,
     });
 
-    // Kimlik/adres/e-posta ödeme audit log'undan ve genel reservation note alanından ayrı tutulur.
+    await logPaymentAudit("LEGAL_CONSENT_ACCEPTED", {
+    reservationId: result.inquiry.id,
+    villa: parsed.data.villa,
+    legalVersion: parsed.data.legalVersion,
+    termsAccepted: true,
+    privacyNoticeAcknowledged: true,
+    source: "booking_inquiry",
+  });
+
+  // Kimlik/adres/e-posta ödeme audit log'undan ve genel reservation note alanından ayrı tutulur.
     // Admin yalnız yetkili booking-inquiry detay endpoint'i üzerinden okur.
     await upsertBookingGuestDetails(result.inquiry.id, {
       email: parsed.data.email,

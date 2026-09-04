@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Script from "next/script";
+import Link from "next/link";
 import { trackBeginCheckout, type PaymentTypeAnalytics, type VillaId } from "@/lib/analytics";
+import { LEGAL_ACCEPTANCE_VERSION, hasValidLegalConsent } from "@/lib/legal-consent";
 import styles from "./CheckoutForm.module.css";
 
 export default function CheckoutForm({
@@ -15,6 +17,9 @@ export default function CheckoutForm({
   initialEmail = "",
   initialPhone = "",
   initialAddress = "",
+  initialTermsAccepted = false,
+  initialPrivacyNoticeAcknowledged = false,
+  initialLegalVersion = LEGAL_ACCEPTANCE_VERSION,
   autoStart = false,
 }: {
   paymentId: string;
@@ -26,6 +31,9 @@ export default function CheckoutForm({
   initialEmail?: string;
   initialPhone?: string;
   initialAddress?: string;
+  initialTermsAccepted?: boolean;
+  initialPrivacyNoticeAcknowledged?: boolean;
+  initialLegalVersion?: string;
   autoStart?: boolean;
 }) {
   // Normal /odeme sayfasında alanlar boş başlayabilir. Public rezervasyon akışında ise müşteri
@@ -34,6 +42,9 @@ export default function CheckoutForm({
   const [email, setEmail] = useState(initialEmail);
   const [phone, setPhone] = useState(initialPhone);
   const [address, setAddress] = useState(initialAddress);
+  const [termsAccepted, setTermsAccepted] = useState(initialTermsAccepted);
+  const [privacyNoticeAcknowledged, setPrivacyNoticeAcknowledged] = useState(initialPrivacyNoticeAcknowledged);
+  const [legalVersion] = useState(initialLegalVersion);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [iframeUrl, setIframeUrl] = useState<string | null>(null);
@@ -41,13 +52,18 @@ export default function CheckoutForm({
   const autoStarted = useRef(false);
 
   const requestCheckout = useCallback(async () => {
+    const consent = { termsAccepted, privacyNoticeAcknowledged, legalVersion };
+    if (!hasValidLegalConsent(consent)) {
+      setError("Ödeme öncesinde sözleşme ve bilgilendirme onaylarını tamamlayın.");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
       const response = await fetch("/api/payments/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paymentId, name, email, phone, address }),
+        body: JSON.stringify({ paymentId, name, email, phone, address, termsAccepted, privacyNoticeAcknowledged, legalVersion }),
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.ok) throw new Error(data.error ?? "Ödeme oturumu başlatılamadı.");
@@ -58,7 +74,7 @@ export default function CheckoutForm({
     } finally {
       setLoading(false);
     }
-  }, [address, email, name, paymentId, paymentType, phone, testMode, villaId, villaName]);
+  }, [address, email, legalVersion, name, paymentId, paymentType, phone, privacyNoticeAcknowledged, termsAccepted, testMode, villaId, villaName]);
 
   useEffect(() => {
     if (!autoStart || autoStarted.current) return;
@@ -128,8 +144,18 @@ export default function CheckoutForm({
         <span>Adres</span>
         <input type="text" required maxLength={400} value={address} onChange={(event) => setAddress(event.target.value)} placeholder="Fatura/iletişim adresi" autoComplete="street-address" />
       </label>
+      <div className={styles.consentGroup}>
+        <label className={styles.consentRow}>
+          <input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} required />
+          <span><Link href="/rezervasyon-kosullari" target="_blank">Rezervasyon ve Konaklama Koşulları</Link>, <Link href="/on-bilgilendirme" target="_blank">Ön Bilgilendirme Formu</Link> ve <Link href="/mesafeli-hizmet-sozlesmesi" target="_blank">Mesafeli Hizmet Sözleşmesi</Link>&apos;ni okudum ve kabul ediyorum.</span>
+        </label>
+        <label className={styles.consentRow}>
+          <input type="checkbox" checked={privacyNoticeAcknowledged} onChange={(event) => setPrivacyNoticeAcknowledged(event.target.checked)} required />
+          <span><Link href="/gizlilik" target="_blank">Gizlilik Politikası</Link> ve <Link href="/kvkk" target="_blank">KVKK Aydınlatma Metni</Link>&apos;ni inceledim.</span>
+        </label>
+      </div>
       {error ? <p className={styles.error}>{error}</p> : null}
-      <button type="submit" disabled={loading}>{loading ? "Hazırlanıyor…" : "Güvenli Ödemeye Geç"}</button>
+      <button type="submit" disabled={loading || !termsAccepted || !privacyNoticeAcknowledged}>{loading ? "Hazırlanıyor…" : "Güvenli Ödemeye Geç"}</button>
       <p className={styles.trustNote}>Güvenli kart ödeme işlemi PayTR altyapısı üzerinden gerçekleştirilir. Kart bilgileriniz Safira &amp; Destan Villas sistemlerinde saklanmaz.</p>
     </form>
   );

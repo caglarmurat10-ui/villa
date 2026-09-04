@@ -15,6 +15,7 @@ import {
 import { requestPaytrToken } from "@/lib/payments/paytr/token";
 import { logPaymentAudit } from "@/lib/payments/audit";
 import { EXPIRY_GRACE_MINUTES } from "@/lib/payments/types";
+import { LEGAL_ACCEPTANCE_VERSION, hasValidLegalConsent } from "@/lib/legal-consent";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,9 @@ const schema = z.object({
   email: z.string().trim().email().max(100).refine((value) => /^[\x00-\x7F]+$/.test(value), "E-posta yalnız ASCII karakter içermelidir."),
   phone: z.string().trim().min(7).max(20),
   address: z.string().trim().min(5).max(400),
+  termsAccepted: z.literal(true),
+  privacyNoticeAcknowledged: z.literal(true),
+  legalVersion: z.literal(LEGAL_ACCEPTANCE_VERSION),
 });
 
 const ORIGIN = "https://safiradestan.com";
@@ -37,11 +41,15 @@ const MAX_USER_IP_LENGTH = 39; // PayTR'ın dokümante ettiği user_ip üst sın
 // müşterinin gerçek IP'sini taşır (PayTR'ın zorunlu user_ip alanı için doğru kaynak - admin'in
 // "Ödeme Oluştur" anında değil).
 export async function POST(request: Request) {
-  const parsed = schema.safeParse(await request.json().catch(() => null));
+  const payload = await request.json().catch(() => null);
+  if (!hasValidLegalConsent(payload)) {
+    return Response.json({ ok: false, error: "Ödeme öncesi sözleşme ve bilgilendirme onayları gereklidir." }, { status: 400 });
+  }
+  const parsed = schema.safeParse(payload);
   if (!parsed.success) {
     return Response.json({ ok: false, error: "Lütfen tüm alanları eksiksiz doldurun." }, { status: 400 });
   }
-  const { paymentId, name, email, phone, address } = parsed.data;
+  const { paymentId, name, email, phone, address, legalVersion } = parsed.data;
 
   let payment = await getPayment(paymentId);
   if (!payment) {
@@ -70,6 +78,16 @@ export async function POST(request: Request) {
       error: "Ödeme için ayrılan süre sona erdi veya tarihler artık kullanılamıyor. Lütfen tarihleri yeniden seçin.",
     }, { status: 409 });
   }
+
+  await logPaymentAudit("LEGAL_CONSENT_ACCEPTED", {
+    paymentId,
+    reservationId: payment.reservationId,
+    villa: payment.villa,
+    legalVersion,
+    termsAccepted: true,
+    privacyNoticeAcknowledged: true,
+    source: "checkout",
+  });
 
   // Kaynak-doğruluk YALNIZ D1'deki payments.test_mode - istemciden gelen hiçbir alan (query/body)
   // bu kontrolü etkilemez. Gerçek ödemeler için aşağıdaki conflict guard'ın hiçbir dalı atlanmaz;

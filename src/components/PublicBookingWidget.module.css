@@ -380,3 +380,9 @@
   .paymentSummary strong { width: 100%; margin-left: 0; }
   .trust { gap: 10px 14px; }
 }
+
+
+.consentGroup { display: grid; gap: 10px; margin-top: 14px; padding: 13px 14px; background: #f8f5ee; border: 1px solid #e0d5c1; }
+.consentRow { display: grid; grid-template-columns: 18px 1fr; align-items: start; gap: 9px; color: #5f574b; font-size: 11px; line-height: 1.55; }
+.consentRow input { width: 16px; height: 16px; margin: 2px 0 0; accent-color: #173f2a; }
+.consentRow a { color: #173f2a; text-decoration: underline; text-underline-offset: 2px; }

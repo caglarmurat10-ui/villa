@@ -331,13 +331,13 @@ export default async function PublicHomePage() {
   <p>
     Müsaitlik kontrolünü yukarıdaki canlı takvimden yapabilirsiniz.<br />
     <Link href="/rezervasyon-kosullari">Rezervasyon ve Konaklama Koşulları</Link><br />
-    <Link href="/rezervasyon-kosullari#hakkimizda">Hakkımızda</Link><br />
-    <Link href="/rezervasyon-kosullari#teslimat-iade">Teslimat, İptal ve İade</Link><br />
-    <Link href="/rezervasyon-kosullari#gizlilik">Gizlilik Politikası</Link><br />
-    <Link href="/rezervasyon-kosullari#kvkk">KVKK Aydınlatma Metni</Link><br />
-    <Link href="/rezervasyon-kosullari#mesafeli-hizmet-sozlesmesi">Mesafeli Hizmet Sözleşmesi</Link><br />
-    <Link href="/rezervasyon-kosullari#on-bilgilendirme">Ön Bilgilendirme Formu</Link><br />
-    <Link href="/rezervasyon-kosullari#odeme-guvenligi">SSL ve Ödeme Güvenliği</Link>
+    <Link href="/hakkimizda">Hakkımızda</Link><br />
+    <Link href="/teslimat-iade">Teslimat, İptal ve İade</Link><br />
+    <Link href="/gizlilik">Gizlilik Politikası</Link><br />
+    <Link href="/kvkk">KVKK Aydınlatma Metni</Link><br />
+    <Link href="/mesafeli-hizmet-sozlesmesi">Mesafeli Hizmet Sözleşmesi</Link><br />
+    <Link href="/on-bilgilendirme">Ön Bilgilendirme Formu</Link><br />
+    <Link href="/odeme-guvenligi">SSL ve Ödeme Güvenliği</Link>
   </p>
 </div>
           <div>

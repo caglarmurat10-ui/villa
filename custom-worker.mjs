@@ -23,11 +23,13 @@ const PUBLIC_API_PATH_PREFIXES = ["/api/calendar/export/"];
 // Next.js "@/" alias'larını çözemediği için middleware.ts'i import edemez, bkz. dosyanın başındaki
 // genel NOT).
 const REGION_GUIDE_SLUGS = ["patara", "patara-plaji", "patara-antik-kenti", "kas", "kalkan"];
+const LEGAL_PAGE_SLUGS = ["hakkimizda", "teslimat-iade", "gizlilik", "kvkk", "mesafeli-hizmet-sozlesmesi", "on-bilgilendirme", "odeme-guvenligi"];
 const PUBLIC_ROUTE_MAP = new Map([
   ["/", "/site"],
   ["/villa-safira", "/site/villa-safira"],
   ["/villa-destan", "/site/villa-destan"],
   ["/rezervasyon-kosullari", "/site/rezervasyon-kosullari"],
+  ...LEGAL_PAGE_SLUGS.map((slug) => [`/${slug}`, `/site/${slug}`]),
   ["/rehber", "/site/rehber"],
   ...REGION_GUIDE_SLUGS.map((slug) => [`/rehber/${slug}`, `/site/rehber/${slug}`]),
 ]);

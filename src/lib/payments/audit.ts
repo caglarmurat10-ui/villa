@@ -17,7 +17,8 @@ export type PaymentAuditAction =
   | "PAYMENT_EXPIRED"
   | "PAYMENT_RETRY_BLOCKED"
   | "PAYMENT_ACTIVE_ATTEMPT_BLOCKED"
-  | "PAYMENT_OVERCHARGE_BLOCKED";
+  | "PAYMENT_OVERCHARGE_BLOCKED"
+  | "LEGAL_CONSENT_ACCEPTED";
 
 interface PaymentAuditPayload {
   paymentId?: string;
@@ -26,10 +27,15 @@ interface PaymentAuditPayload {
   paymentType?: string;
   status?: string;
   amountMinor?: number;
+  legalVersion?: string;
+  termsAccepted?: boolean;
+  privacyNoticeAcknowledged?: boolean;
+  source?: "booking_inquiry" | "checkout";
 }
 
-// Yalnız güvenli metadata: payment/reservation id, villa, tip, durum, tutar. E-posta/telefon/kart/
-// hash/token/merchant_key/merchant_salt/ham callback body ASLA bu fonksiyona geçirilmemeli.
+// Yalnız güvenli metadata: payment/reservation id, villa, tip, durum, tutar ve yasal onay sürümü/
+// booleanları. E-posta/telefon/kimlik/adres/kart/hash/token/merchant_key/merchant_salt/ham callback
+// body ASLA bu fonksiyona geçirilmemeli.
 export async function logPaymentAudit(action: PaymentAuditAction, payload: PaymentAuditPayload): Promise<void> {
   const { env } = await getCloudflareContext({ async: true });
   await env.DB.prepare(

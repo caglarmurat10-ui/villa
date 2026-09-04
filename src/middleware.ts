@@ -26,16 +26,19 @@ const WORKER_ALLOWED_PATHS = new Set([
 // eşleşmeli. Yeni bir rehber alt sayfası eklerken hem oradaki listeye hem buradaki iki map'e
 // (custom-worker.mjs'teki PUBLIC_ROUTE_MAP dahil) ekleme yapılmalı - yoksa route 404 verir.
 const REGION_GUIDE_SLUGS = ["patara", "patara-plaji", "patara-antik-kenti", "kas", "kalkan"];
+const LEGAL_PAGE_SLUGS = ["hakkimizda", "teslimat-iade", "gizlilik", "kvkk", "mesafeli-hizmet-sozlesmesi", "on-bilgilendirme", "odeme-guvenligi"];
 const PUBLIC_REWRITES = new Map([
   ["/", "/site"],
   ["/villa-safira", "/site/villa-safira"],
   ["/villa-destan", "/site/villa-destan"],
   ["/rezervasyon-kosullari", "/site/rezervasyon-kosullari"],
+  ...LEGAL_PAGE_SLUGS.map((slug): [string, string] => [`/${slug}`, `/site/${slug}`]),
   ["/rehber", "/site/rehber"],
   ...REGION_GUIDE_SLUGS.map((slug): [string, string] => [`/rehber/${slug}`, `/site/rehber/${slug}`]),
 ]);
 const PUBLIC_INTERNAL_PATHS = new Set([
   "/site", "/site/villa-safira", "/site/villa-destan", "/site/rezervasyon-kosullari", "/site/rehber",
+  ...LEGAL_PAGE_SLUGS.map((slug) => `/site/${slug}`),
   ...REGION_GUIDE_SLUGS.map((slug) => `/site/rehber/${slug}`),
 ]);
 

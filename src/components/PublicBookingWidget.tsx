@@ -7,6 +7,7 @@ import { toVillaId, trackCheckAvailability, trackGenerateLead } from "@/lib/anal
 import { computePriceQuote, splitEvenInstallments, type PriceSegment } from "@/lib/price-engine";
 import { validateBookingPrefill } from "@/lib/booking-prefill";
 import { CLOSED_SEASON_MESSAGE, hasClosedSeasonNight } from "@/lib/season-policy";
+import { LEGAL_ACCEPTANCE_VERSION, hasValidLegalConsent } from "@/lib/legal-consent";
 import CheckoutForm from "@/components/payments/CheckoutForm";
 import VillaAvailabilityCalendar from "./VillaAvailabilityCalendar";
 import styles from "./PublicBookingWidget.module.css";
@@ -123,6 +124,8 @@ export default function PublicBookingWidget({
   const [guestCount, setGuestCount] = useState(prefill.guestCount);
   const [note, setNote] = useState("");
   const [website, setWebsite] = useState("");
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyNoticeAcknowledged, setPrivacyNoticeAcknowledged] = useState(false);
   const [requestState, setRequestState] = useState<RequestState>({ kind: "idle", message: "" });
   const [checkout, setCheckout] = useState<CheckoutState>(null);
   const [source] = useState(() => resolveSource());
@@ -216,6 +219,10 @@ export default function PublicBookingWidget({
   async function submitInquiry(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSubmitInquiry) return;
+    if (!hasValidLegalConsent({ termsAccepted, privacyNoticeAcknowledged, legalVersion: LEGAL_ACCEPTANCE_VERSION })) {
+      setRequestState({ kind: "error", message: "Rezervasyon ve yasal bilgilendirme onaylarını tamamlayın." });
+      return;
+    }
     setRequestState({ kind: "sending", message: "Bilgileriniz kaydediliyor…" });
     setCheckout(null);
 
@@ -236,6 +243,9 @@ export default function PublicBookingWidget({
           note,
           website,
           source,
+          termsAccepted,
+          privacyNoticeAcknowledged,
+          legalVersion: LEGAL_ACCEPTANCE_VERSION,
         }),
       });
       const data = await response.json().catch(() => ({}));
@@ -411,8 +421,19 @@ export default function PublicBookingWidget({
             <input tabIndex={-1} autoComplete="off" value={website} onChange={(event) => setWebsite(event.target.value)} />
           </label>
 
-          <div className={styles.submitRow}>
-            <button type="submit" disabled={requestState.kind === "sending"}>
+          <div className={styles.consentGroup}>
+  <label className={styles.consentRow}>
+    <input type="checkbox" checked={termsAccepted} onChange={(event) => setTermsAccepted(event.target.checked)} required />
+    <span><Link href="/rezervasyon-kosullari" target="_blank" rel="noopener noreferrer">Rezervasyon ve Konaklama Koşulları</Link>, <Link href="/on-bilgilendirme" target="_blank" rel="noopener noreferrer">Ön Bilgilendirme Formu</Link> ve <Link href="/mesafeli-hizmet-sozlesmesi" target="_blank" rel="noopener noreferrer">Mesafeli Hizmet Sözleşmesi</Link>&apos;ni okudum ve kabul ediyorum.</span>
+  </label>
+  <label className={styles.consentRow}>
+    <input type="checkbox" checked={privacyNoticeAcknowledged} onChange={(event) => setPrivacyNoticeAcknowledged(event.target.checked)} required />
+    <span><Link href="/gizlilik" target="_blank" rel="noopener noreferrer">Gizlilik Politikası</Link> ve <Link href="/kvkk" target="_blank" rel="noopener noreferrer">KVKK Aydınlatma Metni</Link>&apos;ni inceledim.</span>
+  </label>
+</div>
+
+<div className={styles.submitRow}>
+  <button type="submit" disabled={requestState.kind === "sending" || !termsAccepted || !privacyNoticeAcknowledged}>
               {requestState.kind === "sending" ? "Hazırlanıyor…" : "Bilgileri Kaydet ve Kart Ödemesine Geç"}
             </button>
             <small>Kimlik ve iletişim bilgileri rezervasyon kaydı için kullanılır. Kart numarası, son kullanma tarihi ve CVV sistemimizde saklanmaz.</small>
@@ -456,6 +477,9 @@ export default function PublicBookingWidget({
             initialEmail={email}
             initialPhone={phone}
             initialAddress={address}
+            initialTermsAccepted={termsAccepted}
+            initialPrivacyNoticeAcknowledged={privacyNoticeAcknowledged}
+            initialLegalVersion={LEGAL_ACCEPTANCE_VERSION}
             autoStart
           />
         </section>
