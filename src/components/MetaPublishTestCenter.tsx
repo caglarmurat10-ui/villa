@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { isMetaTargetHardBlocked } from "@/lib/social-account-policy";
 
 type Check = {
   villa: "Safira" | "Destan";
@@ -16,12 +17,19 @@ type Check = {
   manualOnly?: string[];
 };
 
+type BlockedTarget = {
+  villa: "Safira" | "Destan";
+  platform: "Instagram" | "Facebook";
+  reason: string;
+};
+
 type Readiness = {
   checkedAt: string;
   ready: boolean;
   accountsReady: boolean;
   mediaReady: boolean;
   checks: Check[];
+  blocked?: BlockedTarget[];
 };
 
 type SmokePlan = {
@@ -70,8 +78,8 @@ export default function MetaPublishTestCenter() {
       }
       setReadiness(data);
       setNotice(data.ready
-        ? "✓ Dört Meta hedefi ve doğrulanmış Drive medya havuzu yayın testine hazır."
-        : "Ön kontrolde eksik var; kırmızı satırlar düzeltilmeden gerçek yayın yapılmayacak.");
+        ? "✓ Üç aktif Meta hedefi ve doğrulanmış Drive medya havuzu yayın testine hazır. Destan Instagram HARD BLOCK olarak dışarıda tutuluyor."
+        : "Ön kontrolde aktif hedeflerden birinde eksik var; kırmızı satırlar düzeltilmeden gerçek yayın yapılmayacak.");
     } catch {
       setNotice("Meta yayın ön kontrolüne ulaşılamadı.");
     } finally {
@@ -89,8 +97,9 @@ export default function MetaPublishTestCenter() {
         setNotice(data.error ?? "Kontrollü yayın planları hazırlanamadı.");
         return;
       }
-      setPlans(Array.isArray(data.plans) ? data.plans : []);
-      setNotice(`${data.message} Yeni: ${data.createdCount}, mevcut: ${data.existingCount}. Aşağıdaki dört karttan tek tek ilerleyebilirsiniz.`);
+      const nextPlans = Array.isArray(data.plans) ? data.plans : [];
+      setPlans(nextPlans);
+      setNotice(`${data.message} Yeni: ${data.createdCount}, mevcut: ${data.existingCount}. Aşağıdaki ${nextPlans.length} aktif karttan tek tek ilerleyebilirsiniz.`);
     } catch {
       setNotice("Kontrollü yayın planları hazırlanırken bağlantı kurulamadı.");
     } finally {
@@ -99,7 +108,7 @@ export default function MetaPublishTestCenter() {
   }
 
   async function approve(plan: SmokePlan) {
-    if (plan.status !== "Planlandı") return;
+    if (plan.status !== "Planlandı" || isMetaTargetHardBlocked(plan.villa, plan.platform)) return;
     setWorking(plan.id);
     setNotice("");
     try {
@@ -124,6 +133,10 @@ export default function MetaPublishTestCenter() {
 
   async function publish(plan: SmokePlan) {
     if (plan.status !== "Planlandı" || plan.approvalStatus !== "Onaylandı") return;
+    if (isMetaTargetHardBlocked(plan.villa, plan.platform)) {
+      setNotice("Villa Destan Instagram HARD BLOCK: Graph API yayın isteği gönderilmedi.");
+      return;
+    }
     const confirmed = window.confirm(`Villa ${plan.villa} ${plan.platform} test gönderisi GERÇEKTEN yayınlanacak. Devam edilsin mi?`);
     if (!confirmed) return;
 
@@ -159,47 +172,51 @@ export default function MetaPublishTestCenter() {
         <div>
           <small style={{display:"block",fontSize:9,fontWeight:900,letterSpacing:1.4,color:"#93c5fd"}}>KONTROLLÜ META YAYIN TESTİ</small>
           <h2 style={{margin:"5px 0 4px",fontSize:18}}>Ön kontrol → güvenli plan → insan onayı → gerçek yayın</h2>
-          <p style={{margin:0,maxWidth:760,color:"#9fb0c5",fontSize:11,lineHeight:1.55}}>Bu merkez Facebook ve Instagram hesaplarını, yayın kotasını ve doğrulanmış Safira/Destan medya havuzunu kontrol eder. Test planları otomatik hazırlanabilir ancak insan onayı verilmeden hiçbir içerik Meta'ya gönderilmez.</p>
+          <p style={{margin:0,maxWidth:760,color:"#9fb0c5",fontSize:11,lineHeight:1.55}}>Bu merkez aktif Meta hedeflerini, yayın kotasını ve doğrulanmış Safira/Destan medya havuzunu kontrol eder. Safira Instagram ile iki Facebook Sayfası desteklenir; Destan Instagram sahiplik sorunu çözülene kadar HARD BLOCK'tur. Test planları otomatik hazırlanabilir ancak insan onayı verilmeden hiçbir içerik Meta'ya gönderilmez.</p>
         </div>
         <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           <button type="button" onClick={runCheck} disabled={checking} style={{border:0,borderRadius:10,padding:"10px 13px",background:"#1d4ed8",color:"white",fontSize:11,fontWeight:900,cursor:"pointer"}}>{checking?"Kontrol ediliyor…":"Ön kontrolü çalıştır"}</button>
-          <button type="button" onClick={preparePlans} disabled={preparing || readiness?.ready !== true} style={{border:"1px solid #22c55e66",borderRadius:10,padding:"10px 13px",background:readiness?.ready?"#123522":"#17263c",color:readiness?.ready?"#bbf7d0":"#7f8ea3",fontSize:11,fontWeight:900,cursor:readiness?.ready?"pointer":"not-allowed"}}>{preparing?"Planlar hazırlanıyor…":"4 güvenli yayın planı hazırla"}</button>
+          <button type="button" onClick={preparePlans} disabled={preparing || readiness?.ready !== true} style={{border:"1px solid #22c55e66",borderRadius:10,padding:"10px 13px",background:readiness?.ready?"#123522":"#17263c",color:readiness?.ready?"#bbf7d0":"#7f8ea3",fontSize:11,fontWeight:900,cursor:readiness?.ready?"pointer":"not-allowed"}}>{preparing?"Planlar hazırlanıyor…":"3 güvenli yayın planı hazırla"}</button>
         </div>
       </div>
 
       {notice ? <div style={{marginTop:12,padding:"10px 12px",borderRadius:10,background:"#071b16",border:"1px solid #22c55e44",color:"#bbf7d0",fontSize:11}}>{notice}</div> : null}
 
-      {readiness ? <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:9,marginTop:12}}>
-        {readiness.checks.map((check) => <article key={`${check.villa}-${check.platform}`} style={{padding:12,border:`1px solid ${check.ready?"#22c55e55":"#ef444466"}`,borderRadius:12,background:"#071321"}}>
-          <div style={{display:"flex",justifyContent:"space-between",gap:8}}><strong style={{fontSize:11}}>Villa {check.villa} · {check.platform}</strong><b style={{fontSize:10,color:check.ready?"#86efac":"#fca5a5"}}>{check.ready?"✓ Hazır":"✕ Eksik"}</b></div>
-          <p style={{margin:"7px 0 0",fontSize:10,color:"#b8c6d8"}}>{check.account ?? check.error ?? "Hesap doğrulanamadı"}</p>
-          <p style={{margin:"5px 0 0",fontSize:9,color:"#8fa4bd"}}>Medya: {check.imageAssets} görsel · {check.videoAssets} video · Onaylı hazır plan: {check.readyPosts}</p>
-          {check.platform === "Instagram" && check.quota ? <p style={{margin:"5px 0 0",fontSize:9,color:"#93c5fd"}}>Instagram kotası: {check.quota.remaining ?? "?"}/{check.quota.quotaTotal ?? "?"}</p> : null}
-          <p style={{margin:"5px 0 0",fontSize:9,color:"#8fa4bd"}}>Destek: {check.capabilities.join(" · ")}{check.manualOnly?.length?` · Manuel: ${check.manualOnly.join(", ")}`:""}</p>
-        </article>)}
-      </div> : null}
+      {readiness ? <>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:9,marginTop:12}}>
+          {readiness.checks.map((check) => <article key={`${check.villa}-${check.platform}`} style={{padding:12,border:`1px solid ${check.ready?"#22c55e55":"#ef444466"}`,borderRadius:12,background:"#071321"}}>
+            <div style={{display:"flex",justifyContent:"space-between",gap:8}}><strong style={{fontSize:11}}>Villa {check.villa} · {check.platform}</strong><b style={{fontSize:10,color:check.ready?"#86efac":"#fca5a5"}}>{check.ready?"✓ Hazır":"✕ Eksik"}</b></div>
+            <p style={{margin:"7px 0 0",fontSize:10,color:"#b8c6d8"}}>{check.account ?? check.error ?? "Hesap doğrulanamadı"}</p>
+            <p style={{margin:"5px 0 0",fontSize:9,color:"#8fa4bd"}}>Medya: {check.imageAssets} görsel · {check.videoAssets} video · Onaylı hazır plan: {check.readyPosts}</p>
+            {check.platform === "Instagram" && check.quota ? <p style={{margin:"5px 0 0",fontSize:9,color:"#93c5fd"}}>Instagram kotası: {check.quota.remaining ?? "?"}/{check.quota.quotaTotal ?? "?"}</p> : null}
+            <p style={{margin:"5px 0 0",fontSize:9,color:"#8fa4bd"}}>Destek: {check.capabilities.join(" · ")}{check.manualOnly?.length?` · Manuel: ${check.manualOnly.join(", ")}`:""}</p>
+          </article>)}
+        </div>
+        {(readiness.blocked ?? []).map((blocked) => <div key={`${blocked.villa}-${blocked.platform}-blocked`} style={{marginTop:9,padding:"10px 12px",border:"1px solid #a1620766",borderRadius:10,background:"#241a06",color:"#fbbf24",fontSize:10}}><strong>Villa {blocked.villa} · {blocked.platform} · HARD BLOCK</strong> — {blocked.reason}</div>)}
+      </> : null}
 
       {plans.length ? <div style={{marginTop:14,borderTop:"1px solid #203b59",paddingTop:14}}>
         <div style={{display:"flex",justifyContent:"space-between",gap:10,alignItems:"center",flexWrap:"wrap"}}>
           <div><strong style={{fontSize:12}}>Kontrollü test planları</strong><p style={{margin:"3px 0 0",fontSize:10,color:"#8fa4bd"}}>Planları başka yerde aramanız gerekmez. Onay ve gerçek yayın burada, tek tek yapılır.</p></div>
-          <span style={{fontSize:10,color:"#93c5fd",fontWeight:900}}>{plans.length}/4 plan bulundu</span>
+          <span style={{fontSize:10,color:"#93c5fd",fontWeight:900}}>{plans.length}/3 aktif plan bulundu</span>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:9,marginTop:10}}>
           {plans.map((plan) => {
             const published = plan.status === "Yayınlandı";
             const approved = plan.approvalStatus === "Onaylandı";
             const busy = working === plan.id;
+            const blocked = isMetaTargetHardBlocked(plan.villa, plan.platform);
             return <article key={plan.id} style={{padding:12,border:`1px solid ${published?"#22c55e66":approved?"#3b82f666":"#475569"}`,borderRadius:12,background:"#071321"}}>
               <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"flex-start"}}>
                 <strong style={{fontSize:11}}>Villa {plan.villa} · {plan.platform}</strong>
-                <b style={{fontSize:9,color:published?"#86efac":approved?"#93c5fd":"#fbbf24"}}>{published?"✓ Yayınlandı":approved?"Onaylandı":"İnsan onayı bekliyor"}</b>
+                <b style={{fontSize:9,color:blocked?"#fbbf24":published?"#86efac":approved?"#93c5fd":"#fbbf24"}}>{blocked?"HARD BLOCK":published?"✓ Yayınlandı":approved?"Onaylandı":"İnsan onayı bekliyor"}</b>
               </div>
               <p style={{margin:"7px 0 0",fontSize:9,color:"#9fb0c5",lineHeight:1.45}}>{plan.caption.split("\n")[0]}</p>
               {plan.lastPublishError ? <p style={{margin:"6px 0 0",fontSize:9,color:"#fca5a5"}}>Son hata: {plan.lastPublishError}</p> : null}
               {plan.platformPostId ? <p style={{margin:"6px 0 0",fontSize:9,color:"#86efac"}}>Meta ID: {plan.platformPostId}</p> : null}
               <div style={{display:"flex",gap:7,marginTop:10,flexWrap:"wrap"}}>
-                <button type="button" onClick={() => approve(plan)} disabled={busy || published || approved} style={{border:"1px solid #3b82f666",borderRadius:8,padding:"8px 10px",background:!published&&!approved?"#172554":"#17263c",color:!published&&!approved?"#bfdbfe":"#64748b",fontSize:10,fontWeight:900,cursor:!published&&!approved?"pointer":"not-allowed"}}>{busy?"İşleniyor…":approved?"✓ Onaylandı":"1. İnsan onayı ver"}</button>
-                <button type="button" onClick={() => publish(plan)} disabled={busy || published || !approved} style={{border:"1px solid #22c55e66",borderRadius:8,padding:"8px 10px",background:approved&&!published?"#123522":"#17263c",color:approved&&!published?"#bbf7d0":"#64748b",fontSize:10,fontWeight:900,cursor:approved&&!published?"pointer":"not-allowed"}}>{published?"✓ Gerçek yayın tamam":busy?"Yayınlanıyor…":"2. Gerçek yayını gönder"}</button>
+                <button type="button" onClick={() => approve(plan)} disabled={blocked || busy || published || approved} style={{border:"1px solid #3b82f666",borderRadius:8,padding:"8px 10px",background:!blocked&&!published&&!approved?"#172554":"#17263c",color:!blocked&&!published&&!approved?"#bfdbfe":"#64748b",fontSize:10,fontWeight:900,cursor:!blocked&&!published&&!approved?"pointer":"not-allowed"}}>{blocked?"HARD BLOCK":busy?"İşleniyor…":approved?"✓ Onaylandı":"1. İnsan onayı ver"}</button>
+                <button type="button" onClick={() => publish(plan)} disabled={blocked || busy || published || !approved} style={{border:"1px solid #22c55e66",borderRadius:8,padding:"8px 10px",background:!blocked&&approved&&!published?"#123522":"#17263c",color:!blocked&&approved&&!published?"#bbf7d0":"#64748b",fontSize:10,fontWeight:900,cursor:!blocked&&approved&&!published?"pointer":"not-allowed"}}>{blocked?"Yayın kapalı":published?"✓ Gerçek yayın tamam":busy?"Yayınlanıyor…":"2. Gerçek yayını gönder"}</button>
               </div>
             </article>;
           })}
