@@ -43,9 +43,10 @@ export interface PaytrReadiness {
   merchantPanelChecklist: PaytrChecklistItem[];
 }
 
-// "PAYTR_READY" hiçbir zaman otomatik dönmez: canlıya geçiş (PAYTR_TEST_MODE=false) bilinçli bir
-// kod değişikliği+deploy gerektirir (bkz. types.ts), bu yüzden test_mode açıkken en iyi ihtimalle
-// PAYTR_TEST_MODE_ONLY - gerçek tahsilat teknik olarak mümkün değildir.
+// PAYTR_READY burada yalnız iki kod-seviyesi koşulu ifade eder: merchant secret'ları tanımlı ve
+// PAYTR_TEST_MODE=false. Merchant hesabının gerçekten aktif olduğu, callback/domain/taksit ayarlarının
+// doğru olduğu anlamına GELMEZ; onlar aşağıdaki MANUAL_ONLY checklist veya canlı bağlantı testiyle
+// ayrıca doğrulanır.
 export async function getPaytrReadiness(): Promise<PaytrReadiness> {
   const configured = await isPaytrConfigured();
   const merchantPanelChecklist: PaytrChecklistItem[] = [
