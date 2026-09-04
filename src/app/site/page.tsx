@@ -326,7 +326,20 @@ export default async function PublicHomePage() {
               {locations.Destan && <a href={locations.Destan} rel="noopener noreferrer" target="_blank">Villa Destan konumu</a>}
             </p>
           </div>
-          <div><small>REZERVASYON</small><p>Müsaitlik kontrolünü yukarıdaki canlı takvimden yapabilirsiniz.<br /><Link href="/rezervasyon-kosullari">Rezervasyon ve Konaklama Koşulları</Link></p></div>
+          <div>
+  <small>REZERVASYON &amp; YASAL</small>
+  <p>
+    Müsaitlik kontrolünü yukarıdaki canlı takvimden yapabilirsiniz.<br />
+    <Link href="/rezervasyon-kosullari">Rezervasyon ve Konaklama Koşulları</Link><br />
+    <Link href="/rezervasyon-kosullari#hakkimizda">Hakkımızda</Link><br />
+    <Link href="/rezervasyon-kosullari#teslimat-iade">Teslimat, İptal ve İade</Link><br />
+    <Link href="/rezervasyon-kosullari#gizlilik">Gizlilik Politikası</Link><br />
+    <Link href="/rezervasyon-kosullari#kvkk">KVKK Aydınlatma Metni</Link><br />
+    <Link href="/rezervasyon-kosullari#mesafeli-hizmet-sozlesmesi">Mesafeli Hizmet Sözleşmesi</Link><br />
+    <Link href="/rezervasyon-kosullari#on-bilgilendirme">Ön Bilgilendirme Formu</Link><br />
+    <Link href="/rezervasyon-kosullari#odeme-guvenligi">SSL ve Ödeme Güvenliği</Link>
+  </p>
+</div>
           <div>
             <small>SOSYAL</small>
             <p>
