@@ -1,6 +1,7 @@
 import { GUIDE_PLACES, GUIDE_CATEGORIES, type GuidePlace } from "@/lib/region-guide";
 import { EVERGREEN_TIPS, TRUST_CLAIMS } from "@/lib/social-design-templates";
 import { ITINERARY_DEFINITIONS, itineraryCaption, resolveItineraryPlaces } from "@/lib/itinerary-content";
+import { ctaStyleForIndex, pickCtaLine } from "@/lib/social-engagement";
 import type { SocialContentTemplate } from "@/lib/social-content-library";
 import type { Villa } from "@/lib/types";
 
@@ -17,9 +18,23 @@ import type { Villa } from "@/lib/types";
 // bağımsız) kullanılır.
 
 const VILLAS: Villa[] = ["Safira", "Destan"];
+const DISCOVERY_THEMES = new Set(["Bölge", "Gezi", "Tarih-Doğa", "Yerel İpucu", "Rota"]);
 
 function villaSlug(villa: Villa): "safira" | "destan" {
   return villa === "Safira" ? "safira" : "destan";
+}
+
+function stableSeed(value: string): number {
+  let hash = 0;
+  for (const char of value) hash = (Math.imul(hash, 31) + char.charCodeAt(0)) >>> 0;
+  return hash;
+}
+
+function appendDiscoveryGrowthCta(id: string, theme: string, caption: string): string {
+  if (!DISCOVERY_THEMES.has(theme)) return caption;
+  const seed = stableSeed(id);
+  const style = ctaStyleForIndex(seed);
+  return `${caption}\n\n${pickCtaLine(style, seed)}`;
 }
 
 function guideCaption(place: GuidePlace, villa: Villa): { hook: string; caption: string } {
@@ -53,9 +68,10 @@ function trustCaption(claim: string, villa: Villa): { hook: string; caption: str
 
 function baseTemplate(id: string, villa: Villa, theme: string, hook: string, caption: string, publicPath: string): SocialContentTemplate {
   const mediaUrl = `/api/public/social-assets/${publicPath}`;
+  const finalCaption = appendDiscoveryGrowthCta(id, theme, caption);
   return {
     id, scheduledDate: new Date().toISOString().slice(0, 10), villa, format: "Feed", contentType: "Gönderi",
-    theme, mediaFile: publicPath, hook, caption,
+    theme, mediaFile: publicPath, hook, caption: finalCaption,
     mediaResolved: true, mediaKind: "image", driveFileId: "", driveViewUrl: "", previewUrl: "",
     mediaUrl, mediaUrls: [mediaUrl],
   };
