@@ -83,7 +83,10 @@ export async function requestPaytrToken(input: TokenRequestInput): Promise<Token
     payment_amount: paymentAmount,
     paytr_token: paytrToken,
     user_basket: userBasket,
-    debug_on: input.testMode ? "1" : "0",
+    // PayTR resmi dokümanı entegrasyon aşamasında debug_on=1 bırakılmasını öneriyor. Bu yalnız
+    // başarısız token isteğinin nedenini JSON `reason` alanında döndürür; test_mode'ı değiştirmez
+    // ve tek başına tahsilat oluşturmaz. İlk başarılı canlı iframe doğrulamasından sonra 0'a çekilecek.
+    debug_on: "1",
     no_installment: noInstallment,
     max_installment: maxInstallment,
     user_name: input.userName,
