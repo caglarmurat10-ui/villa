@@ -2,6 +2,7 @@ import { getFacebookPageProfile } from "@/lib/facebook";
 import { getInstagramProfile, getInstagramPublishingLimit } from "@/lib/meta";
 import { getFacebookCredentials, getInstagramCredentials, listMetaAccounts } from "@/lib/meta-store";
 import { brandProfiles } from "@/lib/brand-profiles";
+import { DESTAN_INSTAGRAM_HARD_BLOCK, isMetaTargetHardBlocked } from "@/lib/social-account-policy";
 import type { Villa } from "@/lib/types";
 
 const villas: Villa[] = ["Safira", "Destan"];
@@ -58,7 +59,7 @@ export async function GET() {
   const connected = new Set(accounts.map((item) => `${item.villa}:${item.platform}`));
 
   const checks = await Promise.all(villas.flatMap((villa) => [
-    (async () => {
+    ...(isMetaTargetHardBlocked(villa, "Instagram") ? [] : [(async () => {
       const isConnected = connected.has(`${villa}:Instagram`);
       if (!isConnected) return { villa, platform: "Instagram" as const, connected: false, healthy: false, label: "Bağlı değil" };
       try {
@@ -100,7 +101,7 @@ export async function GET() {
       } catch (error) {
         return { villa, platform: "Instagram" as const, connected: true, healthy: false, ...safeFailure(error, "Instagram") };
       }
-    })(),
+    })()]),
     (async () => {
       const isConnected = connected.has(`${villa}:Facebook`);
       if (!isConnected) return { villa, platform: "Facebook" as const, connected: false, healthy: false, label: "Bağlı değil" };
@@ -153,6 +154,11 @@ export async function GET() {
     healthy: checks.every((item) => item.connected && item.healthy),
     connectedCount: checks.filter((item) => item.connected).length,
     expectedCount: checks.length,
+    blocked: [{
+      villa: DESTAN_INSTAGRAM_HARD_BLOCK.villa,
+      platform: DESTAN_INSTAGRAM_HARD_BLOCK.platform,
+      label: DESTAN_INSTAGRAM_HARD_BLOCK.reason,
+    }],
     checks,
   }, {
     headers: { "Cache-Control": "no-store" },
