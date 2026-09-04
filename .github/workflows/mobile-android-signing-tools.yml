@@ -1,0 +1,37 @@
+name: Android Signing Tools Export
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - agent/cloudflare-migration
+    paths:
+      - ".github/workflows/mobile-android-signing-tools.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  export-signing-tools:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Export latest Android build-tools signing utilities
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUILD_TOOLS_DIR="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          echo "Using build tools: $BUILD_TOOLS_DIR"
+          mkdir -p signing-tools/lib
+          cp "$BUILD_TOOLS_DIR/apksigner" signing-tools/
+          cp "$BUILD_TOOLS_DIR/zipalign" signing-tools/
+          cp "$BUILD_TOOLS_DIR/lib/apksigner.jar" signing-tools/lib/
+          printf '%s\n' "$(basename "$BUILD_TOOLS_DIR")" > signing-tools/BUILD_TOOLS_VERSION.txt
+          chmod +x signing-tools/apksigner signing-tools/zipalign
+
+      - name: Upload signing tools
+        uses: actions/upload-artifact@v4
+        with:
+          name: Android-official-signing-tools
+          path: signing-tools
+          if-no-files-found: error
+          retention-days: 1
