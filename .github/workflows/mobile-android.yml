@@ -1,4 +1,4 @@
-name: Mobile Android APK
+name: Mobile Android Release
 
 on:
   workflow_dispatch:
@@ -46,16 +46,18 @@ jobs:
       - name: Sync Capacitor Android
         run: npx cap sync android
 
-      - name: Build debug APK
+      - name: Build unsigned release APK and AAB
         run: |
           chmod +x android/gradlew
           cd android
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew assembleRelease bundleRelease --stacktrace
 
-      - name: Upload APK artifact
+      - name: Upload unsigned release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Villa-Yonetim-Android-debug
-          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          name: Villa-Yonetim-Android-1.1.0-unsigned
+          path: |
+            mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
+            mobile/android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 3
