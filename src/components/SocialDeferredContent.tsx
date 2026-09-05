@@ -14,9 +14,15 @@ const SocialMediaView = dynamic(() => import("@/components/SocialMediaView"), {
   loading: () => <div style={{maxWidth:1250,margin:"14px auto",padding:"16px 20px",color:"#94a3b8"}}>Sosyal takvim yükleniyor…</div>,
 });
 
+const SocialGrowthAgentPanel = dynamic(() => import("@/components/SocialGrowthAgentPanel"), {
+  ssr: false,
+  loading: () => <div style={{maxWidth:1250,margin:"14px auto",padding:"16px 20px",color:"#94a3b8"}}>Social Growth Agent yükleniyor…</div>,
+});
+
 export default function SocialDeferredContent({ posts, gaps }: { posts: SocialPost[]; gaps: AvailabilityGap[] }) {
   return <>
     <SocialContentLibrary />
     <SocialMediaView initialPosts={posts} availabilityGaps={gaps} />
+    <SocialGrowthAgentPanel />
   </>;
 }
