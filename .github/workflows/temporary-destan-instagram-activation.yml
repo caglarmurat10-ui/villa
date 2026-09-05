@@ -1,0 +1,166 @@
+name: Temporary Destan Instagram Activation
+
+on:
+  push:
+    branches:
+      - agent/cloudflare-migration
+
+permissions:
+  contents: write
+
+jobs:
+  activate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/cloudflare-migration
+          fetch-depth: 0
+
+      - name: Activate verified Destan Instagram safely
+        shell: bash
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+
+          def replace(path, old, new, count=1):
+              p = Path(path)
+              text = p.read_text(encoding='utf-8')
+              actual = text.count(old)
+              if actual != count:
+                  raise SystemExit(f'{path}: expected {count} occurrence(s), found {actual}: {old[:120]!r}')
+              p.write_text(text.replace(old, new), encoding='utf-8')
+
+          # 1) Destan Instagram is now an active Meta target after a successful OAuth connection.
+          replace(
+              'src/lib/social-account-policy.ts',
+              '  blocked: true as const,\n  reason: "Meta Business Portfolio / hesap sahipliği sorunu çözülene kadar bağlantı ve yayın devre dışı.",',
+              '  blocked: false as boolean,\n  reason: "Instagram OAuth bağlantısı başarıyla doğrulandı; Destan Instagram aktif Meta hedefidir.",'
+          )
+          replace(
+              'src/lib/social-account-policy.ts',
+              '  { villa: "Destan", platform: "Facebook" },\n] as const satisfies readonly MetaTarget[];',
+              '  { villa: "Destan", platform: "Facebook" },\n  { villa: "Destan", platform: "Instagram" },\n] as const satisfies readonly MetaTarget[];'
+          )
+          replace(
+              'src/lib/social-account-policy.ts',
+              '  return villa === DESTAN_INSTAGRAM_HARD_BLOCK.villa && platform === DESTAN_INSTAGRAM_HARD_BLOCK.platform;',
+              '  return DESTAN_INSTAGRAM_HARD_BLOCK.blocked && villa === DESTAN_INSTAGRAM_HARD_BLOCK.villa && platform === DESTAN_INSTAGRAM_HARD_BLOCK.platform;'
+          )
+          replace(
+              'src/lib/social-account-policy.ts',
+              '// Organik yayın için fiilen desteklenen hedefler. Destan Instagram bilinçli olarak bu listede yoktur;\n// hem cron hem manuel publish endpoint\'i ayrıca HARD BLOCK uygular.',
+              '// Organik yayın için fiilen desteklenen Meta hedefleri. Destan Instagram OAuth bağlantısı\n// 2026-09-05 tarihinde başarıyla doğrulandığı için aktif hedefler arasına alınmıştır.'
+          )
+
+          # 2) Do not flush legacy Destan IG backlog. Old/today rows remain guarded; future rows are active.
+          replace(
+              'custom-worker.mjs',
+              "AND NOT (villa = 'Destan' AND platform = 'Instagram')",
+              "AND NOT (villa = 'Destan' AND platform = 'Instagram' AND scheduled_date <= '2026-09-05')"
+          )
+          replace(
+              'src/app/api/meta/instagram/publish/route.ts',
+              '  if (post.villa === "Destan") {',
+              '  if (post.villa === "Destan" && post.scheduledDate <= "2026-09-05") {'
+          )
+          replace(
+              'src/app/api/meta/instagram/publish/route.ts',
+              '    return Response.json({ error: "Villa Destan Instagram hesabı için bağlantı/sahiplik sorunu çözülene kadar yayın devre dışı bırakıldı." }, { status: 409 });',
+              '    return Response.json({ error: "Villa Destan Instagram eski bekleyen içerikleri güvenlik nedeniyle yeniden yayınlanmaz. 6 Eylül 2026 ve sonrası planlar aktiftir." }, { status: 409 });'
+          )
+
+          # 3) Diagnostics and live Meta health now include Destan Instagram.
+          replace(
+              'src/lib/meta-diagnostics.ts',
+              '      hardBlocked: [{\n        label: `${DESTAN_INSTAGRAM_HARD_BLOCK.villa} ${DESTAN_INSTAGRAM_HARD_BLOCK.platform}`,\n        reason: DESTAN_INSTAGRAM_HARD_BLOCK.reason,\n      }],',
+              '      hardBlocked: DESTAN_INSTAGRAM_HARD_BLOCK.blocked ? [{\n        label: `${DESTAN_INSTAGRAM_HARD_BLOCK.villa} ${DESTAN_INSTAGRAM_HARD_BLOCK.platform}`,\n        reason: DESTAN_INSTAGRAM_HARD_BLOCK.reason,\n      }] : [],'
+          )
+          replace(
+              'src/app/api/meta/health/route.ts',
+              '    blocked: [{\n      villa: DESTAN_INSTAGRAM_HARD_BLOCK.villa,\n      platform: DESTAN_INSTAGRAM_HARD_BLOCK.platform,\n      label: DESTAN_INSTAGRAM_HARD_BLOCK.reason,\n    }],',
+              '    blocked: DESTAN_INSTAGRAM_HARD_BLOCK.blocked ? [{\n      villa: DESTAN_INSTAGRAM_HARD_BLOCK.villa,\n      platform: DESTAN_INSTAGRAM_HARD_BLOCK.platform,\n      label: DESTAN_INSTAGRAM_HARD_BLOCK.reason,\n    }] : [],'
+          )
+
+          # 4) Desktop UI wording follows the resolved connection state.
+          replace(
+              'src/components/MetaConnections.tsx',
+              'Safira Instagram ayrı tutulur. Facebook ise Safira ve Destan için tek ortak Meta OAuth oturumuyla bağlanır;',
+              'Instagram hesapları villa bazında ayrı tutulur. Facebook ise Safira ve Destan için tek ortak Meta OAuth oturumuyla bağlanır;'
+          )
+          replace(
+              'src/components/MetaDiagnostics.tsx',
+              'Safira Instagram ile Safira ve Destan Facebook bağlantıları tamam.',
+              'Safira ve Destan Instagram/Facebook bağlantıları tamam.'
+          )
+          replace(
+              'src/app/api/meta/smoke-plans/route.ts',
+              '    message: `${META_ACTIVE_TARGETS.length} kontrollü yayın planı hazırlandı. Destan Instagram HARD BLOCK nedeniyle plana alınmaz. Hiçbiri insan onayı olmadan Meta\'ya gönderilmez.`,',
+              '    message: `${META_ACTIVE_TARGETS.length} kontrollü yayın planı hazırlandı. Tüm aktif Meta hedefleri kapsanır. Hiçbiri insan onayı olmadan Meta\'ya gönderilmez.`,',
+          )
+
+          # 5) Mobile APIs must stop reporting a resolved hard block.
+          replace(
+              'src/app/api/mobile/v1/social/route.ts',
+              'import { getPostAutomationClasses } from "@/lib/social-library-summary";\n',
+              'import { getPostAutomationClasses } from "@/lib/social-library-summary";\nimport { isMetaTargetHardBlocked } from "@/lib/social-account-policy";\n'
+          )
+          replace(
+              'src/app/api/mobile/v1/social/route.ts',
+              '      destanInstagramHardBlocked: p.villa === "Destan" && p.platform === "Instagram",',
+              '      destanInstagramHardBlocked: isMetaTargetHardBlocked(p.villa, p.platform),'
+          )
+          replace(
+              'src/app/api/mobile/v1/dashboard/route.ts',
+              'import type { Reservation } from "@/lib/types";\n',
+              'import type { Reservation } from "@/lib/types";\nimport { DESTAN_INSTAGRAM_HARD_BLOCK } from "@/lib/social-account-policy";\n'
+          )
+          replace(
+              'src/app/api/mobile/v1/dashboard/route.ts',
+              '      destanInstagramHardBlocked: true,',
+              '      destanInstagramHardBlocked: DESTAN_INSTAGRAM_HARD_BLOCK.blocked,'
+          )
+
+          # 6) Remove the always-visible stale mobile warning card. Per-post badge remains data-driven.
+          mobile = Path('mobile/src/screens/SocialScreen.tsx')
+          text = mobile.read_text(encoding='utf-8')
+          start = text.index('        <div className="card" style={{ borderColor: "#a16207", marginTop: 4 }}>')
+          end_marker = '        <div style={{ display: "flex", gap: 8, margin: "14px 0 10px" }}>'
+          end = text.index(end_marker, start)
+          text = text[:start] + end_marker + text[end + len(end_marker):]
+          text = text.replace('  const [warningOpen, setWarningOpen] = useState(false);\n', '')
+          mobile.write_text(text, encoding='utf-8')
+
+          # 7) Desktop hard-block count card should only exist while a real hard block exists.
+          p = Path('src/components/SocialPublishHealth.tsx')
+          text = p.read_text(encoding='utf-8')
+          old = '          <div style={{padding:"8px 10px",border:"1px solid #a16207",borderRadius:9,background:"#241a06",color:"#fbbf24"}}>HARD BLOCK (Destan IG)<br /><b style={{fontSize:15}}>{destanIgWaiting.length}</b></div>'
+          if text.count(old) != 1:
+              raise SystemExit(f'SocialPublishHealth hard-block count card occurrence={text.count(old)}')
+          text = text.replace(old, '          {destanIgWaiting.length > 0 ? <div style={{padding:"8px 10px",border:"1px solid #a16207",borderRadius:9,background:"#241a06",color:"#fbbf24"}}>HARD BLOCK (Destan IG)<br /><b style={{fontSize:15}}>{destanIgWaiting.length}</b></div> : null}')
+          p.write_text(text, encoding='utf-8')
+
+          print('Destan Instagram activation patch applied.')
+          PY
+
+      - name: Show remaining Destan hard-block references
+        shell: bash
+        run: |
+          grep -R -n -E 'Destan Instagram.*(HARD BLOCK|kapalı|sahiplik|bekleniyor)|HARD BLOCK \(Destan IG\)' src mobile custom-worker.mjs --include='*.ts' --include='*.tsx' --include='*.mjs' || true
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run tests
+        run: npm test
+
+      - name: Commit activation and remove this temporary workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/temporary-destan-instagram-activation.yml
+          git add custom-worker.mjs src mobile
+          git commit -m 'Activate verified Destan Instagram safely'
+          git push origin HEAD:agent/cloudflare-migration
