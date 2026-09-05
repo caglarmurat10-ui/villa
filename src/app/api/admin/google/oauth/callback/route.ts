@@ -1,13 +1,51 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
+import { discoverGbpAccountsAndLocations } from "@/lib/gbp/adapter";
+import { setGbpLocationMapping } from "@/lib/gbp/mapping";
 
 export const dynamic = "force-dynamic";
 
-// admin.safiradestan.com'da adminAuthGate tarafından zaten korunuyor - Google'ın kendisi de
-// yalnız /api/admin/google/oauth/start'tan başlatılmış, geçerli state'i olan bir isteği buraya
-// yönlendirebilir (kullanıcı zaten oturum açmış olmalı, çünkü start endpoint'i de korunuyor).
-//
-// Access/refresh token DEĞERLERİ hiçbir zaman loglanmaz veya response'ta geri gösterilmez - yalnız
-// GOOGLE_PRIVATE KV'ye yazılır. Authorization code da loglanmaz.
+const GOOGLE_CORE_CONNECTIONS = ["search_console", "ga4", "gbp"] as const;
+const SINGLE_CONNECTIONS = new Set(["search_console", "ga4", "gbp", "google_ads"]);
+
+function normalizeTitle(value: string): string {
+  return value.normalize("NFKC").trim().toLocaleLowerCase("tr-TR");
+}
+
+async function tryExactGbpAutoMapping(redirectBack: URL): Promise<void> {
+  try {
+    const discovery = await discoverGbpAccountsAndLocations();
+    if (discovery.state !== "READY_READ_ONLY") {
+      redirectBack.searchParams.set("gbp_auto_mapping", discovery.state.toLowerCase());
+      return;
+    }
+
+    // Burada isim BENZERLIGI yok. Yalniz daha once kullanici tarafindan acikca belirlenen
+    // Villa Safira -> "Villa Safira" ve Villa Destan -> "Villa Destan" eslemesi, her baslik
+    // discovery sonucunda TEK ve TAM eslesiyorsa otomatik kaydedilir. Arici Tarim veya baska
+    // herhangi bir isletme hicbir kosulda villa olarak eslestirilmez.
+    const safira = discovery.locations.filter((location) => normalizeTitle(location.title) === "villa safira");
+    const destan = discovery.locations.filter((location) => normalizeTitle(location.title) === "villa destan");
+
+    if (safira.length === 1 && destan.length === 1 && safira[0].name !== destan[0].name) {
+      await Promise.all([
+        setGbpLocationMapping("Safira", safira[0].name, safira[0].title),
+        setGbpLocationMapping("Destan", destan[0].name, destan[0].title),
+      ]);
+      redirectBack.searchParams.set("gbp_auto_mapping", "complete");
+      return;
+    }
+
+    redirectBack.searchParams.set("gbp_auto_mapping", "needs_review");
+  } catch (error) {
+    console.error(`[Google OAuth] exact GBP auto mapping failed: ${error instanceof Error ? error.message : "unknown"}`);
+    redirectBack.searchParams.set("gbp_auto_mapping", "error");
+  }
+}
+
+// admin.safiradestan.com'da adminAuthGate tarafindan zaten korunuyor - Google'in kendisi de
+// yalniz /api/admin/google/oauth/start'tan baslatilmis, gecerli state'i olan bir istegi buraya
+// yonlendirebilir. Access/refresh token DEGERLERI hicbir zaman loglanmaz veya response'ta geri
+// gosterilmez; yalniz GOOGLE_PRIVATE KV'ye yazilir. Authorization code da loglanmaz.
 export async function GET(request: Request) {
   const { env } = await getCloudflareContext({ async: true });
   const url = new URL(request.url);
@@ -31,14 +69,17 @@ export async function GET(request: Request) {
     return Response.redirect(redirectBack.toString(), 302);
   }
 
-  // Tek kullanımlık state doğrulaması: KV'de yoksa/süresi dolmuşsa reddedilir, bulunduysa hemen
-  // silinir (replay koruması).
   const scopeKey = await env.GOOGLE_PRIVATE.get(`oauth_state:${state}`);
   if (!scopeKey) {
     redirectBack.searchParams.set("google_oauth", "invalid_state");
     return Response.redirect(redirectBack.toString(), 302);
   }
   await env.GOOGLE_PRIVATE.delete(`oauth_state:${state}`);
+
+  if (scopeKey !== "google_core" && !SINGLE_CONNECTIONS.has(scopeKey)) {
+    redirectBack.searchParams.set("google_oauth", "invalid_scope");
+    return Response.redirect(redirectBack.toString(), 302);
+  }
 
   try {
     const redirectUri = `${url.origin}/api/admin/google/oauth/callback`;
@@ -58,18 +99,25 @@ export async function GET(request: Request) {
       redirectBack.searchParams.set("google_oauth", "token_exchange_failed");
       return Response.redirect(redirectBack.toString(), 302);
     }
+
     const tokens = await tokenResponse.json() as { access_token?: string; refresh_token?: string; expires_in?: number };
     if (!tokens.refresh_token) {
-      // Google yalnız ilk onayda refresh_token döner - kullanıcı daha önce onay verdiyse
-      // prompt=consent bunu zorunlu kılar (start route'ta zaten set edildi).
       redirectBack.searchParams.set("google_oauth", "no_refresh_token");
       return Response.redirect(redirectBack.toString(), 302);
     }
 
-    await env.GOOGLE_PRIVATE.put(`connection:${scopeKey}`, JSON.stringify({
+    const stored = JSON.stringify({
       refreshToken: tokens.refresh_token,
       connectedAt: new Date().toISOString(),
-    }));
+    });
+
+    if (scopeKey === "google_core") {
+      await Promise.all(GOOGLE_CORE_CONNECTIONS.map((key) => env.GOOGLE_PRIVATE.put(`connection:${key}`, stored)));
+      await tryExactGbpAutoMapping(redirectBack);
+    } else {
+      await env.GOOGLE_PRIVATE.put(`connection:${scopeKey}`, stored);
+      if (scopeKey === "gbp") await tryExactGbpAutoMapping(redirectBack);
+    }
 
     redirectBack.searchParams.set("google_oauth", "connected");
     redirectBack.searchParams.set("scope", scopeKey);
