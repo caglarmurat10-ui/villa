@@ -24,9 +24,8 @@ export const META_ACTIVE_TARGETS = [
 ] as const satisfies readonly MetaTarget[];
 
 // Sağlık ekranı SocialPost.platform (Instagram/Facebook/TikTok/WhatsApp Durum) ile çalışır.
-// HARD BLOCK politikası yalnız Destan+Instagram kombinasyonuna uygulanır; Meta dışı platformlar
-// doğal olarak false döner. Parametreyi MetaPlatform ile sınırlamak, çağıran tarafta gereksiz
-// type assertion ve production build hatası üretiyordu.
+// Bu helper yalnız politika bayrağı tekrar açılırsa Destan+Instagram kombinasyonunu bloklar;
+// OAuth doğrulaması sonrası mevcut production politikası blocked=false olduğu için dört Meta hedefi aktiftir.
 export function isMetaTargetHardBlocked(villa: Villa, platform: SocialPlatform) {
   return DESTAN_INSTAGRAM_HARD_BLOCK.blocked && villa === DESTAN_INSTAGRAM_HARD_BLOCK.villa && platform === DESTAN_INSTAGRAM_HARD_BLOCK.platform;
 }
