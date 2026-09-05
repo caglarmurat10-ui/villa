@@ -12,6 +12,10 @@ export const REQUIRED_FACEBOOK_PERMISSIONS = [
   "pages_read_engagement",
   "pages_manage_posts",
   "pages_manage_metadata",
+  // Page.instagram_business_account / Page.connected_instagram_account alanlarını okumak için
+  // Meta Graph API v26 (Facebook Login for Business) bu izni ayrıca gerektirir. pages_* izinleri
+  // tek başına bu ilişkiyi görünür kılmaz. Bkz. src/lib/facebook-instagram-relationship.ts.
+  "instagram_basic",
 ] as const;
 
 async function facebookConfig() {
@@ -134,6 +138,25 @@ export async function getFacebookPermissionStatus(userAccessToken: string) {
   const granted = REQUIRED_FACEBOOK_PERMISSIONS.filter((permission) => statuses.get(permission) === "granted");
   const missing = REQUIRED_FACEBOOK_PERMISSIONS.filter((permission) => statuses.get(permission) !== "granted");
   return { granted, missing, complete: missing.length === 0 };
+}
+
+export async function getFacebookTokenScopes(inputToken: string) {
+  const { appId, appSecret } = await facebookConfig();
+  const url = new URL(`${META_GRAPH}/debug_token`);
+  url.searchParams.set("input_token", inputToken);
+  url.searchParams.set("access_token", `${appId}|${appSecret}`);
+  const response = await fetch(url, { method: "GET" });
+  const payload = (await response.json().catch(() => ({}))) as {
+    data?: { is_valid?: boolean; scopes?: string[] };
+    error?: { code?: number };
+  };
+  if (!response.ok || !payload.data) {
+    throw new Error(`Facebook token izin bilgisi alınamadı (HTTP ${response.status}${payload.error?.code ? ` / ${payload.error.code}` : ""}).`);
+  }
+  return {
+    valid: Boolean(payload.data.is_valid),
+    scopes: Array.isArray(payload.data.scopes) ? payload.data.scopes : [],
+  };
 }
 
 type FacebookPageApi = {

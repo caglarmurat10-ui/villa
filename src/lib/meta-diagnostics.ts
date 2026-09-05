@@ -1,5 +1,6 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { MetaSocialAccount } from "./meta-store";
+import { REQUIRED_FACEBOOK_PERMISSIONS } from "./facebook";
 import {
   DESTAN_INSTAGRAM_HARD_BLOCK,
   META_ACTIVE_TARGETS,
@@ -77,7 +78,7 @@ export async function getMetaDiagnostic(accounts: MetaSocialAccount[]): Promise<
     },
     requiredScopes: {
       instagram: ["instagram_business_basic", "instagram_business_content_publish"],
-      facebook: ["pages_show_list", "pages_read_engagement", "pages_manage_posts", "pages_manage_metadata"],
+      facebook: [...REQUIRED_FACEBOOK_PERMISSIONS],
     },
     accounts: {
       connected: activeConnected.length,

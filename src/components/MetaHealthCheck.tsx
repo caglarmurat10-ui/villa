@@ -10,8 +10,17 @@ type HealthItem = {
   label: string;
 };
 
+type RelationshipCode =
+  | "FACEBOOK_IG_LINK_OK"
+  | "FACEBOOK_IG_LINK_MISSING"
+  | "FACEBOOK_IG_LINK_MISMATCH"
+  | "FACEBOOK_IG_PERMISSION_MISSING"
+  | "FACEBOOK_IG_SCOPE_UNAVAILABLE"
+  | "FACEBOOK_IG_API_ERROR";
+
 type RelationshipItem = {
   villa: "Safira" | "Destan";
+  code: RelationshipCode;
   status: "healthy" | "mismatch" | "missing" | "unavailable";
   healthy: boolean | null;
   label: string;
@@ -69,8 +78,9 @@ export default function MetaHealthCheck() {
       </div>
       {(result.relationships ?? []).length ? <div className="meta-health-results" style={{marginTop:10}}>
         {(result.relationships ?? []).map((item) => {
-          const className = item.status === "healthy" ? "healthy" : item.status === "unavailable" ? "warning" : "missing";
-          const icon = item.status === "healthy" ? "✓" : item.status === "unavailable" ? "?" : "!";
+          const uncertain = item.code === "FACEBOOK_IG_PERMISSION_MISSING" || item.code === "FACEBOOK_IG_SCOPE_UNAVAILABLE" || item.code === "FACEBOOK_IG_API_ERROR";
+          const className = item.code === "FACEBOOK_IG_LINK_OK" ? "healthy" : uncertain ? "warning" : "missing";
+          const icon = item.code === "FACEBOOK_IG_LINK_OK" ? "✓" : uncertain ? "?" : "!";
           return <div key={`${item.villa}-relationship`} className={className}><span>{icon}</span><div><strong>Villa {item.villa} · Facebook ↔ Instagram</strong><small>{item.label}</small></div></div>;
         })}
       </div> : null}
