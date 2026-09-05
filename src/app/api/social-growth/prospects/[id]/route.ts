@@ -3,7 +3,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { updateProspectStatus } from "@/lib/social-growth-store";
 
 const statusSchema = z.object({
-  status: z.enum(["DISCOVERED", "WATCHLIST", "RECOMMENDED", "DISMISSED", "BLOCKED"]),
+  status: z.enum(["DISCOVERED", "WATCHLIST", "RECOMMENDED", "FOLLOWED_MANUALLY", "DISMISSED", "BLOCKED"]),
 });
 
 export async function PATCH(request: Request, context: { params: Promise<{ id: string }> }) {

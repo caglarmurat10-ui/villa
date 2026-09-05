@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS social_prospects (
   username TEXT NOT NULL,
   account_id TEXT,
   display_name TEXT,
+  profile_url TEXT,
   category TEXT NOT NULL DEFAULT 'travel_creator' CHECK (category IN (
     'travel_creator','local_creator','tourism_page','local_business',
     'photographer','food_creator','family_travel','lifestyle_creator','high_value_guest_source'
@@ -29,7 +30,10 @@ CREATE TABLE IF NOT EXISTS social_prospects (
   final_growth_score INTEGER,
   discovered_at TEXT NOT NULL,
   last_checked_at TEXT,
-  status TEXT NOT NULL DEFAULT 'DISCOVERED' CHECK (status IN ('DISCOVERED','WATCHLIST','RECOMMENDED','DISMISSED','BLOCKED')),
+  status TEXT NOT NULL DEFAULT 'DISCOVERED' CHECK (status IN ('DISCOVERED','WATCHLIST','RECOMMENDED','FOLLOWED_MANUALLY','DISMISSED','BLOCKED')),
+  source_type TEXT CHECK (source_type IN ('manual_entry','public_web_search','manual_seed_review')),
+  source_url TEXT,
+  short_reason TEXT,
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL,
   UNIQUE (platform, username)
@@ -74,7 +78,7 @@ CREATE TABLE IF NOT EXISTS social_agent_runs (
   agent_type TEXT NOT NULL CHECK (agent_type IN ('SCOUT','INSIGHTS','COMMENTS','MENTIONS','DM','PROSPECT_REFRESH')),
   started_at TEXT NOT NULL,
   finished_at TEXT,
-  status TEXT NOT NULL DEFAULT 'PENDING_PERMISSION' CHECK (status IN ('OK','ERROR','PENDING_PERMISSION')),
+  status TEXT NOT NULL DEFAULT 'PENDING_PERMISSION' CHECK (status IN ('OK','ERROR','PENDING_PERMISSION','PENDING_CONFIGURATION')),
   candidate_count INTEGER NOT NULL DEFAULT 0,
   required_permission TEXT,
   notes TEXT

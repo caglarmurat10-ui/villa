@@ -49,8 +49,11 @@
   // "0 3 * * *" - günlük sosyal planlayıcı (ensureRolling30DayPlan), yayın-kritik */15 cron'undan
   // BİLEREK ayrı bir invocation'da çalışır (bkz. custom-worker.mjs scheduled() - Error 1102 sonrası
   // kaynak izolasyonu). 03:00 UTC = 06:00 İstanbul, düşük trafik saati.
+  // "0 5 * * *" - Social Growth Agent Public Web Scout, günde bir kez, 05:00 UTC = 08:00 İstanbul.
+  // SOCIAL_SCOUT_SEARCH_API_KEY tanımlı değilse (bkz. secrets notu) hiçbir dış istek atmadan
+  // PENDING_CONFIGURATION olarak durur - bu satır deploy'u bloklamaz.
   "triggers": {
-    "crons": ["*/15 * * * *", "*/30 * * * *", "0 3 * * *"]
+    "crons": ["*/15 * * * *", "*/30 * * * *", "0 3 * * *", "0 5 * * *"]
   },
   "observability": { "enabled": true }
 }

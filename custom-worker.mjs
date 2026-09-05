@@ -913,6 +913,43 @@ async function runDailySocialPlannerIfDue(env, ctx) {
   }
 }
 
+// Social Growth Agent - Public Web Scout. Meta API'ye hiç dokunmaz, Instagram'a login/scraping
+// YAPMAZ - yalnız (varsa) Google Custom Search JSON API üzerinden herkese açık web sonuçlarını
+// sorgular (bkz. src/lib/social-growth-public-scout.ts). SOCIAL_SCOUT_SEARCH_API_KEY tanımlı
+// değilse route hiçbir dış istek atmadan PENDING_CONFIGURATION olarak durur - bu cron'un
+// eklenmesi deploy'u bloklamaz, hiçbir yeni secret ZORUNLU kılınmaz (PayTR ile aynı desen).
+// Yayın-kritik */15 cron'undan BİLEREK ayrı bir invocation (bkz. runDailySocialPlannerIfDue notu).
+const PUBLIC_SCOUT_KV_KEY = "social_public_scout_last_run_date";
+
+async function runPublicScoutIfDue(env, ctx) {
+  const today = istanbulClock(new Date()).date;
+  let lastRunDate = null;
+  try {
+    lastRunDate = await env.META_PRIVATE.get(PUBLIC_SCOUT_KV_KEY);
+  } catch (error) {
+    console.error(`[Social Growth Scout] KV okuma hatası: ${safeCronError(error)}`);
+  }
+  if (lastRunDate === today) return;
+
+  const baseUrl = String(env.APP_BASE_URL ?? "https://admin.safiradestan.com").replace(/\/$/, "");
+  const targetUrl = `${baseUrl}/api/social-growth/public-scout/run`;
+  try {
+    const response = await nextWorker.fetch(new Request(targetUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Host: new URL(targetUrl).host },
+    }), env, ctx);
+    if (!response.ok) {
+      console.error(`[Social Growth Scout] public-scout/run HTTP ${response.status} döndü, bugün tekrar denenecek.`);
+      return;
+    }
+    await env.META_PRIVATE.put(PUBLIC_SCOUT_KV_KEY, today);
+    const payload = await response.json().catch(() => ({}));
+    console.log(`[Social Growth Scout] Günlük tarama çalıştı: ${JSON.stringify(payload.result ?? {}).slice(0, 300)}`);
+  } catch (error) {
+    console.error(`[Social Growth Scout] Çağrı başarısız, bugün tekrar denenecek: ${safeCronError(error)}`);
+  }
+}
+
 async function runSocialCron(controller, env, ctx) {
   const ranAt = new Date(controller.scheduledTime).toISOString();
 
@@ -1197,6 +1234,16 @@ export default {
         await runDailySocialPlannerIfDue(env, ctx);
       } catch (error) {
         console.error(`[Social Planner] Zamanlanmış çalıştırma beklenmeyen hata: ${safeCronError(error)}`);
+      }
+      return;
+    }
+    // Social Growth Agent - Public Web Scout, günde bir kez. Diğer üç cron'dan (yayın, OTA, sosyal
+    // planlayıcı) BİLEREK ayrı bir invocation - kaynak izolasyonu aynı gerekçeyle korunuyor.
+    if (controller.cron === "0 5 * * *") {
+      try {
+        await runPublicScoutIfDue(env, ctx);
+      } catch (error) {
+        console.error(`[Social Growth Scout] Zamanlanmış çalıştırma beklenmeyen hata: ${safeCronError(error)}`);
       }
       return;
     }
