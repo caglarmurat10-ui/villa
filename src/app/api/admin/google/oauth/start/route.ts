@@ -2,15 +2,19 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 
 export const dynamic = "force-dynamic";
 
-// admin.safiradestan.com'da adminAuthGate tarafından zaten korunuyor (cookie session) - diğer
-// /api/admin/* route'ları gibi hiçbir public allowlist'e eklenmedi.
+// admin.safiradestan.com'da adminAuthGate tarafindan zaten korunuyor (cookie session) - diger
+// /api/admin/* route'lari gibi hicbir public allowlist'e eklenmedi.
 //
-// Search Console + GA4, aynı Google OAuth client'ı (GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET) ile tek
-// bir izin ekranında istenir - GBP ve Google Ads ayrı, daha geniş izinler gerektirdiği için ayrı
-// bir "scope" parametresiyle (query: ?scope=search_console|ga4|gbp|google_ads) tetiklenir. Google
-// Ads API'sinin KENDİSİ ayrıca developer token + customer ID gerektirir (bkz. google-ads/readiness.ts)
-// - bu OAuth adımı yalnız "adwords" izninin verilmesini sağlar, tek başına API erişimine yetmez.
+// google_core, Search Console + GA4 + Business Profile izinlerini TEK Google onay ekraninda ister.
+// Boylece kullanici ayri ayri uc OAuth akisindan gecmek zorunda kalmaz. Google Ads bilerek ayri
+// kalir: reklam harcamasi 0 TL politikasinda ve Ads API icin ayrica developer token/customer ID
+// gerekir; bu endpoint onu otomatik olarak devreye almaz.
 const SCOPES: Record<string, string> = {
+  google_core: [
+    "https://www.googleapis.com/auth/webmasters.readonly",
+    "https://www.googleapis.com/auth/analytics.readonly",
+    "https://www.googleapis.com/auth/business.manage",
+  ].join(" "),
   search_console: "https://www.googleapis.com/auth/webmasters.readonly",
   ga4: "https://www.googleapis.com/auth/analytics.readonly",
   gbp: "https://www.googleapis.com/auth/business.manage",
@@ -25,20 +29,20 @@ function randomToken(): string {
 export async function GET(request: Request) {
   const { env } = await getCloudflareContext({ async: true });
   if (!env.GOOGLE_CLIENT_ID) {
-    return Response.json({ error: "GOOGLE_CLIENT_ID tanımlı değil - Google OAuth henüz yapılandırılmadı." }, { status: 503 });
+    return Response.json({ error: "GOOGLE_CLIENT_ID tanimli degil - Google OAuth henuz yapilandirilmadi." }, { status: 503 });
   }
   if (!env.GOOGLE_PRIVATE) {
-    return Response.json({ error: "GOOGLE_PRIVATE KV bağlı değil." }, { status: 503 });
+    return Response.json({ error: "GOOGLE_PRIVATE KV bagli degil." }, { status: 503 });
   }
 
   const url = new URL(request.url);
   const scopeKey = url.searchParams.get("scope") ?? "";
   const scope = SCOPES[scopeKey];
   if (!scope) {
-    return Response.json({ error: "Geçersiz scope. Beklenen: search_console, ga4, gbp veya google_ads." }, { status: 400 });
+    return Response.json({ error: "Gecersiz scope. Beklenen: google_core, search_console, ga4, gbp veya google_ads." }, { status: 400 });
   }
 
-  // CSRF: state KV'de kısa ömürlü saklanır, callback'te birebir eşleşmeli ve tek kullanımlıktır.
+  // CSRF: state KV'de kisa omurlu saklanir, callback'te birebir eslesmeli ve tek kullanimlidir.
   const state = randomToken();
   await env.GOOGLE_PRIVATE.put(`oauth_state:${state}`, scopeKey, { expirationTtl: STATE_TTL_SECONDS });
 
@@ -50,6 +54,7 @@ export async function GET(request: Request) {
   authUrl.searchParams.set("scope", scope);
   authUrl.searchParams.set("access_type", "offline");
   authUrl.searchParams.set("prompt", "consent");
+  authUrl.searchParams.set("include_granted_scopes", "true");
   authUrl.searchParams.set("state", state);
 
   return Response.redirect(authUrl.toString(), 302);
