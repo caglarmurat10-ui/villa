@@ -11,18 +11,18 @@ import { describe, expect, it } from "vitest";
 const HERE = dirname(fileURLToPath(import.meta.url)); // .../src/lib
 const ROOT = resolve(HERE, "..", ".."); // .../  (proje koku)
 
-describe("Destan Instagram HARD BLOCK regresyonu", () => {
-  it("cron aday sorgusu villa=Destan + platform=Instagram'i disliyor (custom-worker.mjs)", () => {
+describe("Destan Instagram güvenli aktivasyon regresyonu", () => {
+  it("cron yalnız 2026-09-05 ve önceki Destan Instagram backlog'unu dışlıyor", () => {
     const source = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
-    expect(source).toContain("NOT (villa = 'Destan' AND platform = 'Instagram')");
+    expect(source).toContain("NOT (villa = 'Destan' AND platform = 'Instagram' AND scheduled_date <= '2026-09-05')");
   });
 
-  it("manuel/admin publish route'u Destan icin sert reddediyor (route.ts)", () => {
+  it("manuel/admin publish route eski Destan backlog'unu Graph çağrısından önce reddediyor", () => {
     const source = readFileSync(
       resolve(ROOT, "src", "app", "api", "meta", "instagram", "publish", "route.ts"),
       "utf-8",
     );
-    expect(source).toContain('post.villa === "Destan"');
+    expect(source).toContain('post.villa === "Destan" && post.scheduledDate <= "2026-09-05"');
     // Guard, herhangi bir Graph API/medya cagrisindan ONCE calismali - import satirlarini degil,
     // guard'dan SONRAKI ilk gercek publishInstagram* CAGRISINI ariyoruz (fonksiyon govdesinde).
     const guardIndex = source.indexOf('post.villa === "Destan"');

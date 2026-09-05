@@ -213,14 +213,9 @@ export async function ensureRolling30DayPlan(dailyTarget = 1) {
     const mediaUrl = mediaUrls[0] ?? "";
     if (!mediaUrl) continue;
 
-    // Faz 5 son denetim düzeltmesi (bölüm 11) - Destan Instagram HARD BLOCK'u yalnız cron/publish
-    // route katmanına bırakmak yerine, planlayıcı aşamasında da bu kombinasyon hiç ÜRETİLMEZ
-    // ("tercihen planner aşamasında da platformu üretme"). Aşağıdaki cron (duePosts,
-    // custom-worker.mjs) ve manuel publish route (route.ts) guard'ları DEĞİŞMEDEN, bağımsız bir
-    // ikinci savunma katmanı olarak kalmaya devam eder.
-    if (template.villa !== "Destan") {
-      inputs.push({ villa: template.villa, platform: "Instagram", contentType: template.contentType, scheduledDate: slot.date, caption: template.caption, mediaUrl, mediaUrls });
-    }
+    // Her iki villanın Instagram hesabı aktiftir. Eski Destan kuyruğunun yeniden yayınlanmasını
+    // engelleyen tarih kesimi cron/publish katmanında korunur; yeni planlar normal üretilir.
+    inputs.push({ villa: template.villa, platform: "Instagram", contentType: template.contentType, scheduledDate: slot.date, caption: template.caption, mediaUrl, mediaUrls });
     if (template.contentType === "Gönderi" || (template.contentType === "Reels" && template.mediaKind === "video")) {
       inputs.push({ villa: template.villa, platform: "Facebook", contentType: template.contentType, scheduledDate: slot.date, caption: template.caption, mediaUrl, mediaUrls });
     }
@@ -287,11 +282,9 @@ export async function ensureSpecialDayPosts(): Promise<{ created: number; update
       const villaSlug = villa === "Safira" ? "safira" : "destan";
       const mediaUrl = new URL(`/api/public/social-assets/${villaSlug}_special-day_${date}/feed`, `${baseUrl}/`).toString();
 
-      // Destan Instagram HARD BLOCK - bayram içeriği dahil, İSTİSNASIZ (bkz. ensureRolling30DayPlan
-      // aynı guard, bağımsız ikinci savunma katmanı).
-      if (villa !== "Destan") {
-        inputs.push({ villa, platform: "Instagram", contentType: "Gönderi", scheduledDate: date, caption, mediaUrl, mediaUrls: [mediaUrl] });
-      }
+      // Her iki villa için Instagram + Facebook özel gün içeriği üretilebilir; insan onayı ve
+      // normal yayın güvenlik katmanları aynen geçerlidir.
+      inputs.push({ villa, platform: "Instagram", contentType: "Gönderi", scheduledDate: date, caption, mediaUrl, mediaUrls: [mediaUrl] });
       inputs.push({ villa, platform: "Facebook", contentType: "Gönderi", scheduledDate: date, caption, mediaUrl, mediaUrls: [mediaUrl] });
     }
   }

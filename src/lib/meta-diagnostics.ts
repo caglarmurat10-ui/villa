@@ -83,10 +83,10 @@ export async function getMetaDiagnostic(accounts: MetaSocialAccount[]): Promise<
       connected: activeConnected.length,
       expected: expected.length,
       missing: expected.filter((item) => !connected.has(item)),
-      hardBlocked: [{
+      hardBlocked: DESTAN_INSTAGRAM_HARD_BLOCK.blocked ? [{
         label: `${DESTAN_INSTAGRAM_HARD_BLOCK.villa} ${DESTAN_INSTAGRAM_HARD_BLOCK.platform}`,
         reason: DESTAN_INSTAGRAM_HARD_BLOCK.reason,
-      }],
+      }] : [],
     },
   };
 }

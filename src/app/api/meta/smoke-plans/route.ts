@@ -105,6 +105,6 @@ export async function POST(request: Request) {
     createdCount: prepared.filter((item) => item.created).length,
     existingCount: prepared.filter((item) => !item.created).length,
     approvalStatus: "İnsan onayı",
-    message: `${META_ACTIVE_TARGETS.length} kontrollü yayın planı hazırlandı. Destan Instagram HARD BLOCK nedeniyle plana alınmaz. Hiçbiri insan onayı olmadan Meta'ya gönderilmez.`,
+    message: `${META_ACTIVE_TARGETS.length} kontrollü yayın planı hazırlandı. Tüm aktif Meta hedefleri kapsanır. Hiçbiri insan onayı olmadan Meta'ya gönderilmez.`,
   });
 }

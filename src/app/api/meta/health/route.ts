@@ -154,11 +154,11 @@ export async function GET() {
     healthy: checks.every((item) => item.connected && item.healthy),
     connectedCount: checks.filter((item) => item.connected).length,
     expectedCount: checks.length,
-    blocked: [{
+    blocked: DESTAN_INSTAGRAM_HARD_BLOCK.blocked ? [{
       villa: DESTAN_INSTAGRAM_HARD_BLOCK.villa,
       platform: DESTAN_INSTAGRAM_HARD_BLOCK.platform,
       label: DESTAN_INSTAGRAM_HARD_BLOCK.reason,
-    }],
+    }] : [],
     checks,
   }, {
     headers: { "Cache-Control": "no-store" },

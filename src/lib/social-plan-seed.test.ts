@@ -1,5 +1,5 @@
 // Faz 5 son denetim düzeltmesi - ensureRolling30DayPlan()'ın gerçek D1 katmanıyla uçtan uca
-// davranışını doğrular: AUTO_SAFE -> approval_status='Onaylandı', Destan+Instagram hiç üretilmez,
+// davranışını doğrular: AUTO_SAFE -> approval_status='Onaylandı', dört Meta hedefi üretilebilir,
 // 60 günlük duplicate history YAYINLANMIŞ (Yayınlandı) postları da kapsar.
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -50,11 +50,11 @@ describe("ensureRolling30DayPlan (gerçek D1 entegrasyon testi)", () => {
     expect(rows.every((r) => r.approval_status === "Onaylandı")).toBe(true);
   });
 
-  it("Destan + Instagram kombinasyonu planlayıcı tarafından HİÇ üretilmez (HARD BLOCK, planlama aşamasında)", async () => {
+  it("Destan + Instagram kombinasyonu aktif bağlantı sonrası planlayıcı tarafından üretilebilir", async () => {
     const { ensureRolling30DayPlan } = await import("./social-plan-seed");
-    await ensureRolling30DayPlan(4); // birden fazla villa/platform üretmeye zorla
+    await ensureRolling30DayPlan(4);
     const rows = await socialPostRows();
-    expect(rows.some((r) => r.villa === "Destan" && r.platform === "Instagram")).toBe(false);
+    expect(rows.some((r) => r.villa === "Destan" && r.platform === "Instagram")).toBe(true);
   });
 
   it("Safira Instagram/Facebook ve Destan Facebook üretilebilir", async () => {
@@ -152,12 +152,11 @@ describe("ensureSpecialDayPosts (gerçek D1 entegrasyon testi) - Faz 6 bölüm 5
     expect(holidayRows.every((r) => r.caption.includes("23 Nisan"))).toBe(true);
   });
 
-  it("Destan + Instagram kombinasyonu bayram icerigi icin de HIC uretilmez (HARD BLOCK istisnasiz)", async () => {
+  it("Destan + Instagram kombinasyonu özel gün içeriği için de üretilebilir", async () => {
     const { ensureSpecialDayPosts } = await import("./social-plan-seed");
     await ensureSpecialDayPosts();
     const rows = await socialPostRows();
-    expect(rows.some((r) => r.villa === "Destan" && r.platform === "Instagram")).toBe(false);
-    // Ama Destan Facebook ve Safira Instagram/Facebook uretilmis olmali.
+    expect(rows.some((r) => r.villa === "Destan" && r.platform === "Instagram")).toBe(true);
     expect(rows.some((r) => r.villa === "Destan" && r.platform === "Facebook")).toBe(true);
     expect(rows.some((r) => r.villa === "Safira" && r.platform === "Instagram")).toBe(true);
   });

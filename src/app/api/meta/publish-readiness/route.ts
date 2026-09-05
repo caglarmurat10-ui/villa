@@ -120,11 +120,11 @@ export async function GET() {
     ready: accountsReady && mediaReady,
     accountsReady,
     mediaReady,
-    blocked: [{
+    blocked: DESTAN_INSTAGRAM_HARD_BLOCK.blocked ? [{
       villa: DESTAN_INSTAGRAM_HARD_BLOCK.villa,
       platform: DESTAN_INSTAGRAM_HARD_BLOCK.platform,
       reason: DESTAN_INSTAGRAM_HARD_BLOCK.reason,
-    }],
+    }] : [],
     checks,
   }, { headers: { "Cache-Control": "no-store" } });
 }

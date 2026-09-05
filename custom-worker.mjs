@@ -788,7 +788,7 @@ async function duePosts(env, scheduledAt) {
   const commonFilter = `status = 'Planlandı'
       AND approval_status = 'Onaylandı'
       AND platform IN ('Instagram', 'Facebook')
-      AND NOT (villa = 'Destan' AND platform = 'Instagram')
+      AND NOT (villa = 'Destan' AND platform = 'Instagram' AND scheduled_date <= '2026-09-05')
       AND (
         (platform = 'Instagram' AND content_type IN ('Gönderi', 'Hikâye', 'Reels'))
         OR (platform = 'Facebook' AND content_type IN ('Gönderi', 'Reels'))

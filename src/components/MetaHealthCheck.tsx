@@ -47,7 +47,7 @@ export default function MetaHealthCheck() {
   }
 
   return <div className="meta-health">
-    <div className="meta-health-head"><div><strong>Canlı bağlantı testi</strong><p>Şifreli kayıtlı tokenları yalnız aktif Meta hedeflerinde API üzerinden doğrular. Destan Instagram HARD BLOCK nedeniyle teste ve yayına alınmaz. Token değeri ekrana veya tarayıcıya gönderilmez.</p></div><button type="button" onClick={runCheck} disabled={loading}>{loading ? "Kontrol ediliyor…" : "Bağlantıları test et"}</button></div>
+    <div className="meta-health-head"><div><strong>Canlı bağlantı testi</strong><p>Şifreli kayıtlı tokenları tüm aktif Meta hedeflerinde API üzerinden doğrular. Safira ve Destan Instagram/Facebook bağlantıları birlikte test edilir. Token değeri ekrana veya tarayıcıya gönderilmez.</p></div><button type="button" onClick={runCheck} disabled={loading}>{loading ? "Kontrol ediliyor…" : "Bağlantıları test et"}</button></div>
     {error ? <p className="meta-health-error">{error}</p> : null}
     {result ? <div className="meta-health-results">
       {result.checks.map((item) => <div key={`${item.villa}-${item.platform}`} className={item.healthy ? "healthy" : item.connected ? "warning" : "missing"}><span>{item.healthy ? "✓" : item.connected ? "!" : "–"}</span><div><strong>Villa {item.villa} · {item.platform}</strong><small>{item.label}</small></div></div>)}

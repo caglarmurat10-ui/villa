@@ -2,6 +2,7 @@ import { listReservations } from "@/lib/db";
 import { listSocialPosts } from "@/lib/social-db";
 import { listExternalBlocksForAdmin } from "@/lib/ota/availability";
 import type { Reservation } from "@/lib/types";
+import { DESTAN_INSTAGRAM_HARD_BLOCK } from "@/lib/social-account-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,7 @@ export async function GET() {
       scheduledToday: socialScheduledToday.length,
       publishedToday: socialPublishedToday.length,
       failed: socialFailed.length,
-      destanInstagramHardBlocked: true,
+      destanInstagramHardBlocked: DESTAN_INSTAGRAM_HARD_BLOCK.blocked,
     },
     otaNeedsReview: {
       count: needsReview.length,

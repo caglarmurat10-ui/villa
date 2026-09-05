@@ -6,17 +6,18 @@ import {
 } from "./social-account-policy";
 
 describe("Meta aktif hedef politikası", () => {
-  it("yalnız desteklenen üç organik hedefi aktif sayar", () => {
+  it("dört organik Meta hedefini aktif sayar", () => {
     expect(META_ACTIVE_TARGETS).toEqual([
       { villa: "Safira", platform: "Instagram" },
       { villa: "Safira", platform: "Facebook" },
       { villa: "Destan", platform: "Facebook" },
+      { villa: "Destan", platform: "Instagram" },
     ]);
   });
 
-  it("Destan Instagram'i HARD BLOCK olarak tutar", () => {
-    expect(DESTAN_INSTAGRAM_HARD_BLOCK.blocked).toBe(true);
-    expect(isMetaTargetHardBlocked("Destan", "Instagram")).toBe(true);
+  it("Destan Instagram OAuth doğrulaması sonrası HARD BLOCK değildir", () => {
+    expect(DESTAN_INSTAGRAM_HARD_BLOCK.blocked).toBe(false);
+    expect(isMetaTargetHardBlocked("Destan", "Instagram")).toBe(false);
     expect(isMetaTargetHardBlocked("Safira", "Instagram")).toBe(false);
     expect(isMetaTargetHardBlocked("Destan", "Facebook")).toBe(false);
   });

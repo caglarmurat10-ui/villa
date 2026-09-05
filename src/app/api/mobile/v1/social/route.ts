@@ -1,5 +1,6 @@
 import { listSocialPosts } from "@/lib/social-db";
 import { getPostAutomationClasses } from "@/lib/social-library-summary";
+import { isMetaTargetHardBlocked } from "@/lib/social-account-policy";
 
 export const dynamic = "force-dynamic";
 
@@ -29,7 +30,7 @@ export async function GET(request: Request) {
       lastPublishError: p.lastPublishError,
       platformPostId: p.platformPostId,
       automationClass: automationClasses[p.id] ?? null,
-      destanInstagramHardBlocked: p.villa === "Destan" && p.platform === "Instagram",
+      destanInstagramHardBlocked: isMetaTargetHardBlocked(p.villa, p.platform),
     })),
   });
 }

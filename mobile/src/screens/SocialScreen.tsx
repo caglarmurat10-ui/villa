@@ -55,7 +55,6 @@ export function SocialScreen() {
   const [villa, setVilla] = useState<"" | "Safira" | "Destan">("");
   const [bucket, setBucket] = useState<StatusBucket>("");
   const [detailPost, setDetailPost] = useState<SocialPost | null>(null);
-  const [warningOpen, setWarningOpen] = useState(false);
   const { data, loading, error, reload } = useApi<{ posts: SocialPost[] }>(`/social${villa ? `?villa=${villa}` : ""}`, [villa]);
 
   const summary = useMemo(() => {
@@ -88,18 +87,6 @@ export function SocialScreen() {
               <div className="hero-stat" style={{ borderColor: "#7f1d1d" }}><div className="value" style={{ color: "#fca5a5" }}>{summary.failed}</div><div className="label" style={{ color: "#fca5a5" }}>Başarısız</div></div>
             )}
           </div>
-        </div>
-
-        <div className="card" style={{ borderColor: "#a16207", marginTop: 4 }}>
-          <div className="card-title" style={{ color: "#fbbf24" }}>DESTAN INSTAGRAM</div>
-          <p style={{ fontSize: 13, margin: "6px 0 2px" }}>Bağlantı sorunu nedeniyle yayın kapalı.</p>
-          <p style={{ fontSize: 11, color: "#9fb0c5", margin: 0 }}>Facebook yayını etkilenmiyor.</p>
-          <button type="button" className="btn" style={{ marginTop: 8, fontSize: 11, minHeight: 32, padding: "0 10px" }} onClick={() => setWarningOpen((o) => !o)}>
-            {warningOpen ? "Detayı gizle ▲" : "Detay ▼"}
-          </button>
-          {warningOpen && (
-            <p style={{ fontSize: 11, color: "#9fb0c5", marginTop: 8 }}>HARD BLOCKED — Business Portfolio sorunu çözülene kadar otomatik/manuel yayın yapılamaz.</p>
-          )}
         </div>
 
         <div style={{ display: "flex", gap: 8, margin: "14px 0 10px" }}>

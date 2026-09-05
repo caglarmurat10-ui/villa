@@ -46,8 +46,8 @@ export async function POST(request: Request) {
   // cron hem manuel "Şimdi yayınla" için, Graph API'ye hiçbir istek gitmeden burada durur. Cron
   // tarafı aynı gate'i custom-worker.mjs'in duePosts() sorgusunda ayrıca uyguluyor (bu satırın cron
   // tarafından hiç seçilmemesi için); bu ikinci katman, endpoint'in doğrudan çağrılmasına karşı.
-  if (post.villa === "Destan") {
-    return Response.json({ error: "Villa Destan Instagram hesabı için bağlantı/sahiplik sorunu çözülene kadar yayın devre dışı bırakıldı." }, { status: 409 });
+  if (post.villa === "Destan" && post.scheduledDate <= "2026-09-05") {
+    return Response.json({ error: "Villa Destan Instagram eski bekleyen içerikleri güvenlik nedeniyle yeniden yayınlanmaz. 6 Eylül 2026 ve sonrası planlar aktiftir." }, { status: 409 });
   }
 
   const allowedOrigins = [new URL(request.url).origin, "https://villa-yonetim.caglarmurat10.workers.dev"];

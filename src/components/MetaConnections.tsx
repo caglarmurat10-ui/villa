@@ -85,7 +85,7 @@ export default function MetaConnections({ initialAccounts }: { initialAccounts: 
   }
 
   return <section className="meta-connect-box">
-    <div className="meta-connect-head"><div><span className="eyebrow">META BAĞLANTILARI</span><h2>Instagram ve Facebook hesaplarını Villa Yönetim'e bağla</h2><p>Safira Instagram ayrı tutulur. Facebook ise Safira ve Destan için tek ortak Meta OAuth oturumuyla bağlanır; iki Sayfa aynı ekranda açıkça eşleştirilir ve iki güncel Page tokenı birlikte private KV'ye yazılır. Otomatik isim eşleştirmesi yapılmaz.</p></div></div>
+    <div className="meta-connect-head"><div><span className="eyebrow">META BAĞLANTILARI</span><h2>Instagram ve Facebook hesaplarını Villa Yönetim'e bağla</h2><p>Instagram hesapları villa bazında ayrı tutulur. Facebook ise Safira ve Destan için tek ortak Meta OAuth oturumuyla bağlanır; iki Sayfa aynı ekranda açıkça eşleştirilir ve iki güncel Page tokenı birlikte private KV'ye yazılır. Otomatik isim eşleştirmesi yapılmaz.</p></div></div>
     {notice ? <p className="message">{notice}</p> : null}
     <div className="meta-account-grid">{villas.flatMap((villa) => platforms.map((platform) => {
       const account = accounts.find((item) => item.villa === villa && item.platform === platform);

@@ -10,16 +10,17 @@ export type MetaTarget = {
 export const DESTAN_INSTAGRAM_HARD_BLOCK = {
   villa: "Destan" as const,
   platform: "Instagram" as const,
-  blocked: true as const,
-  reason: "Meta Business Portfolio / hesap sahipliği sorunu çözülene kadar bağlantı ve yayın devre dışı.",
+  blocked: false as boolean,
+  reason: "Instagram OAuth bağlantısı başarıyla doğrulandı; Destan Instagram aktif Meta hedefidir.",
 };
 
-// Organik yayın için fiilen desteklenen hedefler. Destan Instagram bilinçli olarak bu listede yoktur;
-// hem cron hem manuel publish endpoint'i ayrıca HARD BLOCK uygular.
+// Organik yayın için fiilen desteklenen Meta hedefleri. Destan Instagram OAuth bağlantısı
+// 2026-09-05 tarihinde başarıyla doğrulandığı için aktif hedefler arasına alınmıştır.
 export const META_ACTIVE_TARGETS = [
   { villa: "Safira", platform: "Instagram" },
   { villa: "Safira", platform: "Facebook" },
   { villa: "Destan", platform: "Facebook" },
+  { villa: "Destan", platform: "Instagram" },
 ] as const satisfies readonly MetaTarget[];
 
 // Sağlık ekranı SocialPost.platform (Instagram/Facebook/TikTok/WhatsApp Durum) ile çalışır.
@@ -27,7 +28,7 @@ export const META_ACTIVE_TARGETS = [
 // doğal olarak false döner. Parametreyi MetaPlatform ile sınırlamak, çağıran tarafta gereksiz
 // type assertion ve production build hatası üretiyordu.
 export function isMetaTargetHardBlocked(villa: Villa, platform: SocialPlatform) {
-  return villa === DESTAN_INSTAGRAM_HARD_BLOCK.villa && platform === DESTAN_INSTAGRAM_HARD_BLOCK.platform;
+  return DESTAN_INSTAGRAM_HARD_BLOCK.blocked && villa === DESTAN_INSTAGRAM_HARD_BLOCK.villa && platform === DESTAN_INSTAGRAM_HARD_BLOCK.platform;
 }
 
 export function metaTargetLabel(target: MetaTarget) {

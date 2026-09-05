@@ -146,7 +146,7 @@ export default function SocialPublishHealth({ posts, autoPublishEnabled, content
           <div style={{padding:"8px 10px",border:"1px solid #223a57",borderRadius:9,background:"#0b1728"}}>Zamanlandı<br /><b style={{fontSize:15}}>{todayScheduled.length}</b></div>
           <div style={{padding:"8px 10px",border:"1px solid #1f5f3b",borderRadius:9,background:"#071b16",color:"#86efac"}}>Yayınlandı<br /><b style={{fontSize:15}}>{todayPublished.length}</b></div>
           <div style={{padding:"8px 10px",border:"1px solid #451a1a",borderRadius:9,background:"#2a0a0a",color:"#fca5a5"}}>Hatalı<br /><b style={{fontSize:15}}>{failed.length}</b></div>
-          <div style={{padding:"8px 10px",border:"1px solid #a16207",borderRadius:9,background:"#241a06",color:"#fbbf24"}}>HARD BLOCK (Destan IG)<br /><b style={{fontSize:15}}>{destanIgWaiting.length}</b></div>
+          {destanIgWaiting.length > 0 ? <div style={{padding:"8px 10px",border:"1px solid #a16207",borderRadius:9,background:"#241a06",color:"#fbbf24"}}>HARD BLOCK (Destan IG)<br /><b style={{fontSize:15}}>{destanIgWaiting.length}</b></div> : null}
           <div style={{padding:"8px 10px",border:"1px solid #47617f",borderRadius:9,background:"#102238",color:"#dbeafe"}}>İnceleme gerekiyor<br /><b style={{fontSize:15}}>{contentLibrarySummary.reviewRequired}</b></div>
           <div style={{padding:"8px 10px",border:"1px solid #451a1a",borderRadius:9,background:"#1a0a0a",color:"#f87171"}}>Bloklandı<br /><b style={{fontSize:15}}>{contentLibrarySummary.blocked}</b></div>
         </div>
