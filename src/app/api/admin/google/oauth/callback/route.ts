@@ -56,6 +56,12 @@ export async function GET(request: Request) {
     return Response.redirect(redirectBack.toString(), 302);
   }
 
+  // TypeScript'in closure icinde optional binding olarak yeniden genisletmesini engellemek icin
+  // guard'dan sonra daraltilmis binding'i sabit bir referansa aliyoruz.
+  const googlePrivate = env.GOOGLE_PRIVATE;
+  const googleClientId = env.GOOGLE_CLIENT_ID;
+  const googleClientSecret = env.GOOGLE_CLIENT_SECRET;
+
   const error = url.searchParams.get("error");
   if (error) {
     redirectBack.searchParams.set("google_oauth", "denied");
@@ -69,12 +75,12 @@ export async function GET(request: Request) {
     return Response.redirect(redirectBack.toString(), 302);
   }
 
-  const scopeKey = await env.GOOGLE_PRIVATE.get(`oauth_state:${state}`);
+  const scopeKey = await googlePrivate.get(`oauth_state:${state}`);
   if (!scopeKey) {
     redirectBack.searchParams.set("google_oauth", "invalid_state");
     return Response.redirect(redirectBack.toString(), 302);
   }
-  await env.GOOGLE_PRIVATE.delete(`oauth_state:${state}`);
+  await googlePrivate.delete(`oauth_state:${state}`);
 
   if (scopeKey !== "google_core" && !SINGLE_CONNECTIONS.has(scopeKey)) {
     redirectBack.searchParams.set("google_oauth", "invalid_scope");
@@ -88,8 +94,8 @@ export async function GET(request: Request) {
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
         code,
-        client_id: env.GOOGLE_CLIENT_ID,
-        client_secret: env.GOOGLE_CLIENT_SECRET,
+        client_id: googleClientId,
+        client_secret: googleClientSecret,
         redirect_uri: redirectUri,
         grant_type: "authorization_code",
       }),
@@ -112,10 +118,10 @@ export async function GET(request: Request) {
     });
 
     if (scopeKey === "google_core") {
-      await Promise.all(GOOGLE_CORE_CONNECTIONS.map((key) => env.GOOGLE_PRIVATE.put(`connection:${key}`, stored)));
+      await Promise.all(GOOGLE_CORE_CONNECTIONS.map((key) => googlePrivate.put(`connection:${key}`, stored)));
       await tryExactGbpAutoMapping(redirectBack);
     } else {
-      await env.GOOGLE_PRIVATE.put(`connection:${scopeKey}`, stored);
+      await googlePrivate.put(`connection:${scopeKey}`, stored);
       if (scopeKey === "gbp") await tryExactGbpAutoMapping(redirectBack);
     }
 
