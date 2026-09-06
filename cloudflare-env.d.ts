@@ -7,6 +7,7 @@ declare global {
     META_PRIVATE: KVNamespace;
     OTA_PRIVATE: KVNamespace;
     GOOGLE_PRIVATE: KVNamespace;
+    SOCIAL_ASSET_CACHE: KVNamespace;
     CF_VERSION_METADATA?: {
       id: string;
       tag?: string;

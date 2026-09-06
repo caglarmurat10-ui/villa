@@ -2,7 +2,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { Villa } from "./types";
 import type { FacebookPageCandidate } from "./facebook-private-store";
 import { brandProfiles } from "./brand-profiles";
-import { renderProfileImage } from "./social-brand-images";
+import { getBrandImageBytes } from "./social-brand-images";
 
 const META_GRAPH_VERSION = "v26.0";
 const META_GRAPH = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
@@ -261,14 +261,13 @@ async function uploadFacebookImage(
   pageId: string,
   pageAccessToken: string,
   path: string,
-  image: Response,
+  imageBytes: ArrayBuffer,
   fields: Record<string, string>,
 ) {
-  const imageBlob = await image.blob();
   const form = new FormData();
   form.set("access_token", pageAccessToken);
   for (const [key, value] of Object.entries(fields)) form.set(key, value);
-  form.set("source", imageBlob, "image.png");
+  form.set("source", new Blob([imageBytes], { type: "image/png" }), "image.png");
   const response = await fetch(`${META_GRAPH}/${encodeURIComponent(pageId)}/${path}`, { method: "POST", body: form });
   const data = (await response.json().catch(() => ({}))) as { id?: string; success?: boolean; error?: { code?: number; message?: string } };
   return { response, data };
@@ -279,9 +278,7 @@ export async function applyFacebookBrandAssets(
   pageId: string,
   pageAccessToken: string,
 ): Promise<FacebookBrandApplyResult> {
-  const { baseUrl } = await facebookConfig();
   const brand = brandProfiles[villa].facebook;
-  const coverUrl = `${baseUrl}/api/social-assets/${villa}/cover`;
   const result: FacebookBrandApplyResult = {
     details: { applied: false },
     profile: { applied: false },
@@ -330,11 +327,12 @@ export async function applyFacebookBrandAssets(
   try {
     // Meta'nın /{page-id}/picture ucu `url` parametresiyle çağrıldığında kendi sunucusundan görseli
     // çekmeye çalışıyor ve gözlemlenen davranışta bunu güvenilir biçimde yapamıyor - "(#1) Could not
-    // fetch picture" hatasıyla reddediyor (canlıda doğrulandı: URL bizim tarafımızdan hem GET hem
-    // HEAD ile sorunsuz erişilebiliyor). Görseli Meta'ya URL vermek yerine doğrudan render edip
-    // (self-fetch YOK - Cloudflare Workers'ta bir Worker'ın kendi alan adına HTTP isteği atması
-    // güvenilir değil, HTTP 522 canlıda gözlemlendi) binary olarak yüklüyoruz.
-    const { response, data } = await uploadFacebookImage(pageId, pageAccessToken, "picture", renderProfileImage(villa), { no_feed_story: "true" });
+    // fetch picture" hatasıyla reddediyor (canlıda doğrulandı). Bunun yerine binary yüklüyoruz.
+    // getBrandImageBytes önbellekli - render maliyeti (Cloudflare Workers Free plan'ın 10ms istek
+    // başına CPU limitini zaman zaman aşan next/og WASM render'ı, canlıda doğrulandı) önbellek
+    // isabetinde neredeyse sıfıra iniyor.
+    const profileBytes = await getBrandImageBytes(villa, "profile");
+    const { response, data } = await uploadFacebookImage(pageId, pageAccessToken, "picture", profileBytes, { no_feed_story: "true" });
     if (response.ok && (data.success === true || Boolean(data.id))) result.profile.applied = true;
     else {
       result.profile.error = publicGraphError("Facebook profil fotoğrafı uygulanamadı", response, data);
@@ -346,16 +344,11 @@ export async function applyFacebookBrandAssets(
   }
 
   try {
-    // Kapak görseli, profil görselinin aksine, doğrudan render edilip binary yüklenmiyor: kapak
-    // render'ı (dış Google Drive görselini çekip 1640x924 üzerine bindiriyor) tek başına bile
-    // zaman zaman Cloudflare Workers CPU süresi limitini zorluyor ("Exceeded CPU Limit", canlıda
-    // doğrulandı) - bunu profil render'ı ve iki Graph API çağrısıyla AYNI istekte yapmak
-    // isteği güvenilir biçimde limitin üstüne taşıdı (canlıda doğrulandı). Meta'ya URL vererek
-    // Meta'nın kendi (ayrı) isteğiyle çektirmek, render CPU maliyetini bu isteğin dışına, ayrı bir
-    // Worker çağrısına taşıyor - /{page-id}/photos ucu bu URL akışını (profilden farklı olarak)
-    // güvenilir kabul ediyor.
-    const uploadBody = new URLSearchParams({ access_token: pageAccessToken, url: coverUrl, published: "false", no_story: "true" });
-    const upload = await graphPost(`${encodeURIComponent(pageId)}/photos`, uploadBody);
+    // Aynı önbellekli-bayt + binary yükleme yaklaşımı kapak görseli için de geçerli. Önbellek
+    // sayesinde bu artık Meta'nın kendi URL çekmesine (self-fetch/reliability riski) veya CPU'yu
+    // zorlayan bir render'a ihtiyaç duymuyor.
+    const coverBytes = await getBrandImageBytes(villa, "cover");
+    const upload = await uploadFacebookImage(pageId, pageAccessToken, "photos", coverBytes, { published: "false", no_story: "true" });
     if (!upload.response.ok || !upload.data.id) {
       result.cover.error = publicGraphError("Facebook kapak görseli yüklenemedi", upload.response, upload.data);
       console.error(`[Facebook Brand][${villa}][cover] ${upload.data.error?.message ?? "mesaj yok"}`);

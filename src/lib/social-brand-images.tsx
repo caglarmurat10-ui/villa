@@ -1,4 +1,6 @@
 import { ImageResponse } from "next/og";
+import { getCloudflareContext } from "@opennextjs/cloudflare";
+import type { KVNamespace } from "@cloudflare/workers-types";
 import { resolveDriveMediaById } from "@/lib/social-drive-media";
 import type { Villa } from "@/lib/types";
 
@@ -72,4 +74,46 @@ export function renderCoverImage(villa: Villa): Response {
     </div>,
     { width: 1640, height: 924 },
   );
+}
+
+type BrandImageAsset = "profile" | "cover";
+
+// next/og (Satori/resvg-WASM) render'ı Cloudflare Workers Free plan'ın 10ms istek başına CPU
+// süresi limitini zaman zaman aşıyor (canlıda doğrulandı: "Exceeded CPU Limit"; hesabın Free
+// plan'da olduğu bir `limits.cpu_ms` deploy denemesiyle doğrulandı - Paid plan olmadan bu limit
+// yükseltilemiyor). Görsel villa markası değişmediği sürece bayttan bayta aynı olduğundan, bir kez
+// render edip KV'de saklıyoruz - önbellek isabetinde render hiç çalışmıyor (KV okuma çok ucuz),
+// bu da hem bu route'u hem applyFacebookBrandAssets'i güvenilir hale getiriyor. Anahtar, marka
+// içeriğinin (metin + kaynak görsel) parmak izini içeriyor - kod içinde BRAND sabiti değişirse
+// anahtar da değişir ve önbellek kendiliğinden geçersiz olur, elle temizleme gerekmez.
+async function fingerprint(villa: Villa, asset: BrandImageAsset) {
+  const brand = BRAND[villa];
+  const raw = asset === "profile"
+    ? `profile|${brand.monogram}|${brand.name}`
+    : `cover|${brand.monogram}|${brand.title}|${brand.subtitle}|${brand.mediaId}`;
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+  return Array.from(new Uint8Array(digest)).map((byte) => byte.toString(16).padStart(2, "0")).join("").slice(0, 20);
+}
+
+export async function getBrandImageBytes(villa: Villa, asset: BrandImageAsset): Promise<ArrayBuffer> {
+  const key = `${villa}:${asset}:${await fingerprint(villa, asset)}`;
+
+  let kv: KVNamespace | undefined;
+  try {
+    kv = (await getCloudflareContext({ async: true })).env.SOCIAL_ASSET_CACHE;
+  } catch {
+    kv = undefined;
+  }
+
+  if (kv) {
+    const cached = await kv.get(key, "arrayBuffer").catch(() => null);
+    if (cached) return cached;
+  }
+
+  const rendered = asset === "profile" ? renderProfileImage(villa) : renderCoverImage(villa);
+  const bytes = await rendered.arrayBuffer();
+
+  if (kv) await kv.put(key, bytes, { expirationTtl: 60 * 60 * 24 * 180 }).catch(() => undefined);
+
+  return bytes;
 }
