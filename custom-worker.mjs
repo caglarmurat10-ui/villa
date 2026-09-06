@@ -544,7 +544,19 @@ async function adminAuthGate(request, env) {
   // Tip/Villa Lifestyle/Offer) Meta'ya publish media olarak vermek için de oturumsuz erişim gerekir.
   // Route yalnız kapalı bir allowlist'ten (parseTemplateId - Villa enum + TemplateType enum +
   // GUIDE_PLACES/EVERGREEN_TIPS sabit listeleri) besleniyor, serbest metin render etmiyor.
-  if (adminPublicAssetPath(url.pathname) || url.pathname.startsWith("/api/media/drive/") || url.pathname.startsWith("/api/public/social-assets/") || ADMIN_PUBLIC_PATHS.has(url.pathname)) return null;
+  // /api/social-assets/[Safira|Destan]/[profile|cover]: AYNI ihtiyaç - applyFacebookBrandAssets
+  // (src/lib/facebook.ts) Facebook Sayfa profil fotoğrafı/kapak görselini Graph API'ye bu URL'yi
+  // vererek uyguluyor; Meta bunu kendi sunucusundan, oturum çerezi olmadan çekiyor. Bu satır
+  // olmadan Meta "missing or invalid image file" (kod 324) hatasıyla reddediyordu - canlıda
+  // doğrulandı. Sadece bu 4 sabit yol (2 villa x profile/cover) açık; aynı route'un
+  // template/[type] ve manifest gibi diğer admin-korumalı alt yolları bu istisnaya dahil değil.
+  if (
+    adminPublicAssetPath(url.pathname) ||
+    url.pathname.startsWith("/api/media/drive/") ||
+    url.pathname.startsWith("/api/public/social-assets/") ||
+    /^\/api\/social-assets\/(Safira|Destan)\/(profile|cover)$/.test(url.pathname) ||
+    ADMIN_PUBLIC_PATHS.has(url.pathname)
+  ) return null;
 
   const authenticated = await verifyAdminSession(request, env);
   if (url.pathname === ADMIN_LOGIN_PATH) {
