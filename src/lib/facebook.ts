@@ -2,7 +2,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { Villa } from "./types";
 import type { FacebookPageCandidate } from "./facebook-private-store";
 import { brandProfiles } from "./brand-profiles";
-import { renderCoverImage, renderProfileImage } from "./social-brand-images";
+import { renderProfileImage } from "./social-brand-images";
 
 const META_GRAPH_VERSION = "v26.0";
 const META_GRAPH = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
@@ -279,7 +279,9 @@ export async function applyFacebookBrandAssets(
   pageId: string,
   pageAccessToken: string,
 ): Promise<FacebookBrandApplyResult> {
+  const { baseUrl } = await facebookConfig();
   const brand = brandProfiles[villa].facebook;
+  const coverUrl = `${baseUrl}/api/social-assets/${villa}/cover`;
   const result: FacebookBrandApplyResult = {
     details: { applied: false },
     profile: { applied: false },
@@ -344,7 +346,16 @@ export async function applyFacebookBrandAssets(
   }
 
   try {
-    const upload = await uploadFacebookImage(pageId, pageAccessToken, "photos", renderCoverImage(villa), { published: "false", no_story: "true" });
+    // Kapak görseli, profil görselinin aksine, doğrudan render edilip binary yüklenmiyor: kapak
+    // render'ı (dış Google Drive görselini çekip 1640x924 üzerine bindiriyor) tek başına bile
+    // zaman zaman Cloudflare Workers CPU süresi limitini zorluyor ("Exceeded CPU Limit", canlıda
+    // doğrulandı) - bunu profil render'ı ve iki Graph API çağrısıyla AYNI istekte yapmak
+    // isteği güvenilir biçimde limitin üstüne taşıdı (canlıda doğrulandı). Meta'ya URL vererek
+    // Meta'nın kendi (ayrı) isteğiyle çektirmek, render CPU maliyetini bu isteğin dışına, ayrı bir
+    // Worker çağrısına taşıyor - /{page-id}/photos ucu bu URL akışını (profilden farklı olarak)
+    // güvenilir kabul ediyor.
+    const uploadBody = new URLSearchParams({ access_token: pageAccessToken, url: coverUrl, published: "false", no_story: "true" });
+    const upload = await graphPost(`${encodeURIComponent(pageId)}/photos`, uploadBody);
     if (!upload.response.ok || !upload.data.id) {
       result.cover.error = publicGraphError("Facebook kapak görseli yüklenemedi", upload.response, upload.data);
       console.error(`[Facebook Brand][${villa}][cover] ${upload.data.error?.message ?? "mesaj yok"}`);
