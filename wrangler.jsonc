@@ -53,8 +53,13 @@
   // "0 5 * * *" - Social Growth Agent Public Web Scout, günde bir kez, 05:00 UTC = 08:00 İstanbul.
   // SOCIAL_SCOUT_SEARCH_API_KEY tanımlı değilse (bkz. secrets notu) hiçbir dış istek atmadan
   // PENDING_CONFIGURATION olarak durur - bu satır deploy'u bloklamaz.
+  // "0 7 * * 1,4" - GBP (Google Business Profile) otomatik gönderi, haftada 2 kez (Pazartesi ve
+  // Perşembe), 07:00 UTC = 10:00 İstanbul. Kullanıcının açık isteğiyle eklendi (bkz.
+  // src/lib/gbp/schedule.ts, src/lib/gbp/posts.ts başındaki not). Villa GBP konum eşleşmesi yoksa
+  // (henüz Google Business Profile API erişimi onaylanmadıysa) sessizce SKIPPED döner, deploy'u
+  // bloklamaz. Haftalık değil günlük diğer cron'lardan BİLEREK ayrı desen (kendi KV guard'ı).
   "triggers": {
-    "crons": ["*/15 * * * *", "*/30 * * * *", "0 3 * * *", "0 5 * * *"]
+    "crons": ["*/15 * * * *", "*/30 * * * *", "0 3 * * *", "0 5 * * *", "0 7 * * 1,4"]
   },
   "observability": { "enabled": true }
 }

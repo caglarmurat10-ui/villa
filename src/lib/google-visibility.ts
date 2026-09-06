@@ -4,7 +4,10 @@ import { WHATSAPP_PHONE_DISPLAY_INTL } from "./contact";
 import { getSearchConsoleProbe, type SearchConsoleSummary } from "./google-search-console";
 import { getGa4Probe, type Ga4Summary } from "./google-analytics";
 import { hasGoogleConnection } from "./google-api";
+import { getRecentGbpPosts } from "./gbp/schedule";
 import type { Villa } from "./types";
+
+type RecentGbpPost = Awaited<ReturnType<typeof getRecentGbpPosts>>[number];
 
 // Admin "Google Görünürlük" paneli için tek kaynak - hiçbir alan tahmin/uydurma değil, yalnız
 // kodda gerçekten var olan/yapılandırılmış olan şeyleri raporlar. Search Console/GBP API bağlı
@@ -30,6 +33,7 @@ export interface GoogleVisibilitySnapshot {
   reviewLinksState: GoogleReadinessState;
   reviewAutomationState: GoogleReadinessState;
   napPhone: string;
+  recentGbpPosts: RecentGbpPost[];
 }
 
 const SITEMAP_URLS = [
@@ -55,11 +59,12 @@ const JSON_LD_PAGES = [
 export async function getGoogleVisibilitySnapshot(): Promise<GoogleVisibilitySnapshot> {
   const { env } = await getCloudflareContext({ async: true });
   const oauthClientConfigured = Boolean(env.GOOGLE_CLIENT_ID && env.GOOGLE_CLIENT_SECRET);
-  const [locations, searchConsoleProbe, ga4Probe, gbpConnected] = await Promise.all([
+  const [locations, searchConsoleProbe, ga4Probe, gbpConnected, recentGbpPosts] = await Promise.all([
     getVillaLocations(),
     getSearchConsoleProbe(),
     getGa4Probe(),
     hasGoogleConnection("gbp"),
+    getRecentGbpPosts(8),
   ]);
 
   const placesApiConfigured = Boolean(env.GOOGLE_PLACES_API_KEY);
@@ -109,5 +114,6 @@ export async function getGoogleVisibilitySnapshot(): Promise<GoogleVisibilitySna
     reviewLinksState,
     reviewAutomationState,
     napPhone: WHATSAPP_PHONE_DISPLAY_INTL,
+    recentGbpPosts,
   };
 }

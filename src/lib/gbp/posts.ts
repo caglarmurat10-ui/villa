@@ -5,14 +5,19 @@ import type { Villa } from "../types";
 // Faz 6 bölüm 11/17 - Google Business Profile Local Posts YAZMA (write) katmanı. Şema
 // developers.google.com/my-business/reference/rest/v4/accounts.locations.localPosts (2026-09-03
 // canlı olarak doğrulandı) - uydurulmadı. Scope zaten mevcut GBP OAuth akışında istenen
-// business.manage - AYRI bir OAuth adımı gerekmiyor, yalnız bu adım şimdiye kadar hiç
-// ÇAĞRILMAMIŞTI (adapter.ts hâlâ yalnız read-only discovery yapıyor).
+// business.manage - AYRI bir OAuth adımı gerekmiyor.
 //
-// KRİTİK: Bu dosyanın hiçbir fonksiyonu otomatik/zamanlanmış bir görevden ÇAĞRILMAZ - yalnız
-// admin'in açık bir aksiyonuyla (bkz. /api/admin/google/gbp/publish-post) tetiklenir. Google'ın
-// kendisi de Business Profile API'lerini varsayılan olarak KAPALI/sıfır kotayla başlatıyor - gerçek
-// bir yayın denemesi PERMISSION_DENIED/kota hatası dönebilir, bu WAITING_EXTERNAL_ACCESS gibi
-// mevcut readiness desenine uygun, beklenen bir durumdur - "LIVE" asla otomatik varsayılmaz.
+// GÜNCELLEME (kullanıcının açık isteğiyle): publishGbpLocalPost artık yalnız admin action'ından
+// DEĞİL, zamanlanmış bir cron'dan da çağrılıyor (bkz. src/lib/gbp/schedule.ts
+// runGbpPostForVilla/runGbpPostCron, custom-worker.mjs runGbpPostCronIfDue). Bu, dosyanın önceki
+// "yalnız elle" tasarımının bilinçli bir istisnasıdır - güvenlik ağı: içerik tamamen sabit/
+// önceden yazılmış gbpContentLibrary'den gelir (hiçbir serbest metin üretimi yok), her deneme
+// gbp_posts D1 tablosuna kaydedilir, ve schedule.ts'teki GBP_AUTO_POST_ENABLED kill-switch'i
+// anında kapatılabilir. Google'ın kendisi Business Profile API'lerini varsayılan olarak KAPALI/
+// sıfır kotayla başlatıyor - gerçek bir yayın denemesi PERMISSION_DENIED/kota hatası dönebilir,
+// bu WAITING_EXTERNAL_ACCESS gibi mevcut readiness desenine uygun, beklenen bir durumdur - "LIVE"
+// asla otomatik varsayılmaz, her sonuç (başarılı/başarısız) ayrı ayrı kaydedilir.
+// /api/admin/google/gbp/publish-post hâlâ elle tek-seferlik deneme için ayrıca kullanılabilir.
 
 const LOCAL_POSTS_BASE = "https://mybusiness.googleapis.com/v4";
 

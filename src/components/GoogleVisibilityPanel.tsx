@@ -213,8 +213,24 @@ export default function GoogleVisibilityPanel({
         <GbpLocationPicker />
       </div>
 
+      <div style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
+        <strong style={{fontSize:11,color:"#93c5fd"}}>Son GBP gönderileri (otomatik, haftada 2 kez — Pazartesi/Perşembe)</strong>
+        {snapshot.recentGbpPosts.length === 0 ? (
+          <p style={{marginTop:8,fontSize:10,color:"#8fa4bd"}}>Henüz bir deneme yok — villa konum eşleşmesi tamamlanınca ilk otomatik gönderi bir sonraki zamanlanmış çalıştırmada denenir.</p>
+        ) : (
+          <div style={{display:"grid",gap:6,marginTop:8}}>
+            {snapshot.recentGbpPosts.map((post, index) => (
+              <div key={`${post.villa}-${post.attempted_at}-${index}`} style={{padding:"8px 10px",border:`1px solid ${post.status==="PUBLISHED"?"#1f5f3b":"#a16207"}`,borderRadius:9,background:post.status==="PUBLISHED"?"#071b16":"#241a06",fontSize:10}}>
+                <b style={{color:post.status==="PUBLISHED"?"#86efac":"#fbbf24"}}>{post.status==="PUBLISHED"?"✓ Yayınlandı":"⚠ Başarısız"}</b> — Villa {post.villa} · {post.category}
+                <div style={{marginTop:3,color:"#8fa4bd"}}>{new Date(post.attempted_at).toLocaleString("tr-TR")}{post.error ? ` · ${post.error}` : ""}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
       <details style={{marginTop:14,paddingTop:13,borderTop:"1px solid #203954"}}>
-        <summary style={{fontSize:11,color:"#93c5fd",fontWeight:800,cursor:"pointer"}}>GBP İçerik Kütüphanesi ({gbpContentLibrary.length} taslak, API erişimi gelince kullanılabilir)</summary>
+        <summary style={{fontSize:11,color:"#93c5fd",fontWeight:800,cursor:"pointer"}}>GBP İçerik Kütüphanesi ({gbpContentLibrary.length} taslak — villa konum eşleşmesi tamamlanınca otomatik rotasyonla kullanılır)</summary>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:8,marginTop:10}}>
           {gbpContentLibrary.map((post) => (
             <div key={`${post.villa}-${post.category}`} style={{padding:"8px 10px",border:"1px solid #223a57",borderRadius:9,background:"#0b1728",fontSize:9}}>

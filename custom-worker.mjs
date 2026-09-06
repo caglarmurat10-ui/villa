@@ -962,6 +962,43 @@ async function runPublicScoutIfDue(env, ctx) {
   }
 }
 
+// GBP (Google Business Profile) otomatik gönderi - haftada 2 kez (bkz. wrangler.jsonc "0 7 * * 1,4"
+// notu). Kullanıcının açık isteğiyle eklendi - src/lib/gbp/posts.ts başındaki not ve
+// src/lib/gbp/schedule.ts'teki GBP_AUTO_POST_ENABLED kill-switch'e bakın. Villa GBP konum
+// eşleşmesi yoksa route hiçbir dış istek atmadan SKIPPED döner - bu cron'un eklenmesi deploy'u
+// bloklamaz. Diğer cron'lardan BİLEREK ayrı invocation (aynı Error 1102 sonrası kaynak izolasyonu
+// gerekçesiyle - runDailySocialPlannerIfDue notu).
+const GBP_POST_CRON_KV_KEY = "gbp_post_cron_last_run_date";
+
+async function runGbpPostCronIfDue(env, ctx) {
+  const today = istanbulClock(new Date()).date;
+  let lastRunDate = null;
+  try {
+    lastRunDate = await env.META_PRIVATE.get(GBP_POST_CRON_KV_KEY);
+  } catch (error) {
+    console.error(`[GBP Posts] KV okuma hatası: ${safeCronError(error)}`);
+  }
+  if (lastRunDate === today) return;
+
+  const baseUrl = String(env.APP_BASE_URL ?? "https://admin.safiradestan.com").replace(/\/$/, "");
+  const targetUrl = `${baseUrl}/api/admin/google/gbp/auto-publish`;
+  try {
+    const response = await nextWorker.fetch(new Request(targetUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Host: new URL(targetUrl).host },
+    }), env, ctx);
+    if (!response.ok) {
+      console.error(`[GBP Posts] auto-publish HTTP ${response.status} döndü, bir sonraki zamanlanmış çalıştırmada tekrar denenecek.`);
+      return;
+    }
+    await env.META_PRIVATE.put(GBP_POST_CRON_KV_KEY, today);
+    const payload = await response.json().catch(() => ({}));
+    console.log(`[GBP Posts] Zamanlanmış çalıştırma tamamlandı: ${JSON.stringify(payload.results ?? []).slice(0, 300)}`);
+  } catch (error) {
+    console.error(`[GBP Posts] Çağrı başarısız, bir sonraki zamanlanmış çalıştırmada tekrar denenecek: ${safeCronError(error)}`);
+  }
+}
+
 async function runSocialCron(controller, env, ctx) {
   const ranAt = new Date(controller.scheduledTime).toISOString();
 
@@ -1256,6 +1293,15 @@ export default {
         await runPublicScoutIfDue(env, ctx);
       } catch (error) {
         console.error(`[Social Growth Scout] Zamanlanmış çalıştırma beklenmeyen hata: ${safeCronError(error)}`);
+      }
+      return;
+    }
+    // GBP otomatik gönderi - haftada 2 kez. Diğer cron'lardan BİLEREK ayrı invocation.
+    if (controller.cron === "0 7 * * 1,4") {
+      try {
+        await runGbpPostCronIfDue(env, ctx);
+      } catch (error) {
+        console.error(`[GBP Posts] Zamanlanmış çalıştırma beklenmeyen hata: ${safeCronError(error)}`);
       }
       return;
     }
