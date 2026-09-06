@@ -271,22 +271,69 @@ export async function applyFacebookBrandAssets(
     cover: { applied: false },
   };
 
-  try {
-    const detailBody = new URLSearchParams({ access_token: pageAccessToken, bio: brand.intro, description: brand.about });
-    const updated = await graphPost(encodeURIComponent(pageId), detailBody);
-    if (updated.response.ok && (updated.data.success === true || Boolean(updated.data.id))) result.details.applied = true;
-    else result.details.error = publicGraphError("Facebook Hakkında alanları uygulanamadı", updated.response, updated.data);
-  } catch {
-    result.details.error = "Facebook Hakkında alanları uygulanamadı.";
+  {
+    // `bio` ve `description` ayrı ayrı gönderiliyor: Meta bazı Sayfa kategorilerinde bu alanlardan
+    // yalnızca birini kabul edebiliyor - tek bir birleşik POST'ta biri reddedilirse ikisi de
+    // uygulanmıyordu. Ayırınca en azından geçerli olan alan uygulanabiliyor; hangisinin
+    // reddedildiği de ayrı ayrı loglanıyor.
+    let bioApplied = false;
+    let descriptionApplied = false;
+    const errors: string[] = [];
+
+    try {
+      const bioBody = new URLSearchParams({ access_token: pageAccessToken, bio: brand.intro });
+      const updated = await graphPost(encodeURIComponent(pageId), bioBody);
+      if (updated.response.ok && (updated.data.success === true || Boolean(updated.data.id))) bioApplied = true;
+      else {
+        errors.push(publicGraphError("bio", updated.response, updated.data));
+        console.error(`[Facebook Brand][${villa}][details][bio] ${updated.data.error?.message ?? "mesaj yok"}`);
+      }
+    } catch (error) {
+      errors.push("bio uygulanamadı");
+      console.error(`[Facebook Brand][${villa}][details][bio][exception] ${error instanceof Error ? error.message : "bilinmeyen"}`);
+    }
+
+    try {
+      const descriptionBody = new URLSearchParams({ access_token: pageAccessToken, description: brand.about });
+      const updated = await graphPost(encodeURIComponent(pageId), descriptionBody);
+      if (updated.response.ok && (updated.data.success === true || Boolean(updated.data.id))) descriptionApplied = true;
+      else {
+        errors.push(publicGraphError("description", updated.response, updated.data));
+        console.error(`[Facebook Brand][${villa}][details][description] ${updated.data.error?.message ?? "mesaj yok"}`);
+      }
+    } catch (error) {
+      errors.push("description uygulanamadı");
+      console.error(`[Facebook Brand][${villa}][details][description][exception] ${error instanceof Error ? error.message : "bilinmeyen"}`);
+    }
+
+    result.details.applied = bioApplied && descriptionApplied;
+    if (!result.details.applied) result.details.error = `Facebook Hakkında alanları uygulanamadı (${errors.join("; ")})`;
   }
 
   try {
-    const body = new URLSearchParams({ access_token: pageAccessToken, url: profileUrl, no_feed_story: "true" });
-    const { response, data } = await graphPost(`${encodeURIComponent(pageId)}/picture`, body);
+    // Meta'nın /{page-id}/picture ucu `url` parametresiyle çağrıldığında kendi sunucusundan görseli
+    // çekmeye çalışıyor ve gözlemlenen davranışta bunu güvenilir biçimde yapamıyor - "(#1) Could not
+    // fetch picture" hatasıyla reddediyor (canlıda doğrulandı: aynı URL bizim tarafımızdan hem GET
+    // hem HEAD ile sorunsuz erişilebiliyor). /{page-id}/photos ucu aynı tip URL'yi sorunsuz kabul
+    // ediyor (kapak görseli bu yüzden çalışıyor) - bu yüzden profil görselini de Meta'ya URL
+    // vermek yerine kendimiz indirip binary olarak yüklüyoruz.
+    const imageResponse = await fetch(profileUrl);
+    if (!imageResponse.ok) throw new Error(`Profil görseli üretilemedi (HTTP ${imageResponse.status}).`);
+    const imageBlob = await imageResponse.blob();
+    const form = new FormData();
+    form.set("access_token", pageAccessToken);
+    form.set("no_feed_story", "true");
+    form.set("source", imageBlob, "profile.png");
+    const response = await fetch(`${META_GRAPH}/${encodeURIComponent(pageId)}/picture`, { method: "POST", body: form });
+    const data = (await response.json().catch(() => ({}))) as { id?: string; success?: boolean; error?: { code?: number; message?: string } };
     if (response.ok && (data.success === true || Boolean(data.id))) result.profile.applied = true;
-    else result.profile.error = publicGraphError("Facebook profil fotoğrafı uygulanamadı", response, data);
-  } catch {
+    else {
+      result.profile.error = publicGraphError("Facebook profil fotoğrafı uygulanamadı", response, data);
+      console.error(`[Facebook Brand][${villa}][profile] ${data.error?.message ?? "mesaj yok"}`);
+    }
+  } catch (error) {
     result.profile.error = "Facebook profil fotoğrafı uygulanamadı.";
+    console.error(`[Facebook Brand][${villa}][profile][exception] ${error instanceof Error ? error.message : "bilinmeyen"}`);
   }
 
   try {
