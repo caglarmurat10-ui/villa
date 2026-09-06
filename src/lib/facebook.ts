@@ -2,6 +2,7 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { Villa } from "./types";
 import type { FacebookPageCandidate } from "./facebook-private-store";
 import { brandProfiles } from "./brand-profiles";
+import { renderCoverImage, renderProfileImage } from "./social-brand-images";
 
 const META_GRAPH_VERSION = "v26.0";
 const META_GRAPH = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
@@ -256,15 +257,29 @@ function publicGraphError(prefix: string, response: Response, data: { error?: { 
   return `${prefix} (HTTP ${response.status}${data.error?.code ? ` / ${data.error.code}` : ""})`;
 }
 
+async function uploadFacebookImage(
+  pageId: string,
+  pageAccessToken: string,
+  path: string,
+  image: Response,
+  fields: Record<string, string>,
+) {
+  const imageBlob = await image.blob();
+  const form = new FormData();
+  form.set("access_token", pageAccessToken);
+  for (const [key, value] of Object.entries(fields)) form.set(key, value);
+  form.set("source", imageBlob, "image.png");
+  const response = await fetch(`${META_GRAPH}/${encodeURIComponent(pageId)}/${path}`, { method: "POST", body: form });
+  const data = (await response.json().catch(() => ({}))) as { id?: string; success?: boolean; error?: { code?: number; message?: string } };
+  return { response, data };
+}
+
 export async function applyFacebookBrandAssets(
   villa: Villa,
   pageId: string,
   pageAccessToken: string,
 ): Promise<FacebookBrandApplyResult> {
-  const { baseUrl } = await facebookConfig();
   const brand = brandProfiles[villa].facebook;
-  const profileUrl = `${baseUrl}/api/social-assets/${villa}/profile`;
-  const coverUrl = `${baseUrl}/api/social-assets/${villa}/cover`;
   const result: FacebookBrandApplyResult = {
     details: { applied: false },
     profile: { applied: false },
@@ -313,19 +328,11 @@ export async function applyFacebookBrandAssets(
   try {
     // Meta'nın /{page-id}/picture ucu `url` parametresiyle çağrıldığında kendi sunucusundan görseli
     // çekmeye çalışıyor ve gözlemlenen davranışta bunu güvenilir biçimde yapamıyor - "(#1) Could not
-    // fetch picture" hatasıyla reddediyor (canlıda doğrulandı: aynı URL bizim tarafımızdan hem GET
-    // hem HEAD ile sorunsuz erişilebiliyor). /{page-id}/photos ucu aynı tip URL'yi sorunsuz kabul
-    // ediyor (kapak görseli bu yüzden çalışıyor) - bu yüzden profil görselini de Meta'ya URL
-    // vermek yerine kendimiz indirip binary olarak yüklüyoruz.
-    const imageResponse = await fetch(profileUrl);
-    if (!imageResponse.ok) throw new Error(`Profil görseli üretilemedi (HTTP ${imageResponse.status}).`);
-    const imageBlob = await imageResponse.blob();
-    const form = new FormData();
-    form.set("access_token", pageAccessToken);
-    form.set("no_feed_story", "true");
-    form.set("source", imageBlob, "profile.png");
-    const response = await fetch(`${META_GRAPH}/${encodeURIComponent(pageId)}/picture`, { method: "POST", body: form });
-    const data = (await response.json().catch(() => ({}))) as { id?: string; success?: boolean; error?: { code?: number; message?: string } };
+    // fetch picture" hatasıyla reddediyor (canlıda doğrulandı: URL bizim tarafımızdan hem GET hem
+    // HEAD ile sorunsuz erişilebiliyor). Görseli Meta'ya URL vermek yerine doğrudan render edip
+    // (self-fetch YOK - Cloudflare Workers'ta bir Worker'ın kendi alan adına HTTP isteği atması
+    // güvenilir değil, HTTP 522 canlıda gözlemlendi) binary olarak yüklüyoruz.
+    const { response, data } = await uploadFacebookImage(pageId, pageAccessToken, "picture", renderProfileImage(villa), { no_feed_story: "true" });
     if (response.ok && (data.success === true || Boolean(data.id))) result.profile.applied = true;
     else {
       result.profile.error = publicGraphError("Facebook profil fotoğrafı uygulanamadı", response, data);
@@ -337,18 +344,19 @@ export async function applyFacebookBrandAssets(
   }
 
   try {
-    const uploadBody = new URLSearchParams({ access_token: pageAccessToken, url: coverUrl, published: "false", no_story: "true" });
-    const upload = await graphPost(`${encodeURIComponent(pageId)}/photos`, uploadBody);
+    const upload = await uploadFacebookImage(pageId, pageAccessToken, "photos", renderCoverImage(villa), { published: "false", no_story: "true" });
     if (!upload.response.ok || !upload.data.id) {
       result.cover.error = publicGraphError("Facebook kapak görseli yüklenemedi", upload.response, upload.data);
+      console.error(`[Facebook Brand][${villa}][cover] ${upload.data.error?.message ?? "mesaj yok"}`);
     } else {
       const applyBody = new URLSearchParams({ access_token: pageAccessToken, cover: upload.data.id, offset_y: "50", no_feed_story: "true" });
       const applied = await graphPost(encodeURIComponent(pageId), applyBody);
       if (applied.response.ok && (applied.data.success === true || Boolean(applied.data.id))) result.cover.applied = true;
       else result.cover.error = publicGraphError("Facebook kapak görseli uygulanamadı", applied.response, applied.data);
     }
-  } catch {
+  } catch (error) {
     result.cover.error = "Facebook kapak görseli uygulanamadı.";
+    console.error(`[Facebook Brand][${villa}][cover][exception] ${error instanceof Error ? error.message : "bilinmeyen"}`);
   }
 
   return result;

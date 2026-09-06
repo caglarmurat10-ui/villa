@@ -1,4 +1,8 @@
 import { applyFacebookBrandAssets, getFacebookPageProfile } from "@/lib/facebook";
+
+// applyFacebookBrandAssets next/og (ImageResponse) ile profil/kapak görselini doğrudan render
+// ediyor - social-assets rotalarıyla aynı çalışma zamanı gerekiyor.
+export const runtime = "nodejs";
 import {
   deleteFacebookSelection,
   readFacebookSelection,

@@ -2,6 +2,10 @@ import { z } from "zod";
 import { applyFacebookBrandAssets } from "@/lib/facebook";
 import { getFacebookCredentials } from "@/lib/meta-store";
 
+// applyFacebookBrandAssets artık next/og (ImageResponse) ile profil/kapak görselini doğrudan
+// render ediyor - social-assets rotalarıyla aynı çalışma zamanı gerekiyor.
+export const runtime = "nodejs";
+
 const schema = z.object({ villa: z.enum(["Safira", "Destan"]) });
 
 function safeError(error: unknown) {
