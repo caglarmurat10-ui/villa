@@ -51,11 +51,14 @@ export function renderProfileImage(villa: Villa): Response {
 export function renderCoverImage(villa: Villa): Response {
   const brand = BRAND[villa];
   const media = resolveDriveMediaById(brand.mediaId);
-  // Kapak görseli 1640x924 olarak render ediliyor - kaynak görseli w1600'den daha büyük (w2400)
-  // çekmek CSS objectFit:cover ile görsel olarak fark yaratmıyordu ama decode/composite CPU
-  // maliyetini ~2.25x artırıyordu ve Cloudflare Workers CPU süresi limitini zaman zaman aşırıyordu
-  // ("Exceeded CPU Limit", canlıda doğrulandı). w1600 final render genişliğine zaten yakın.
-  const imageUrl = media?.previewUrl ?? "";
+  // Kapak görseli 1640x924 olarak render ediliyor ama Facebook'ta gerçekte ~820x312 gibi çok daha
+  // küçük gösteriliyor; w1600 kaynak bile Cloudflare Workers Free plan'ın 10ms istek başına CPU
+  // limitini zaman zaman aşırıyordu (canlıda doğrulandı - Safira'nın kaynak fotoğrafında tutarlı
+  // biçimde, Destan'da nadiren). getBrandImageBytes zaten sonucu önbelleğe alıyor (bu render en
+  // fazla marka içeriği değişince bir kez çalışır) ama İLK render'ın kendisi yine de bu limit
+  // içinde bitmeli - w1000 görsel kaliteden gözle görülür ödün vermeden decode/composite CPU
+  // maliyetini belirgin biçimde azaltıyor.
+  const imageUrl = media?.previewUrl.replace("sz=w1600", "sz=w1000") ?? "";
 
   return new ImageResponse(
     <div style={{width:"100%",height:"100%",display:"flex",position:"relative",overflow:"hidden",background:"#061a33",fontFamily:"serif"}}>
