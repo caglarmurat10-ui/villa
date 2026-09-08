@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import PublicBookingWidget from "@/components/PublicBookingWidget";
@@ -26,36 +25,11 @@ import styles from "../site.module.css";
 const ORIGIN = "https://safiradestan.com";
 const villas = VILLAS;
 
-export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
-  const { slug } = await params;
-  if (!(slug in villas)) return {};
-  const villa = villas[slug as VillaSlug];
-  const canonical = `${ORIGIN}/${slug}`;
-  const title = `${villa.name} | Patara Kaş Özel Havuzlu Villa`;
-  const description = `${villa.name}, Patara Kaş'ta özel havuzlu villa tatili. Gerçek fotoğrafları inceleyin, canlı müsaitlik ve dönemsel fiyat kontrolü yapın, doğrudan rezervasyon talebi gönderin.`;
-
-  return {
-    title,
-    description,
-    alternates: { canonical },
-    openGraph: {
-      title,
-      description,
-      url: canonical,
-      siteName: "Safira & Destan Villas",
-      locale: "tr_TR",
-      type: "website",
-      images: [{ url: villa.cover, alt: `${villa.name} Patara Kaş özel havuzlu villa` }],
-    },
-    twitter: {
-      card: "summary_large_image",
-      title,
-      description,
-      images: [villa.cover],
-    },
-  };
-}
-
+// NOT: Bu route'un metadata'sı BURADA tanımlanmaz - villa-safira/villa-destan literal klasörleri
+// (src/app/site/villa-safira/page.tsx, .../villa-destan/page.tsx) kendi statik `metadata` export'larını
+// taşır (getPublicVillaMetadata() - @/lib/public-villa-seo.ts) ve Next.js route çözümlemesinde literal
+// segment [slug] dinamik segmentinden ÖNCELİKLİDİR. Bu dosyanın kendi generateMetadata'sı önceden vardı
+// ama hiçbir zaman render edilmiyordu (dead code / iki farklı metadata kaynağı riski) - kaldırıldı.
 export default async function VillaDetailPage({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<Record<string, string | string[] | undefined>> }) {
   const { slug } = await params;
   const query = await searchParams;
@@ -396,6 +370,7 @@ export default async function VillaDetailPage({ params, searchParams }: { params
         <span className={styles.kicker}>DİĞER SEÇENEK</span>
         <h2>İki karakter.<br />Aynı özen.</h2>
         <Link href={slug === "villa-safira" ? "/villa-destan" : "/villa-safira"}>{slug === "villa-safira" ? "Villa Destan’ı" : "Villa Safira’yı"} keşfet →</Link>
+        <Link href="/patara-villa">Patara kiralık villa seçeneklerini karşılaştır →</Link>
         <Link href="/rehber/patara">Patara rehberini keşfet →</Link>
         <Link href="/rehber/patara-plaji">Patara Plajı hakkında →</Link>
         <Link href="/rehber">Tüm bölge rehberini keşfet →</Link>

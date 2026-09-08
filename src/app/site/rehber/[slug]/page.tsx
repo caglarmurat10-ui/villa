@@ -6,6 +6,7 @@ import { GUIDE_PLACES, guideMapsUrl } from "@/lib/region-guide";
 import { REGION_GUIDE_PAGES, REGION_GUIDE_PAGE_SLUGS, type RegionGuidePageSlug } from "@/lib/region-guide-pages";
 import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
 import TrackedGuidePlaceLink from "@/components/analytics/TrackedGuidePlaceLink";
+import { hreflangAlternates } from "@/lib/seo";
 import styles from "../../site.module.css";
 
 const ORIGIN = "https://safiradestan.com";
@@ -26,7 +27,7 @@ export async function generateMetadata({ params }: { params: Promise<{ slug: str
   return {
     title: page.seoTitle,
     description: page.metaDescription,
-    alternates: { canonical },
+    alternates: hreflangAlternates(canonical),
     robots: { index: true, follow: true },
     openGraph: { title: page.title, description: page.metaDescription, url: canonical, type: "article" },
     twitter: { card: "summary_large_image", title: page.title, description: page.metaDescription },
@@ -149,6 +150,7 @@ export default async function RegionGuideSubPage({ params }: { params: Promise<{
         <div className={styles.policyCtaLinks}>
           <Link href="/villa-safira">Villa Safira'yı keşfet →</Link>
           <Link href="/villa-destan">Villa Destan'ı keşfet →</Link>
+          <Link href="/patara-villa">Patara kiralık villa seçeneklerini karşılaştır →</Link>
           <Link href="/rehber">Tüm bölge rehberine dön →</Link>
         </div>
       </section>

@@ -5,7 +5,9 @@ import NavigationBridge from "@/components/NavigationBridge";
 import OperationsTopNav from "@/components/OperationsTopNav";
 import OfflineBanner from "@/components/OfflineBanner";
 import CookieConsentBanner from "@/components/analytics/CookieConsentBanner";
+import AttributionCapture from "@/components/analytics/AttributionCapture";
 import { CONSENT_STORAGE_KEY, GTM_ID } from "@/lib/analytics";
+import { hreflangAlternates } from "@/lib/seo";
 import "./globals.css";
 import "./social.css";
 import "./social-approval.css";
@@ -73,7 +75,7 @@ export async function generateMetadata(): Promise<Metadata> {
       title: "Patara Kaş Özel Havuzlu Villa | Safira & Destan Villas",
       description: "Patara, Kaş'ta Villa Safira ve Villa Destan: özel havuzlu villa tatili, canlı müsaitlik, dönemsel fiyat ve doğrudan rezervasyon.",
       applicationName: "Safira & Destan Villas",
-      alternates: { canonical: "/" },
+      alternates: hreflangAlternates("/"),
       keywords: [
         "Patara villa kiralama",
         "Kaş villa kiralama",
@@ -155,6 +157,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
       <body>
         {isPublicSite && (
           <>
+            <AttributionCapture />
             <Script id="ga-consent-default" strategy="beforeInteractive" dangerouslySetInnerHTML={{ __html: CONSENT_DEFAULT_SCRIPT }} />
             <noscript>
               <iframe

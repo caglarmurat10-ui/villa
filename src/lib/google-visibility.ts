@@ -40,6 +40,7 @@ const SITEMAP_URLS = [
   "https://safiradestan.com/",
   "https://safiradestan.com/villa-safira",
   "https://safiradestan.com/villa-destan",
+  "https://safiradestan.com/patara-villa",
   "https://safiradestan.com/rezervasyon-kosullari",
   "https://safiradestan.com/rehber",
   "https://safiradestan.com/rehber/patara",
@@ -53,6 +54,7 @@ const JSON_LD_PAGES = [
   "/ (WebSite, Organization, FAQPage)",
   "/villa-safira (VacationRental+telephone, BreadcrumbList, FAQPage)",
   "/villa-destan (VacationRental+telephone, BreadcrumbList, FAQPage)",
+  "/patara-villa (CollectionPage, BreadcrumbList, FAQPage)",
   "/rehber/* (5 sayfa — BreadcrumbList, WebPage, FAQPage)",
 ];
 

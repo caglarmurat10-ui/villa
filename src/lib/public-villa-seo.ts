@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { VILLAS, type VillaSlug } from "./villa-content";
+import { hreflangAlternates } from "./seo";
 
 const ORIGIN = "https://safiradestan.com";
 
@@ -13,7 +14,7 @@ export function getPublicVillaMetadata(slug: VillaSlug): Metadata {
   return {
     title,
     description,
-    alternates: { canonical },
+    alternates: hreflangAlternates(canonical),
     openGraph: {
       title,
       description,

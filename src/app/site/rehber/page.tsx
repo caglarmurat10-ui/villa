@@ -4,6 +4,7 @@ import { VILLAS } from "@/lib/villa-content";
 import { REGION_GUIDE_PAGES, REGION_GUIDE_PAGE_SLUGS } from "@/lib/region-guide-pages";
 import RegionGuideGrid from "@/components/RegionGuideGrid";
 import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
+import { hreflangAlternates } from "@/lib/seo";
 import styles from "../site.module.css";
 
 const ORIGIN = "https://safiradestan.com";
@@ -15,7 +16,7 @@ const DESCRIPTION = "Patara Antik Kenti, Patara Plajı, Kaputaş Plajı, Xanthos
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
-  alternates: { canonical: CANONICAL },
+  alternates: hreflangAlternates(CANONICAL),
   robots: { index: true, follow: true },
   openGraph: { title: TITLE, description: DESCRIPTION, url: CANONICAL, type: "website" },
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },

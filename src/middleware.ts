@@ -7,6 +7,7 @@ const PUBLIC_API_PATHS = new Set([
   "/api/health",
   "/api/system/version",
   "/api/public/booking-inquiries",
+  "/api/public/track",
   "/api/payments/checkout",
   "/api/payments/paytr/callback",
 ]);
@@ -31,13 +32,14 @@ const PUBLIC_REWRITES = new Map([
   ["/", "/site"],
   ["/villa-safira", "/site/villa-safira"],
   ["/villa-destan", "/site/villa-destan"],
+  ["/patara-villa", "/site/patara-villa"],
   ["/rezervasyon-kosullari", "/site/rezervasyon-kosullari"],
   ...LEGAL_PAGE_SLUGS.map((slug): [string, string] => [`/${slug}`, `/site/${slug}`]),
   ["/rehber", "/site/rehber"],
   ...REGION_GUIDE_SLUGS.map((slug): [string, string] => [`/rehber/${slug}`, `/site/rehber/${slug}`]),
 ]);
 const PUBLIC_INTERNAL_PATHS = new Set([
-  "/site", "/site/villa-safira", "/site/villa-destan", "/site/rezervasyon-kosullari", "/site/rehber",
+  "/site", "/site/villa-safira", "/site/villa-destan", "/site/patara-villa", "/site/rezervasyon-kosullari", "/site/rehber",
   ...LEGAL_PAGE_SLUGS.map((slug) => `/site/${slug}`),
   ...REGION_GUIDE_SLUGS.map((slug) => `/site/rehber/${slug}`),
 ]);

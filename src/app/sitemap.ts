@@ -10,9 +10,28 @@ const BUILD_TIME = new Date();
 
 export default function sitemap(): MetadataRoute.Sitemap {
   return [
-    { url: "https://safiradestan.com/", lastModified: BUILD_TIME, changeFrequency: "weekly", priority: 1 },
-    { url: "https://safiradestan.com/villa-safira", lastModified: BUILD_TIME, changeFrequency: "weekly", priority: 0.9 },
-    { url: "https://safiradestan.com/villa-destan", lastModified: BUILD_TIME, changeFrequency: "weekly", priority: 0.9 },
+    {
+      url: "https://safiradestan.com/",
+      lastModified: BUILD_TIME,
+      changeFrequency: "weekly",
+      priority: 1,
+      images: ["https://safiradestan.com/villas/safira-hero-20260830.jpg", "https://safiradestan.com/villas/destan-hero-20260830.jpg"],
+    },
+    {
+      url: "https://safiradestan.com/villa-safira",
+      lastModified: BUILD_TIME,
+      changeFrequency: "weekly",
+      priority: 0.9,
+      images: ["https://safiradestan.com/villas/safira-hero-20260830.jpg"],
+    },
+    {
+      url: "https://safiradestan.com/villa-destan",
+      lastModified: BUILD_TIME,
+      changeFrequency: "weekly",
+      priority: 0.9,
+      images: ["https://safiradestan.com/villas/destan-hero-20260830.jpg"],
+    },
+    { url: "https://safiradestan.com/patara-villa", lastModified: BUILD_TIME, changeFrequency: "weekly", priority: 0.85 },
     { url: "https://safiradestan.com/rezervasyon-kosullari", lastModified: BUILD_TIME, changeFrequency: "monthly", priority: 0.5 },
     ...LEGAL_PAGE_SLUGS.map((slug) => ({
       url: `https://safiradestan.com/${slug}`,

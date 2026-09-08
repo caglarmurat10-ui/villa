@@ -3,6 +3,7 @@ import Link from "next/link";
 import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
 import { LEGAL_PAGE_LINKS, type LegalPageContent } from "@/lib/legal-content";
 import { WHATSAPP_PHONE_DISPLAY_TR } from "@/lib/contact";
+import { hreflangAlternates } from "@/lib/seo";
 import styles from "@/app/site/site.module.css";
 
 const ORIGIN = "https://safiradestan.com";
@@ -12,7 +13,7 @@ export function buildLegalMetadata(page: LegalPageContent): Metadata {
   return {
     title: `${page.title} | Safira & Destan Villas`,
     description: page.description,
-    alternates: { canonical },
+    alternates: hreflangAlternates(canonical),
     robots: { index: true, follow: true },
     openGraph: { title: `${page.title} | Safira & Destan Villas`, description: page.description, url: canonical, type: "website" },
     twitter: { card: "summary_large_image", title: `${page.title} | Safira & Destan Villas`, description: page.description },

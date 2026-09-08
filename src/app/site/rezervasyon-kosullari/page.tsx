@@ -4,6 +4,7 @@ import { VILLAS } from "@/lib/villa-content";
 import { POLICY_SECTIONS, POLICY_SUMMARY } from "@/lib/reservation-policy";
 import { LEGAL_PAGE_LINKS } from "@/lib/legal-content";
 import CookiePreferencesButton from "@/components/analytics/CookiePreferencesButton";
+import { hreflangAlternates } from "@/lib/seo";
 import styles from "../site.module.css";
 
 const ORIGIN = "https://safiradestan.com";
@@ -14,7 +15,7 @@ const DESCRIPTION = "Villa Safira ve Villa Destan için rezervasyon ön ödemesi
 export const metadata: Metadata = {
   title: TITLE,
   description: DESCRIPTION,
-  alternates: { canonical: CANONICAL },
+  alternates: hreflangAlternates(CANONICAL),
   robots: { index: true, follow: true },
   openGraph: { title: TITLE, description: DESCRIPTION, url: CANONICAL, type: "website" },
   twitter: { card: "summary_large_image", title: TITLE, description: DESCRIPTION },

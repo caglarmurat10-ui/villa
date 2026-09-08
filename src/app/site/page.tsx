@@ -19,6 +19,8 @@ import TrackedWhatsappLink from "@/components/analytics/TrackedWhatsappLink";
 import TrackedDatesPriceLink from "@/components/analytics/TrackedDatesPriceLink";
 import TrackedPhoneLink from "@/components/analytics/TrackedPhoneLink";
 import { whatsappLink, WHATSAPP_PHONE_INTL, WHATSAPP_PHONE_DISPLAY_TR } from "@/lib/contact";
+import { hreflangAlternates } from "@/lib/seo";
+import { buildHomepageStructuredData } from "@/lib/homepage-structured-data";
 import styles from "./site.module.css";
 
 export const dynamic = "force-dynamic";
@@ -27,17 +29,11 @@ const ORIGIN = "https://safiradestan.com";
 const HAS_OTA_LISTINGS = Object.values(VILLAS).some((villa) => villa.airbnbListingUrl || villa.bookingListingUrl);
 const GUIDE_TEASER_IDS = ["patara-antik-kenti", "patara-plaji", "kaputas-plaji", "kas-merkez"];
 const GUIDE_TEASER_PLACES = GUIDE_PLACES.filter((place) => GUIDE_TEASER_IDS.includes(place.id));
-const SOCIAL_LINKS = [
-  VILLAS["villa-safira"].instagram,
-  VILLAS["villa-destan"].instagram,
-  VILLAS["villa-safira"].facebook,
-  VILLAS["villa-destan"].facebook,
-];
 
 export const metadata: Metadata = {
   title: "Patara Kaş Özel Havuzlu Villa | Villa Safira & Villa Destan",
   description: "Patara Kaş'ta Villa Safira ve Villa Destan. Gerçek fotoğrafları inceleyin, canlı müsaitlik ve dönemsel fiyatı kontrol edip doğrudan talep gönderin.",
-  alternates: { canonical: ORIGIN },
+  alternates: hreflangAlternates(ORIGIN),
   openGraph: {
     title: "Patara Kaş Özel Havuzlu Villa | Villa Safira & Villa Destan",
     description: "Patara'da iki özel havuzlu villa; canlı müsaitlik, dönemsel fiyat ve doğrudan rezervasyon.",
@@ -89,38 +85,13 @@ const MEDIA = {
   destanExperienceAlt: destanExperienceImage.alt,
 } as const;
 
-function buildStructuredData(faqItems: ReturnType<typeof getFaqItems>) {
-  return {
-  "@context": "https://schema.org",
-  "@graph": [
-    {
-      "@type": "WebSite",
-      "@id": `${ORIGIN}/#website`,
-      url: ORIGIN,
-      name: "Safira & Destan Villas",
-      inLanguage: "tr-TR",
-      sameAs: SOCIAL_LINKS,
-    },
-    {
-      "@type": "FAQPage",
-      "@id": `${ORIGIN}/#faq`,
-      mainEntity: faqItems.map((item) => ({
-        "@type": "Question",
-        name: item.question,
-        acceptedAnswer: { "@type": "Answer", text: item.answer },
-      })),
-    },
-  ],
-  };
-}
-
 export default async function PublicHomePage() {
   const [reservations, prices, locations, blockedRanges, installmentCampaign, paytrReadiness] = await Promise.all([listReservations(), listPriceRanges(), getVillaLocations(), listBlockedRanges(), getInstallmentCampaignReadiness(), getPaytrReadiness()]);
   const faqItems = getFaqItems({
     paytrReady: paytrReadiness.state === "PAYTR_READY",
     installmentVerified: installmentCampaign.state === "INSTALLMENT_CAMPAIGN_VERIFIED",
   });
-  const structuredData = buildStructuredData(faqItems);
+  const structuredData = buildHomepageStructuredData(faqItems);
   const bookingReservations = [
     ...reservations.map(({ villa, checkIn, checkOut }) => ({ villa, checkIn, checkOut })),
     ...blockedRanges,
@@ -188,7 +159,7 @@ export default async function PublicHomePage() {
       <Reveal><ReservationConfidenceSection /></Reveal>
 
       <section className={styles.section} id="villalar">
-        <div className={styles.editorialHead}><span className={styles.kicker}>PATARA VİLLA KİRALAMA</span><h2>Hangisi sizin<br />tatiliniz?</h2><p>Villa Safira ve Villa Destan’ı gerçek fotoğraflarıyla keşfedin; Patara’da özel havuzlu villa tatili için size en uygun seçeneği bulun.</p></div>
+        <div className={styles.editorialHead}><span className={styles.kicker}>PATARA VİLLA KİRALAMA</span><h2>Hangisi sizin<br />tatiliniz?</h2><p>Villa Safira ve Villa Destan’ı gerçek fotoğraflarıyla keşfedin; <Link href="/patara-villa" className={styles.experienceLink}>Patara’da özel havuzlu villa</Link> tatili için size en uygun seçeneği bulun.</p></div>
         <div className={styles.villaGrid}>
           <Link className={styles.villaStory} href="/villa-safira">
             <div className={styles.storyImage}>

@@ -10,6 +10,11 @@ export default defineConfig({
   },
   test: {
     environment: "node",
+    // .worktrees/ - eşzamanlı çalışan başka bir agent/oturumun kendi git worktree'si (bu projenin
+    // parçası değil, kendi bağımsız kopyası). Vitest'in varsayılan include glob'u proje kökünden
+    // her yeri tarar - bu dışlama olmadan o worktree'nin KENDİ (bu oturumdan bağımsız, farklı bir
+    // anda değişmiş) test dosyaları da toplanıp yanlışlıkla bu projenin test sonucuna karışır.
+    exclude: ["**/node_modules/**", "**/.worktrees/**", "**/dist/**", "**/.next/**", "**/.open-next/**"],
     server: {
       deps: {
         // node:sqlite built-in bazı Vite SSR ön-derleme yollarında "node:" öneki düşürülüp
