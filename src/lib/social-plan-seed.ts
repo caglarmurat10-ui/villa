@@ -271,7 +271,7 @@ export async function ensureSpecialDayPosts(): Promise<{ created: number; update
     if (!match) continue;
 
     const { automationClass, reason } = classifySpecialDaySafety(match);
-    const name = match.kind === "fixed" ? match.holiday.name : match.entry.name;
+    const name = match.kind === "fixed" ? match.holiday.name : match.kind === "religious" ? match.entry.name : "Cuma Mesajı";
     if (automationClass !== "AUTO_SAFE") {
       needsReview.push({ date, name, automationClass: "REVIEW_REQUIRED", reason });
       continue;

@@ -149,8 +149,9 @@ export function renderTrustClaim(villa: Villa, format: Format, claimIndex: numbe
 export function renderSpecialDay(villa: Villa, format: Format, dateIso: string): Response | null {
   const match = getSpecialDayForDate(dateIso);
   if (!match) return null;
-  const name = match.kind === "fixed" ? match.holiday.name : match.entry.name;
-  return textCard(villa, format, "ÖZEL GÜN", name, match.message);
+  const name = match.kind === "fixed" ? match.holiday.name : match.kind === "religious" ? match.entry.name : "Cuma Mesajı";
+  const kicker = match.kind === "friday" ? "CUMA MESAJI" : "ÖZEL GÜN";
+  return textCard(villa, format, kicker, name, match.message);
 }
 
 // ITINERARY (rota) - yalnız GUIDE_PLACES'te GERÇEKTEN var olan yerlerden derlenir
