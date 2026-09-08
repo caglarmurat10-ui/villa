@@ -2,6 +2,7 @@
 
 import type { AnchorHTMLAttributes } from "react";
 import { trackSocialProfileClick, type SocialPlatformAnalytics, type VillaId } from "@/lib/analytics";
+import { beaconConversionEvent } from "@/lib/conversion-events-client";
 
 // TrackedOtaLink ile aynı desen - sunucu bileşenindeki düz Instagram/Facebook linklerine ince
 // istemci sarmalayıcı. Tıklama yalnız analytics event'i gönderir, link normal şekilde açılır.
@@ -17,6 +18,7 @@ export default function TrackedSocialLink({ platform, villaId, ctaLocation, onCl
       {...rest}
       onClick={(event) => {
         trackSocialProfileClick(platform, { villa_id: villaId }, ctaLocation);
+        beaconConversionEvent(platform === "instagram" ? "instagram_click" : "facebook_click", villaId);
         onClick?.(event);
       }}
     />

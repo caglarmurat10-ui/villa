@@ -2,6 +2,7 @@
 
 import type { AnchorHTMLAttributes } from "react";
 import { trackWhatsappClick, type VillaId } from "@/lib/analytics";
+import { beaconConversionEvent } from "@/lib/conversion-events-client";
 
 // TrackedMapsLink/TrackedSocialLink ile aynı desen. villa_name PII DEĞİL (herkese açık villa adı,
 // misafir bilgisi değil) - trackWhatsappClick zaten yalnız villa_id/villa_name/cta_location alır.
@@ -17,6 +18,7 @@ export default function TrackedWhatsappLink({ villaId, villaName, ctaLocation, o
       {...rest}
       onClick={(event) => {
         trackWhatsappClick({ villa_id: villaId, villa_name: villaName, cta_location: ctaLocation });
+        beaconConversionEvent("whatsapp_click", villaId);
         onClick?.(event);
       }}
     />

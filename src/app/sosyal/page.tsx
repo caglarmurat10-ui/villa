@@ -16,12 +16,18 @@ import { getGoogleVisibilitySnapshot } from "@/lib/google-visibility";
 import GoogleVisibilityPanel from "@/components/GoogleVisibilityPanel";
 import LocalEventsPanel from "@/components/LocalEventsPanel";
 import PlanRefreshButton from "@/components/PlanRefreshButton";
+import ConversionEventsPanel from "@/components/ConversionEventsPanel";
+import { getConversionEventSummary, getConversionEventTotals } from "@/lib/conversion-events";
 import type { Villa } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 function istanbulToday() {
   return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
+}
+
+function conversionEventsSinceIso(days: number): string {
+  return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
 }
 
 function firstParam(value: string | string[] | undefined) {
@@ -62,7 +68,8 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
   const googleScope = firstParam(params.scope);
 
   const today = istanbulToday();
-  const [posts, initialAccounts, reservations, contentLibrarySummary, googleSnapshot, stats7, stats30, cronHeartbeat] = await Promise.all([
+  const conversionSince28d = conversionEventsSinceIso(28);
+  const [posts, initialAccounts, reservations, contentLibrarySummary, googleSnapshot, stats7, stats30, cronHeartbeat, conversionTotals, conversionBySource] = await Promise.all([
     listSocialPosts(30),
     listMetaAccounts(),
     listReservations(),
@@ -71,6 +78,8 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
     getPublishStats(7, today),
     getPublishStats(30, today),
     getSocialCronHeartbeat(),
+    getConversionEventTotals(conversionSince28d),
+    getConversionEventSummary(conversionSince28d),
   ]);
   const { env } = await getCloudflareContext({ async: true });
   const autoPublishEnabled = String(env.SOCIAL_AUTO_PUBLISH_ENABLED ?? "true").toLowerCase() === "true";
@@ -161,5 +170,6 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
     <PlanRefreshButton />
     <LocalEventsPanel />
     <GoogleVisibilityPanel snapshot={googleSnapshot} stats7={stats7} stats30={stats30} reservations={reservations} todayIso={today} />
+    <ConversionEventsPanel totals={conversionTotals} bySource={conversionBySource} windowLabel="son 28 gün" />
   </>;
 }

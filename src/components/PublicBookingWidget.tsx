@@ -4,6 +4,7 @@ import Link from "next/link";
 import { FormEvent, useMemo, useState } from "react";
 import type { PriceRange, Reservation, Villa } from "@/lib/types";
 import { toVillaId, trackCheckAvailability, trackGenerateLead } from "@/lib/analytics";
+import { beaconConversionEvent } from "@/lib/conversion-events-client";
 import { computePriceQuote, splitEvenInstallments, type PriceSegment } from "@/lib/price-engine";
 import { validateBookingPrefill } from "@/lib/booking-prefill";
 import { CLOSED_SEASON_MESSAGE, hasClosedSeasonNight } from "@/lib/season-policy";
@@ -261,6 +262,7 @@ export default function PublicBookingWidget({
       }
 
       trackGenerateLead({ villa_id: toVillaId(villa), villa_name: `Villa ${villa}` }, "booking_widget_form");
+      beaconConversionEvent("contact_submit", toVillaId(villa));
     } catch (error) {
       setRequestState({
         kind: "error",
