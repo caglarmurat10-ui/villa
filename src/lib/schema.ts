@@ -59,4 +59,8 @@ export const socialPostMediaSchema = z.object({
 
 export const socialPostStatusSchema = z.object({ status: z.enum(["Planlandı", "Yayınlandı"]) });
 export const socialPostApprovalSchema = z.object({ approvalStatus: z.enum(["İnsan onayı", "Onaylandı"]) });
+// Manuel yayın iş akışı (bölüm 6/12) - Destan Instagram gibi dış nedenle otomatik yayını engelli
+// hedefler için. "ready": uygulama içerik hazırladı, insan Instagram uygulamasından paylaşacak.
+// "confirm": insan gerçekten elle paylaştığını doğruladı - platform_post_id ASLA burada yazılmaz.
+export const socialPostManualPublishSchema = z.object({ manualPublishAction: z.enum(["ready", "confirm"]) });
 export type SocialPostInput = z.infer<typeof socialPostSchema>;

@@ -154,7 +154,7 @@ export async function GET() {
   ]);
 
   // Ham FACEBOOK_IG_LINK_MISSING/MISMATCH kodları, Villa Destan Instagram için özellikle dış Meta
-  // Business Suite yapılandırma eksikliğini gösteriyorsa (bkz. metaPublishGate) BLOCKED_EXTERNAL_META_SETUP
+  // Business Suite yapılandırma eksikliğini gösteriyorsa (bkz. metaPublishGate) BLOCKED_EXTERNAL_META_OWNERSHIP
   // olarak yeniden etiketlenir - panel "bizim hatamız" ile "Meta'da elle düzeltilmesi gereken dış sorun"
   // ayrımını net gösterir. Diğer üç hedef için (Safira IG/FB, Destan FB) davranış DEĞİŞMEZ.
   const gatedRelationships = relationships.map((item) => {

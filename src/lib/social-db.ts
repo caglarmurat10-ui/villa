@@ -29,6 +29,8 @@ type SocialPostRow = {
   last_publish_error?: string | null;
   publish_lock_token?: string | null;
   publish_lock_expires_at?: string | null;
+  manual_publish_state?: SocialPost["manualPublishState"] | null;
+  manually_published_at?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -66,6 +68,8 @@ function mapRow(row: SocialPostRow): SocialPost {
     publishAttemptCount: Number(row.publish_attempt_count ?? 0),
     lastPublishAttemptAt: row.last_publish_attempt_at ?? null,
     lastPublishError: row.last_publish_error ?? null,
+    manualPublishState: row.manual_publish_state ?? null,
+    manuallyPublishedAt: row.manually_published_at ?? null,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -111,6 +115,10 @@ async function prepareTable(db: D1Database) {
   try { await db.prepare("ALTER TABLE social_posts ADD COLUMN last_publish_error TEXT").run(); } catch {}
   try { await db.prepare("ALTER TABLE social_posts ADD COLUMN publish_lock_token TEXT").run(); } catch {}
   try { await db.prepare("ALTER TABLE social_posts ADD COLUMN publish_lock_expires_at TEXT").run(); } catch {}
+  // Manuel yayın durumu (bölüm 6/12) - GERÇEK Meta Graph API yayınından (status/platform_post_id)
+  // TAMAMEN AYRI, bkz. migrations/0026_manual_publish_state.sql.
+  try { await db.prepare("ALTER TABLE social_posts ADD COLUMN manual_publish_state TEXT CHECK (manual_publish_state IN ('READY_FOR_MANUAL_PUBLISH', 'MANUALLY_PUBLISHED') OR manual_publish_state IS NULL)").run(); } catch {}
+  try { await db.prepare("ALTER TABLE social_posts ADD COLUMN manually_published_at TEXT").run(); } catch {}
   try { await db.prepare("CREATE INDEX IF NOT EXISTS social_posts_publish_state_idx ON social_posts (status, approval_status, scheduled_date, last_publish_attempt_at)").run(); } catch {}
 }
 
@@ -360,6 +368,40 @@ export async function updateSocialPostStatus(id: string, status: SocialPostStatu
     SET status = ?, published_at = ?, publish_lock_token = NULL, publish_lock_expires_at = NULL, updated_at = ?
     WHERE id = ?`)
     .bind(status, publishedAt, now, id).run();
+  return fetchSocialPost(db, id);
+}
+
+// Manuel yayın iş akışı (bölüm 6/12) - Destan Instagram gibi otomatik (Graph API) yayının dış bir
+// Meta sorunu nedeniyle engellendiği hedefler için: uygulama caption/hashtag/CTA'yı HAZIRLAR, insan
+// Instagram uygulamasından ELLE paylaşır, sonra bunu burada DOĞRULAR/onaylar. platform_post_id bu
+// akışta HİÇBİR ZAMAN yazılmaz - yalnız gerçek Graph API başarısı (markSocialPublishSuccess) onu
+// doldurur. status yalnız insan MANUALLY_PUBLISHED'ı onayladığında 'Yayınlandı'ya döner (READY
+// aşamasında satır hâlâ 'Planlandı' kalır - cron/duePosts onu normal şekilde görebilir/atlayabilir).
+export async function markReadyForManualPublish(id: string): Promise<SocialPost | null> {
+  const db = await database();
+  await ensureTable(db);
+  const now = new Date().toISOString();
+  await db.prepare(`UPDATE social_posts
+    SET manual_publish_state = 'READY_FOR_MANUAL_PUBLISH', updated_at = ?
+    WHERE id = ? AND status = 'Planlandı'`)
+    .bind(now, id).run();
+  return fetchSocialPost(db, id);
+}
+
+export async function markManuallyPublished(id: string): Promise<SocialPost | null> {
+  const db = await database();
+  await ensureTable(db);
+  const now = new Date().toISOString();
+  await db.prepare(`UPDATE social_posts
+    SET manual_publish_state = 'MANUALLY_PUBLISHED',
+        manually_published_at = ?,
+        status = 'Yayınlandı',
+        published_at = ?,
+        publish_lock_token = NULL,
+        publish_lock_expires_at = NULL,
+        updated_at = ?
+    WHERE id = ? AND status = 'Planlandı'`)
+    .bind(now, now, now, id).run();
   return fetchSocialPost(db, id);
 }
 

@@ -17,7 +17,7 @@ type RelationshipCode =
   | "FACEBOOK_IG_PERMISSION_MISSING"
   | "FACEBOOK_IG_SCOPE_UNAVAILABLE"
   | "FACEBOOK_IG_API_ERROR"
-  | "BLOCKED_EXTERNAL_META_SETUP";
+  | "BLOCKED_EXTERNAL_META_OWNERSHIP";
 
 type RelationshipItem = {
   villa: "Safira" | "Destan";
@@ -80,7 +80,7 @@ export default function MetaHealthCheck() {
       {(result.relationships ?? []).length ? <div className="meta-health-results" style={{marginTop:10}}>
         {(result.relationships ?? []).map((item) => {
           const uncertain = item.code === "FACEBOOK_IG_PERMISSION_MISSING" || item.code === "FACEBOOK_IG_SCOPE_UNAVAILABLE" || item.code === "FACEBOOK_IG_API_ERROR";
-          const externalBlock = item.code === "BLOCKED_EXTERNAL_META_SETUP";
+          const externalBlock = item.code === "BLOCKED_EXTERNAL_META_OWNERSHIP";
           const className = item.code === "FACEBOOK_IG_LINK_OK" ? "healthy" : uncertain ? "warning" : "missing";
           const icon = item.code === "FACEBOOK_IG_LINK_OK" ? "✓" : uncertain ? "?" : "!";
           return (

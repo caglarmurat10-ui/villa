@@ -101,6 +101,29 @@ export default function SocialPublishHealth({ posts, autoPublishEnabled, content
     }
   }
 
+  async function manualPublishAction(postId: string, action: "ready" | "confirm") {
+    setBusy(postId);
+    setNotice("");
+    try {
+      const response = await fetch(`/api/social-posts/${encodeURIComponent(postId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ manualPublishAction: action }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "Manuel yayın durumu güncellenemedi.");
+      const updated = data.post as SocialPost | undefined;
+      if (updated) setItems((current) => current.map((post) => post.id === postId ? updated : post));
+      setNotice(action === "ready"
+        ? "✓ İçerik manuel yayına hazır - caption/hashtag'i Instagram uygulamasına kopyalayıp elle paylaşabilirsiniz."
+        : "✓ Manuel yayın onaylandı. Not: bu bir Meta API onayı DEĞİL, yalnız sizin bildiriminiz - Meta gönderi kimliği kaydedilmedi.");
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Manuel yayın durumu güncellenemedi.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function pauseDueQueue() {
     if (!dueReady.length) return;
     const confirmed = window.confirm(`${dueReady.length} adet bugün veya geçmiş tarihli onaylı içerik otomatik yayından çıkarılacak. İçerikler silinmeyecek ve insan onayına dönecek. Devam edilsin mi?`);
@@ -153,8 +176,40 @@ export default function SocialPublishHealth({ posts, autoPublishEnabled, content
       </div>
 
       {destanIgWaiting.length > 0 ? (
-        <div style={{marginTop:10,padding:"10px 12px",border:"1px solid #a16207",borderRadius:11,background:"#241a06",color:"#fbbf24",fontSize:10,fontWeight:700}}>
-          ⚠ Villa Destan Instagram: Bağlantı/sahiplik çözümü bekleniyor — otomatik yayın kapalı. {destanIgWaiting.length} içerik HARD BLOCK altında bekliyor; yayına hazır/hatalı sayaçlarına dahil edilmiyor ve hiçbiri yayına gönderilmiyor.
+        <div style={{marginTop:10,padding:"10px 12px",border:"1px solid #a16207",borderRadius:11,background:"#241a06",color:"#fbbf24",fontSize:10}}>
+          <div style={{fontWeight:900}}>⚠ Villa Destan Instagram — BLOCKED_EXTERNAL_META_OWNERSHIP</div>
+          <p style={{margin:"5px 0 0",lineHeight:1.5,color:"#fde68a"}}>
+            @villadestanpatara şu anda başka bir Meta İşletme Portföyü ile ilişkilendirilmiş görünüyor;
+            bu bizim kontrolümüz dışında, Meta tarafında elle çözülmesi gereken bir sahiplik sorunu.
+            <b> Otomatik (API) yayın kapalı</b> — Graph API&apos;ye hiçbir istek gönderilmiyor.
+            <b> Instagram uygulamasından manuel paylaşım kullanılabilir</b> (aşağıda). {destanIgWaiting.length} içerik bekliyor;
+            yayına hazır/hatalı sayaçlarına dahil edilmiyor.
+          </p>
+        </div>
+      ) : null}
+
+      {destanIgWaiting.length > 0 ? (
+        <div style={{marginTop:10,display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(250px,1fr))",gap:8}}>
+          {destanIgWaiting.slice(0, 12).map((post) => (
+            <article key={post.id} style={{padding:"10px 11px",border:"1px solid #a16207",borderRadius:11,background:"#1a1206"}}>
+              <div style={{display:"flex",justifyContent:"space-between",gap:8,alignItems:"start"}}>
+                <strong style={{fontSize:10,color:"#fde68a"}}>Villa {post.villa} · {post.platform}</strong>
+                <span style={{fontSize:9,color:"#fbbf24",fontWeight:900}}>{post.scheduledDate}</span>
+              </div>
+              <p style={{margin:"6px 0 0",fontSize:9,lineHeight:1.45,color:"#e2ceac"}}>{compactCaption(post.caption)}</p>
+              {post.manualPublishState === "MANUALLY_PUBLISHED" ? (
+                <div style={{marginTop:8,fontSize:9,fontWeight:900,color:"#86efac"}}>✓ Manuel olarak paylaşıldı bildirildi ({formatTime(post.manuallyPublishedAt)})</div>
+              ) : post.manualPublishState === "READY_FOR_MANUAL_PUBLISH" ? (
+                <button type="button" onClick={() => manualPublishAction(post.id, "confirm")} disabled={busy !== null} style={{marginTop:8,border:"1px solid #1f5f3b",borderRadius:8,padding:"6px 9px",background:"#0f2a1c",color:"#86efac",fontSize:9,fontWeight:800,cursor:busy?"wait":"pointer"}}>
+                  {busy === post.id ? "İşleniyor…" : "Instagram'dan elle paylaştım - onayla"}
+                </button>
+              ) : (
+                <button type="button" onClick={() => manualPublishAction(post.id, "ready")} disabled={busy !== null} style={{marginTop:8,border:"1px solid #a16207",borderRadius:8,padding:"6px 9px",background:"#241a06",color:"#fbbf24",fontSize:9,fontWeight:800,cursor:busy?"wait":"pointer"}}>
+                  {busy === post.id ? "İşleniyor…" : "Manuel yayına hazırla"}
+                </button>
+              )}
+            </article>
+          ))}
         </div>
       ) : null}
 

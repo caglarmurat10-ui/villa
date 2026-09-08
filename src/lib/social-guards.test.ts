@@ -83,3 +83,27 @@ describe("Exponential backoff regresyonu (sabit 30dk cooldown yerine)", () => {
     expect(source).toContain("COALESCE(publish_attempt_count, 0) = 2 AND last_publish_attempt_at <= ?");
   });
 });
+
+describe("DESTAN_IG = BLOCKED_EXTERNAL_META_OWNERSHIP regresyonu (2026-09-08 dogrulanan Meta sahiplik sorunu)", () => {
+  it("duePosts() Destan+Instagram'i (tarihten bagimsiz TUMU) WHERE cumlesinde eler - cron adaylik listesine hic girmez", () => {
+    const source = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
+    expect(source).toContain("const DESTAN_INSTAGRAM_HARD_BLOCKED = true;");
+    expect(source).toContain("AND NOT (villa = 'Destan' AND platform = 'Instagram')");
+  });
+
+  it("custom-worker.mjs (DESTAN_INSTAGRAM_HARD_BLOCKED) ve social-account-policy.ts (DESTAN_INSTAGRAM_HARD_BLOCK.blocked) AYNI degeri tasir", () => {
+    const cronSource = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
+    const policySource = readFileSync(resolve(ROOT, "src", "lib", "social-account-policy.ts"), "utf-8");
+    const cronMatch = cronSource.match(/const DESTAN_INSTAGRAM_HARD_BLOCKED = (true|false);/);
+    const policyMatch = policySource.match(/blocked: (true|false) as boolean,/);
+    expect(cronMatch).not.toBeNull();
+    expect(policyMatch).not.toBeNull();
+    expect(cronMatch![1]).toBe(policyMatch![1]);
+  });
+
+  it("metaPublishGate icin BLOCKED_EXTERNAL_META_OWNERSHIP kodu kaynak kodda tanimli (eski BLOCKED_EXTERNAL_META_SETUP degil)", () => {
+    const source = readFileSync(resolve(ROOT, "src", "lib", "social-account-policy.ts"), "utf-8");
+    expect(source).toContain("BLOCKED_EXTERNAL_META_OWNERSHIP");
+    expect(source).not.toContain("BLOCKED_EXTERNAL_META_SETUP");
+  });
+});

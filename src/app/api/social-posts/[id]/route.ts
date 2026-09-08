@@ -1,10 +1,12 @@
 import {
   deleteSocialPost,
   getSocialPost,
+  markManuallyPublished,
+  markReadyForManualPublish,
   updateSocialPostApproval,
   updateSocialPostStatus,
 } from "@/lib/social-db";
-import { socialPostApprovalSchema, socialPostMediaSchema, socialPostStatusSchema } from "@/lib/schema";
+import { socialPostApprovalSchema, socialPostManualPublishSchema, socialPostMediaSchema, socialPostStatusSchema } from "@/lib/schema";
 import { approvedProxyMediaAsset } from "@/lib/social-drive-media";
 import { deleteSocialPostMedia, replaceSocialPostMedia } from "@/lib/social-media-store";
 
@@ -42,6 +44,30 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     const saved = await replaceSocialPostMedia(id, items);
     const updated = await getSocialPost(id);
     return Response.json({ post: updated ? { ...updated, mediaUrls: saved.map((item) => item.mediaUrl) } : null });
+  }
+
+  const manualPublish = socialPostManualPublishSchema.safeParse(body);
+  if (manualPublish.success) {
+    const current = await getSocialPost(id);
+    if (!current) return Response.json({ error: "Paylaşım bulunamadı." }, { status: 404 });
+    if (current.status === "Yayınlandı") {
+      return Response.json({ error: "Yayınlanmış bir paylaşımın manuel yayın durumu değiştirilemez." }, { status: 409 });
+    }
+    if (manualPublish.data.manualPublishAction === "ready") {
+      if (current.approvalStatus !== "Onaylandı") {
+        return Response.json({ error: "Manuel yayına hazırlamadan önce insan onayı verilmelidir." }, { status: 409 });
+      }
+      const post = await markReadyForManualPublish(id);
+      return Response.json({ post });
+    }
+    // "confirm" - yalnız gerçekten READY_FOR_MANUAL_PUBLISH aşamasındaki bir satır onaylanabilir,
+    // bir satırı doğrudan (hazırlık adımı atlanarak) "manuel yayınlandı" işaretlemek YASAK -
+    // insanın gerçekten hazırlanan içeriği gördüğünü/paylaştığını garanti eden tek adım budur.
+    if (current.manualPublishState !== "READY_FOR_MANUAL_PUBLISH") {
+      return Response.json({ error: "Önce içerik manuel yayına hazırlanmalı (\"ready\" adımı atlanamaz)." }, { status: 409 });
+    }
+    const post = await markManuallyPublished(id);
+    return Response.json({ post });
   }
 
   const approval = socialPostApprovalSchema.safeParse(body);

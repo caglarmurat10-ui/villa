@@ -2,8 +2,10 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { MetaSocialAccount } from "./meta-store";
 import { REQUIRED_FACEBOOK_PERMISSIONS } from "./facebook";
 import {
+  DESTAN_ADS_STATE,
   DESTAN_INSTAGRAM_HARD_BLOCK,
   META_ACTIVE_TARGETS,
+  META_PROFILE_ACCESS,
   metaTargetLabel,
 } from "./social-account-policy";
 
@@ -34,6 +36,10 @@ export type MetaDiagnostic = {
     missing: string[];
     hardBlocked: Array<{ label: string; reason: string }>;
   };
+  // Reklam yeterliliği (bölüm: DESTAN_ADS) organik yayın sağlığından TAMAMEN AYRI izlenir - bu
+  // proje Meta Ads kullanmıyor (mutlak maliyet kuralı), bu alan yalnız teşhis/doğruluk amaçlı.
+  ads: { state: typeof DESTAN_ADS_STATE.state; reason: string };
+  profileAccess: { state: typeof META_PROFILE_ACCESS.state; note: string };
 };
 
 export async function getMetaDiagnostic(accounts: MetaSocialAccount[]): Promise<MetaDiagnostic> {
@@ -89,5 +95,7 @@ export async function getMetaDiagnostic(accounts: MetaSocialAccount[]): Promise<
         reason: DESTAN_INSTAGRAM_HARD_BLOCK.reason,
       }] : [],
     },
+    ads: { state: DESTAN_ADS_STATE.state, reason: DESTAN_ADS_STATE.reason },
+    profileAccess: { state: META_PROFILE_ACCESS.state, note: META_PROFILE_ACCESS.note },
   };
 }

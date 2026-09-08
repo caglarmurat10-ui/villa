@@ -28,6 +28,11 @@ export default function MetaDiagnostics({ diagnostic }: { diagnostic: MetaDiagno
       </div><p>Graph API: <strong>{diagnostic.graphApiVersion}</strong></p>{!diagnostic.configuration.facebookAppId || !diagnostic.configuration.facebookAppSecret || !diagnostic.configuration.facebookConfigId ? <p className="diag-warning">Facebook Login for Business için App ID, App Secret ve Business Login Configuration ID ayrı olarak Cloudflare'a eklenmelidir.</p> : null}</article>
 
       <article><h3>Hesap bağlantıları</h3><p><strong>{diagnostic.accounts.connected}/{diagnostic.accounts.expected}</strong> aktif hedef bağlantısı hazır</p>{diagnostic.accounts.missing.length ? <ul>{diagnostic.accounts.missing.map((item) => <li key={item}>{item} bekleniyor</li>)}</ul> : <p className="diag-complete">Safira ve Destan Instagram/Facebook bağlantıları tamam.</p>}{diagnostic.accounts.hardBlocked.map((item) => <p className="diag-warning" key={item.label}><strong>{item.label}: HARD BLOCK</strong> — {item.reason}</p>)}</article>
+
+      <article><h3>Reklam yeterliliği (organik yayından ayrı izlenir)</h3>
+        <p className="diag-warning"><strong>DESTAN_ADS: {diagnostic.ads.state}</strong> — {diagnostic.ads.reason}</p>
+        <p><strong>Kişisel profil erişimi ({diagnostic.profileAccess.state}):</strong> {diagnostic.profileAccess.note}</p>
+      </article>
     </div>
 
     <div className="diag-callbacks">

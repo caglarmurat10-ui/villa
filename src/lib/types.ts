@@ -58,6 +58,11 @@ export interface SocialPost {
   publishAttemptCount?: number;
   lastPublishAttemptAt?: string | null;
   lastPublishError?: string | null;
+  // Manuel yayın durumu (bölüm 6/12) - GERÇEK Meta Graph API yayınından (status/platformPostId)
+  // TAMAMEN AYRI. MANUALLY_PUBLISHED olsa bile platformPostId hiçbir zaman bu alanla birlikte
+  // set edilmez - yalnız gerçek Graph API yanıtı platformPostId'yi doldurur.
+  manualPublishState?: "READY_FOR_MANUAL_PUBLISH" | "MANUALLY_PUBLISHED" | null;
+  manuallyPublishedAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }

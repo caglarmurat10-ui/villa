@@ -793,6 +793,16 @@ async function mobileAuthGate(request, env) {
 // (30dk arayla) tekrar denenip MAX_ATTEMPTS'i gereksiz yere tüketmesini engeller.
 const RETRY_BACKOFF_MINUTES = [30, 60];
 
+// DESTAN_INSTAGRAM_HARD_BLOCK.blocked ile SENKRONIZE tutulmalı (src/lib/social-account-policy.ts) -
+// custom-worker.mjs TS path-alias'larını çözemediği için o dosyayı import EDEMEZ, kendi bağımsız
+// kopyasını taşır. İki değer ayrışırsa social-guards.test.ts'teki regresyon testi kırılır.
+// 2026-09-08: Meta, @villadestanpatara'nın başka bir İşletme Portföyü ile ilişkili olduğunu
+// bildirdi (geçici değil, dış bir sahiplik sorunu) - bu yüzden true. Bu satırların cron tarafından
+// hiç SEÇİLMEMESİ (Graph API'ye hiç istek gitmemesi VE SOCIAL_AUTO_PUBLISH_LIMIT slotu
+// TÜKETİLMEMESİ) için WHERE cümlesinin bir PARÇASI - yalnız sonradan "skipped" sayılmaz, hiç
+// adaylık listesine girmez.
+const DESTAN_INSTAGRAM_HARD_BLOCKED = true;
+
 async function duePosts(env, scheduledAt) {
   const clock = istanbulClock(scheduledAt);
   const publishTime = safeTime(env.SOCIAL_AUTO_PUBLISH_TIME);
@@ -800,16 +810,22 @@ async function duePosts(env, scheduledAt) {
   const [cooldownAfter1st, cooldownAfter2nd] = RETRY_BACKOFF_MINUTES.map(
     (minutes) => new Date(scheduledAt.getTime() - minutes * 60 * 1000).toISOString(),
   );
-  // HARD GATE: Destan Instagram'ın Business Portfolio ownership sorunu çözülene kadar cron bu
-  // satırları seçemez - Graph API'ye hiçbir istek gitmeden burada eleniyor. DB'de connected
-  // görünmesi (social_accounts satırı, token_expires_at) bu gate'i etkilemez; yalnız villa+platform
-  // kombinasyonuna bakılır. Manuel "Şimdi yayınla" için aynı gate /api/meta/instagram/publish
-  // route'unda ayrıca uygulanıyor (iki bağımsız katman - src/lib/social-availability.ts değil, bu
-  // tamamen ayrı bir iş kuralı). Ayrıca aynı route'ta canlı BLOCKED_EXTERNAL_META_SETUP kontrolü var.
+  // HARD GATE 1: eski (2026-09-05 ve öncesi) Destan Instagram backlog'u - aktivasyon öncesi
+  // biriken içerik güvenlik nedeniyle asla yeniden denenmez.
+  // HARD GATE 2: DESTAN_INSTAGRAM_HARD_BLOCKED true iken Destan+Instagram (tarihten bağımsız,
+  // TÜMÜ) - Graph API'ye hiçbir istek gitmeden burada eleniyor, SOCIAL_AUTO_PUBLISH_LIMIT slotu
+  // tüketilmez, sağlıklı diğer hedefler (SAFIRA_IG/SAFIRA_FB/DESTAN_FB) bu slotu kullanır. DB'de
+  // connected görünmesi (social_accounts satırı, token_expires_at) bu gate'i etkilemez; yalnız
+  // villa+platform kombinasyonuna bakılır. Manuel "Şimdi yayınla" için aynı gate
+  // /api/meta/instagram/publish route'unda ayrıca uygulanıyor (iki bağımsız katman).
+  const destanInstagramHardBlockClause = DESTAN_INSTAGRAM_HARD_BLOCKED
+    ? "AND NOT (villa = 'Destan' AND platform = 'Instagram')"
+    : "";
   const commonFilter = `status = 'Planlandı'
       AND approval_status = 'Onaylandı'
       AND platform IN ('Instagram', 'Facebook')
       AND NOT (villa = 'Destan' AND platform = 'Instagram' AND scheduled_date <= '2026-09-05')
+      ${destanInstagramHardBlockClause}
       AND (
         (platform = 'Instagram' AND content_type IN ('Gönderi', 'Hikâye', 'Reels'))
         OR (platform = 'Facebook' AND content_type IN ('Gönderi', 'Reels'))

@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Villa Destan Instagram eski bekleyen içerikleri güvenlik nedeniyle yeniden yayınlanmaz. 6 Eylül 2026 ve sonrası planlar aktiftir." }, { status: 409 });
   }
 
-  // BLOCKED_EXTERNAL_META_SETUP gate: Villa Destan Instagram için, gerçek/canlı Facebook<->Instagram
+  // BLOCKED_EXTERNAL_META_OWNERSHIP gate: Villa Destan Instagram için, gerçek/canlı Facebook<->Instagram
   // ilişki durumu Meta'nın kendisinden doğrulanmadan HİÇBİR Graph API yayın isteği gönderilmez. Bu
   // statik bir bayrak değil - dış Meta yapılandırması düzeltildiğinde otomatik olarak açılır (bkz.
   // social-account-policy.ts metaPublishGate). Diğer üç hedefi (SAFIRA_IG, SAFIRA_FB, DESTAN_FB)
