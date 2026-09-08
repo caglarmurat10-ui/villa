@@ -16,7 +16,8 @@ type RelationshipCode =
   | "FACEBOOK_IG_LINK_MISMATCH"
   | "FACEBOOK_IG_PERMISSION_MISSING"
   | "FACEBOOK_IG_SCOPE_UNAVAILABLE"
-  | "FACEBOOK_IG_API_ERROR";
+  | "FACEBOOK_IG_API_ERROR"
+  | "BLOCKED_EXTERNAL_META_SETUP";
 
 type RelationshipItem = {
   villa: "Safira" | "Destan";
@@ -79,9 +80,18 @@ export default function MetaHealthCheck() {
       {(result.relationships ?? []).length ? <div className="meta-health-results" style={{marginTop:10}}>
         {(result.relationships ?? []).map((item) => {
           const uncertain = item.code === "FACEBOOK_IG_PERMISSION_MISSING" || item.code === "FACEBOOK_IG_SCOPE_UNAVAILABLE" || item.code === "FACEBOOK_IG_API_ERROR";
+          const externalBlock = item.code === "BLOCKED_EXTERNAL_META_SETUP";
           const className = item.code === "FACEBOOK_IG_LINK_OK" ? "healthy" : uncertain ? "warning" : "missing";
           const icon = item.code === "FACEBOOK_IG_LINK_OK" ? "✓" : uncertain ? "?" : "!";
-          return <div key={`${item.villa}-relationship`} className={className}><span>{icon}</span><div><strong>Villa {item.villa} · Facebook ↔ Instagram</strong><small>{item.label}</small></div></div>;
+          return (
+            <div key={`${item.villa}-relationship`} className={className}>
+              <span>{icon}</span>
+              <div>
+                <strong>Villa {item.villa} · Facebook ↔ Instagram{externalBlock ? " · Meta'da elle düzeltilmeli" : ""}</strong>
+                <small>{item.label}</small>
+              </div>
+            </div>
+          );
         })}
       </div> : null}
     </> : null}

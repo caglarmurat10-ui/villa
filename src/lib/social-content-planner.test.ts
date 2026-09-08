@@ -137,6 +137,42 @@ describe("planRolling30Days", () => {
     expect(closedSeasonSalesSlots).toHaveLength(0);
   });
 
+  it("adillik (bölüm 9/18) - bir villa diğerinden geride kaldığında sonraki uygun slot geride kalan villayı önceliklendirir", () => {
+    // Aynı kategoride (Villa) hem Safira hem Destan şablonu var; Safira zaten iki kez planlanmış
+    // (recentPosts) durumda - kategori tekrar seçildiğinde Destan'ın şablonu önce denenmeli.
+    const pool = [
+      template({ id: "V1", theme: "Villa", villa: "Safira", caption: "Villa Safira güneşli bir sabah." }),
+      template({ id: "V2", theme: "Villa", villa: "Destan", caption: "Villa Destan sakin bir akşam." }),
+    ];
+    const recentPosts: RecentPost[] = [
+      { villa: "Safira", caption: "Eski Safira 1", mediaFile: "old1.jpg", scheduledDate: "2026-08-01" },
+      { villa: "Safira", caption: "Eski Safira 2", mediaFile: "old2.jpg", scheduledDate: "2026-08-02" },
+    ];
+    const input: PlannerInput = {
+      todayIso: "2026-09-10", horizonDays: 1, dailyTarget: 1,
+      pool, existingScheduled: [], recentPosts,
+    };
+    const { planned } = planRolling30Days(input);
+    expect(planned).toHaveLength(1);
+    expect(planned[0]?.villa).toBe("Destan");
+  });
+
+  it("adillik - hiçbir geçmiş yokken iki villa arasında tutarlı (id sırasına dayalı) bir seçim yapılır, çökmez", () => {
+    const pool = [
+      template({ id: "V1", theme: "Villa", villa: "Safira", caption: "Villa Safira içerik." }),
+      template({ id: "V2", theme: "Villa", villa: "Destan", caption: "Villa Destan içerik." }),
+    ];
+    const input: PlannerInput = {
+      todayIso: "2026-09-10", horizonDays: 2, dailyTarget: 1,
+      pool, existingScheduled: [], recentPosts: [],
+    };
+    const { planned } = planRolling30Days(input);
+    const villasUsed = new Set(planned.map((p) => p.villa));
+    // İki gün, iki farklı villa şablonu (havuzda ikişer tane var, tekrar kullanılmaz) - starvation yok.
+    expect(planned.length).toBe(2);
+    expect(villasUsed.size).toBe(2);
+  });
+
   it("gerçek üretim içerik havuzuyla (60 şablon) 30 günlük ufku, aynı medyayı tekrar kullanmadan güvenle doldurabildiği kadar doldurur", () => {
     const input: PlannerInput = {
       todayIso: "2026-09-03", horizonDays: 30, dailyTarget: 1,

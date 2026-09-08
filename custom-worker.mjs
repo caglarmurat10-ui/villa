@@ -3,7 +3,6 @@ import nextWorker from "./.open-next/worker.js";
 const DEFAULT_PUBLISH_TIME = "12:00";
 const DEFAULT_LIMIT = 2;
 const MAX_ATTEMPTS = 3;
-const RETRY_COOLDOWN_MS = 30 * 60 * 1000;
 const PUBLIC_HOSTS = new Set(["safiradestan.com", "www.safiradestan.com"]);
 const ADMIN_HOST = "admin.safiradestan.com";
 const ADMIN_ORIGIN = `https://${ADMIN_HOST}`;
@@ -12,6 +11,7 @@ const PUBLIC_API_PATHS = new Set([
   "/api/health",
   "/api/system/version",
   "/api/public/booking-inquiries",
+  "/api/public/track",
   "/api/payments/checkout",
   "/api/payments/paytr/callback",
 ]);
@@ -28,6 +28,7 @@ const PUBLIC_ROUTE_MAP = new Map([
   ["/", "/site"],
   ["/villa-safira", "/site/villa-safira"],
   ["/villa-destan", "/site/villa-destan"],
+  ["/patara-villa", "/site/patara-villa"],
   ["/rezervasyon-kosullari", "/site/rezervasyon-kosullari"],
   ...LEGAL_PAGE_SLUGS.map((slug) => [`/${slug}`, `/site/${slug}`]),
   ["/rehber", "/site/rehber"],
@@ -786,17 +787,25 @@ async function mobileAuthGate(request, env) {
   return null;
 }
 
+// Exponential backoff: 1. başarısızlıktan sonra 30dk, 2. başarısızlıktan sonra 60dk bekler (3.
+// deneme MAX_ATTEMPTS'e ulaşır - markSocialPublishFailure() bunu dead-letter'a taşır, bkz. social-db.ts).
+// Sabit 30dk yerine artan bekleme, geçici bir Meta API/rate-limit hatasının hemen art arda 3 kez
+// (30dk arayla) tekrar denenip MAX_ATTEMPTS'i gereksiz yere tüketmesini engeller.
+const RETRY_BACKOFF_MINUTES = [30, 60];
+
 async function duePosts(env, scheduledAt) {
   const clock = istanbulClock(scheduledAt);
   const publishTime = safeTime(env.SOCIAL_AUTO_PUBLISH_TIME);
   const limit = safeLimit(env.SOCIAL_AUTO_PUBLISH_LIMIT);
-  const cooldownBefore = new Date(scheduledAt.getTime() - RETRY_COOLDOWN_MS).toISOString();
+  const [cooldownAfter1st, cooldownAfter2nd] = RETRY_BACKOFF_MINUTES.map(
+    (minutes) => new Date(scheduledAt.getTime() - minutes * 60 * 1000).toISOString(),
+  );
   // HARD GATE: Destan Instagram'ın Business Portfolio ownership sorunu çözülene kadar cron bu
   // satırları seçemez - Graph API'ye hiçbir istek gitmeden burada eleniyor. DB'de connected
   // görünmesi (social_accounts satırı, token_expires_at) bu gate'i etkilemez; yalnız villa+platform
   // kombinasyonuna bakılır. Manuel "Şimdi yayınla" için aynı gate /api/meta/instagram/publish
   // route'unda ayrıca uygulanıyor (iki bağımsız katman - src/lib/social-availability.ts değil, bu
-  // tamamen ayrı bir iş kuralı).
+  // tamamen ayrı bir iş kuralı). Ayrıca aynı route'ta canlı BLOCKED_EXTERNAL_META_SETUP kontrolü var.
   const commonFilter = `status = 'Planlandı'
       AND approval_status = 'Onaylandı'
       AND platform IN ('Instagram', 'Facebook')
@@ -810,7 +819,11 @@ async function duePosts(env, scheduledAt) {
         OR length(trim(COALESCE(media_url, ''))) > 0
       )
       AND COALESCE(publish_attempt_count, 0) < ?
-      AND (last_publish_attempt_at IS NULL OR last_publish_attempt_at <= ?)`;
+      AND (
+        last_publish_attempt_at IS NULL
+        OR (COALESCE(publish_attempt_count, 0) <= 1 AND last_publish_attempt_at <= ?)
+        OR (COALESCE(publish_attempt_count, 0) = 2 AND last_publish_attempt_at <= ?)
+      )`;
 
   // Satır kendi scheduled_time'ını taşıyorsa (Europe/Istanbul HH:MM) global SOCIAL_AUTO_PUBLISH_TIME
   // yerine o kullanılır - aynı gün içindeki farklı içerikleri farklı saatlere yayarak "hepsi aynı anda
@@ -820,13 +833,17 @@ async function duePosts(env, scheduledAt) {
     scheduled_date < ?
     OR (scheduled_date = ? AND ? >= COALESCE(NULLIF(trim(scheduled_time), ''), ?))
   )`;
+  // ORDER BY villa ile başlar (Safira/Destan alfabetik olarak dönüşümlü etkiye sahiptir) - tek bir
+  // villanın sürekli aynı tick içinde limit'i tüketip diğerini geciktirmesini azaltmak için basit bir
+  // adillik önlemi; asıl adillik günlük planlayıcının villalar arası dönüşümlü içerik üretmesinden gelir
+  // (bkz. social-content-planner.ts planRolling30Days + social-content-planner.test.ts).
   const result = await env.DB.prepare(`SELECT id, villa, platform, content_type, scheduled_date, publish_attempt_count
     FROM social_posts
     WHERE ${commonFilter}
       AND ${dateClause}
-    ORDER BY scheduled_date ASC, COALESCE(scheduled_time, '99:99') ASC, COALESCE(approved_at, created_at) ASC
+    ORDER BY scheduled_date ASC, COALESCE(scheduled_time, '99:99') ASC, villa ASC, COALESCE(approved_at, created_at) ASC
     LIMIT ?`)
-    .bind(MAX_ATTEMPTS, cooldownBefore, clock.date, clock.date, clock.time, publishTime, limit)
+    .bind(MAX_ATTEMPTS, cooldownAfter1st, cooldownAfter2nd, clock.date, clock.date, clock.time, publishTime, limit)
     .all();
 
   return result.results ?? [];

@@ -1,4 +1,5 @@
 import type { SocialPlatform, Villa } from "./types";
+import type { FacebookInstagramRelationshipClassification } from "./facebook-instagram-relationship";
 
 export type MetaPlatform = "Instagram" | "Facebook";
 
@@ -32,4 +33,50 @@ export function isMetaTargetHardBlocked(villa: Villa, platform: SocialPlatform) 
 
 export function metaTargetLabel(target: MetaTarget) {
   return `${target.villa} ${target.platform}`;
+}
+
+// Bölüm 8: Villa Destan Instagram, kendi tarafımızda OAuth token'ı bağlı görünse bile Meta Business
+// Suite tarafında Facebook Sayfası <-> Instagram profesyonel hesabı ilişkisi kurulmamışsa
+// ("Bir Instagram profili bağla" uyarısı) gerçek yayın gönderilemez - bu bizim kontrolümüz dışında,
+// dış bir Meta yapılandırma eksikliği. FACEBOOK_IG_LINK_MISSING/MISMATCH bu spesifik dış nedenden
+// kaynaklandığında, Destan+Instagram için ayrı ve açık bir BLOCKED_EXTERNAL_META_SETUP etiketiyle
+// raporlanır - "bizim hatamız" (PERMISSION_MISSING/SCOPE_UNAVAILABLE/API_ERROR) ile karıştırılmaz.
+// Bu durum statik bir bayrak DEĞİL - her çağrıda canlı Graph API ilişki kontrolüne (bkz.
+// facebook-instagram-relationship-live.ts) dayanır, dış Meta ayarı düzeltildiği anda otomatik olarak
+// kendi kendine düzelir (kod değişikliği/redeploy gerekmez).
+export type MetaPublishGateCode = FacebookInstagramRelationshipClassification["code"] | "BLOCKED_EXTERNAL_META_SETUP";
+
+export type MetaPublishGateResult = {
+  blocked: boolean;
+  code: MetaPublishGateCode;
+  label: string;
+};
+
+export function metaPublishGate(
+  villa: Villa,
+  platform: MetaPlatform,
+  relationship: FacebookInstagramRelationshipClassification | null,
+): MetaPublishGateResult {
+  if (!relationship) {
+    return {
+      blocked: true,
+      code: "FACEBOOK_IG_API_ERROR",
+      label: `${villa} ${platform} ilişki durumu okunamadı; yayın güvenlik nedeniyle durduruldu.`,
+    };
+  }
+
+  const isDestanInstagram = villa === "Destan" && platform === "Instagram";
+  if (isDestanInstagram && (relationship.code === "FACEBOOK_IG_LINK_MISSING" || relationship.code === "FACEBOOK_IG_LINK_MISMATCH")) {
+    return {
+      blocked: true,
+      code: "BLOCKED_EXTERNAL_META_SETUP",
+      label: "Meta Business Suite'te Villa Destan Facebook Sayfası'na bağlı bir Instagram profesyonel hesabı görünmüyor (\"Bir Instagram profili bağla\"). Bu, Meta'nın kendi arayüzünden elle düzeltilmesi gereken dış bir yapılandırma eksikliği - kodumuzdaki bir hata değil. Düzeltildikten sonra bu kontrol otomatik olarak sağlıklı görünecektir.",
+    };
+  }
+
+  return {
+    blocked: !relationship.healthy,
+    code: relationship.code,
+    label: relationship.label,
+  };
 }

@@ -1,15 +1,9 @@
-import { getFacebookPageProfile, getFacebookTokenScopes } from "@/lib/facebook";
+import { getFacebookPageProfile } from "@/lib/facebook";
 import { getInstagramProfile, getInstagramPublishingLimit } from "@/lib/meta";
 import { getFacebookCredentials, getInstagramCredentials, listMetaAccounts } from "@/lib/meta-store";
 import { brandProfiles } from "@/lib/brand-profiles";
-import { DESTAN_INSTAGRAM_HARD_BLOCK, isMetaTargetHardBlocked } from "@/lib/social-account-policy";
-import {
-  FACEBOOK_INSTAGRAM_RELATIONSHIP_PERMISSION,
-  classifyFacebookInstagramRelationship,
-  legacyRelationshipStatus,
-  type FacebookInstagramRelationResult,
-  type FacebookTokenScopesResult,
-} from "@/lib/facebook-instagram-relationship";
+import { DESTAN_INSTAGRAM_HARD_BLOCK, isMetaTargetHardBlocked, metaPublishGate } from "@/lib/social-account-policy";
+import { checkFacebookInstagramRelationships } from "@/lib/facebook-instagram-relationship-live";
 import type { Villa } from "@/lib/types";
 
 const villas: Villa[] = ["Safira", "Destan"];
@@ -59,90 +53,6 @@ async function getFacebookCoreProfile(pageId: string, accessToken: string) {
     throw new Error(`Facebook Sayfa kimliği doğrulanamadı (HTTP ${response.status}${payload.error?.code ? ` / ${payload.error.code}` : ""}).`);
   }
   return { id: payload.id, name: payload.name ?? "Facebook Sayfası" };
-}
-
-async function getFacebookInstagramRelationship(pageId: string, accessToken: string) {
-  const url = new URL(`${FACEBOOK_GRAPH}/${encodeURIComponent(pageId)}`);
-  url.searchParams.set("fields", "id,name,instagram_business_account{id,username},connected_instagram_account{id,username}");
-  url.searchParams.set("access_token", accessToken);
-  const response = await fetch(url, { method: "GET" });
-  const payload = (await response.json().catch(() => ({}))) as {
-    id?: string;
-    name?: string;
-    instagram_business_account?: { id?: string; username?: string } | null;
-    connected_instagram_account?: { id?: string; username?: string } | null;
-    error?: { code?: number };
-  };
-  if (!response.ok || !payload.id) {
-    throw new Error(`Facebook–Instagram ilişki bilgisi okunamadı (HTTP ${response.status}${payload.error?.code ? ` / ${payload.error.code}` : ""}).`);
-  }
-  return payload;
-}
-
-async function relationshipCredentials(villa: Villa) {
-  const [facebook, instagram] = await Promise.all([
-    getFacebookCredentials(villa).catch(() => null),
-    getInstagramCredentials(villa).catch(() => null),
-  ]);
-  return { villa, facebook, instagram };
-}
-
-async function relationshipScopeState(facebook: { accessToken: string } | null): Promise<FacebookTokenScopesResult> {
-  if (!facebook) return { ok: false };
-  try {
-    const { scopes } = await getFacebookTokenScopes(facebook.accessToken);
-    return { ok: true, scopes };
-  } catch {
-    return { ok: false };
-  }
-}
-
-async function relationshipsForVillas() {
-  const credentials = await Promise.all(villas.map(relationshipCredentials));
-  const scopeStates = await Promise.all(credentials.map((item) => relationshipScopeState(item.facebook)));
-  const scopeGrantedElsewhere = scopeStates.some(
-    (state) => state.ok && state.scopes.includes(FACEBOOK_INSTAGRAM_RELATIONSHIP_PERMISSION),
-  );
-
-  return Promise.all(credentials.map(async ({ villa, facebook, instagram }, index) => {
-    if (!facebook || !instagram) {
-      const label = !facebook && !instagram
-        ? "Facebook ve Instagram bağlantısı eksik"
-        : !facebook
-          ? "Facebook Sayfası bağlantısı eksik"
-          : "Instagram bağlantısı eksik";
-      return { villa, code: "FACEBOOK_IG_LINK_MISSING" as const, status: legacyRelationshipStatus("FACEBOOK_IG_LINK_MISSING"), healthy: false, label };
-    }
-
-    const scopesResult = scopeStates[index];
-    let relationResult: FacebookInstagramRelationResult = { ok: false };
-    let pageName = `Villa ${villa}`;
-    if (scopesResult.ok && scopesResult.scopes.includes(FACEBOOK_INSTAGRAM_RELATIONSHIP_PERMISSION)) {
-      try {
-        const relation = await getFacebookInstagramRelationship(facebook.accountId, facebook.accessToken);
-        pageName = relation.name ?? pageName;
-        relationResult = {
-          ok: true,
-          pageName,
-          instagramBusinessAccount: relation.instagram_business_account,
-          connectedInstagramAccount: relation.connected_instagram_account,
-        };
-      } catch {
-        relationResult = { ok: false };
-      }
-    }
-
-    const classification = classifyFacebookInstagramRelationship({
-      villa,
-      pageName,
-      storedInstagramAccountId: instagram.accountId,
-      scopesResult,
-      scopeGrantedElsewhere,
-      relationResult,
-    });
-
-    return { villa, ...classification };
-  }));
 }
 
 export async function GET() {
@@ -240,8 +150,17 @@ export async function GET() {
         }
       })(),
     ])),
-    relationshipsForVillas(),
+    checkFacebookInstagramRelationships(),
   ]);
+
+  // Ham FACEBOOK_IG_LINK_MISSING/MISMATCH kodları, Villa Destan Instagram için özellikle dış Meta
+  // Business Suite yapılandırma eksikliğini gösteriyorsa (bkz. metaPublishGate) BLOCKED_EXTERNAL_META_SETUP
+  // olarak yeniden etiketlenir - panel "bizim hatamız" ile "Meta'da elle düzeltilmesi gereken dış sorun"
+  // ayrımını net gösterir. Diğer üç hedef için (Safira IG/FB, Destan FB) davranış DEĞİŞMEZ.
+  const gatedRelationships = relationships.map((item) => {
+    const gate = metaPublishGate(item.villa, "Instagram", item);
+    return { ...item, code: gate.code, label: gate.label };
+  });
 
   return Response.json({
     checkedAt: new Date().toISOString(),
@@ -254,7 +173,7 @@ export async function GET() {
       platform: DESTAN_INSTAGRAM_HARD_BLOCK.platform,
       label: DESTAN_INSTAGRAM_HARD_BLOCK.reason,
     }] : [],
-    relationships,
+    relationships: gatedRelationships,
     checks,
   }, {
     headers: { "Cache-Control": "no-store" },

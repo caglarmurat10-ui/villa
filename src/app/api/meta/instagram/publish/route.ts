@@ -15,6 +15,8 @@ import {
 } from "@/lib/social-db";
 import { approvedProxyMediaAsset } from "@/lib/social-drive-media";
 import { listSocialPostMedia, type SocialPostMediaItem } from "@/lib/social-media-store";
+import { checkFacebookInstagramRelationshipForVilla } from "@/lib/facebook-instagram-relationship-live";
+import { metaPublishGate } from "@/lib/social-account-policy";
 
 const schema = z.object({
   postId: z.string().trim().min(1, "Paylaşım kimliği gerekli."),
@@ -48,6 +50,19 @@ export async function POST(request: Request) {
   // tarafından hiç seçilmemesi için); bu ikinci katman, endpoint'in doğrudan çağrılmasına karşı.
   if (post.villa === "Destan" && post.scheduledDate <= "2026-09-05") {
     return Response.json({ error: "Villa Destan Instagram eski bekleyen içerikleri güvenlik nedeniyle yeniden yayınlanmaz. 6 Eylül 2026 ve sonrası planlar aktiftir." }, { status: 409 });
+  }
+
+  // BLOCKED_EXTERNAL_META_SETUP gate: Villa Destan Instagram için, gerçek/canlı Facebook<->Instagram
+  // ilişki durumu Meta'nın kendisinden doğrulanmadan HİÇBİR Graph API yayın isteği gönderilmez. Bu
+  // statik bir bayrak değil - dış Meta yapılandırması düzeltildiğinde otomatik olarak açılır (bkz.
+  // social-account-policy.ts metaPublishGate). Diğer üç hedefi (SAFIRA_IG, SAFIRA_FB, DESTAN_FB)
+  // etkilemez - yalnız villa==="Destan" && platform==="Instagram" için çalışır.
+  if (post.villa === "Destan") {
+    const relationship = await checkFacebookInstagramRelationshipForVilla("Destan").catch(() => null);
+    const gate = metaPublishGate("Destan", "Instagram", relationship);
+    if (gate.blocked) {
+      return Response.json({ error: gate.label, code: gate.code }, { status: 409 });
+    }
   }
 
   const allowedOrigins = [new URL(request.url).origin, "https://villa-yonetim.caglarmurat10.workers.dev"];

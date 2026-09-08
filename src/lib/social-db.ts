@@ -3,6 +3,13 @@ import type { D1Database } from "@cloudflare/workers-types";
 import type { SocialPost, SocialPostApproval, SocialPostStatus } from "./types";
 import type { SocialPostInput } from "./schema";
 
+// custom-worker.mjs'teki MAX_ATTEMPTS sabitiyle AYNI değeri taşımalı (bkz. social-guards.test.ts'teki
+// çapraz-doğrulama regresyon testi) - cron tarafı duePosts()'ta hangi satırların hâlâ deneneceğini
+// filtreler, burası ise MAX_PUBLISH_ATTEMPTS'e ULAŞAN bir denemeden SONRA dead-letter arşivlemesini
+// tetikler. custom-worker.mjs TS path-alias'larını çözemediği için bu değeri import EDEMEZ, kendi
+// bağımsız kopyasını taşır - iki sabit ayrışırsa regresyon testi kırılır.
+const MAX_PUBLISH_ATTEMPTS = 3;
+
 type SocialPostRow = {
   id: string;
   villa: SocialPost["villa"];
@@ -274,17 +281,56 @@ export async function beginSocialPublishAttempt(id: string): Promise<SocialPost 
   return claim?.post ?? null;
 }
 
+// publish_attempt_count claimSocialPublishAttempt() içinde denemeden ÖNCE artırılır - bu yüzden
+// buraya geldiğimizde satırın güncel deneme sayısı zaten bu başarısız denemeyi sayar. Sayaç
+// MAX_PUBLISH_ATTEMPTS'e ulaştıysa satır kalıcı olarak başarısız kabul edilir (dead-letter):
+// - approval_status 'İnsan onayı'na döner (duePosts()/claimSocialPublishAttempt yalnız 'Onaylandı'
+//   satırları seçtiği için cron artık bu satırı asla otomatik seçmez - insan yeniden onaylamadan
+//   sonsuz döngüye girmez),
+// - yapılandırılmış hata kaydı social_publish_failure_archive'a yazılır (migration 0022'de tanımlı
+//   ama o zamana kadar hiç canlı kod yolundan yazılmıyordu - artık gerçek dead-letter geçmişi burada).
+// Bu satırın 3. (son) denemesi DIŞINDA hiçbir davranış değişmez - ilk 2 başarısızlıkta satır
+// 'Onaylandı' kalır ve custom-worker.mjs'teki exponential backoff'a göre yeniden denenir.
 export async function markSocialPublishFailure(id: string, lockToken: string, errorMessage: string): Promise<SocialPost | null> {
   const db = await database();
   await ensureTable(db);
   const now = new Date().toISOString();
+  const truncatedError = errorMessage.slice(0, 500);
+
+  const current = await fetchSocialPost(db, id);
+  const attemptCount = current?.publishAttemptCount ?? 0;
+  const isDeadLetter = attemptCount >= MAX_PUBLISH_ATTEMPTS;
+
   await db.prepare(`UPDATE social_posts
     SET last_publish_error = ?,
         publish_lock_token = NULL,
         publish_lock_expires_at = NULL,
+        approval_status = CASE WHEN ? THEN 'İnsan onayı' ELSE approval_status END,
+        approved_at = CASE WHEN ? THEN NULL ELSE approved_at END,
         updated_at = ?
     WHERE id = ? AND status = 'Planlandı' AND publish_lock_token = ?`)
-    .bind(errorMessage.slice(0, 500), now, id, lockToken).run();
+    .bind(truncatedError, isDeadLetter ? 1 : 0, isDeadLetter ? 1 : 0, now, id, lockToken).run();
+
+  if (isDeadLetter && current) {
+    await db.prepare(`INSERT OR IGNORE INTO social_publish_failure_archive (
+        post_id, villa, platform, content_type, scheduled_date, scheduled_time,
+        approval_status, publish_attempt_count, last_publish_attempt_at, error_message, archived_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(
+        current.id,
+        current.villa,
+        current.platform,
+        current.contentType,
+        current.scheduledDate,
+        current.scheduledTime ?? null,
+        "İnsan onayı",
+        attemptCount,
+        current.lastPublishAttemptAt ?? now,
+        truncatedError,
+        now,
+      ).run();
+  }
+
   return fetchSocialPost(db, id);
 }
 

@@ -108,15 +108,35 @@ function addDays(iso: string, days: number): string {
 // Bir kategori-havuzu içinde deterministik olarak (id sırasına göre) ilk uygun, tekrar
 // etmeyen, medyası çözümlenmiş şablonu seçer - aynı girdiyle her zaman aynı sonucu üretir (test
 // edilebilirlik için kasıtlı).
+// Villa adilliği (bölüm 9/18 - "scheduler bir villayı/platformu aç bırakmaz"): kategori içinde
+// birden fazla aday varsa, o ana kadar recentPosts+planned'de DAHA AZ temsil edilen villa önce
+// denenir - yalnız id alfabetik sırasına (Destan/Safira arasında sabit bir kazanan yaratabilecek
+// bir yan etkiye) bağlı kalınmaz. Kategori-açığı dengeleme mantığına (computeDeficitOrder)
+// DOKUNMAZ - tamamen ayrı, ortogonal bir adillik katmanı.
+function sortByVillaFairness(
+  candidates: SocialContentTemplate[],
+  recentPosts: RecentPost[],
+): SocialContentTemplate[] {
+  const villaCounts = new Map<string, number>();
+  for (const post of recentPosts) {
+    villaCounts.set(post.villa, (villaCounts.get(post.villa) ?? 0) + 1);
+  }
+  return [...candidates].sort((a, b) => {
+    const countA = villaCounts.get(a.villa) ?? 0;
+    const countB = villaCounts.get(b.villa) ?? 0;
+    if (countA !== countB) return countA - countB;
+    return a.id.localeCompare(b.id);
+  });
+}
+
 function pickCandidate(
   category: ContentMixCategory,
   pool: SocialContentTemplate[],
   usedTemplateIds: Set<string>,
   recentPosts: RecentPost[],
 ): SocialContentTemplate | null {
-  const candidates = pool
-    .filter((t) => templateCategory(t.theme) === category && !usedTemplateIds.has(t.id))
-    .sort((a, b) => a.id.localeCompare(b.id));
+  const unsorted = pool.filter((t) => templateCategory(t.theme) === category && !usedTemplateIds.has(t.id));
+  const candidates = sortByVillaFairness(unsorted, recentPosts);
 
   for (const candidate of candidates) {
     const duplicate = checkDuplicateContent(

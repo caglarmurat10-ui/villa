@@ -43,4 +43,43 @@ describe("Sosyal otomatik yayin MAX_ATTEMPTS regresyonu", () => {
     expect(source).toContain("COALESCE(publish_attempt_count, 0) < ?");
     expect(source).toContain(".bind(MAX_ATTEMPTS,");
   });
+
+  it("custom-worker.mjs (cron gate) ve social-db.ts (dead-letter) MAX_ATTEMPTS icin AYNI degeri tasir", () => {
+    const cronSource = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
+    const dbSource = readFileSync(resolve(ROOT, "src", "lib", "social-db.ts"), "utf-8");
+    const cronMatch = cronSource.match(/const MAX_ATTEMPTS = (\d+);/);
+    const dbMatch = dbSource.match(/const MAX_PUBLISH_ATTEMPTS = (\d+);/);
+    expect(cronMatch).not.toBeNull();
+    expect(dbMatch).not.toBeNull();
+    expect(dbMatch![1]).toBe(cronMatch![1]);
+  });
+});
+
+describe("Cron izolasyonu regresyonu (bölüm 9/18 test 7 - bir hedefin hatası digerlerini durdurmaz)", () => {
+  it("runSocialCron her postu KENDI try/catch bloğunda işler - bir hata dongu disina cikip digerlerini iptal etmez", () => {
+    const source = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
+    const fnStart = source.indexOf("async function runSocialCron");
+    expect(fnStart).toBeGreaterThan(-1);
+    const fnBody = source.slice(fnStart, source.indexOf("\n}", fnStart));
+    expect(fnBody).toContain("for (const post of posts) {");
+    // try, for'un ICINDE (her post icin ayri) olmali - for'un disinda TEK bir try/catch DEGIL.
+    const forIndex = fnBody.indexOf("for (const post of posts) {");
+    const tryIndex = fnBody.indexOf("try {", forIndex);
+    const catchIndex = fnBody.indexOf("} catch (error) {", tryIndex);
+    expect(tryIndex).toBeGreaterThan(forIndex);
+    expect(catchIndex).toBeGreaterThan(tryIndex);
+    // catch bloğu döngüyü kirmiyor (break/return yok) - hata sayilip bir sonraki post'a devam edilir.
+    const catchBody = fnBody.slice(catchIndex, fnBody.indexOf("}", fnBody.indexOf("errorCount += 1;", catchIndex)) + 1);
+    expect(catchBody).not.toContain("break");
+    expect(catchBody).not.toContain("return");
+  });
+});
+
+describe("Exponential backoff regresyonu (sabit 30dk cooldown yerine)", () => {
+  it("duePosts artan bekleme (1. hata sonrasi 30dk, 2. hata sonrasi 60dk) uyguluyor", () => {
+    const source = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
+    expect(source).toContain("const RETRY_BACKOFF_MINUTES = [30, 60];");
+    expect(source).toContain("COALESCE(publish_attempt_count, 0) <= 1 AND last_publish_attempt_at <= ?");
+    expect(source).toContain("COALESCE(publish_attempt_count, 0) = 2 AND last_publish_attempt_at <= ?");
+  });
 });
