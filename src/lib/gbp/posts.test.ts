@@ -52,6 +52,20 @@ describe("buildGbpCtaUrl - section 11 dogru villa + UTM", () => {
     const url = new URL(buildGbpCtaUrl("Destan", "test_campaign"));
     expect(url.pathname).toBe("/villa-destan");
   });
+
+  it("site-ici rehber landingPath verilirse ayni domain ve UTM korunur", () => {
+    const url = new URL(buildGbpCtaUrl("Safira", "auto_patara", "/rehber/patara"));
+    expect(url.origin).toBe("https://safiradestan.com");
+    expect(url.pathname).toBe("/rehber/patara");
+    expect(url.searchParams.get("utm_source")).toBe("google");
+    expect(url.searchParams.get("utm_medium")).toBe("organic_gbp");
+    expect(url.searchParams.get("utm_campaign")).toBe("auto_patara");
+  });
+
+  it("harici/protokol-benzeri landingPath kabul etmez", () => {
+    expect(() => buildGbpCtaUrl("Safira", "x", "//evil.example/path")).toThrow();
+    expect(() => buildGbpCtaUrl("Safira", "x", "https://evil.example/path")).toThrow();
+  });
 });
 
 describe("selectFirstGbpPostCandidate - section 17 ilk aday, HENÜZ yayınlanmaz", () => {
