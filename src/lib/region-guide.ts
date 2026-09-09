@@ -90,6 +90,16 @@ export const GUIDE_PLACES: GuidePlace[] = [
     description: "Tarihi limanı, Likya lahitleri ve antik tiyatrosuyla bilinen sahil kasabası; kafe ve restoranlarla çevrili bir meydanı vardır.",
     mapsQuery: "Kaş Limanı, Antalya",
   },
+  // 2026-09-09'da bağımsız, çok kaynaklı web araştırmasıyla doğrulandı (haftalık pazar günü ve
+  // öne çıkan yerel ürünler birden fazla kaynakta tutarlı) - fiyat/saat gibi değişken bir bilgi
+  // eklenmedi, yalnız sabit/kalıcı bir gerçek (pazarın kurulduğu gün).
+  {
+    id: "kas-cuma-pazari",
+    name: "Kaş Cuma Pazarı",
+    category: "gezi",
+    description: "Kaş'ta her Cuma kurulan haftalık semt pazarı; bölgenin zeytinyağı, kekik, bal ve köy peyniri gibi yerel ürünleriyle bilinir.",
+    mapsQuery: "Kaş Pazar Yeri, Antalya",
+  },
   {
     id: "kalkan",
     name: "Kalkan",
