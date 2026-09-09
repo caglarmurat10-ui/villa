@@ -10,9 +10,10 @@ declare global {
         callback: (response: { authResponse?: { code?: string }; status?: string }) => void,
         options: {
           config_id: string;
+          auth_type?: "rerequest";
           response_type: "code";
           override_default_response_type: true;
-          extras?: { featureType?: string; sessionInfoVersion?: string };
+          extras?: { setup?: Record<string, never>; featureType?: string };
         },
       ): void;
     };
@@ -27,35 +28,102 @@ type SignupEventPayload = {
 };
 
 const FB_SDK_SRC = "https://connect.facebook.net/tr_TR/sdk.js";
-const FB_SDK_VERSION = "v21.0";
+// Meta Graph API'nin 2026-09 itibarıyla güncel sürümü. v21 hâlâ desteklense de 2027-01'de
+// kapanacağı için yeni Embedded Signup akışını eski bir Graph sürümüne sabitlemiyoruz.
+const FB_SDK_VERSION = "v26.0";
+
+function initializeFacebookSdk(appId: string) {
+  window.FB?.init({ appId, autoLogAppEvents: true, xfbml: false, version: FB_SDK_VERSION });
+}
 
 function loadFacebookSdk(appId: string): Promise<void> {
-  return new Promise((resolve) => {
-    if (window.FB) {
-      resolve();
-      return;
-    }
-    window.fbAsyncInit = () => {
-      window.FB?.init({ appId, autoLogAppEvents: true, xfbml: false, version: FB_SDK_VERSION });
+  if (window.FB) {
+    initializeFacebookSdk(appId);
+    return Promise.resolve();
+  }
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const complete = () => {
+      if (settled) return;
+      if (!window.FB) {
+        settled = true;
+        reject(new Error("Facebook SDK yüklenemedi."));
+        return;
+      }
+      initializeFacebookSdk(appId);
+      settled = true;
       resolve();
     };
-    if (document.getElementById("facebook-jssdk")) return;
+    const fail = () => {
+      if (settled) return;
+      settled = true;
+      reject(new Error("Facebook SDK yüklenemedi."));
+    };
+
+    const previousAsyncInit = window.fbAsyncInit;
+    window.fbAsyncInit = () => {
+      previousAsyncInit?.();
+      complete();
+    };
+
+    const existing = document.getElementById("facebook-jssdk") as HTMLScriptElement | null;
+    if (existing) {
+      existing.addEventListener("load", complete, { once: true });
+      existing.addEventListener("error", fail, { once: true });
+      return;
+    }
+
     const script = document.createElement("script");
     script.id = "facebook-jssdk";
     script.src = FB_SDK_SRC;
     script.async = true;
     script.defer = true;
+    script.addEventListener("load", () => {
+      // Facebook SDK normalde fbAsyncInit'i çağırır; bazı tarayıcı/cache senaryolarında FB
+      // zaten hazırsa load olayı üzerinden de güvenli şekilde tamamlarız.
+      if (window.FB) complete();
+    }, { once: true });
+    script.addEventListener("error", fail, { once: true });
     document.body.appendChild(script);
   });
 }
 
 export default function WhatsappEmbeddedSignupPanel({ config }: { config: { appId: string; configId: string } | null }) {
-  const [status, setStatus] = useState<"idle" | "loading" | "waiting-code" | "exchanging" | "done" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "waiting-code" | "exchanging" | "done" | "error">("idle");
   const [notice, setNotice] = useState("");
   const [wabaId, setWabaId] = useState<string | null>(null);
   const [phoneNumberId, setPhoneNumberId] = useState<string | null>(null);
   const [accessToken, setAccessToken] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [sdkReady, setSdkReady] = useState(false);
+
+  // ÖNEMLİ: Meta'nın popup çağrısı doğrudan kullanıcı click event'i içinde senkron çalışmalı.
+  // SDK'yı butona basıldıktan sonra await etmek popup'ın tarayıcı tarafından engellenmesine yol
+  // açabildiği için SDK sayfa açılır açılmaz önden yüklenir; connect() içinde await YOKTUR.
+  useEffect(() => {
+    let cancelled = false;
+    if (!config) {
+      setSdkReady(false);
+      return;
+    }
+
+    loadFacebookSdk(config.appId)
+      .then(() => {
+        if (!cancelled) setSdkReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setSdkReady(false);
+          setStatus("error");
+          setNotice("Facebook SDK yüklenemedi. Sayfayı yenileyip tekrar deneyin.");
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [config?.appId]);
 
   useEffect(() => {
     function onMessage(event: MessageEvent) {
@@ -82,20 +150,21 @@ export default function WhatsappEmbeddedSignupPanel({ config }: { config: { appI
     return () => window.removeEventListener("message", onMessage);
   }, []);
 
-  async function connect() {
+  function connect() {
     if (!config) return;
-    setStatus("loading");
     setNotice("");
-    try {
-      await loadFacebookSdk(config.appId);
-    } catch {
+
+    if (!sdkReady || !window.FB) {
       setStatus("error");
-      setNotice("Facebook SDK yüklenemedi.");
+      setNotice("Meta bağlantı bileşeni henüz hazır değil. Birkaç saniye sonra tekrar deneyin.");
       return;
     }
 
     setStatus("waiting-code");
-    window.FB?.login(
+    // Embedded Signup v4: ürün/asset/permission seçimi Meta'daki Builder config'inde yapılır.
+    // Client çağrısında legacy sessionInfoVersion gönderilmez. Coexistence seçeneğini açan
+    // featureType ise v4'te de gerekli kalır.
+    window.FB.login(
       (response) => {
         const code = response.authResponse?.code;
         if (!code) {
@@ -107,9 +176,10 @@ export default function WhatsappEmbeddedSignupPanel({ config }: { config: { appI
       },
       {
         config_id: config.configId,
+        auth_type: "rerequest",
         response_type: "code",
         override_default_response_type: true,
-        extras: { featureType: "whatsapp_business_app_onboarding", sessionInfoVersion: "3" },
+        extras: { setup: {}, featureType: "whatsapp_business_app_onboarding" },
       },
     );
   }
@@ -168,11 +238,11 @@ export default function WhatsappEmbeddedSignupPanel({ config }: { config: { appI
         {status !== "done" ? (
           <button
             type="button"
-            onClick={() => void connect()}
-            disabled={status === "loading" || status === "waiting-code" || status === "exchanging"}
-            style={{ marginTop: 12, border: "1px solid #1877f2", borderRadius: 9, padding: "10px 14px", background: "#1877f2", color: "#fff", fontSize: 11, fontWeight: 900, cursor: "pointer" }}
+            onClick={connect}
+            disabled={!sdkReady || status === "waiting-code" || status === "exchanging"}
+            style={{ marginTop: 12, border: "1px solid #1877f2", borderRadius: 9, padding: "10px 14px", background: "#1877f2", color: "#fff", fontSize: 11, fontWeight: 900, cursor: sdkReady ? "pointer" : "not-allowed", opacity: sdkReady ? 1 : 0.7 }}
           >
-            {status === "loading" ? "Yükleniyor…" : status === "waiting-code" ? "Meta penceresi açık…" : status === "exchanging" ? "Token alınıyor…" : "WhatsApp Business'ı bağla (Coexistence)"}
+            {!sdkReady ? "Meta SDK hazırlanıyor…" : status === "waiting-code" ? "Meta penceresi açık…" : status === "exchanging" ? "Token alınıyor…" : "WhatsApp Business'ı bağla (Coexistence)"}
           </button>
         ) : null}
 
