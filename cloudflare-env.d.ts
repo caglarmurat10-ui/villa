@@ -37,6 +37,13 @@ declare global {
     GOOGLE_ADS_CUSTOMER_ID?: string;
     GOOGLE_ADS_LOGIN_CUSTOMER_ID?: string;
     META_ADS_AD_ACCOUNT_ID?: string;
+    // WhatsApp Business Platform / Cloud API - bilerek "secrets.required" listesinde DEĞİL (bkz.
+    // wrangler.jsonc notu). Yapılandırılmadan gönderim fail-closed kalır (src/lib/whatsapp/config.ts).
+    WHATSAPP_ACCESS_TOKEN?: string;
+    WHATSAPP_PHONE_NUMBER_ID?: string;
+    WHATSAPP_BUSINESS_ACCOUNT_ID?: string;
+    WHATSAPP_CHECKOUT_TEMPLATE_NAME?: string;
+    WHATSAPP_WEBHOOK_VERIFY_TOKEN?: string;
   }
 }
 

@@ -27,6 +27,11 @@
   // deploy "required secrets have not been set" hatasıyla durdu). PayTR entegrasyonu tasarım gereği
   // bu üç secret olmadan da deploy edilebilir/dormant kalabilir olmalı - o yüzden bu liste değişmedi.
   // Gerçek secret isimleri src/lib/payments/paytr/config.ts'te ve final raporda dokümante edilmiştir.
+  // AYNI GEREKÇEYLE: WHATSAPP_ACCESS_TOKEN/WHATSAPP_PHONE_NUMBER_ID/WHATSAPP_BUSINESS_ACCOUNT_ID/
+  // WHATSAPP_CHECKOUT_TEMPLATE_NAME/WHATSAPP_WEBHOOK_VERIFY_TOKEN de bu listeye EKLENMEDİ - gerçek
+  // WhatsApp Business hesabı/şablon onayı işletme sahibinin dışarıda tamamlaması gereken bir adım,
+  // bunlar olmadan da deploy edilebilir kalmalı. Yapılandırılmadan otomatik gönderim fail-closed
+  // kalır (bkz. src/lib/whatsapp/config.ts, final rapor).
   "secrets": {
     "required": [
       "META_APP_SECRET",

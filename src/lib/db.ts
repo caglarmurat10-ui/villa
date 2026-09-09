@@ -3,6 +3,7 @@ import type { D1Database } from "@cloudflare/workers-types";
 import type { PriceRange, Reservation, SocialPost, SocialPostStatus, Villa, VillaLocations } from "./types";
 import type { ReservationInput, SocialPostInput } from "./schema";
 import { computePriceQuote, type PriceQuoteResult } from "./price-engine";
+import { cancelCheckoutReminderForReservation, syncCheckoutReminderForReservation } from "./whatsapp/store";
 
 type ReservationRow = {
   id: string;
@@ -147,7 +148,20 @@ export async function createReservation(input: ReservationInput): Promise<Reserv
     db.prepare("INSERT INTO audit_log (entity_id, action, payload, created_at) VALUES (?, 'CREATE', ?, ?)")
       .bind(reservation.id, JSON.stringify(reservation), now),
   ]);
+  await syncWhatsappCheckoutReminderSafely(reservation);
   return reservation;
+}
+
+// whatsapp/store.ts'teki senkronizasyon rezervasyon akışının (create/update/phone/delete) İKİNCİL,
+// en iyi çaba (best-effort) bir yan etkisi - başarısız olursa (ör. D1 geçici hatası) rezervasyon
+// işleminin kendisi asla engellenmemeli/geri alınmamalı, yalnız loglanır. Bir sonraki güncelleme
+// (ör. telefon düzenlemesi) senkronizasyonu tekrar dener - idempotent olduğu için güvenlidir.
+async function syncWhatsappCheckoutReminderSafely(reservation: Reservation): Promise<void> {
+  try {
+    await syncCheckoutReminderForReservation({ id: reservation.id, checkOut: reservation.checkOut, phone: reservation.phone });
+  } catch (error) {
+    console.error(`[WhatsApp Checkout] Senkronizasyon başarısız (reservation=${reservation.id}): ${error instanceof Error ? error.message : String(error)}`);
+  }
 }
 
 export async function getCommissionRate(): Promise<number> {
@@ -260,6 +274,11 @@ export async function softDeleteReservation(id: string): Promise<boolean> {
     db.prepare("UPDATE reservations SET deleted_at = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL").bind(now, now, id),
     db.prepare("INSERT INTO audit_log (entity_id, action, payload, created_at) VALUES (?, 'DELETE', '{}', ?)").bind(id, now),
   ]);
+  try {
+    await cancelCheckoutReminderForReservation(id);
+  } catch (error) {
+    console.error(`[WhatsApp Checkout] İptal senkronizasyonu başarısız (reservation=${id}): ${error instanceof Error ? error.message : String(error)}`);
+  }
   return true;
 }
 
@@ -282,7 +301,9 @@ export async function updateReservation(id: string, input: ReservationInput): Pr
     db.prepare("INSERT INTO audit_log (entity_id, action, payload, created_at) VALUES (?, 'UPDATE', ?, ?)")
       .bind(id, JSON.stringify(input), now),
   ]);
-  return (await findReservation(id))!;
+  const updated = (await findReservation(id))!;
+  await syncWhatsappCheckoutReminderSafely(updated);
+  return updated;
 }
 
 export async function updateReservationPhone(id: string, phone: string): Promise<Reservation> {
@@ -297,7 +318,9 @@ export async function updateReservationPhone(id: string, phone: string): Promise
     db.prepare("INSERT INTO audit_log (entity_id, action, payload, created_at) VALUES (?, 'PHONE', ?, ?)")
       .bind(id, JSON.stringify({ phone: cleanPhone }), now),
   ]);
-  return (await findReservation(id))!;
+  const updated = (await findReservation(id))!;
+  await syncWhatsappCheckoutReminderSafely(updated);
+  return updated;
 }
 
 export async function updatePayment(id: string, paidAmount: number): Promise<Reservation> {

@@ -2,6 +2,9 @@
 
 import { useState } from "react";
 import type { Reservation, VillaLocations } from "@/lib/types";
+import { normalizeWhatsappPhone } from "@/lib/whatsapp/phone";
+import { CHECKOUT_REMINDER_MESSAGE_TEXT } from "@/lib/whatsapp/checkout-message";
+import type { WhatsappScheduledMessage } from "@/lib/whatsapp/types";
 
 type MessageType = "Giriş" | "Çıkış";
 
@@ -9,14 +12,6 @@ const MAP_LINKS = {
   Destan: "https://maps.app.goo.gl/8zCrgoegzri52ro79",
   Safira: "https://maps.app.goo.gl/fKBpCQhn5Qneuo5H6",
 } as const;
-
-function normalizeWhatsAppNumber(value: string) {
-  const digits = value.replace(/\D/g, "");
-  if (digits.startsWith("00")) return digits.slice(2);
-  if (digits.length === 10) return `90${digits}`;
-  if (digits.length === 11 && digits.startsWith("0")) return `90${digits.slice(1)}`;
-  return digits;
-}
 
 function villaName(reservation: Reservation) {
   return `${reservation.villa} Villa`;
@@ -32,22 +27,71 @@ function messageText(reservation: Reservation, type: MessageType, locations: Vil
     return `Merhaba 👋\n\n${villaName(reservation)} rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız.\n\n📍 ${villaName(reservation)} konumu:\n${mapLink}\n\n🕓 Giriş saatimiz 16.00’dır.\n\nVillaya sorunsuz şekilde giriş yapabilmeniz için konuma yaklaşık 15 dakika kala bize haber vermenizi rica ederiz.\n\nŞimdiden iyi yolculuklar dileriz.`;
   }
 
-  return `Merhaba 👋\n\nBizi tercih ettiğiniz için teşekkür ederiz.\n\n🧳 Çıkış saatimiz 10.00’dır.\n\nÇıkış saatinizde villada olacağız ve çıkış işlemlerini birlikte tamamlayacağız.\n\nGüzel anılarla ayrılmanızı diler, sizi yeniden ağırlamaktan memnuniyet duyarız.`;
+  return CHECKOUT_REMINDER_MESSAGE_TEXT;
 }
 
 function formatDate(value: string) {
   return new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "short" }).format(new Date(`${value}T12:00:00`));
 }
 
-export default function MessageCenter({ reservations, locations }: { reservations: Reservation[]; locations: VillaLocations }) {
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("tr-TR", { timeZone: "Europe/Istanbul", day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+}
+
+function automationStatusLine(message: WhatsappScheduledMessage | undefined): { label: string; className: string } | null {
+  if (!message) return null;
+  switch (message.status) {
+    case "SCHEDULED":
+      return { label: `Çıkış mesajı · ${formatDateTime(message.scheduledAt)} · Planlandı`, className: "scheduled" };
+    case "SENDING":
+      return { label: "Gönderiliyor…", className: "scheduled" };
+    case "SENT":
+      return { label: `Gönderildi · ${message.sentAt ? formatDateTime(message.sentAt) : ""}`, className: "sent" };
+    case "DELIVERED":
+      return { label: `İletildi · ${message.deliveredAt ? formatDateTime(message.deliveredAt) : ""}`, className: "delivered" };
+    case "READ":
+      return { label: `Okundu · ${message.readAt ? formatDateTime(message.readAt) : ""}`, className: "read" };
+    case "FAILED":
+      return { label: "Gönderilemedi", className: "failed" };
+    case "SKIPPED_NOT_CONFIGURED":
+      return { label: "WhatsApp otomasyonu bağlı değil", className: "not-configured" };
+    case "CANCELLED":
+      return { label: "Otomatik hatırlatma iptal edildi", className: "cancelled" };
+    default:
+      return null;
+  }
+}
+
+export default function MessageCenter({ reservations, locations, checkoutReminders }: { reservations: Reservation[]; locations: VillaLocations; checkoutReminders: Record<string, WhatsappScheduledMessage> }) {
   const [items, setItems] = useState(reservations);
   const [phoneDrafts, setPhoneDrafts] = useState<Record<string, string>>(() => Object.fromEntries(reservations.map((reservation) => [reservation.id, reservation.phone ?? ""])));
   const [notice, setNotice] = useState<Record<string, string>>({});
   const [savingPhone, setSavingPhone] = useState<string | null>(null);
+  const [reminders, setReminders] = useState(checkoutReminders);
+  const [previewOpenId, setPreviewOpenId] = useState<string | null>(null);
+  const [automationBusy, setAutomationBusy] = useState<string | null>(null);
+
+  async function automationAction(reservationId: string, action: "enable" | "disable" | "retry") {
+    setAutomationBusy(reservationId);
+    try {
+      const response = await fetch(`/api/admin/whatsapp/checkout-reminders/${encodeURIComponent(reservationId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error ?? "İşlem tamamlanamadı.");
+      setReminders((current) => ({ ...current, [reservationId]: data.message }));
+    } catch (error) {
+      setNotice((current) => ({ ...current, [reservationId]: error instanceof Error ? error.message : "İşlem tamamlanamadı." }));
+    } finally {
+      setAutomationBusy(null);
+    }
+  }
 
   async function savePhone(reservation: Reservation) {
     const phone = (phoneDrafts[reservation.id] ?? "").trim();
-    if (normalizeWhatsAppNumber(phone).length < 10) {
+    if (normalizeWhatsappPhone(phone).length < 10) {
       setNotice((current) => ({ ...current, [reservation.id]: "Geçerli bir WhatsApp numarası girin." }));
       return;
     }
@@ -75,7 +119,7 @@ export default function MessageCenter({ reservations, locations }: { reservation
 
   function send(reservation: Reservation, type: MessageType) {
     const phone = (reservation.phone ?? "").trim();
-    const number = normalizeWhatsAppNumber(phone);
+    const number = normalizeWhatsappPhone(phone);
 
     if (type === "Giriş" && !locationLink(reservation, locations)) {
       setNotice((current) => ({ ...current, [reservation.id]: `${villaName(reservation)} konum bağlantısı tanımlı değil.` }));
@@ -113,6 +157,37 @@ export default function MessageCenter({ reservations, locations }: { reservation
             />
           </label>
           {notice[reservation.id] ? <small>{notice[reservation.id]}</small> : null}
+          {(() => {
+            const reminder = reminders[reservation.id];
+            const status = automationStatusLine(reminder);
+            if (!status) return null;
+            const showPreview = previewOpenId === reservation.id;
+            const busy = automationBusy === reservation.id;
+            return <div className="message-automation">
+              <div className="automation-line">
+                <span className={`automation-status ${status.className}`}>{status.label}</span>
+                <button type="button" onClick={() => setPreviewOpenId(showPreview ? null : reservation.id)} style={{ background: "none", border: "none", color: "#93c5fd", fontSize: 10, cursor: "pointer", padding: 0 }}>
+                  {showPreview ? "Metni gizle" : "Metni gör"}
+                </button>
+              </div>
+              {showPreview ? <p className="automation-preview">{CHECKOUT_REMINDER_MESSAGE_TEXT}</p> : null}
+              {reminder?.status === "SCHEDULED" ? (
+                <div className="automation-row">
+                  <button type="button" disabled={busy} onClick={() => void automationAction(reservation.id, reminder.autoEnabled ? "disable" : "enable")}>
+                    {busy ? "İşleniyor…" : reminder.autoEnabled ? "Otomatik gönderimi kapat" : "Otomatik gönderimi aç"}
+                  </button>
+                </div>
+              ) : null}
+              {reminder?.status === "FAILED" ? (
+                <div className="automation-row">
+                  <span>{reminder.failureReason ?? "Bilinmeyen hata"}</span>
+                  <button type="button" className="retry" disabled={busy} onClick={() => void automationAction(reservation.id, "retry")}>
+                    {busy ? "İşleniyor…" : "Yeniden dene"}
+                  </button>
+                </div>
+              ) : null}
+            </div>;
+          })()}
         </div>
         <div className="message-actions">
           <button className="phone-save" disabled={savingPhone === reservation.id} onClick={() => void savePhone(reservation)}>{savingPhone === reservation.id ? "Kaydediliyor…" : "Numarayı kaydet"}</button>

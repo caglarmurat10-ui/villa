@@ -54,6 +54,11 @@ const ADMIN_PUBLIC_PATHS = new Set([
   "/api/system/version",
   "/api/meta/instagram/callback",
   "/api/meta/facebook/callback",
+  // Meta'nın WhatsApp Business Platform webhook'u (mesaj durum bildirimleri) - admin oturum çerezi
+  // olmadan, Meta'nın kendi sunucularından çağrılır. Route kendi imza doğrulamasını yapar (bkz.
+  // src/app/api/webhooks/whatsapp/route.ts, X-Hub-Signature-256) - bu satır yalnız admin login
+  // duvarını atlatır, içerik doğrulaması route'un kendi sorumluluğunda.
+  "/api/webhooks/whatsapp",
 ]);
 const ADMIN_SESSION_COOKIE = "__Host-villa_admin_session";
 const ADMIN_SESSION_TTL_SECONDS = 12 * 60 * 60;
@@ -1032,6 +1037,71 @@ async function runGbpPostCronIfDue(env, ctx) {
   }
 }
 
+// Otomatik WhatsApp çıkış hatırlatması - GERÇEK gönderim mantığı (Meta Cloud API çağrısı, D1 durum
+// güncellemesi, claim/idempotency) src/app/api/admin/whatsapp/dispatch-due/route.ts'te TypeScript
+// olarak yazılı; burası yalnız publishThroughApp/runGbpPostCronIfDue ile AYNI, kanıtlanmış
+// in-process nextWorker.fetch() + zorunlu Host header deseniyle o route'u tetikler (bkz.
+// publishThroughApp'teki 2026-08-30 kök neden notu - Host header'sız istek middleware'de sessizce
+// 404 olur). Yayın-kritik cron'un (runSocialCron) İÇİNDE, aynı */15 tikinde çalışır - iş yükü çok
+// hafif (birkaç D1 satırı + nadiren birkaç HTTP çağrısı), ayrı bir cron tetikleyicisi gerekmiyor;
+// hata burada da diğer post'ları etkilemeyecek şekilde izole edilir (kendi try/catch'i).
+async function runWhatsappCheckoutCron(env, ctx) {
+  const baseUrl = String(env.APP_BASE_URL ?? "https://admin.safiradestan.com").replace(/\/$/, "");
+  const targetUrl = `${baseUrl}/api/admin/whatsapp/dispatch-due`;
+  try {
+    const response = await nextWorker.fetch(new Request(targetUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Host: new URL(targetUrl).host },
+    }), env, ctx);
+    if (!response.ok) {
+      console.error(`[WhatsApp Checkout Cron] dispatch-due HTTP ${response.status} döndü.`);
+      return;
+    }
+    const payload = await response.json().catch(() => ({}));
+    if (payload.sent || payload.failed || payload.skippedNotConfigured) {
+      console.log(`[WhatsApp Checkout Cron] Tur tamamlandı: ${JSON.stringify(payload).slice(0, 300)}`);
+    }
+  } catch (error) {
+    console.error(`[WhatsApp Checkout Cron] Çağrı başarısız: ${safeCronError(error)}`);
+  }
+}
+
+// Bu özellik devreye alınmadan ÖNCE oluşturulmuş, hâlâ aktif rezervasyonlar için günde bir kez -
+// runDailySocialPlannerIfDue/runPublicScoutIfDue/runGbpPostCronIfDue ile AYNI KV-guard deseni -
+// backfill tetikler (bkz. src/app/api/admin/whatsapp/backfill-active-reservations/route.ts).
+// Yalnız BAŞARILI bir çağrıdan sonra "bugün çalıştı" işaretlenir - başarısız bir deneme ertesi
+// günkü tetiklemede tekrar denenir.
+const WHATSAPP_BACKFILL_KV_KEY = "whatsapp_checkout_backfill_last_run_date";
+
+async function runWhatsappBackfillIfDue(env, ctx) {
+  const today = istanbulClock(new Date()).date;
+  let lastRunDate = null;
+  try {
+    lastRunDate = await env.META_PRIVATE.get(WHATSAPP_BACKFILL_KV_KEY);
+  } catch (error) {
+    console.error(`[WhatsApp Backfill] KV okuma hatası: ${safeCronError(error)}`);
+  }
+  if (lastRunDate === today) return;
+
+  const baseUrl = String(env.APP_BASE_URL ?? "https://admin.safiradestan.com").replace(/\/$/, "");
+  const targetUrl = `${baseUrl}/api/admin/whatsapp/backfill-active-reservations`;
+  try {
+    const response = await nextWorker.fetch(new Request(targetUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Host: new URL(targetUrl).host },
+    }), env, ctx);
+    if (!response.ok) {
+      console.error(`[WhatsApp Backfill] HTTP ${response.status} döndü, bugün tekrar denenecek.`);
+      return;
+    }
+    await env.META_PRIVATE.put(WHATSAPP_BACKFILL_KV_KEY, today);
+    const payload = await response.json().catch(() => ({}));
+    console.log(`[WhatsApp Backfill] Günlük çalıştırma tamamlandı: ${JSON.stringify(payload).slice(0, 300)}`);
+  } catch (error) {
+    console.error(`[WhatsApp Backfill] Çağrı başarısız, bugün tekrar denenecek: ${safeCronError(error)}`);
+  }
+}
+
 async function runSocialCron(controller, env, ctx) {
   const ranAt = new Date(controller.scheduledTime).toISOString();
 
@@ -1317,6 +1387,11 @@ export default {
       } catch (error) {
         console.error(`[Social Planner] Zamanlanmış çalıştırma beklenmeyen hata: ${safeCronError(error)}`);
       }
+      try {
+        await runWhatsappBackfillIfDue(env, ctx);
+      } catch (error) {
+        console.error(`[WhatsApp Backfill] Zamanlanmış çalıştırma beklenmeyen hata: ${safeCronError(error)}`);
+      }
       return;
     }
     // Social Growth Agent - Public Web Scout, günde bir kez. Diğer üç cron'dan (yayın, OTA, sosyal
@@ -1339,5 +1414,10 @@ export default {
       return;
     }
     await runSocialCron(controller, env, ctx);
+    try {
+      await runWhatsappCheckoutCron(env, ctx);
+    } catch (error) {
+      console.error(`[WhatsApp Checkout Cron] Zamanlanmış çalıştırma beklenmeyen hata: ${safeCronError(error)}`);
+    }
   },
 };
