@@ -59,6 +59,22 @@ export function resolveGbpMediaUrl(baseUrl: string, villa: Villa, mediaHint: str
   return `${baseUrl}${pool[hash % pool.length].proxyPath}`;
 }
 
+// Bölge odaklı GBP gönderileri doğrudan ilgili, doğrulanmış rehber sayfasına gider. Böylece
+// kullanıcı "Patara Plajı" içeriğine tıkladığında genel villa landing'ine düşmez; Search Console'da
+// henüz keşif/otorite biriktiren rehber sayfalarına gerçek, ölçülebilir organik trafik aktarılır.
+// Diğer kategoriler villa sayfasında kalır. Harita sabittir; serbest URL/harici domain yoktur.
+const GBP_GUIDE_LANDING_PATHS: Partial<Record<GbpPostDraft["category"], string>> = {
+  patara: "/rehber/patara",
+  "patara-plaji": "/rehber/patara-plaji",
+  "patara-antik-kenti": "/rehber/patara-antik-kenti",
+  kas: "/rehber/kas",
+  kalkan: "/rehber/kalkan",
+};
+
+export function gbpLandingPath(villa: Villa, draft: GbpPostDraft): string {
+  return GBP_GUIDE_LANDING_PATHS[draft.category] ?? (villa === "Safira" ? "/villa-safira" : "/villa-destan");
+}
+
 export function draftToInput(villa: Villa, draft: GbpPostDraft, mediaUrl: string): GbpLocalPostInput {
   const useCta = draft.cta === "website";
   return {
@@ -66,7 +82,7 @@ export function draftToInput(villa: Villa, draft: GbpPostDraft, mediaUrl: string
     summary: draft.body,
     mediaSourceUrl: mediaUrl,
     ctaActionType: useCta ? "LEARN_MORE" : undefined,
-    ctaUrl: useCta ? buildGbpCtaUrl(villa, `auto_${draft.category}`) : undefined,
+    ctaUrl: useCta ? buildGbpCtaUrl(villa, `auto_${draft.category}`, gbpLandingPath(villa, draft)) : undefined,
   };
 }
 
