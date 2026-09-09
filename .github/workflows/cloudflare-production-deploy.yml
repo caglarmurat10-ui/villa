@@ -179,9 +179,12 @@ jobs:
           grep -Fq "Villa Destan Resmi Site | Patara Kaş 6 Kişilik Villa" <<<"$destan_html"
           grep -Fq "Villa Destan resmi sitesi. Patara Kaş'ta 6 kişilik, 3 yatak odalı özel havuzlu villa." <<<"$destan_html"
 
-          if grep -Fq '"@type":"Organization"' <<<"$home_html"; then
-            echo "Unexpected standalone Organization schema remains on homepage."
-            exit 1
-          fi
+          # Homepage structured data intentionally uses one Organization entity and
+          # links the WebSite publisher to that exact entity. Verify that relationship
+          # instead of treating Organization as an error.
+          grep -Fq '"@type":"WebSite"' <<<"$home_html"
+          grep -Fq '"publisher":{"@id":"https://safiradestan.com/#organization"}' <<<"$home_html"
+          grep -Fq '"@type":"Organization"' <<<"$home_html"
+          grep -Fq '"@id":"https://safiradestan.com/#organization"' <<<"$home_html"
 
           echo "Production content verification passed."
