@@ -5,7 +5,7 @@ import { VILLAS } from "./villa-content";
 export const ORIGIN = "https://safiradestan.com";
 export const PATARA_VILLA_CANONICAL = `${ORIGIN}/patara-villa`;
 export const PATARA_VILLA_TITLE = "Patara Kiralık Villa | Villa Safira & Villa Destan";
-export const PATARA_VILLA_DESCRIPTION = "Patara'da kiralık, özel havuzlu villa arıyorsanız: Villa Safira ve Villa Destan, Gelemiş Mahallesi'nde, doğrudan rezervasyon ve canlı müsaitlikle. Gerçek fotoğraflar, dönemsel fiyat.";
+export const PATARA_VILLA_DESCRIPTION = "Patara'da özel havuzlu kiralık villa: Villa Safira ve Villa Destan. Gelemiş'te doğrudan rezervasyon, canlı müsaitlik, gerçek fotoğraflar ve dönemsel fiyatlar.";
 
 export const PATARA_VILLA_FAQ = [
   {
