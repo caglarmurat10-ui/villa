@@ -169,32 +169,37 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
     seoTitle: "Kalkan Gezi Rehberi | Safira & Destan",
     metaDescription: "Kalkan hakkında: eski Rum balıkçı köyü geçmişi, beyaz badanalı evleri ve marinası. Villa Safira ve Villa Destan'a yakın bölge rehberi.",
     kicker: "KALKAN REHBERİ",
-    intro: "Kalkan, eski bir Rum balıkçı köyünden gelişerek bugünkü şık sahil kasabası halini almış bir yerleşim. Beyaz badanalı evleri ve marinasıyla, Patara/Gelemiş bölgesinde tatil yapan ziyaretçilerin gezi rotasına dahil edebileceği bir diğer durak.",
+    intro: "Kalkan, eski bir Rum balıkçı köyünden gelişerek bugünkü şık sahil kasabası halini almış bir yerleşim. Beyaz badanalı evleri, dar sokakları ve marinasıyla Patara/Gelemiş bölgesinde tatil yapan ziyaretçilerin gezi rotasına doğal biçimde ekleyebileceği farklı karakterde bir sahil durağıdır.",
     sections: [
       {
-        heading: "Tarihi doku",
-        body: "Kalkan, eski bir Rum balıkçı köyünden gelişen geçmişiyle bilinir. Bu tarihi doku, kasabanın mimarisinde ve dar sokaklarında hâlâ hissedilir.",
+        heading: "Kalkan'ın tarihi dokusu ve karakteri",
+        body: "Kalkan, eski bir Rum balıkçı köyünden gelişen geçmişiyle bilinir. Bu geçmiş bugün özellikle beyaz badanalı yapı dokusunda, dar sokakların ölçeğinde ve yerleşimin marina çevresinde kurduğu sahil kasabası atmosferinde hissedilir. Kalkan'ı gezerken tek bir noktaya odaklanmak yerine sokak dokusunu, yapıların birbirleriyle ilişkisini ve kıyıya doğru değişen manzarayı birlikte gözlemlemek, kasabanın karakterini daha iyi anlamaya yardımcı olur.",
       },
       {
-        heading: "Marina ve sahil",
-        body: "Beyaz badanalı evleri ve marinasıyla Kalkan, bölgenin daha şık ve sakin sahil kasabalarından biri olarak öne çıkar.",
+        heading: "Marina ve sahil çevresi",
+        body: "Kalkan'ın marinası ve sahil çevresi, kasabanın denizle kurduğu ilişkinin en görünür bölümlerinden biridir. Beyaz badanalı evlerle marina çevresinin aynı yürüyüş içinde görülebilmesi, yerleşimin geçmişi ile bugünkü sahil yaşamını birlikte okumayı kolaylaştırır. Ziyaretinizi sabit bir programa bağlamak yerine çevreyi kendi temponuzda dolaşmak, sokaklar ile kıyı arasındaki geçişi daha rahat keşfetmenizi sağlar.",
       },
       {
-        heading: "Kalkan'da kısa gezi rotası",
-        body: "Kalkan'ı keşfederken kasabanın karakterini oluşturan dar sokaklar, beyaz badanalı yapı dokusu ve marina çevresini aynı yürüyüş rotasının parçaları olarak düşünebilirsiniz. Böyle bir yaklaşım, yalnızca tek bir fotoğraf noktasına gitmek yerine yerleşimin geçmişten bugüne taşıdığı sahil kasabası atmosferini daha bütünlüklü görmenizi sağlar.",
+        heading: "Kalkan'da yürüyerek keşif",
+        body: "Kalkan'ı keşfetmenin en anlaşılır yolu, kasabanın dar sokaklarını ve marina çevresini birbirinden kopuk duraklar gibi değil, tek bir gezi bütününün parçaları olarak düşünmektir. Böylece yalnızca bilinen bir fotoğraf noktasına gidip dönmek yerine beyaz badanalı evlerin oluşturduğu sokak dokusunu, sahile yaklaştıkça değişen yerleşim hissini ve marina çevresindeki açık alanları aynı rota içinde deneyimleyebilirsiniz.",
       },
       {
         heading: "Patara tatiliyle Kalkan'ı birleştirmek",
-        body: "Patara/Gelemiş'te konaklarken Kalkan'ı çevre gezilerinden biri olarak planlamak, aynı tatilde farklı sahil yerleşimlerinin karakterini karşılaştırma fırsatı verir. Yol süresi ve trafik gibi bilgiler sezona ve güne göre değişebileceğinden sabit bir süre vermek yerine güncel harita uygulamasını kullanmak daha doğru olur. Böylece Kalkan gezisini kendi programınıza göre esnek biçimde yerleştirebilirsiniz.",
+        body: "Patara/Gelemiş'te konaklarken Kalkan'ı çevre gezilerinden biri olarak planlamak, aynı tatilde farklı sahil yerleşimlerinin karakterini karşılaştırma fırsatı verir. Patara tarih, plaj ve doğal peyzajıyla öne çıkarken Kalkan daha çok yerleşim dokusu, beyaz badanalı evleri ve marina çevresiyle farklı bir deneyim sunar. Bu iki bölgeyi aynı tatil içinde görmek, çevreyi tek bir merkezden ibaret düşünmeden daha geniş bir perspektifle keşfetmenize yardımcı olabilir.",
+      },
+      {
+        heading: "Ziyareti güncel koşullara göre planlamak",
+        body: "Kalkan gezisini planlarken yol süresi, trafik, işletme saatleri veya dönemsel uygulamalar gibi değişebilen ayrıntılarda sabit bilgiler yerine güncel harita ve resmi kaynakları kullanmak daha sağlıklı olur. Rehberimiz değişmeyen bölge karakterine odaklanır; günün saatini, ulaşım seçeneğini ve gezi sürenizi ise ziyaret tarihindeki gerçek koşullara göre belirleyebilirsiniz. Bu yaklaşım özellikle yoğun sezonlarda eski bilgilerle hareket etme riskini azaltır.",
       },
       {
         heading: "Villadan Kalkan'a",
-        body: "Villa Safira ve Villa Destan'ın bulunduğu Patara/Gelemiş bölgesinden Kalkan'a ulaşım mümkündür. Güncel yol koşulları ve süre bilgisi için harita uygulamanızı kullanmanızı öneririz.",
+        body: "Villa Safira ve Villa Destan'ın bulunduğu Patara/Gelemiş bölgesinden Kalkan'a ulaşım mümkündür. Villada konaklarken Kalkan'ı ayrı bir çevre gezisi olarak planlayabilir, güncel yol koşulları ve süre bilgisi için harita uygulamanızı kullanabilirsiniz. Villa sayfalarındaki konum bağlantıları ile bölge rehberlerini birlikte kullanmak, konaklama ve çevre gezilerini aynı plan içinde değerlendirmeyi kolaylaştırır.",
       },
     ],
     relatedPlaceIds: ["kalkan"],
     faq: [
       { question: "Kalkan'ın tarihi geçmişi nedir?", answer: "Kalkan, eski bir Rum balıkçı köyünden gelişerek bugünkü şık sahil kasabası halini almıştır." },
+      { question: "Patara'da konaklarken Kalkan gezisi planlanabilir mi?", answer: "Evet. Villa Safira ve Villa Destan Patara/Gelemiş bölgesindedir; Kalkan'ı çevre gezisi olarak planlayabilir, güncel yol ve süre bilgisini harita uygulamasından kontrol edebilirsiniz." },
     ],
   },
 };
