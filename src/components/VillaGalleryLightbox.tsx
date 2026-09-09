@@ -7,6 +7,15 @@ import styles from "./VillaGalleryLightbox.module.css";
 
 const SWIPE_THRESHOLD = 40;
 
+const REGION_GUIDE_LINKS = [
+  { href: "/patara-villa", label: "Patara kiralık villa rehberi" },
+  { href: "/rehber/patara", label: "Patara gezi rehberi" },
+  { href: "/rehber/patara-plaji", label: "Patara Plajı rehberi" },
+  { href: "/rehber/patara-antik-kenti", label: "Patara Antik Kenti rehberi" },
+  { href: "/rehber/kas", label: "Kaş gezi rehberi" },
+  { href: "/rehber/kalkan", label: "Kalkan gezi rehberi" },
+] as const;
+
 export default function VillaGalleryLightbox({
   images,
   villaName,
@@ -159,6 +168,28 @@ export default function VillaGalleryLightbox({
             </picture>
           </button>
         ))}
+      </div>
+
+      <div style={{ marginTop: 36 }}>
+        <p className={styles.countLabel}>BÖLGE REHBERİ</p>
+        <h2 style={{ margin: "0 0 10px", fontSize: "clamp(22px, 3vw, 34px)", fontWeight: 600, color: "#2f2a22" }}>
+          Patara ve Kaş çevresini keşfedin
+        </h2>
+        <p style={{ margin: "0 0 18px", maxWidth: 720, lineHeight: 1.7, color: "#665e52" }}>
+          {villaName} fotoğraflarını inceledikten sonra tatil planınızı bölgenin doğrulanmış gezi ve konaklama rehberleriyle tamamlayabilirsiniz.
+        </p>
+        <nav className={styles.filterBar} aria-label={`${villaName} bölge rehberi bağlantıları`}>
+          {REGION_GUIDE_LINKS.map((item) => (
+            <a
+              key={item.href}
+              className={styles.filterChip}
+              href={item.href}
+              style={{ display: "inline-flex", alignItems: "center", textDecoration: "none" }}
+            >
+              {item.label} →
+            </a>
+          ))}
+        </nav>
       </div>
 
       {current && (
