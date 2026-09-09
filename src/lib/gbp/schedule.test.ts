@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { draftToInput, pickNextCategory, resolveGbpMediaUrl } from "./schedule";
+import { draftToInput, gbpLandingPath, pickNextCategory, resolveGbpMediaUrl } from "./schedule";
 import { gbpContentLibrary } from "../google-business-content";
 
 describe("pickNextCategory - hiç paylaşılmamış önce, sonra en eski paylaşılan", () => {
@@ -21,7 +21,6 @@ describe("pickNextCategory - hiç paylaşılmamış önce, sonra en eski paylaş
     const categories = Array.from(new Set(gbpContentLibrary.filter((d) => d.villa === "Safira").map((d) => d.category)));
     expect(categories.length).toBe(12);
     const allPosted = new Map(categories.map((c, i) => [c, `2026-09-${String(i + 1).padStart(2, "0")}T00:00:00.000Z`]));
-    // En eski (ilk index, en küçük tarih) tekrar seçilmeli
     expect(pickNextCategory(categories, allPosted)).toBe(categories[0]);
   });
 });
@@ -50,14 +49,43 @@ describe("resolveGbpMediaUrl - yalnız gerçek, kimliksiz erişilebilir görsel 
   });
 });
 
+describe("gbpLandingPath - içerik niyetine göre doğru site sayfası", () => {
+  it("bölge kategorileri ilgili rehber sayfasına gider", () => {
+    const patara = gbpContentLibrary.find((d) => d.villa === "Safira" && d.category === "patara")!;
+    const plaj = gbpContentLibrary.find((d) => d.villa === "Destan" && d.category === "patara-plaji")!;
+    const kalkan = gbpContentLibrary.find((d) => d.villa === "Safira" && d.category === "kalkan")!;
+    expect(gbpLandingPath("Safira", patara)).toBe("/rehber/patara");
+    expect(gbpLandingPath("Destan", plaj)).toBe("/rehber/patara-plaji");
+    expect(gbpLandingPath("Safira", kalkan)).toBe("/rehber/kalkan");
+  });
+
+  it("villa odaklı kategoriler kendi villa sayfasında kalır", () => {
+    const safira = gbpContentLibrary.find((d) => d.villa === "Safira" && d.category === "villa-tanitim")!;
+    const destan = gbpContentLibrary.find((d) => d.villa === "Destan" && d.category === "sezon-evergreen")!;
+    expect(gbpLandingPath("Safira", safira)).toBe("/villa-safira");
+    expect(gbpLandingPath("Destan", destan)).toBe("/villa-destan");
+  });
+});
+
 describe("draftToInput - website CTA'sı olan ve olmayan taslaklar doğru dönüşür", () => {
-  it("cta:website olan taslak için LEARN_MORE + UTM'li url üretir", () => {
+  it("cta:website olan villa tanıtımı için LEARN_MORE + UTM'li villa url üretir", () => {
     const draft = gbpContentLibrary.find((d) => d.villa === "Safira" && d.category === "villa-tanitim")!;
     const input = draftToInput("Safira", draft, "https://example.com/x.jpg");
     expect(input.ctaActionType).toBe("LEARN_MORE");
     expect(input.ctaUrl).toContain("utm_medium=organic_gbp");
+    expect(new URL(input.ctaUrl!).pathname).toBe("/villa-safira");
     expect(input.summary).toBe(draft.body);
     expect(input.mediaSourceUrl).toBe("https://example.com/x.jpg");
+  });
+
+  it("destination website CTA'sı ilgili rehbere yönlenir ve ölçüm parametrelerini korur", () => {
+    const draft = gbpContentLibrary.find((d) => d.villa === "Safira" && d.category === "patara")!;
+    const input = draftToInput("Safira", draft, "https://example.com/x.jpg");
+    const url = new URL(input.ctaUrl!);
+    expect(url.pathname).toBe("/rehber/patara");
+    expect(url.searchParams.get("utm_source")).toBe("google");
+    expect(url.searchParams.get("utm_medium")).toBe("organic_gbp");
+    expect(url.searchParams.get("utm_campaign")).toBe("auto_patara");
   });
 
   it("cta:null olan taslak için ctaActionType/ctaUrl tanımsız kalır", () => {
