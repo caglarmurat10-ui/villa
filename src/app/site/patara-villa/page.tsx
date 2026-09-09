@@ -67,6 +67,33 @@ export default function PataraVillaHubPage() {
         </p>
       </section>
 
+      <section className={styles.highlights}>
+        <span className={styles.kicker}>PATARA &amp; KAŞ REHBERİ</span>
+        <h2>Tatil planınızı bölge rehberleriyle tamamlayın.</h2>
+        <div className={styles.highlightGrid}>
+          <Link href="/rehber/patara" className={styles.highlightCard}>
+            <h3>Patara gezi rehberi</h3>
+            <p>Patara&apos;yı tarih, sahil ve çevre deneyimiyle birlikte keşfedin.</p>
+          </Link>
+          <Link href="/rehber/patara-plaji" className={styles.highlightCard}>
+            <h3>Patara Plajı rehberi</h3>
+            <p>Patara Plajı için hazırlanan doğrulanmış bölge içeriğini inceleyin.</p>
+          </Link>
+          <Link href="/rehber/patara-antik-kenti" className={styles.highlightCard}>
+            <h3>Patara Antik Kenti rehberi</h3>
+            <p>Patara&apos;nın tarihî odağını ayrı rehber sayfasında keşfedin.</p>
+          </Link>
+          <Link href="/rehber/kas" className={styles.highlightCard}>
+            <h3>Kaş gezi rehberi</h3>
+            <p>Kaş çevresini planınıza eklemek için bölge rehberine göz atın.</p>
+          </Link>
+          <Link href="/rehber/kalkan" className={styles.highlightCard}>
+            <h3>Kalkan gezi rehberi</h3>
+            <p>Kalkan&apos;ı keşfetmek için hazırlanan rehber içeriğini inceleyin.</p>
+          </Link>
+        </div>
+      </section>
+
       <section className={styles.faq} id="sss">
         <span className={styles.kicker}>SIK SORULAN SORULAR</span>
         <h2>Patara kiralık villa hakkında merak edilenler</h2>
