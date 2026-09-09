@@ -1,18 +1,21 @@
 import OtaIntegrationsPanel from "@/components/OtaIntegrationsPanel";
 import IntegrationCenterPanel from "@/components/IntegrationCenterPanel";
 import GbpLocationPicker from "@/components/GbpLocationPicker";
+import WhatsappEmbeddedSignupPanel from "@/components/WhatsappEmbeddedSignupPanel";
 import { listOtaConnectionsStatus } from "@/lib/ota/status";
 import { checkHubReadiness, isHubActivated } from "@/lib/ota/hub";
 import { getIntegrationCenterSnapshot } from "@/lib/integration-center";
+import { getWhatsappEmbeddedSignupConfig } from "@/lib/whatsapp/embedded-signup-config";
 
 export const dynamic = "force-dynamic";
 
 export default async function EntegrasyonlarPage() {
-  const [connections, hubActivated, hubReadiness, integrationSnapshot] = await Promise.all([
+  const [connections, hubActivated, hubReadiness, integrationSnapshot, whatsappEmbeddedSignupConfig] = await Promise.all([
     listOtaConnectionsStatus(),
     isHubActivated(),
     checkHubReadiness(),
     getIntegrationCenterSnapshot(),
+    getWhatsappEmbeddedSignupConfig(),
   ]);
 
   return (
@@ -35,6 +38,7 @@ export default async function EntegrasyonlarPage() {
           <GbpLocationPicker />
         </div>
       </section>
+      <WhatsappEmbeddedSignupPanel config={whatsappEmbeddedSignupConfig} />
       <OtaIntegrationsPanel
         initialConnections={connections}
         initialHubActivated={hubActivated}

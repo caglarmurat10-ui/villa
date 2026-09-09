@@ -44,6 +44,10 @@ declare global {
     WHATSAPP_BUSINESS_ACCOUNT_ID?: string;
     WHATSAPP_CHECKOUT_TEMPLATE_NAME?: string;
     WHATSAPP_WEBHOOK_VERIFY_TOKEN?: string;
+    // Coexistence Embedded Signup için Meta panelinde AYRICA oluşturulan Facebook Login for
+    // Business config'i - secret DEĞİL (Meta'nın kendi örnekleri client-side JS'e gömer), ama
+    // gerçek bir config oluşturulana kadar tanımsız kalır (fail-closed).
+    WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID?: string;
   }
 }
 
