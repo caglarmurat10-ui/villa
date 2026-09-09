@@ -20,6 +20,7 @@ import type { Villa } from "../types";
 // /api/admin/google/gbp/publish-post hâlâ elle tek-seferlik deneme için ayrıca kullanılabilir.
 
 const LOCAL_POSTS_BASE = "https://mybusiness.googleapis.com/v4";
+const OWNED_SITE_ORIGIN = "https://safiradestan.com";
 
 export type GbpPostTopicType = "STANDARD" | "EVENT" | "OFFER";
 export type GbpCtaActionType = "BOOK" | "LEARN_MORE";
@@ -68,10 +69,21 @@ export function buildGbpLocalPostPayload(input: GbpLocalPostInput): Record<strin
 }
 
 // Section 11 - CTA doğru villa landing page'ine gitmeli + UTM (source=google, medium=organic_gbp).
-// PII YOK - yalnız sabit, herkese açık sayfa URL'i + kampanya etiketi.
-export function buildGbpCtaUrl(villa: Villa, campaign: string): string {
-  const base = `https://${GBP_WEBSITE_LINKS[villa]}`;
-  const url = new URL(base);
+// Destination/rehber gönderileri için schedule.ts aynı alan adı altında doğrulanmış bir rehber
+// pathname'i verebilir. Yalnız site-içi absolute-path kabul edilir; dış domain/protokol enjekte
+// edilemez. PII YOK - yalnız herkese açık sayfa URL'i + kampanya etiketi.
+export function buildGbpCtaUrl(villa: Villa, campaign: string, landingPath?: string): string {
+  const url = new URL(`https://${GBP_WEBSITE_LINKS[villa]}`);
+  if (landingPath) {
+    if (!landingPath.startsWith("/") || landingPath.startsWith("//") || landingPath.includes(":") || landingPath.includes("?")) {
+      throw new Error("GBP CTA landingPath yalnız safiradestan.com içindeki güvenli bir absolute-path olabilir.");
+    }
+    url.pathname = landingPath;
+    url.search = "";
+  }
+  if (url.origin !== OWNED_SITE_ORIGIN) {
+    throw new Error("GBP CTA yalnız safiradestan.com alan adına yönlendirilebilir.");
+  }
   url.searchParams.set("utm_source", "google");
   url.searchParams.set("utm_medium", "organic_gbp");
   url.searchParams.set("utm_campaign", campaign);
