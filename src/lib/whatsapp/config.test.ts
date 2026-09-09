@@ -55,14 +55,20 @@ describe("getWhatsappWebhookSecrets", () => {
     vi.resetModules();
   });
 
-  it("META_APP_SECRET + WHATSAPP_WEBHOOK_VERIFY_TOKEN ikisi de varsa döner", async () => {
-    envOverride = { META_APP_SECRET: "app-secret", WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-token" };
+  it("FACEBOOK_APP_SECRET + WHATSAPP_WEBHOOK_VERIFY_TOKEN ikisi de varsa döner (WhatsApp'ı barındıran gerçek uygulama - bkz. audit notu)", async () => {
+    envOverride = { FACEBOOK_APP_SECRET: "app-secret", WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-token" };
     const { getWhatsappWebhookSecrets } = await import("./config");
     expect(await getWhatsappWebhookSecrets()).toEqual({ appSecret: "app-secret", verifyToken: "verify-token" });
   });
 
   it("yalnız biri tanımlıysa null döner", async () => {
-    envOverride = { META_APP_SECRET: "app-secret" };
+    envOverride = { FACEBOOK_APP_SECRET: "app-secret" };
+    const { getWhatsappWebhookSecrets } = await import("./config");
+    expect(await getWhatsappWebhookSecrets()).toBeNull();
+  });
+
+  it("META_APP_SECRET (ayrı Instagram uygulamasının secret'ı) tek başına YETERLİ DEĞİLDİR - yanlış uygulamanın secret'ı WhatsApp imzasını doğrulayamaz", async () => {
+    envOverride = { META_APP_SECRET: "wrong-app-secret", WHATSAPP_WEBHOOK_VERIFY_TOKEN: "verify-token" };
     const { getWhatsappWebhookSecrets } = await import("./config");
     expect(await getWhatsappWebhookSecrets()).toBeNull();
   });

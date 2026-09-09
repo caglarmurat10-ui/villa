@@ -24,7 +24,7 @@ vi.mock("@/lib/whatsapp/store", () => ({
 
 function statusPayload(status: string, id = "wamid.TEST") {
   return JSON.stringify({
-    entry: [{ changes: [{ value: { statuses: [{ id, status, timestamp: "1700000000" }] } }] }],
+    entry: [{ changes: [{ field: "messages", value: { statuses: [{ id, status, timestamp: "1700000000" }] } }] }],
   });
 }
 
@@ -35,6 +35,8 @@ function webhookRequest(body: string, headers: Record<string, string> = {}) {
     body,
   });
 }
+
+const SIGNED = { "x-hub-signature-256": "sha256=validsig" };
 
 describe("GET /api/webhooks/whatsapp (Meta doğrulama handshake)", () => {
   afterEach(() => {
@@ -63,7 +65,7 @@ describe("GET /api/webhooks/whatsapp (Meta doğrulama handshake)", () => {
   });
 });
 
-describe("POST /api/webhooks/whatsapp (durum bildirimleri)", () => {
+describe("POST /api/webhooks/whatsapp (durum bildirimleri + Coexistence olayları)", () => {
   afterEach(() => {
     webhookSecrets = { appSecret: "app-secret", verifyToken: "verify-token" };
     signatureValid = true;
@@ -91,29 +93,131 @@ describe("POST /api/webhooks/whatsapp (durum bildirimleri)", () => {
 
   it("geçerli imza + delivered durumu markCheckoutReminderDeliveredByProviderMessageId çağırır", async () => {
     const { POST } = await import("./route");
-    const response = await POST(webhookRequest(statusPayload("delivered", "wamid.D1"), { "x-hub-signature-256": "sha256=validsig" }));
+    const response = await POST(webhookRequest(statusPayload("delivered", "wamid.D1"), SIGNED));
     expect(response.status).toBe(200);
     expect(delivered).toEqual(["wamid.D1"]);
   });
 
   it("read durumu markCheckoutReminderReadByProviderMessageId çağırır", async () => {
     const { POST } = await import("./route");
-    await POST(webhookRequest(statusPayload("read", "wamid.R1"), { "x-hub-signature-256": "sha256=validsig" }));
+    await POST(webhookRequest(statusPayload("read", "wamid.R1"), SIGNED));
     expect(read).toEqual(["wamid.R1"]);
   });
 
   it("failed durumu markCheckoutReminderFailedByProviderMessageId çağırır", async () => {
     const { POST } = await import("./route");
-    await POST(webhookRequest(statusPayload("failed", "wamid.F1"), { "x-hub-signature-256": "sha256=validsig" }));
+    await POST(webhookRequest(statusPayload("failed", "wamid.F1"), SIGNED));
     expect(failed).toEqual(["wamid.F1"]);
+  });
+
+  it("aynı delivered webhook'u İKİ KEZ gönderilse (Meta'nın kendi retry'ı) idempotenttir - ikinci çağrı da güvenle işlenir, hata vermez", async () => {
+    const { POST } = await import("./route");
+    const payload = statusPayload("delivered", "wamid.DUP1");
+    const first = await POST(webhookRequest(payload, SIGNED));
+    const second = await POST(webhookRequest(payload, SIGNED));
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    // store.ts'teki markCheckoutReminderDeliveredByProviderMessageId zaten WHERE status='SENT' korumalı
+    // (bkz. store.test.ts) - burada webhook route'unun aynı payload'ı güvenle iki kez işleyebildiğini,
+    // hata fırlatmadığını doğruluyoruz.
+    expect(delivered).toEqual(["wamid.DUP1", "wamid.DUP1"]);
   });
 
   it("boş/ilgisiz payload için 200 döner ama hiçbir mark fonksiyonu çağrılmaz", async () => {
     const { POST } = await import("./route");
-    const response = await POST(webhookRequest(JSON.stringify({ entry: [] }), { "x-hub-signature-256": "sha256=validsig" }));
+    const response = await POST(webhookRequest(JSON.stringify({ entry: [] }), SIGNED));
     expect(response.status).toBe(200);
     expect(delivered).toHaveLength(0);
     expect(read).toHaveLength(0);
     expect(failed).toHaveLength(0);
+  });
+
+  it("'messages' field'ındaki gelen müşteri mesajları (value.messages) SAYILIR ama İÇERİĞİ hiçbir yere yazılmaz", async () => {
+    const { POST } = await import("./route");
+    const payload = JSON.stringify({
+      entry: [{ changes: [{ field: "messages", value: { messages: [
+        { from: "905551112233", id: "wamid.IN1", timestamp: "1700000000", type: "text", text: { body: "Merhaba, sorum var" } },
+      ] } }] }],
+    });
+    const response = await POST(webhookRequest(payload, SIGNED));
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.inboundMessagesIgnored).toBe(1);
+    // Bu test dosyasındaki mock store'da mesaj içeriğini kaydeden HİÇBİR fonksiyon yok - route'un
+    // yalnız store.ts'te export edilen mark* fonksiyonlarını çağırdığı (ve onların da yalnız
+    // id/timestamp/reason parametreleri aldığı, tam mesaj metnini asla almadığı) kod incelemesiyle
+    // doğrulanır.
+    expect(delivered).toHaveLength(0);
+  });
+
+  it("Coexistence 'history' olayı 200 ile ACK edilir, hiçbir mark fonksiyonu çağrılmaz, çökme olmaz", async () => {
+    const { POST } = await import("./route");
+    const payload = JSON.stringify({
+      entry: [{ changes: [{ field: "history", value: {
+        phases: [{ phase: 0, chunk_order: 1, progress: 100 }],
+        threads: [{ id: "905551112233", messages: [{ id: "wamid.HIST1", text: { body: "geçmiş mesaj" } }] }],
+      } }] }],
+    });
+    const response = await POST(webhookRequest(payload, SIGNED));
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.historyEventsIgnored).toBe(1);
+    expect(delivered).toHaveLength(0);
+    expect(read).toHaveLength(0);
+    expect(failed).toHaveLength(0);
+  });
+
+  it("Coexistence 'smb_app_state_sync' olayı 200 ile ACK edilir, kişi bilgisi hiçbir yere yazılmaz", async () => {
+    const { POST } = await import("./route");
+    const payload = JSON.stringify({
+      entry: [{ changes: [{ field: "smb_app_state_sync", value: {
+        state_sync: [{ type: "contact", contact: { full_name: "Test Misafir", phone_number: "905551112233" }, action: "add" }],
+      } }] }],
+    });
+    const response = await POST(webhookRequest(payload, SIGNED));
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.contactSyncEventsIgnored).toBe(1);
+  });
+
+  it("Coexistence 'smb_message_echoes' olayı 200 ile ACK edilir, yansıyan mesaj içeriği hiçbir yere yazılmaz", async () => {
+    const { POST } = await import("./route");
+    const payload = JSON.stringify({
+      entry: [{ changes: [{ field: "smb_message_echoes", value: {
+        message_echoes: [{ from: "905412424455", to: "905551112233", id: "wamid.ECHO1", text: { body: "WhatsApp uygulamasından yanıt" } }],
+      } }] }],
+    });
+    const response = await POST(webhookRequest(payload, SIGNED));
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.messageEchoesIgnored).toBe(1);
+  });
+
+  it("bilinmeyen/gelecekteki bir field ADI için ÇÖKMEZ, 200 ile ACK eder", async () => {
+    const { POST } = await import("./route");
+    const payload = JSON.stringify({
+      entry: [{ changes: [{ field: "future_unknown_field_xyz", value: { anything: "goes here" } }] }],
+    });
+    const response = await POST(webhookRequest(payload, SIGNED));
+    expect(response.status).toBe(200);
+    const data = await response.json();
+    expect(data.unknownFieldsIgnored).toBe(1);
+  });
+
+  it("aynı payload'da hem 'messages' (durum) hem 'history' hem bilinmeyen bir field birlikte gelirse hepsi ayrı ayrı doğru sayılır", async () => {
+    const { POST } = await import("./route");
+    const payload = JSON.stringify({
+      entry: [{ changes: [
+        { field: "messages", value: { statuses: [{ id: "wamid.MIX1", status: "delivered", timestamp: "1700000000" }] } },
+        { field: "history", value: { threads: [] } },
+        { field: "smb_weird_future_field", value: {} },
+      ] }],
+    });
+    const response = await POST(webhookRequest(payload, SIGNED));
+    const data = await response.json();
+    expect(response.status).toBe(200);
+    expect(delivered).toEqual(["wamid.MIX1"]);
+    expect(data.historyEventsIgnored).toBe(1);
+    expect(data.unknownFieldsIgnored).toBe(1);
   });
 });
