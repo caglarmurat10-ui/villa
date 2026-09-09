@@ -27,6 +27,11 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Run Claude API engineer
         uses: anthropics/claude-code-action@v1
         with:
@@ -37,13 +42,18 @@ jobs:
           claude_args: |
             --max-turns 20
             --append-system-prompt "Read and follow CLAUDE.md before making changes. Work conservatively. Never deploy production, add paid services, create ads, add payment methods, expose secrets, or weaken the Destan Instagram hard block unless the repository owner explicitly asks in the triggering task. Run the relevant tests and builds before claiming success."
-            --allowedTools "Bash(npm ci),Bash(npm test),Bash(npm run lint),Bash(npm run build),Bash(npx opennextjs-cloudflare build),Bash(git status:*),Bash(git diff:*),Bash(git log:*)"
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(npm ci),Bash(npm test),Bash(npm run lint),Bash(npm run build),Bash(npx opennextjs-cloudflare build),Bash(git status:*),Bash(git diff:*),Bash(git log:*)"
 
   manual:
     if: github.event_name == 'workflow_dispatch' && github.actor == 'caglarmurat10-ui'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - name: Run requested Claude API task
         uses: anthropics/claude-code-action@v1
         with:
@@ -55,4 +65,4 @@ jobs:
           claude_args: |
             --max-turns 20
             --append-system-prompt "Read and follow CLAUDE.md before making changes. Work conservatively. Never deploy production, add paid services, create ads, add payment methods, expose secrets, or weaken the Destan Instagram hard block unless the repository owner explicitly asks in this task. Run the relevant tests and builds before claiming success."
-            --allowedTools "Bash(npm ci),Bash(npm test),Bash(npm run lint),Bash(npm run build),Bash(npx opennextjs-cloudflare build),Bash(git status:*),Bash(git diff:*),Bash(git log:*)"
+            --allowedTools "Read,Edit,Write,Glob,Grep,Bash(npm ci),Bash(npm test),Bash(npm run lint),Bash(npm run build),Bash(npx opennextjs-cloudflare build),Bash(git status:*),Bash(git diff:*),Bash(git log:*)"
