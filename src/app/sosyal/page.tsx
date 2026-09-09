@@ -16,8 +16,19 @@ import { getGoogleVisibilitySnapshot } from "@/lib/google-visibility";
 import GoogleVisibilityPanel from "@/components/GoogleVisibilityPanel";
 import LocalEventsPanel from "@/components/LocalEventsPanel";
 import PlanRefreshButton from "@/components/PlanRefreshButton";
-import ConversionEventsPanel from "@/components/ConversionEventsPanel";
-import { getConversionEventSummary, getConversionEventTotals } from "@/lib/conversion-events";
+import ConversionEventsPanel, { type ConversionWindowData } from "@/components/ConversionEventsPanel";
+import {
+  getConversionEventSummary,
+  getConversionEventTotals,
+  getConversionEventsByProperty,
+  getConversionRate,
+  getTopLandingPages,
+} from "@/lib/conversion-events";
+import ContentPackagesPanel from "@/components/ContentPackagesPanel";
+import { listPlatformPackages } from "@/lib/platform-content-packages";
+import { socialDriveMedia } from "@/lib/social-drive-media";
+import MapPresencePanel from "@/components/MapPresencePanel";
+import { listMapPresence } from "@/lib/map-presence";
 import type { Villa } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +39,18 @@ function istanbulToday() {
 
 function conversionEventsSinceIso(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+}
+
+async function buildConversionWindow(days: number, windowLabel: string): Promise<ConversionWindowData> {
+  const since = conversionEventsSinceIso(days);
+  const [totals, bySource, byProperty, topLandingPages, conversionRate] = await Promise.all([
+    getConversionEventTotals(since),
+    getConversionEventSummary(since),
+    getConversionEventsByProperty(since),
+    getTopLandingPages(since),
+    getConversionRate(since),
+  ]);
+  return { windowLabel, totals, bySource, byProperty, topLandingPages, conversionRate };
 }
 
 function firstParam(value: string | string[] | undefined) {
@@ -68,8 +91,7 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
   const googleScope = firstParam(params.scope);
 
   const today = istanbulToday();
-  const conversionSince28d = conversionEventsSinceIso(28);
-  const [posts, initialAccounts, reservations, contentLibrarySummary, googleSnapshot, stats7, stats30, cronHeartbeat, conversionTotals, conversionBySource] = await Promise.all([
+  const [posts, initialAccounts, reservations, contentLibrarySummary, googleSnapshot, stats7, stats30, cronHeartbeat, conversionWindow7d, conversionWindow28d, contentPackages, mapPresenceEntries] = await Promise.all([
     listSocialPosts(30),
     listMetaAccounts(),
     listReservations(),
@@ -78,9 +100,15 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
     getPublishStats(7, today),
     getPublishStats(30, today),
     getSocialCronHeartbeat(),
-    getConversionEventTotals(conversionSince28d),
-    getConversionEventSummary(conversionSince28d),
+    buildConversionWindow(7, "son 7 gün"),
+    buildConversionWindow(28, "son 28 gün"),
+    listPlatformPackages(),
+    listMapPresence(),
   ]);
+  const mediaByVilla: Record<Villa, { fileId: string; fileName: string }[]> = {
+    Safira: socialDriveMedia.filter((m) => m.villa === "Safira" && m.sourceOrigin === "REAL_UPLOAD").map((m) => ({ fileId: m.fileId, fileName: m.fileName })),
+    Destan: socialDriveMedia.filter((m) => m.villa === "Destan" && m.sourceOrigin === "REAL_UPLOAD").map((m) => ({ fileId: m.fileId, fileName: m.fileName })),
+  };
   const { env } = await getCloudflareContext({ async: true });
   const autoPublishEnabled = String(env.SOCIAL_AUTO_PUBLISH_ENABLED ?? "true").toLowerCase() === "true";
 
@@ -170,6 +198,8 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
     <PlanRefreshButton />
     <LocalEventsPanel />
     <GoogleVisibilityPanel snapshot={googleSnapshot} stats7={stats7} stats30={stats30} reservations={reservations} todayIso={today} />
-    <ConversionEventsPanel totals={conversionTotals} bySource={conversionBySource} windowLabel="son 28 gün" />
+    <ConversionEventsPanel windows={[conversionWindow7d, conversionWindow28d]} />
+    <ContentPackagesPanel initialPackages={contentPackages} mediaByVilla={mediaByVilla} />
+    <MapPresencePanel initialEntries={mapPresenceEntries} />
   </>;
 }

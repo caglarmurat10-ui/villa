@@ -125,3 +125,50 @@ export async function getConversionEventTotals(sinceIso: string): Promise<Record
   }
   return totals;
 }
+
+export type PropertyTrafficRow = { villa: Villa; eventName: ConversionEventName; count: number };
+
+// "traffic by property" (bölüm 8) - villa NULL olan satırlar (villa'ya özgü olmayan sayfa
+// görüntülemeleri, ör. anasayfa) burada bilerek DIŞLANIR, yalnız gerçekten bir villaya atfedilen
+// event'ler sayılır - "hangi villa daha çok ilgi görüyor" sorusuna uydurma olmayan bir cevap.
+export async function getConversionEventsByProperty(sinceIso: string): Promise<PropertyTrafficRow[]> {
+  const db = await database();
+  await ensureTable(db);
+  const result = await db.prepare(
+    `SELECT villa, event_name, COUNT(*) as count FROM conversion_events
+     WHERE created_at >= ? AND villa IS NOT NULL
+     GROUP BY villa, event_name ORDER BY count DESC`,
+  ).bind(sinceIso).all<{ villa: Villa; event_name: ConversionEventName; count: number }>();
+  return (result.results ?? []).map((row) => ({ villa: row.villa, eventName: row.event_name, count: Number(row.count) }));
+}
+
+export type LandingPageRow = { landingPath: string; count: number };
+
+// "best landing pages" - yalnız page_view event'lerinden, gerçekten kaydedilmiş landing_path
+// değerlerinden hesaplanır (bkz. AttributionCapture.tsx - her public sayfa yüklemesinde bir kez).
+export async function getTopLandingPages(sinceIso: string, limit = 10): Promise<LandingPageRow[]> {
+  const db = await database();
+  await ensureTable(db);
+  const result = await db.prepare(
+    `SELECT landing_path, COUNT(*) as count FROM conversion_events
+     WHERE created_at >= ? AND event_name = 'page_view' AND landing_path IS NOT NULL
+     GROUP BY landing_path ORDER BY count DESC LIMIT ?`,
+  ).bind(sinceIso, limit).all<{ landing_path: string; count: number }>();
+  return (result.results ?? []).map((row) => ({ landingPath: row.landing_path, count: Number(row.count) }));
+}
+
+export interface ConversionRateSummary {
+  pageViews: number;
+  conversions: number; // whatsapp_click + booking_click + contact_submit toplamı - "gerçek niyet" sinyalleri
+  ratePercent: number; // pageViews=0 ise 0 döner, bölme hatası/NaN asla dışa sızmaz
+}
+
+// "conversion rate" (bölüm 8) - yalnız gerçekten kaydedilmiş event sayımlarından hesaplanır,
+// hiçbir sektör ortalaması/varsayım kullanılmaz.
+export async function getConversionRate(sinceIso: string): Promise<ConversionRateSummary> {
+  const totals = await getConversionEventTotals(sinceIso);
+  const conversions = totals.whatsapp_click + totals.booking_click + totals.contact_submit;
+  const pageViews = totals.page_view;
+  const ratePercent = pageViews > 0 ? Math.round((conversions / pageViews) * 1000) / 10 : 0;
+  return { pageViews, conversions, ratePercent };
+}
