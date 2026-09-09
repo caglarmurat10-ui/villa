@@ -2,24 +2,23 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
 import type { Villa } from "./types";
 
-// Harita görünürlüğü takip/iş akışı (bölüm 10/11) - yalnız DURUM izleme. Hiçbir dış API'ye otomatik
-// başvuru/kayıt YAPILMAZ - Google/Apple/Yandex/HERE/TomTom/OSM/Garmin'e gerçek başvuru işletme
-// sahibinin kendisi tarafından, tarayıcı/giriş gerektiren resmi kanallardan yapılır. Bu modül yalnız
-// o sürecin durumunu ve başvuru için gereken doğrulanmış (villa-content.ts kaynaklı) veriyi tutar.
-export const MAP_PLATFORMS = ["GOOGLE", "APPLE", "YANDEX", "HERE", "TOMTOM", "OPENSTREETMAP", "GARMIN"] as const;
-export type MapPlatform = (typeof MAP_PLATFORMS)[number];
-
-export const MAP_PRESENCE_STATUSES = [
-  "NOT_CHECKED",
-  "EXISTS_CORRECT",
-  "NEEDS_CORRECTION",
-  "CLAIM_STARTED",
-  "ADDITION_SUBMITTED",
-  "AWAITING_VERIFICATION",
-  "VERIFIED",
-  "BLOCKED",
-] as const;
-export type MapPresenceStatus = (typeof MAP_PRESENCE_STATUSES)[number];
+// Harita görünürlüğü takip/iş akışı (bölüm 10/11, round 4'te operasyon merkezine genişletildi) -
+// yalnız DURUM izleme + D1 kalıcılığı. Sabitler (MAP_PLATFORMS, MAP_PRESENCE_STATUSES) ve saf
+// başvuru paketi mantığı (buildSubmissionPacket, MAP_PLATFORM_INFO) ./map-presence-content.ts'e
+// taşındı - bu dosya D1/getCloudflareContext içerdiği için yalnız SUNUCU tarafında kullanılmalı,
+// istemci bileşenleri (MapPresencePanel gibi) doğrudan map-presence-content'i import etmeli.
+export {
+  MAP_PLATFORMS,
+  MAP_PRESENCE_STATUSES,
+  MAP_PLATFORM_INFO,
+  buildSubmissionPacket,
+  type MapPlatform,
+  type MapPresenceStatus,
+  type MapPlatformInfo,
+  type SubmissionPacket,
+} from "./map-presence-content";
+import type { MapPlatform, MapPresenceStatus } from "./map-presence-content";
+import { MAP_PLATFORMS as PLATFORMS } from "./map-presence-content";
 
 export interface MapPresenceEntry {
   villa: Villa;
@@ -78,7 +77,7 @@ export async function listMapPresence(): Promise<MapPresenceEntry[]> {
   const existing = new Map((result.results ?? []).map((row) => [`${row.villa}:${row.platform}`, mapRow(row)]));
   const complete: MapPresenceEntry[] = [];
   for (const villa of VILLAS) {
-    for (const platform of MAP_PLATFORMS) {
+    for (const platform of PLATFORMS) {
       const key = `${villa}:${platform}`;
       complete.push(existing.get(key) ?? { villa, platform, status: "NOT_CHECKED", note: "", updatedAt: "" });
     }
