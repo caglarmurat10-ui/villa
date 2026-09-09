@@ -6,6 +6,7 @@ import {
   markCheckoutReminderFailed,
   markCheckoutReminderSent,
   markCheckoutReminderSkippedNotConfigured,
+  requeueSkippedNotConfiguredRemindersWhenReady,
 } from "@/lib/whatsapp/store";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,15 @@ const DISPATCH_BATCH_LIMIT = 25;
 // gerçek Meta Cloud API çağrısı -> SENT veya FAILED. Bir satırdaki hata diğerlerini durdurmaz.
 export async function POST() {
   const nowIso = new Date().toISOString();
+  const credentials = await getWhatsappCredentials();
+
+  // Yapılandırma GERÇEKTEN hazır olduğunda (credentials mevcut) - önce, daha önce
+  // SKIPPED_NOT_CONFIGURED işaretlenmiş ama hâlâ anlamlı/gelecekle ilgili hatırlatmaları güvenle
+  // SCHEDULED'a geri döndür. Bu sayede yapılandırma tamamlandıktan sonraki İLK cron turunda, aynı
+  // turda hemen dispatch edilebilirler (aşağıdaki listDueCheckoutReminders bunları da yakalar).
+  // Yapılandırma yokken bu fonksiyon HİÇ çağrılmaz - "yalnız READY olduğunda" koşulu burada sağlanır.
+  const requeued = credentials ? await requeueSkippedNotConfiguredRemindersWhenReady(nowIso) : 0;
+
   const due = await listDueCheckoutReminders(nowIso, DISPATCH_BATCH_LIMIT);
 
   let sent = 0;
@@ -38,7 +48,6 @@ export async function POST() {
       continue;
     }
 
-    const credentials = await getWhatsappCredentials();
     if (!credentials) {
       await markCheckoutReminderSkippedNotConfigured(message.id);
       skippedNotConfigured += 1;
@@ -58,6 +67,7 @@ export async function POST() {
 
   return Response.json({
     candidateCount: due.length,
+    requeued,
     sent,
     failed,
     skippedNotConfigured,

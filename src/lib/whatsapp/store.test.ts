@@ -344,3 +344,128 @@ describe("listLatestCheckoutRemindersForReservations", () => {
     expect(map.size).toBe(0);
   });
 });
+
+describe("requeueSkippedNotConfiguredRemindersWhenReady (WhatsApp activation safety fix)", () => {
+  beforeEach(() => { db = createFakeD1(""); });
+  afterEach(() => { db.close(); vi.resetModules(); });
+
+  async function seedSkippedMessage(reservationId: string, checkoutDate: string) {
+    const { syncCheckoutReminderForReservation, claimCheckoutReminderForSending, markCheckoutReminderSkippedNotConfigured, getLatestCheckoutReminderForReservation } = await import("./store");
+    await syncCheckoutReminderForReservation({ id: reservationId, checkOut: checkoutDate, phone: VALID_PHONE });
+    const message = await getLatestCheckoutReminderForReservation(reservationId);
+    await claimCheckoutReminderForSending(message!.id);
+    await markCheckoutReminderSkippedNotConfigured(message!.id);
+    return message!.id;
+  }
+
+  it("yapılandırma eksikken due bir hatırlatma SKIPPED_NOT_CONFIGURED olur (kalıcı olarak tüketilmiş SAYILMAZ)", async () => {
+    const { getLatestCheckoutReminderForReservation } = await import("./store");
+    await seedSkippedMessage("rc1", "2099-09-20");
+    const message = await getLatestCheckoutReminderForReservation("rc1");
+    expect(message?.status).toBe("SKIPPED_NOT_CONFIGURED");
+  });
+
+  it("yapılandırma sonradan HAZIR olduğunda: hâlâ gelecekle ilgili SKIPPED_NOT_CONFIGURED bir hatırlatma güvenle SCHEDULED'a döner", async () => {
+    await seedSkippedMessage("rc2", "2099-09-20");
+    const { requeueSkippedNotConfiguredRemindersWhenReady, getLatestCheckoutReminderForReservation } = await import("./store");
+
+    const changed = await requeueSkippedNotConfiguredRemindersWhenReady("2099-09-19T09:00:00.000Z");
+    expect(changed).toBe(1);
+
+    const message = await getLatestCheckoutReminderForReservation("rc2");
+    expect(message?.status).toBe("SCHEDULED");
+    expect(message?.scheduledAt).toBe("2099-09-19T09:00:00.000Z");
+  });
+
+  it("tekrarlanan reconciliation çağrıları idempotenttir - ikinci çağrı 0 satır etkiler, ikinci bir satır OLUŞTURMAZ", async () => {
+    await seedSkippedMessage("rc3", "2099-09-20");
+    const { requeueSkippedNotConfiguredRemindersWhenReady } = await import("./store");
+
+    const first = await requeueSkippedNotConfiguredRemindersWhenReady("2099-09-19T09:00:00.000Z");
+    const second = await requeueSkippedNotConfiguredRemindersWhenReady("2099-09-19T10:00:00.000Z");
+
+    expect(first).toBe(1);
+    expect(second).toBe(0);
+
+    const rows = await db.prepare("SELECT COUNT(*) as cnt FROM whatsapp_scheduled_messages WHERE reservation_id = 'rc3'").first<{ cnt: number }>();
+    expect(rows?.cnt).toBe(1);
+  });
+
+  it("SENT bir hatırlatma ASLA yeniden canlandırılmaz", async () => {
+    const { syncCheckoutReminderForReservation, claimCheckoutReminderForSending, markCheckoutReminderSent, requeueSkippedNotConfiguredRemindersWhenReady, getLatestCheckoutReminderForReservation } = await import("./store");
+    await syncCheckoutReminderForReservation({ id: "rc4", checkOut: "2099-09-20", phone: VALID_PHONE });
+    const message = await getLatestCheckoutReminderForReservation("rc4");
+    await claimCheckoutReminderForSending(message!.id);
+    await markCheckoutReminderSent(message!.id, "wamid.SENT4", "checkout_reminder_tr");
+
+    const changed = await requeueSkippedNotConfiguredRemindersWhenReady();
+    expect(changed).toBe(0);
+    expect((await getLatestCheckoutReminderForReservation("rc4"))?.status).toBe("SENT");
+  });
+
+  it("CANCELLED bir hatırlatma ASLA yeniden canlandırılmaz", async () => {
+    const { syncCheckoutReminderForReservation, cancelCheckoutReminderForReservation, requeueSkippedNotConfiguredRemindersWhenReady, getLatestCheckoutReminderForReservation } = await import("./store");
+    // CANCELLED durumuna yalnız SCHEDULED'dan ulaşılabildiği için önce SCHEDULED bir satır açıp iptal ediyoruz.
+    await syncCheckoutReminderForReservation({ id: "rc5", checkOut: "2099-09-20", phone: VALID_PHONE });
+    await cancelCheckoutReminderForReservation("rc5");
+    expect((await getLatestCheckoutReminderForReservation("rc5"))?.status).toBe("CANCELLED");
+
+    const changed = await requeueSkippedNotConfiguredRemindersWhenReady();
+    expect(changed).toBe(0);
+    expect((await getLatestCheckoutReminderForReservation("rc5"))?.status).toBe("CANCELLED");
+  });
+
+  it("süresi geçmiş (artık anlamlı olmayan) bir SKIPPED_NOT_CONFIGURED hatırlatma yeniden canlandırılmaz", async () => {
+    const { syncCheckoutReminderForReservation, claimCheckoutReminderForSending, markCheckoutReminderSkippedNotConfigured, requeueSkippedNotConfiguredRemindersWhenReady, getLatestCheckoutReminderForReservation } = await import("./store");
+    // syncCheckoutReminderForReservation geçmiş bir checkOut için satır AÇMAZ - bu yüzden önce
+    // gelecekte bir tarihle satırı açıp SKIPPED_NOT_CONFIGURED yapıyoruz, sonra reconciliation'ı
+    // o "gelecek" tarihin ÇOK sonrasına ait bir "şimdi" ile çağırarak süresinin geçtiğini simüle ediyoruz.
+    await syncCheckoutReminderForReservation({ id: "rc6", checkOut: "2099-09-20", phone: VALID_PHONE });
+    const message = await getLatestCheckoutReminderForReservation("rc6");
+    await claimCheckoutReminderForSending(message!.id);
+    await markCheckoutReminderSkippedNotConfigured(message!.id);
+
+    // "şimdi" checkout_date'den (2099-09-20) çok sonrası - minMeaningfulCheckoutDate eşiğinin dışında.
+    const changed = await requeueSkippedNotConfiguredRemindersWhenReady("2099-10-15T09:00:00.000Z");
+    expect(changed).toBe(0);
+    expect((await getLatestCheckoutReminderForReservation("rc6"))?.status).toBe("SKIPPED_NOT_CONFIGURED");
+  });
+
+  it("auto_enabled=0 (admin devre dışı bırakmış) bir SKIPPED_NOT_CONFIGURED hatırlatma yeniden canlandırılmaz", async () => {
+    const { syncCheckoutReminderForReservation, claimCheckoutReminderForSending, markCheckoutReminderSkippedNotConfigured, setCheckoutReminderAutoEnabled, requeueSkippedNotConfiguredRemindersWhenReady, getLatestCheckoutReminderForReservation } = await import("./store");
+    await syncCheckoutReminderForReservation({ id: "rc7", checkOut: "2099-09-20", phone: VALID_PHONE });
+    const message = await getLatestCheckoutReminderForReservation("rc7");
+    // Devre dışı bırakma SCHEDULED iken yapılır (UI akışıyla aynı), SONRA skipped'e geçilir.
+    await setCheckoutReminderAutoEnabled("rc7", false);
+    await claimCheckoutReminderForSending(message!.id);
+    await markCheckoutReminderSkippedNotConfigured(message!.id);
+
+    const changed = await requeueSkippedNotConfiguredRemindersWhenReady("2099-09-19T09:00:00.000Z");
+    expect(changed).toBe(0);
+    expect((await getLatestCheckoutReminderForReservation("rc7"))?.status).toBe("SKIPPED_NOT_CONFIGURED");
+  });
+
+  it("reconciliation sonrası çift gönderim İMKANSIZDIR: SCHEDULED'a dönen satır yalnız BİR kez claim edilebilir", async () => {
+    await seedSkippedMessage("rc8", "2099-09-20");
+    const { requeueSkippedNotConfiguredRemindersWhenReady, getLatestCheckoutReminderForReservation, claimCheckoutReminderForSending } = await import("./store");
+    await requeueSkippedNotConfiguredRemindersWhenReady("2099-09-19T09:00:00.000Z");
+    const message = await getLatestCheckoutReminderForReservation("rc8");
+
+    const firstClaim = await claimCheckoutReminderForSending(message!.id);
+    const secondClaim = await claimCheckoutReminderForSending(message!.id);
+
+    expect(firstClaim).toBe(true);
+    expect(secondClaim).toBe(false);
+  });
+
+  it("reconciliation aynı anda birden fazla uygun satırı (farklı rezervasyonlar) tek seferde SCHEDULED'a döndürür", async () => {
+    await seedSkippedMessage("rc9a", "2099-09-20");
+    await seedSkippedMessage("rc9b", "2099-09-25");
+    const { requeueSkippedNotConfiguredRemindersWhenReady, getLatestCheckoutReminderForReservation } = await import("./store");
+
+    const changed = await requeueSkippedNotConfiguredRemindersWhenReady("2099-09-19T09:00:00.000Z");
+    expect(changed).toBe(2);
+    expect((await getLatestCheckoutReminderForReservation("rc9a"))?.status).toBe("SCHEDULED");
+    expect((await getLatestCheckoutReminderForReservation("rc9b"))?.status).toBe("SCHEDULED");
+  });
+});

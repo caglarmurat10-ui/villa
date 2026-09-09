@@ -10,6 +10,8 @@ let sendResult: { ok: true; providerMessageId: string } | { ok: false; reason: s
 const markedSent: string[] = [];
 const markedFailed: string[] = [];
 const markedSkipped: string[] = [];
+let requeueCallCount = 0;
+let requeueResult = 0;
 
 vi.mock("@/lib/whatsapp/store", () => ({
   listDueCheckoutReminders: async () => dueMessages,
@@ -17,6 +19,7 @@ vi.mock("@/lib/whatsapp/store", () => ({
   markCheckoutReminderSent: async (id: string) => { markedSent.push(id); },
   markCheckoutReminderFailed: async (id: string) => { markedFailed.push(id); },
   markCheckoutReminderSkippedNotConfigured: async (id: string) => { markedSkipped.push(id); },
+  requeueSkippedNotConfiguredRemindersWhenReady: async () => { requeueCallCount += 1; return requeueResult; },
 }));
 
 vi.mock("@/lib/whatsapp/config", () => ({
@@ -36,6 +39,8 @@ describe("POST /api/admin/whatsapp/dispatch-due", () => {
     markedSent.length = 0;
     markedFailed.length = 0;
     markedSkipped.length = 0;
+    requeueCallCount = 0;
+    requeueResult = 0;
     vi.resetModules();
   });
 
@@ -93,5 +98,22 @@ describe("POST /api/admin/whatsapp/dispatch-due", () => {
     expect(markedSent).toHaveLength(0);
     expect(markedFailed).toHaveLength(0);
     expect(markedSkipped).toHaveLength(0);
+  });
+
+  it("yapılandırma yokken requeueSkippedNotConfiguredRemindersWhenReady HİÇ çağrılmaz", async () => {
+    credentials = null;
+    const { POST } = await import("./route");
+    await POST();
+    expect(requeueCallCount).toBe(0);
+  });
+
+  it("yapılandırma HAZIR olduğunda her turda requeueSkippedNotConfiguredRemindersWhenReady çağrılır ve sonucu yanıtta 'requeued' olarak döner", async () => {
+    credentials = { accessToken: "t", phoneNumberId: "p", businessAccountId: "b", checkoutTemplateName: "checkout_reminder_tr" };
+    requeueResult = 3;
+    const { POST } = await import("./route");
+    const response = await POST();
+    const data = await response.json();
+    expect(requeueCallCount).toBe(1);
+    expect(data.requeued).toBe(3);
   });
 });

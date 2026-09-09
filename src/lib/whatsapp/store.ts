@@ -147,20 +147,48 @@ export async function cancelCheckoutReminderForReservation(reservationId: string
   ).bind(now, reservationId).run();
 }
 
+// "Hâlâ anlamlı/gelecekle ilgili" sınırı - Worker uzun süre durursa bile aylar önce geçmiş bir
+// çıkış için anlamsız/kafa karıştırıcı bir hatırlatma göndermez (yalnız makul ölçüde gecikmiş, hâlâ
+// anlamlı bir gönderim işleme alınır). listDueCheckoutReminders VE requeueSkippedNotConfiguredRemindersWhenReady
+// AYNI eşiği kullanır - biri "gönderilebilir" derken diğeri "yeniden kuyruğa alınabilir" derse
+// tutarsızlık olur.
+function minMeaningfulCheckoutDate(nowIso: string): string {
+  return istanbulTodayIso(new Date(new Date(nowIso).getTime() - 24 * 60 * 60 * 1000));
+}
+
 // custom-worker.mjs cron'unun çağırdığı dispatch route'u için: zamanı gelmiş, hâlâ bekleyen satırlar.
-// checkout_date >= (bugün - 1 gün) güvenlik filtresi - Worker uzun süre durursa bile aylar önce
-// geçmiş bir çıkış için anlamsız/kafa karıştırıcı bir hatırlatma göndermez (yalnız makul ölçüde
-// gecikmiş, hâlâ anlamlı olan bir gönderim tekrar denenir).
 export async function listDueCheckoutReminders(nowIso: string, limit: number): Promise<WhatsappScheduledMessage[]> {
   const db = await database();
   await ensureTable(db);
-  const minCheckoutDate = istanbulTodayIso(new Date(new Date(nowIso).getTime() - 24 * 60 * 60 * 1000));
   const result = await db.prepare(
     `SELECT * FROM whatsapp_scheduled_messages
      WHERE status = 'SCHEDULED' AND auto_enabled = 1 AND scheduled_at <= ? AND checkout_date >= ?
      ORDER BY scheduled_at ASC LIMIT ?`,
-  ).bind(nowIso, minCheckoutDate, limit).all<MessageRow>();
+  ).bind(nowIso, minMeaningfulCheckoutDate(nowIso), limit).all<MessageRow>();
   return (result.results ?? []).map(mapRow);
+}
+
+// WhatsApp yapılandırılmadan ÖNCE "due" olup SKIPPED_NOT_CONFIGURED işaretlenen hatırlatmalar,
+// yapılandırma sonradan tamamlandığında KALICI OLARAK kaybolmamalı - bu fonksiyon onları güvenle
+// SCHEDULED'a geri döndürür (scheduled_at = şimdi, aynı cron turunda hemen listDueCheckoutReminders
+// tarafından yakalanabilir). Yalnız dispatch-due route'unda, kimlik bilgileri GERÇEKTEN yapılandırılmışsa
+// çağrılır (bkz. route.ts) - "yapılandırma READY olduğunda" koşulu orada sağlanır.
+//
+// GÜVENLİ OLAN NE: yalnız status = 'SKIPPED_NOT_CONFIGURED' satırlar etkilenir - SENT/DELIVERED/READ/
+// CANCELLED/FAILED asla dokunulmaz (WHERE'e dahil değil). auto_enabled = 0 (admin kapatmış) veya
+// checkout_date artık anlamlı değilse (geçmiş, minMeaningfulCheckoutDate altında) satır ATLANIR.
+// Var olan satır YERİNDE güncellenir - yeni satır oluşturulmaz, UNIQUE(reservation_id, message_type,
+// checkout_date) kısıtı hiç devreye girmez. Tekrar tekrar çağrılması idempotenttir: ilk çağrıda
+// SCHEDULED olan satırlar ikinci çağrının WHERE'ine artık uymaz (status artık SKIPPED_NOT_CONFIGURED
+// değil), bu yüzden bir daha etkilenmezler.
+export async function requeueSkippedNotConfiguredRemindersWhenReady(nowIso: string = new Date().toISOString()): Promise<number> {
+  const db = await database();
+  await ensureTable(db);
+  const result = await db.prepare(
+    `UPDATE whatsapp_scheduled_messages SET status = 'SCHEDULED', scheduled_at = ?, updated_at = ?
+     WHERE status = 'SKIPPED_NOT_CONFIGURED' AND auto_enabled = 1 AND checkout_date >= ?`,
+  ).bind(nowIso, nowIso, minMeaningfulCheckoutDate(nowIso)).run();
+  return result.meta.changes ?? 0;
 }
 
 // Atomik "claim": yalnız hâlâ SCHEDULED ise SENDING'e çevirir. Aynı satır iki eşzamanlı cron
@@ -237,12 +265,18 @@ export async function markCheckoutReminderFailedByProviderMessageId(providerMess
 
 // ============ Admin panel (Mesajlar) için okuma + manuel aksiyonlar ============
 
+// ORDER BY created_at DESC TEK BAŞINA yeterli değil: syncCheckoutReminderForReservation'daki iptal +
+// yeni-satır adımları aynı JS event loop turunda, aynı milisaniye içinde created_at üretebilir -
+// bu durumda created_at eşitliğinde SQLite'ın sıralaması TANIMSIZDIR (b-tree düzenine bağlı, "en son
+// eklenen" garantisi vermez). rowid DESC ikinci sıralama anahtarı olarak eklenir - SQLite'ta INTEGER
+// PRIMARY KEY olmayan her tabloda örtük, monoton artan bir rowid vardır, bu yüzden "en son eklenen
+// satır" garantisi rowid ile KESİN sağlanır.
 export async function getLatestCheckoutReminderForReservation(reservationId: string): Promise<WhatsappScheduledMessage | null> {
   const db = await database();
   await ensureTable(db);
   const row = await db.prepare(
     `SELECT * FROM whatsapp_scheduled_messages WHERE reservation_id = ? AND message_type = 'CHECKOUT_REMINDER'
-     ORDER BY created_at DESC LIMIT 1`,
+     ORDER BY created_at DESC, rowid DESC LIMIT 1`,
   ).bind(reservationId).first<MessageRow>();
   return row ? mapRow(row) : null;
 }
@@ -254,7 +288,7 @@ export async function listLatestCheckoutRemindersForReservations(reservationIds:
   const placeholders = reservationIds.map(() => "?").join(",");
   const result = await db.prepare(
     `SELECT * FROM whatsapp_scheduled_messages WHERE message_type = 'CHECKOUT_REMINDER' AND reservation_id IN (${placeholders})
-     ORDER BY created_at DESC`,
+     ORDER BY created_at DESC, rowid DESC`,
   ).bind(...reservationIds).all<MessageRow>();
   const byReservation = new Map<string, WhatsappScheduledMessage>();
   for (const row of result.results ?? []) {
