@@ -174,9 +174,9 @@ jobs:
           destan_html="$(curl --fail --silent --show-error --retry 5 --retry-delay 3 -H 'Cache-Control: no-cache' "$BASE/villa-destan?$BUST")"
 
           grep -Fq "Patara Kaş'ta Villa Safira ve Villa Destan. Gerçek fotoğrafları inceleyin" <<<"$home_html"
-          grep -Fq "Villa Safira Resmi Site | Patara Kaş 5 Kişilik Villa" <<<"$safira_html"
+          grep -Fq "Villa Safira Patara | Resmi Site • Kaş Özel Havuzlu Villa" <<<"$safira_html"
           grep -Fq "Villa Safira resmi sitesi. Patara Kaş'ta 5 kişilik, 2 yatak odalı özel havuzlu villa." <<<"$safira_html"
-          grep -Fq "Villa Destan Resmi Site | Patara Kaş 6 Kişilik Villa" <<<"$destan_html"
+          grep -Fq "Villa Destan Patara | Resmi Site • Kaş Özel Havuzlu Villa" <<<"$destan_html"
           grep -Fq "Villa Destan resmi sitesi. Patara Kaş'ta 6 kişilik, 3 yatak odalı özel havuzlu villa." <<<"$destan_html"
 
           # Homepage structured data intentionally uses one Organization entity and
