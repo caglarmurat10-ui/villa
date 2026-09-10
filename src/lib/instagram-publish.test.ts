@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { publicGraphError, publishInstagramStory } from "./instagram-publish";
+import { publicGraphError, publishInstagramSingleImage, publishInstagramStory } from "./instagram-publish";
 
 function fakeResponse(status: number): Response {
   return new Response(null, { status });
@@ -78,5 +78,66 @@ describe("publishInstagramStory (2026-09-02 HTTP 400/9007 regresyon fix testi)",
     const calls = mockGraphSequence(["ERROR"]);
     await expect(publishInstagramStory("acc-1", "token-1", { position: 0, kind: "image", mediaUrl: "https://example.com/a.jpg" })).rejects.toThrow();
     expect(calls.some((c) => c.url.endsWith("/media_publish"))).toBe(false);
+  });
+});
+
+describe("Instagram media_publish 9007 retry", () => {
+  const originalFetch = global.fetch;
+
+  afterEach(() => {
+    vi.useRealTimers();
+    global.fetch = originalFetch;
+  });
+
+  it("9007 gecici hatasinda ayni creation_id ile yeniden dener ve basarili olur", async () => {
+    vi.useFakeTimers();
+    let publishAttempts = 0;
+    const creationIds: string[] = [];
+
+    global.fetch = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      const href = url.toString();
+      const method = init?.method ?? "GET";
+      if (method === "POST" && href.endsWith("/media")) {
+        return new Response(JSON.stringify({ id: "container-9007" }), { status: 200 });
+      }
+      if (method === "POST" && href.endsWith("/media_publish")) {
+        publishAttempts += 1;
+        const body = init?.body as URLSearchParams;
+        creationIds.push(body.get("creation_id") ?? "");
+        if (publishAttempts === 1) {
+          return new Response(JSON.stringify({ error: { code: 9007, message: "media not ready" } }), { status: 400 });
+        }
+        return new Response(JSON.stringify({ id: "post-after-retry" }), { status: 200 });
+      }
+      throw new Error(`beklenmeyen istek: ${method} ${href}`);
+    }) as unknown as typeof fetch;
+
+    const publishPromise = publishInstagramSingleImage("acc-1", "token-1", "https://example.com/a.jpg", "caption");
+    await vi.runAllTimersAsync();
+
+    await expect(publishPromise).resolves.toBe("post-after-retry");
+    expect(publishAttempts).toBe(2);
+    expect(creationIds).toEqual(["container-9007", "container-9007"]);
+  });
+
+  it("9007 disindaki Graph 4xx hatalarini yeniden denemez", async () => {
+    let publishAttempts = 0;
+    global.fetch = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      const href = url.toString();
+      const method = init?.method ?? "GET";
+      if (method === "POST" && href.endsWith("/media")) {
+        return new Response(JSON.stringify({ id: "container-token" }), { status: 200 });
+      }
+      if (method === "POST" && href.endsWith("/media_publish")) {
+        publishAttempts += 1;
+        return new Response(JSON.stringify({ error: { code: 190, message: "bad token" } }), { status: 400 });
+      }
+      throw new Error(`beklenmeyen istek: ${method} ${href}`);
+    }) as unknown as typeof fetch;
+
+    await expect(publishInstagramSingleImage("acc-1", "token-1", "https://example.com/a.jpg", "caption")).rejects.toThrow(
+      "Instagram yayını başarısız (HTTP 400 / 190)",
+    );
+    expect(publishAttempts).toBe(1);
   });
 });
