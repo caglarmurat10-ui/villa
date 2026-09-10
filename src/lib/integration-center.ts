@@ -10,6 +10,7 @@ import { getGoogleAdsReadiness, type GoogleAdsReadiness } from "./google-ads/rea
 import { getMetaAdsReadiness, type MetaAdsReadiness } from "./meta-ads/readiness";
 import { getInstallmentCampaignReadiness, type InstallmentCampaignReadiness } from "./payments/installment-campaign";
 import { getGoogleVrReadiness, type GoogleVrReadiness } from "./google-vr/readiness";
+import { DESTAN_INSTAGRAM_HARD_BLOCK } from "./social-account-policy";
 
 // Admin > Entegrasyonlar sayfasındaki tek-ekran "Entegrasyon Merkezi" için tek kaynak. Hiçbir yeni
 // iş mantığı yok - yalnız zaten var olan, kendi başına test edilmiş fonksiyonları (OTA/PayTR/Google/
@@ -24,7 +25,8 @@ export interface MetaOrganicStatus {
   safiraInstagramConnected: boolean;
   safiraFacebookConnected: boolean;
   destanFacebookConnected: boolean;
-  destanInstagramHardBlocked: true;
+  destanInstagramConnected: boolean;
+  destanInstagramHardBlocked: boolean;
 }
 
 export interface IntegrationCenterSnapshot {
@@ -84,7 +86,8 @@ export async function getIntegrationCenterSnapshot(): Promise<IntegrationCenterS
     safiraInstagramConnected: metaAccounts.some((a) => a.villa === "Safira" && a.platform === "Instagram"),
     safiraFacebookConnected: metaAccounts.some((a) => a.villa === "Safira" && a.platform === "Facebook"),
     destanFacebookConnected: metaAccounts.some((a) => a.villa === "Destan" && a.platform === "Facebook"),
-    destanInstagramHardBlocked: true,
+    destanInstagramConnected: metaAccounts.some((a) => a.villa === "Destan" && a.platform === "Instagram"),
+    destanInstagramHardBlocked: DESTAN_INSTAGRAM_HARD_BLOCK.blocked,
   };
 
   const cronHealthy = Boolean(cronHeartbeat && (Date.now() - Date.parse(cronHeartbeat.ranAt)) < CRON_HEALTHY_WINDOW_MS);
