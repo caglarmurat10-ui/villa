@@ -26,4 +26,24 @@ describe("regional guide SEO quality", () => {
       expect(page.intro.length).toBeGreaterThanOrEqual(150);
     }
   });
+
+  it("her sayfa gerçek, doğrulanmış bir verifiedDate (YYYY-MM-DD) taşır - sahte 'bugün güncellendi' iddiası değil", () => {
+    for (const slug of REGION_GUIDE_PAGE_SLUGS) {
+      expect(REGION_GUIDE_PAGES[slug].verifiedDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    }
+  });
+
+  it("xanthos/saklikent/yerel-pazar rehberleri region-guide.ts'teki (2026-09-09'da eklenen) yeni içerik ailesini tamamlar", () => {
+    const newSlugs: (typeof REGION_GUIDE_PAGE_SLUGS)[number][] = ["xanthos", "saklikent", "yerel-pazar"];
+    for (const slug of newSlugs) {
+      expect(REGION_GUIDE_PAGE_SLUGS).toContain(slug);
+      expect(REGION_GUIDE_PAGES[slug].relatedPlaceIds.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("yerel-pazar rehberi hiçbir uydurma fiyat/saat iddiası taşımaz (yalnız kalıcı gerçek: haftanın günü + ürün türleri)", () => {
+    const page = REGION_GUIDE_PAGES["yerel-pazar"];
+    const fullText = [page.intro, ...page.sections.map((s) => s.body), ...page.faq.map((f) => f.answer)].join(" ");
+    expect(fullText).not.toMatch(/₺|TL\b|\d{1,2}:\d{2}/);
+  });
 });

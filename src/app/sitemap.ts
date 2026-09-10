@@ -1,6 +1,14 @@
 import type { MetadataRoute } from "next";
 import { REGION_GUIDE_PAGE_SLUGS } from "@/lib/region-guide-pages";
 import { LEGAL_PAGE_SLUGS } from "@/lib/legal-content";
+import { VILLAS } from "@/lib/villa-content";
+
+// Google Görseller keşfi için - villa-content.ts'teki TEK kaynaktan (gerçek, alt text'li galeri
+// fotoğrafları) türetilir, burada yeni bir görsel listesi elle YAZILMAZ. Yalnız hero değil, TÜM
+// galeri fotoğrafları dahil edilir.
+function villaGalleryImageUrls(slug: "villa-safira" | "villa-destan"): string[] {
+  return VILLAS[slug].gallery.map((image) => `https://safiradestan.com${image.src}`);
+}
 
 // lastModified: gerçek içerik değişim zamanını satır satır izleyen bir mekanizma yok (D1'de değil,
 // kaynak kodda yaşayan statik içerik) - bu yüzden build/deploy zamanı en yakın doğru yaklaşımdır.
@@ -22,14 +30,14 @@ export default function sitemap(): MetadataRoute.Sitemap {
       lastModified: BUILD_TIME,
       changeFrequency: "weekly",
       priority: 0.9,
-      images: ["https://safiradestan.com/villas/safira-hero-20260830.jpg"],
+      images: villaGalleryImageUrls("villa-safira"),
     },
     {
       url: "https://safiradestan.com/villa-destan",
       lastModified: BUILD_TIME,
       changeFrequency: "weekly",
       priority: 0.9,
-      images: ["https://safiradestan.com/villas/destan-hero-20260830.jpg"],
+      images: villaGalleryImageUrls("villa-destan"),
     },
     { url: "https://safiradestan.com/patara-villa", lastModified: BUILD_TIME, changeFrequency: "weekly", priority: 0.85 },
     { url: "https://safiradestan.com/rezervasyon-kosullari", lastModified: BUILD_TIME, changeFrequency: "monthly", priority: 0.5 },

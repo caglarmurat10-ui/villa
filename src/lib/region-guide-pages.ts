@@ -3,7 +3,7 @@
 // yazılmıştır (thin/doorway sayfa değil) - Patara'nın kendisi, plajı, antik kenti; Kaş; Kalkan ayrı
 // ayrı ele alınır, aynı paragrafın şehir adı değiştirilmiş kopyası değildir.
 
-export type RegionGuidePageSlug = "patara" | "patara-plaji" | "patara-antik-kenti" | "kas" | "kalkan";
+export type RegionGuidePageSlug = "patara" | "patara-plaji" | "patara-antik-kenti" | "kas" | "kalkan" | "xanthos" | "saklikent" | "yerel-pazar";
 
 export interface RegionGuidePageFaq {
   question: string;
@@ -20,11 +20,16 @@ export interface RegionGuidePage {
   sections: { heading: string; body: string }[];
   relatedPlaceIds: string[];
   faq: RegionGuidePageFaq[];
+  // ISO tarih - bu sayfanın dayandığı GUIDE_PLACES verisinin gerçekten doğrulandığı tarih (region-guide.ts'teki
+  // kaynak notlarıyla eşleşir). Sahte bir "güncellendi" iddiası DEĞİL - WebPage JSON-LD'deki dateModified bu
+  // alandan gelir (bkz. rehber/[slug]/page.tsx).
+  verifiedDate: string;
 }
 
 export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = {
   patara: {
     slug: "patara",
+    verifiedDate: "2026-09-01",
     title: "Patara Rehberi — Antik Kent, Plaj ve Doğa",
     seoTitle: "Patara Rehberi: Antik Kent ve Plaj | Safira & Destan",
     metaDescription: "Patara'da görülecek yerler: Patara Antik Kenti, Patara Plajı, kum tepeleri ve deniz feneri. Villa Safira ve Villa Destan'a yakın bölge rehberi.",
@@ -60,6 +65,7 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
   },
   "patara-plaji": {
     slug: "patara-plaji",
+    verifiedDate: "2026-09-01",
     title: "Patara Plajı — Kum Tepeleri ve Koruma Alanı",
     seoTitle: "Patara Plajı Rehberi | Safira & Destan",
     metaDescription: "Patara Plajı hakkında: uzunluğu, Caretta caretta koruma alanı, doğal kum tepeleri ve girişin Patara Antik Kenti üzerinden yapılması.",
@@ -95,6 +101,7 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
   },
   "patara-antik-kenti": {
     slug: "patara-antik-kenti",
+    verifiedDate: "2026-09-01",
     title: "Patara Antik Kenti — Likya Birliği'nin Merkezi",
     seoTitle: "Patara Antik Kenti | Safira & Destan",
     metaDescription: "Patara Antik Kenti: Likya Birliği'nin yönetim merkezi, Bouleuterion (Meclis Binası) ve Roma dönemi deniz feneri hakkında bilgiler.",
@@ -130,6 +137,7 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
   },
   kas: {
     slug: "kas",
+    verifiedDate: "2026-09-01",
     title: "Kaş Gezi Rehberi — Merkez ve Kaputaş Plajı",
     seoTitle: "Kaş Gezi Rehberi | Safira & Destan",
     metaDescription: "Kaş'ta görülecek yerler: tarihi liman, Likya lahitleri, antik tiyatro ve yakınındaki Kaputaş Plajı. Villa Safira ve Villa Destan'a yakın bölge rehberi.",
@@ -165,6 +173,7 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
   },
   kalkan: {
     slug: "kalkan",
+    verifiedDate: "2026-09-01",
     title: "Kalkan Gezi Rehberi — Şık Bir Sahil Kasabası",
     seoTitle: "Kalkan Gezi Rehberi | Safira & Destan",
     metaDescription: "Kalkan hakkında: eski Rum balıkçı köyü geçmişi, beyaz badanalı evleri ve marinası. Villa Safira ve Villa Destan'a yakın bölge rehberi.",
@@ -200,6 +209,122 @@ export const REGION_GUIDE_PAGES: Record<RegionGuidePageSlug, RegionGuidePage> = 
     faq: [
       { question: "Kalkan'ın tarihi geçmişi nedir?", answer: "Kalkan, eski bir Rum balıkçı köyünden gelişerek bugünkü şık sahil kasabası halini almıştır." },
       { question: "Patara'da konaklarken Kalkan gezisi planlanabilir mi?", answer: "Evet. Villa Safira ve Villa Destan Patara/Gelemiş bölgesindedir; Kalkan'ı çevre gezisi olarak planlayabilir, güncel yol ve süre bilgisini harita uygulamasından kontrol edebilirsiniz." },
+    ],
+  },
+  xanthos: {
+    slug: "xanthos",
+    verifiedDate: "2026-09-01",
+    title: "Xanthos Antik Kenti — Likya'nın Eski Başkenti",
+    seoTitle: "Xanthos Antik Kenti Rehberi | Safira & Destan",
+    metaDescription: "Xanthos Antik Kenti: Likya'nın eski başkenti, Letoon ile birlikte UNESCO Dünya Mirası. Kaya ve anıt mezarları. Villa Safira/Destan'a yakın bölge rehberi.",
+    kicker: "XANTHOS ANTİK KENTİ",
+    intro: "Xanthos, antik Likya uygarlığının başkenti olarak tarihte önemli bir yere sahip. Kaya mezarları ve anıt mezarlarıyla tanınan ören yeri, yakınındaki Letoon ile birlikte 1988'de UNESCO Dünya Mirası Listesi'ne girmiş, bölgenin en önemli tarihi duraklarından biri.",
+    sections: [
+      {
+        heading: "Likya'nın eski başkenti",
+        body: "Xanthos, antik dönemde Likya uygarlığının başkenti olarak hizmet gördü. Kentin bu siyasi ve kültürel önemi, bugün ayakta kalan geniş ören yerinde hâlâ okunabilir bir tarih bırakmıştır.",
+      },
+      {
+        heading: "UNESCO Dünya Mirası statüsü",
+        body: "Xanthos, yakınındaki Letoon Antik Kenti ile birlikte 1988 yılında UNESCO Dünya Mirası Listesi'ne dahil edilmiştir. İki alan birlikte, Likya uygarlığının siyasi merkezi (Xanthos) ile dinî merkezini (Letoon) temsil eder.",
+      },
+      {
+        heading: "Kaya mezarları ve anıt mezarlar",
+        body: "Xanthos'un en bilinen özelliklerinden biri, kayaya oyulmuş mezarları ve anıt mezarlarıdır. Bu yapılar, Likya uygarlığının kendine özgü mezar mimarisini günümüze taşıyan en önemli örnekler arasında sayılır.",
+      },
+      {
+        heading: "Letoon ile birlikte gezmek",
+        body: "Xanthos ve Letoon, aynı UNESCO listesinde birlikte yer aldıkları için genellikle aynı gezi güzergâhının parçası olarak değerlendirilir. Xanthos'un yönetim/başkent kimliğini, Letoon'un dinî merkez kimliğiyle birlikte görmek, Likya Birliği'nin bölgedeki izlerini daha bütünlüklü bir şekilde anlamayı sağlar.",
+      },
+      {
+        heading: "Ziyaret öncesi planlama",
+        body: "Ören yerindeki çalışma saatleri, ücretler ve erişim uygulamaları dönemsel olarak değişebileceğinden, ziyaret gününde güncel bilgiyi resmi kaynaklardan teyit etmek en sağlıklı yaklaşım. Rehberimiz kalıcı bölge bilgisini bir araya getirir; değişken ayrıntılar için güncel kaynakları kullanmanızı öneririz.",
+      },
+      {
+        heading: "Villadan Xanthos'a",
+        body: "Villa Safira ve Villa Destan, Patara/Gelemiş bölgesinde konumlanıyor; Xanthos bu bölgenin gezi güzergâhında yer alan tarihi duraklardan biridir. Güncel yol koşulları ve süre bilgisi için harita uygulamanızı kullanmanızı öneririz.",
+      },
+    ],
+    relatedPlaceIds: ["xanthos-antik-kenti", "letoon-antik-kenti"],
+    faq: [
+      { question: "Xanthos neden UNESCO Dünya Mirası Listesi'nde?", answer: "Letoon ile birlikte, Likya uygarlığının önemli bir siyasi ve dinî merkezini temsil etmesi nedeniyle 1988'de UNESCO Dünya Mirası Listesi'ne girmiştir." },
+      { question: "Xanthos ve Letoon aynı gezide görülebilir mi?", answer: "Evet, ikisi de Likya Birliği'nin önemli merkezleriydi (Xanthos başkent, Letoon dinî merkez) ve genellikle aynı bölge gezisinin parçası olarak değerlendirilir." },
+    ],
+  },
+  saklikent: {
+    slug: "saklikent",
+    verifiedDate: "2026-09-01",
+    title: "Saklıkent Kanyonu — Serin Sular ve Yüksek Duvarlar",
+    seoTitle: "Saklıkent Kanyonu Rehberi | Safira & Destan",
+    metaDescription: "Saklıkent Kanyonu hakkında: 16 km uzunluk, 200-600 metreye ulaşan kanyon duvarları ve serin sularıyla bilinen doğal alan. Villa Safira/Destan'a yakın rehber.",
+    kicker: "SAKLIKENT KANYONU",
+    intro: "Saklıkent Kanyonu, duvarları yer yer 200-600 metre yüksekliğe ulaşan, yaklaşık 16 kilometre uzunluğundaki etkileyici yapısıyla bölgenin öne çıkan doğal alanlarından biri. Serin sularıyla, sıcak yaz günlerinde doğa içinde farklı bir deneyim arayanlar için bilinen bir durak.",
+    sections: [
+      {
+        heading: "Kanyonun oluşumu ve boyutları",
+        body: "Saklıkent Kanyonu, yaklaşık 16 kilometre uzunluğuyla bölgenin en uzun kanyonlarından biridir. Duvarları bazı noktalarda 200 ila 600 metre arasında değişen yüksekliklere ulaşır; bu da kanyonun içinde yürürken oluşan etkileyici, dar ve derin geçit hissini açıklar.",
+      },
+      {
+        heading: "Serin sular",
+        body: "Kanyonun içinden geçen su, Saklıkent'in en bilinen özelliklerinden biridir ve serinliğiyle tanınır. Bu özellik, özellikle sıcak yaz aylarında kanyonu diğer doğa duraklarından ayıran bir deneyim sunar.",
+      },
+      {
+        heading: "Doğa ve macera arayanlar için",
+        body: "Saklıkent, yüksek kanyon duvarları ve suyla şekillenmiş yapısıyla doğa fotoğrafçılığından yürüyüşe kadar farklı ilgi alanlarına hitap eder. Kanyonun karakteri, bölgedeki deniz ve antik kent odaklı duraklardan farklı, tamamen doğaya dayalı bir gezi deneyimi arayanlar için iyi bir seçenektir.",
+      },
+      {
+        heading: "Ziyaret öncesi planlama",
+        body: "Kanyonun erişim koşulları, su seviyesi ve mevsimsel uygulamalar zaman zaman değişebilir. Bu nedenle ziyaret gününde güncel durumu ve erişim imkânlarını resmi/güncel kaynaklardan kontrol etmek en doğru yaklaşımdır. Rehberimiz kalıcı bölge karakterine odaklanır; değişken ayrıntılar güncel kaynaklarla teyit edilmelidir.",
+      },
+      {
+        heading: "Villadan Saklıkent'e",
+        body: "Villa Safira ve Villa Destan'ın bulunduğu Patara/Gelemiş bölgesinden Saklıkent'e ulaşım mümkündür; Saklıkent, Kaş veya Kalkan'a göre biraz daha uzak bir bölgede (Fethiye çevresinde) yer aldığından, genellikle günün büyük bölümünü ayırdığınız bir gezi olarak planlanır. Güncel yol koşulları ve süre bilgisi için harita uygulamanızı kullanmanızı öneririz.",
+      },
+    ],
+    relatedPlaceIds: ["saklikent-kanyonu"],
+    faq: [
+      { question: "Saklıkent Kanyonu ne kadar uzun?", answer: "Yaklaşık 16 kilometre uzunluğundadır." },
+      { question: "Saklıkent Kanyonu'nun duvarları ne kadar yüksek?", answer: "Duvarları bazı noktalarda 200 ila 600 metre arasında değişen yüksekliklere ulaşır." },
+    ],
+  },
+  "yerel-pazar": {
+    slug: "yerel-pazar",
+    verifiedDate: "2026-09-09",
+    title: "Yerel Pazar ve Lezzetler — Kaş Cuma Pazarı",
+    seoTitle: "Yerel Pazar ve Lezzetler Rehberi | Safira & Destan",
+    metaDescription: "Kaş Cuma Pazarı ve bölgenin yerel ürünleri: zeytinyağı, kekik, bal, köy peyniri. Akdeniz kıyı mutfağı. Villa Safira/Destan'a yakın bölge rehberi.",
+    kicker: "YEREL PAZAR VE LEZZETLER",
+    intro: "Patara/Gelemiş bölgesinde tatil yaparken bölgenin gündelik yaşamını en yakından hissedebileceğiniz duraklardan biri Kaş Cuma Pazarı. Haftalık kurulan bu pazar, zeytinyağından bala, kekikten köy peynirine kadar bölgeye özgü ürünlerle Akdeniz kıyı yaşamının bir kesitini sunar.",
+    sections: [
+      {
+        heading: "Kaş Cuma Pazarı",
+        body: "Kaş'ta her Cuma kurulan haftalık semt pazarı, bölge sakinlerinin ve ziyaretçilerin buluştuğu canlı bir noktadır. Pazar, günlük hayatın bir parçası olan yerel alışverişi ve bölgenin ürün çeşitliliğini yakından görme fırsatı sunar.",
+      },
+      {
+        heading: "Bölgenin yerel ürünleri",
+        body: "Kaş Cuma Pazarı'nda öne çıkan ürünler arasında zeytinyağı, kekik, bal ve köy peyniri sayılabilir. Bu ürünler, bölgenin Akdeniz iklimine ve tarımsal karakterine bağlı, uzun süredir bilinen yerel üretim geleneğini yansıtır.",
+      },
+      {
+        heading: "Akdeniz kıyı mutfağının karakteri",
+        body: "Patara/Kaş çevresi gibi Akdeniz kıyı bölgelerinin mutfağı genel olarak zeytinyağı ağırlıklı hazırlanan yemekler, taze deniz ürünleri ve bölgede yetişen otların kullanımıyla tanınır. Pazarda gördüğünüz zeytinyağı, kekik ve bal gibi ürünler, bu mutfak geleneğinin temel taşları arasında yer alır.",
+      },
+      {
+        heading: "Pazar gezisini tatille birleştirmek",
+        body: "Villa tatilinizi planlarken Kaş Cuma Pazarı'nı gezi rotanıza dahil etmek, bölgeyi yalnızca plaj ve antik kentleriyle değil, gündelik yaşamıyla da tanımanın bir yolu olabilir. Pazardan aldığınız yerel ürünleri villa mutfağınızda değerlendirmek, tatilinize bölgeye özgü bir dokunuş katabilir.",
+      },
+      {
+        heading: "Ziyaret öncesi planlama",
+        body: "Pazar günü sabit olsa da (Cuma), kuruluş saatleri ve satılan ürün çeşitliliği mevsime göre değişebilir. Ziyaretinizi planlarken güncel bilgiyi yerinde teyit etmek, rehberimizdeki kalıcı bilgiyle (haftanın günü, öne çıkan ürün türleri) birlikte en doğru sonucu verir.",
+      },
+      {
+        heading: "Villadan pazara",
+        body: "Villa Safira ve Villa Destan'ın bulunduğu Patara/Gelemiş bölgesinden Kaş'a, dolayısıyla Cuma Pazarı'na ulaşım mümkündür. Güncel yol koşulları ve süre bilgisi için harita uygulamanızı kullanabilir, villa sayfalarındaki konum bağlantılarıyla birlikte gezinizi planlayabilirsiniz.",
+      },
+    ],
+    relatedPlaceIds: ["kas-cuma-pazari"],
+    faq: [
+      { question: "Kaş Cuma Pazarı hangi gün kurulur?", answer: "Adından da anlaşılacağı gibi her Cuma günü kurulur." },
+      { question: "Kaş Cuma Pazarı'nda hangi yerel ürünler öne çıkar?", answer: "Zeytinyağı, kekik, bal ve köy peyniri gibi bölgeye özgü ürünler pazarda öne çıkar." },
     ],
   },
 };

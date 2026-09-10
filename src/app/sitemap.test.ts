@@ -39,6 +39,23 @@ describe("sitemap.xml", () => {
     expect(safira?.images?.length).toBeGreaterThan(0);
   });
 
+  it("villa sayfaları yalnız hero değil, TÜM gerçek galeri fotoğraflarını görsel sitemap'e dahil eder", () => {
+    const safira = entries.find((e) => e.url === `${ORIGIN}/villa-safira`);
+    const destan = entries.find((e) => e.url === `${ORIGIN}/villa-destan`);
+    // villa-content.ts'teki gerçek galeri en az 10 fotoğraf içeriyor (bkz. round 4/5 içerik) -
+    // yalnız 1-2 hero görseline geri düşülmediğini doğrular.
+    expect(safira?.images?.length ?? 0).toBeGreaterThan(5);
+    expect(destan?.images?.length ?? 0).toBeGreaterThan(5);
+    for (const url of safira?.images ?? []) expect(url.startsWith(ORIGIN)).toBe(true);
+  });
+
+  it("yeni bölge rehberlerini (xanthos/saklikent/yerel-pazar) içerir", () => {
+    const urls = entries.map((e) => e.url);
+    expect(urls).toContain(`${ORIGIN}/rehber/xanthos`);
+    expect(urls).toContain(`${ORIGIN}/rehber/saklikent`);
+    expect(urls).toContain(`${ORIGIN}/rehber/yerel-pazar`);
+  });
+
   it("her URL robots.ts'in izin verdiği (allow) yollarla tutarlı - sitemap'te olup robots'ta yasak bir yol yok", () => {
     const robotsConfig = robots();
     const rule = Array.isArray(robotsConfig.rules) ? robotsConfig.rules[0] : robotsConfig.rules;

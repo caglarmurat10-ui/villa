@@ -22,7 +22,7 @@ const PUBLIC_API_PATH_PREFIXES = ["/api/calendar/export/"];
 // src/middleware.ts'teki REGION_GUIDE_SLUGS ile birebir aynı kalmalı (üç bağımsız kopya - custom-worker.mjs
 // Next.js "@/" alias'larını çözemediği için middleware.ts'i import edemez, bkz. dosyanın başındaki
 // genel NOT).
-const REGION_GUIDE_SLUGS = ["patara", "patara-plaji", "patara-antik-kenti", "kas", "kalkan"];
+const REGION_GUIDE_SLUGS = ["patara", "patara-plaji", "patara-antik-kenti", "kas", "kalkan", "xanthos", "saklikent", "yerel-pazar"];
 const LEGAL_PAGE_SLUGS = ["hakkimizda", "teslimat-iade", "gizlilik", "kvkk", "mesafeli-hizmet-sozlesmesi", "on-bilgilendirme", "odeme-guvenligi"];
 const PUBLIC_ROUTE_MAP = new Map([
   ["/", "/site"],

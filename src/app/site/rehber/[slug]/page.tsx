@@ -62,6 +62,10 @@ export default async function RegionGuideSubPage({ params }: { params: Promise<{
         url: canonical,
         name: page.title,
         description: page.metaDescription,
+        // page.verifiedDate: içeriğin dayandığı GUIDE_PLACES verisinin gerçekten doğrulandığı tarih
+        // (region-guide-pages.ts'teki kaynak notu) - sahte bir "bugün güncellendi" iddiası değil.
+        datePublished: page.verifiedDate,
+        dateModified: page.verifiedDate,
         isPartOf: { "@type": "WebSite", "@id": `${ORIGIN}/#website` },
       },
       ...(page.faq.length > 0 ? [{

@@ -26,7 +26,7 @@ const WORKER_ALLOWED_PATHS = new Set([
 // /rehber alt sayfaları - REGION_GUIDE_PAGE_SLUGS (src/lib/region-guide-pages.ts) ile birebir
 // eşleşmeli. Yeni bir rehber alt sayfası eklerken hem oradaki listeye hem buradaki iki map'e
 // (custom-worker.mjs'teki PUBLIC_ROUTE_MAP dahil) ekleme yapılmalı - yoksa route 404 verir.
-const REGION_GUIDE_SLUGS = ["patara", "patara-plaji", "patara-antik-kenti", "kas", "kalkan"];
+const REGION_GUIDE_SLUGS = ["patara", "patara-plaji", "patara-antik-kenti", "kas", "kalkan", "xanthos", "saklikent", "yerel-pazar"];
 const LEGAL_PAGE_SLUGS = ["hakkimizda", "teslimat-iade", "gizlilik", "kvkk", "mesafeli-hizmet-sozlesmesi", "on-bilgilendirme", "odeme-guvenligi"];
 const PUBLIC_REWRITES = new Map([
   ["/", "/site"],
