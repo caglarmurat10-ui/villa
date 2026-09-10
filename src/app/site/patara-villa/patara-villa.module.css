@@ -1,0 +1,232 @@
+.hubHero {
+  width: min(92vw, 1320px);
+  margin: 0 auto;
+  padding: 34px 0 78px;
+}
+
+.heroTopline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 0 0 24px;
+  margin-bottom: 54px;
+  border-bottom: 1px solid #d8cebc;
+  color: #514b42;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.heroTopline a {
+  color: #132019;
+  text-decoration: none;
+}
+
+.heroGrid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.02fr) minmax(420px, .98fr);
+  align-items: center;
+  gap: clamp(42px, 6vw, 92px);
+}
+
+.heroCopy {
+  padding: 20px 0 28px;
+}
+
+.kicker {
+  display: block;
+  margin-bottom: 20px;
+  color: #756b5c;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: .24em;
+}
+
+.heroCopy h1 {
+  max-width: 720px;
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: clamp(50px, 5.25vw, 76px);
+  font-weight: 400;
+  line-height: .96;
+  letter-spacing: -.045em;
+  text-wrap: balance;
+  color: #132019;
+}
+
+.heroLead {
+  max-width: 660px;
+  margin: 26px 0 0;
+  color: #625b51;
+  font-size: 16px;
+  line-height: 1.72;
+}
+
+.heroFacts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 26px;
+}
+
+.heroFacts span {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  padding: 7px 13px;
+  border: 1px solid #d6cbb6;
+  border-radius: 999px;
+  background: rgba(251, 249, 243, .7);
+  color: #4e493f;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.hubActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 30px;
+}
+
+.hubActions .primaryCta,
+.hubActions .secondaryCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 50px;
+  padding: 0 22px;
+  border-radius: 999px;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 800;
+  transition: transform .2s ease, background .2s ease, border-color .2s ease;
+}
+
+.hubActions .primaryCta {
+  border: 1px solid #132019;
+  background: #132019;
+  color: #fff;
+  box-shadow: 0 12px 26px rgba(19, 32, 25, .14);
+}
+
+.hubActions .secondaryCta {
+  border: 1px solid #132019;
+  background: transparent;
+  color: #132019;
+}
+
+.hubActions .primaryCta:hover,
+.hubActions .secondaryCta:hover {
+  transform: translateY(-2px);
+}
+
+.hubActions .primaryCta:hover { background: #223b30; }
+.hubActions .secondaryCta:hover { background: rgba(19, 32, 25, .06); }
+
+.heroVisual {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  min-height: 445px;
+}
+
+.villaTile {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  min-height: 380px;
+  background: #d9cfbf;
+  color: #fff;
+  text-decoration: none;
+  box-shadow: 0 22px 52px rgba(31, 39, 34, .12);
+}
+
+.villaTile:last-child {
+  transform: translateY(42px);
+}
+
+.villaTile::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(0deg, rgba(7, 14, 10, .68) 0%, rgba(7, 14, 10, .08) 56%, rgba(7, 14, 10, .03) 100%);
+}
+
+.villaTile img {
+  width: 100%;
+  height: 100%;
+  min-height: 380px;
+  display: block;
+  object-fit: cover;
+  transition: transform .6s cubic-bezier(.2, .7, .2, 1);
+}
+
+.villaTile:hover img { transform: scale(1.035); }
+
+.tileCopy {
+  position: absolute;
+  z-index: 1;
+  left: 18px;
+  right: 18px;
+  bottom: 18px;
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.tileCopy div {
+  display: grid;
+  gap: 4px;
+}
+
+.tileCopy small {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .16em;
+  opacity: .78;
+}
+
+.tileCopy strong {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.tileCopy b {
+  font-size: 20px;
+  font-weight: 400;
+}
+
+@media (max-width: 980px) {
+  .hubHero { width: calc(100% - 44px); padding-top: 26px; }
+  .heroTopline { margin-bottom: 42px; }
+  .heroGrid { grid-template-columns: 1fr; gap: 44px; }
+  .heroCopy { padding: 0; }
+  .heroCopy h1 { max-width: 820px; font-size: clamp(48px, 9vw, 72px); }
+  .heroVisual { min-height: 360px; }
+  .villaTile,
+  .villaTile img { min-height: 330px; }
+}
+
+@media (max-width: 620px) {
+  .hubHero { width: calc(100% - 36px); padding: 20px 0 60px; }
+  .heroTopline { margin-bottom: 34px; padding-bottom: 18px; }
+  .heroTopline span { display: none; }
+  .heroCopy h1 { font-size: clamp(42px, 12.4vw, 58px); line-height: .98; }
+  .heroLead { font-size: 15px; margin-top: 20px; }
+  .heroFacts { margin-top: 20px; }
+  .hubActions { display: grid; grid-template-columns: 1fr; margin-top: 24px; }
+  .hubActions .primaryCta,
+  .hubActions .secondaryCta { width: 100%; }
+  .heroVisual { gap: 10px; min-height: 270px; }
+  .villaTile,
+  .villaTile img { min-height: 260px; }
+  .villaTile:last-child { transform: translateY(24px); }
+  .tileCopy { left: 12px; right: 12px; bottom: 12px; }
+  .tileCopy strong { font-size: 18px; }
+  .tileCopy b { display: none; }
+}
