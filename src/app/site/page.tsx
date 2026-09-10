@@ -140,7 +140,7 @@ export default async function PublicHomePage() {
             <a className={styles.secondary} href="#villalar">Villaları keşfet</a>
           </div>
         </div>
-        <div className={styles.heroNote}><span>01</span><p>İki ayrı villa.<br />Tek bir özenli deneyim.</p></div>
+        <div className={styles.heroNote}><p>İki ayrı villa.<br />Tek bir özenli deneyim.</p></div>
       </section>
 
       <TrustStrip installmentVerified={installmentCampaign.state === "INSTALLMENT_CAMPAIGN_VERIFIED"} maxInstallment={installmentCampaign.maxInstallment} />
@@ -169,7 +169,7 @@ export default async function PublicHomePage() {
               </picture>
               <span>Safira&apos;yı keşfet ↗</span>
             </div>
-            <div className={styles.storyMeta}><div><small>VILLA 01</small><h3>Villa Safira</h3></div><p>Doğayla çevrili, ferah ve özel havuzlu bir Patara villa tatili.</p></div>
+            <div className={styles.storyMeta}><div><h3>Villa Safira</h3></div><p>Doğayla çevrili, ferah ve özel havuzlu bir Patara villa tatili.</p></div>
           </Link>
           <Link className={`${styles.villaStory} ${styles.storyOffset}`} href="/villa-destan">
             <div className={styles.storyImage}>
@@ -179,7 +179,7 @@ export default async function PublicHomePage() {
               </picture>
               <span>Destan&apos;ı keşfet ↗</span>
             </div>
-            <div className={styles.storyMeta}><div><small>VILLA 02</small><h3>Villa Destan</h3></div><p>Özel havuzu ve güçlü yaşam alanlarıyla mahremiyet odaklı bir kaçış.</p></div>
+            <div className={styles.storyMeta}><div><h3>Villa Destan</h3></div><p>Özel havuzu ve güçlü yaşam alanlarıyla mahremiyet odaklı bir kaçış.</p></div>
           </Link>
         </div>
         {HAS_OTA_LISTINGS && <p className={styles.otaTrustNote}>Doğrudan veya tercih ettiğiniz rezervasyon platformu üzerinden.</p>}
