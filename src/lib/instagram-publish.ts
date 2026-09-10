@@ -1,6 +1,8 @@
 import type { SocialPostMediaItem } from "./social-media-store";
 
 const INSTAGRAM_GRAPH = "https://graph.instagram.com";
+const MEDIA_NOT_READY_CODE = 9007;
+const MEDIA_PUBLISH_RETRY_DELAYS_MS = [2500, 5000, 10000] as const;
 
 // Yalnız gösterim amaçlı okunabilir ipucu - hiçbir retry/publish karar mantığını etkilemez, sadece
 // last_publish_error metnine eklenir (admin panelinde okunuyor, bkz. SocialPublishHealth.tsx).
@@ -55,14 +57,30 @@ async function waitUntilReady(containerId: string, accessToken: string, attempts
 }
 
 async function publishContainer(accountId: string, accessToken: string, creationId: string) {
-  const response = await fetch(`${INSTAGRAM_GRAPH}/${encodeURIComponent(accountId)}/media_publish`, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ creation_id: creationId, access_token: accessToken }),
-  });
-  const payload = (await response.json().catch(() => ({}))) as { id?: string; error?: { message?: string; code?: number } };
-  if (!response.ok || !payload.id) throw new Error(publicGraphError("Instagram yayını başarısız", response, payload));
-  return payload.id;
+  for (let attempt = 0; attempt <= MEDIA_PUBLISH_RETRY_DELAYS_MS.length; attempt += 1) {
+    const response = await fetch(`${INSTAGRAM_GRAPH}/${encodeURIComponent(accountId)}/media_publish`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ creation_id: creationId, access_token: accessToken }),
+    });
+    const payload = (await response.json().catch(() => ({}))) as { id?: string; error?: { message?: string; code?: number } };
+    if (response.ok && payload.id) return payload.id;
+
+    // Graph bazen container FINISHED gorundukten hemen sonra bile 9007 dondurebiliyor.
+    // Bu durumda yeni container olusturmak yerine ayni creation_id ile kisa, sinirli bir retry
+    // yapilir. Yalnizca acik 9007 cevabi retry edilir; token/izin/format gibi diger 4xx
+    // hatalari aynen yukariya tasinir. Boylece gecici medya-isleme yarisi publish kaydini
+    // gereksiz yere kalici hataya dusurmez ve duplicate container riski yaratmaz.
+    const retryDelay = MEDIA_PUBLISH_RETRY_DELAYS_MS[attempt];
+    if (payload.error?.code === MEDIA_NOT_READY_CODE && retryDelay !== undefined) {
+      await new Promise((resolve) => setTimeout(resolve, retryDelay));
+      continue;
+    }
+
+    throw new Error(publicGraphError("Instagram yayını başarısız", response, payload));
+  }
+
+  throw new Error("Instagram yayını başarısız: medya işleme zamanında tamamlanmadı.");
 }
 
 export async function publishInstagramSingleImage(
