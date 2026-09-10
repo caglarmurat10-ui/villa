@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { computePriceCoverage, computePriceQuote, splitEvenInstallments, splitEvenMinor, type PriceRangeInput } from "./price-engine";
+import { computePriceCoverage, computePriceQuote, computeSchemaOrgPriceRange, splitEvenInstallments, splitEvenMinor, type PriceRangeInput } from "./price-engine";
 import { isClosedSeasonDate } from "./season-policy";
 
 // 2027-06-15 -> 2027-09-15 kullanıcı kararı (2026-09-03): Destan 130000 TRY / Safira 110000 TRY,
@@ -298,5 +298,31 @@ describe("splitEvenInstallments", () => {
     const cashTotal = 110000;
     expect(splitEvenInstallments(cashTotal, 3).reduce((sum, n) => sum + n, 0)).toBe(cashTotal);
     expect(splitEvenInstallments(cashTotal, 6).reduce((sum, n) => sum + n, 0)).toBe(cashTotal);
+  });
+});
+
+describe("computeSchemaOrgPriceRange (site/[slug]/page.tsx VacationRental.priceRange kaynağı)", () => {
+  it("hiç dönem yoksa undefined döner - uydurma bir başlangıç fiyatı üretmez", () => {
+    expect(computeSchemaOrgPriceRange([])).toBeUndefined();
+  });
+
+  it("basit nightlyRate dönemlerinden min/max aralığını ₺ formatında döner", () => {
+    const result = computeSchemaOrgPriceRange([{ nightlyRate: 5000 }, { nightlyRate: 8000 }, { nightlyRate: 6500 }]);
+    expect(result).toBe("₺5000 - ₺8000");
+  });
+
+  it("tek dönem varsa min == max olur", () => {
+    expect(computeSchemaOrgPriceRange([{ nightlyRate: 7000 }])).toBe("₺7000 - ₺7000");
+  });
+
+  it("haftalık esas fiyat modelindeki (basePriceMinor/baseNights) dönemleri etkin gecelik tutara çevirir", () => {
+    // Destan 130000 TRY / 7 gece = 13000000 kuruş / 7 = 1857142.86 kuruş/gece -> 18571.43 TRY -> round 18571
+    const result = computeSchemaOrgPriceRange([{ nightlyRate: 18571, basePriceMinor: 13000000, baseNights: 7 }]);
+    expect(result).toBe("₺18571 - ₺18571");
+  });
+
+  it("basePriceMinor/baseNights yalnız BİRİ doluysa (diğeri null/undefined) legacy nightlyRate'e geri döner", () => {
+    const result = computeSchemaOrgPriceRange([{ nightlyRate: 4200, basePriceMinor: 13000000, baseNights: null }]);
+    expect(result).toBe("₺4200 - ₺4200");
   });
 });

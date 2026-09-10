@@ -5,6 +5,7 @@ import SeasonalPricingTable from "@/components/SeasonalPricingTable";
 import InstallmentCampaignBanner from "@/components/InstallmentCampaignBanner";
 import VillaGalleryLightbox from "@/components/VillaGalleryLightbox";
 import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
+import { computeSchemaOrgPriceRange } from "@/lib/price-engine";
 import { getInstallmentCampaignReadiness } from "@/lib/payments/installment-campaign";
 import { getPaytrReadiness } from "@/lib/payments/paytr/config";
 import { VILLAS, getFaqItems, REGION_INFO, formatAddress, type VillaSlug } from "@/lib/villa-content";
@@ -54,6 +55,14 @@ export default async function VillaDetailPage({ params, searchParams }: { params
   const otaPlatformNames = [villa.airbnbListingUrl ? "Airbnb" : null, villa.bookingListingUrl ? "Booking.com" : null].filter((name): name is string => Boolean(name));
   const otaPlatformNamesText = otaPlatformNames.length === 2 ? `${otaPlatformNames[0]} ya da ${otaPlatformNames[1]}` : otaPlatformNames[0];
   const canonical = `${ORIGIN}/${slug}`;
+  // Schema.org priceRange - GERÇEK, canlı D1 fiyat verisinden hesaplanır (yalnız bugün ve sonrası
+  // için tanımlı dönemler; geçmiş/süresi dolmuş bir dönem yanıltıcı bir aralık göstermesin diye
+  // dahil edilmez). Haftalık esas fiyat modelindeki dönemler (basePriceMinor/baseNights) etkin
+  // gecelik tutara çevrilir - price-engine.ts'teki AYNI mantık. Hiçbir fiyat tanımlı değilse alan
+  // hiç eklenmez (uydurma bir değer yok).
+  const villaFuturePrices = prices.filter((price) => price.villa === villa.villa && price.endDate >= todayIso);
+  const schemaPriceRange = computeSchemaOrgPriceRange(villaFuturePrices);
+  const priceRangeSchema = schemaPriceRange ? { priceRange: schemaPriceRange } : {};
   const structuredData = {
     "@context": "https://schema.org",
     "@graph": [
@@ -78,6 +87,7 @@ export default async function VillaDetailPage({ params, searchParams }: { params
           longitude: villa.geo.lng,
         },
         telephone: WHATSAPP_PHONE_DISPLAY_INTL,
+        ...priceRangeSchema,
         containsPlace: {
           "@type": "Accommodation",
           numberOfBedrooms: villa.quickFacts.bedroomCount,
@@ -144,6 +154,9 @@ export default async function VillaDetailPage({ params, searchParams }: { params
           <div className={styles.navlinks}><Link href="/">Ana sayfa</Link><a href="#galeri">Villa</a><a href="#donemsel-fiyatlar">Fiyatlar</a><a href="#konum">Konum</a><a href="#sss">SSS</a><a className={styles.cta} href="#rezervasyon">Müsaitlik</a></div>
         </nav>
         <div className={styles.detailHeroCopy} id="ana-icerik" tabIndex={-1}>
+          <nav aria-label="Breadcrumb" style={{fontSize:12,color:"rgba(255,255,255,.78)",marginBottom:8}}>
+            <Link href="/" style={{color:"inherit"}}>Ana sayfa</Link> · <span>{villa.name}</span>
+          </nav>
           <span className={styles.eyebrow}>{villa.label} · PATARA · KAŞ</span>
           <h1 className={styles.title}>{villa.name}</h1>
           <p className={styles.lead}>{villa.description}</p>

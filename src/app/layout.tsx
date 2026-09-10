@@ -96,8 +96,8 @@ export async function generateMetadata(): Promise<Metadata> {
         images: [
           {
             url: "/villas/safira-hero-20260830.jpg",
-            width: 1600,
-            height: 1066,
+            width: 1400,
+            height: 842,
             alt: "Patara Kaş Villa Safira özel havuzlu villa",
           },
         ],

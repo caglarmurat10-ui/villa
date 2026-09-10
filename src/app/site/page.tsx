@@ -41,7 +41,7 @@ export const metadata: Metadata = {
     siteName: "Safira & Destan Villas",
     locale: "tr_TR",
     type: "website",
-    images: [{ url: "/villas/safira-hero-20260830.jpg", alt: "Villa Safira Patara Kaş özel havuzlu villa" }],
+    images: [{ url: "/villas/safira-hero-20260830.jpg", width: 1400, height: 842, alt: "Villa Safira Patara Kaş özel havuzlu villa" }],
   },
   twitter: {
     card: "summary_large_image",

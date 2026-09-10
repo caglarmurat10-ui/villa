@@ -211,3 +211,24 @@ export function splitEvenInstallments(totalTRY: number, installmentCount: number
 export function splitEvenMinor(totalMinor: number, parts: number): number[] {
   return splitEven(totalMinor, parts);
 }
+
+export interface SchemaPriceRangeInput {
+  nightlyRate: number;
+  basePriceMinor?: number | null;
+  baseNights?: number | null;
+}
+
+// schema.org VacationRental.priceRange için: GERÇEK, çağıranın önceden bugün-veya-sonrası'na
+// filtrelediği dönemlerden min/max etkin gecelik tutarı hesaplar (src/app/site/[slug]/page.tsx).
+// Haftalık esas fiyat modelindeki (basePriceMinor/baseNights) dönemler etkin gecelik tutara
+// çevrilir - computePriceQuote'taki AYNI mantık, ayrı bir hesap yolu değil. Hiçbir dönem yoksa
+// undefined döner - uydurma bir "başlangıç fiyatı" ASLA üretilmez.
+export function computeSchemaOrgPriceRange(periods: SchemaPriceRangeInput[]): string | undefined {
+  if (periods.length === 0) return undefined;
+  const effectiveNightlyRates = periods.map((period) =>
+    period.basePriceMinor && period.baseNights ? period.basePriceMinor / 100 / period.baseNights : period.nightlyRate,
+  );
+  const min = Math.round(Math.min(...effectiveNightlyRates));
+  const max = Math.round(Math.max(...effectiveNightlyRates));
+  return `₺${min} - ₺${max}`;
+}

@@ -21,4 +21,17 @@ describe("public villa search metadata", () => {
       expect(description.length).toBeLessThanOrEqual(160);
     }
   });
+
+  it("OG görseli gerçek dosya piksel boyutlarını (2026-09-10'da JPEG header'ından doğrulandı) taşır - uydurma/varsayılan bir değer değil", () => {
+    const firstImage = (images: unknown) => (Array.isArray(images) ? images[0] : images) as { width?: number; height?: number } | undefined;
+    const safira = getPublicVillaMetadata("villa-safira");
+    const destan = getPublicVillaMetadata("villa-destan");
+    const safiraImage = firstImage(safira.openGraph?.images);
+    const destanImage = firstImage(destan.openGraph?.images);
+    expect(safiraImage?.width).toBe(1400);
+    expect(safiraImage?.height).toBe(842);
+    // İki villanın hero görseli AYNI boyutta değil - villaya göre farklı sabit kullanılmalı.
+    expect(destanImage?.width).toBe(1400);
+    expect(destanImage?.height).toBe(934);
+  });
 });

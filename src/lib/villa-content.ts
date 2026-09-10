@@ -141,7 +141,7 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
     ],
     instagram: "https://www.instagram.com/villasafirapatara/",
     facebook: "https://www.facebook.com/105073114600720",
-    description: "Patara’nın doğal dokusu içinde, özel havuzunuzdan ve bağımsız yaşam alanınızdan vazgeçmeden sakin ve özgür bir Akdeniz tatili.",
+    description: "Patara'nın doğal dokusu içinde, özel havuzunuzdan ve bağımsız yaşam alanınızdan vazgeçmeden sakin ve özgür bir Akdeniz tatili.",
     quote: "Günün hiçbir saatinde acele etmeniz gerekmeyen bir yer.",
     address: {
       streetAddress: "Gelemiş Mah. Karaağaçlıboğaz Sk. Kale Mevki No:60/9",
@@ -198,7 +198,7 @@ export const VILLAS: Record<VillaSlug, VillaContent> = {
     ],
     instagram: "https://www.instagram.com/villadestanpatara/",
     facebook: "https://www.facebook.com/1309122082284129",
-    description: "Patara, Kaş’ta özel havuzu, geniş yaşam alanları ve güçlü iç mekân detaylarıyla kendi ritminizde, mahremiyet odaklı bir villa tatili.",
+    description: "Patara, Kaş'ta özel havuzu, geniş yaşam alanları ve güçlü iç mekân detaylarıyla kendi ritminizde, mahremiyet odaklı bir villa tatili.",
     quote: "Dışarı çıkmak istemeyeceğiniz kadar size ait.",
     address: {
       streetAddress: "Gelemiş Mah. Cumhuriyet Cad. No:30",
@@ -274,7 +274,7 @@ export function getFaqItems(status: PaymentFaqStatus): VillaFaq[] {
 
 export const REGION_INFO = {
   kicker: "PATARA · KAŞ · ANTALYA",
-  title: "Patara’da özel havuzlu villa tatili.",
-  body: "Villa Safira ve Villa Destan, Antalya’nın Kaş ilçesine bağlı Gelemiş Mahallesi’nde (Patara) yer alır. Patara; uzun kumsalı, antik kenti ve Likya kültürüyle bilinen, Kaş merkezine yakın bir tatil bölgesidir. Bölgeye ulaşım genellikle Dalaman veya Antalya havalimanları üzerinden sağlanır.",
+  title: "Patara'da özel havuzlu villa tatili.",
+  body: "Villa Safira ve Villa Destan, Antalya'nın Kaş ilçesine bağlı Gelemiş Mahallesi'nde (Patara) yer alır. Patara; uzun kumsalı, antik kenti ve Likya kültürüyle bilinen, Kaş merkezine yakın bir tatil bölgesidir. Bölgeye ulaşım genellikle Dalaman veya Antalya havalimanları üzerinden sağlanır.",
   note: "Rezervasyon talebiniz onaylandığında ulaşım için ek yönlendirme de ekibimizden alabilirsiniz.",
 };

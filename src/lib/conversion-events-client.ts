@@ -1,6 +1,7 @@
 "use client";
 
 import type { VillaId } from "./analytics";
+import { readStoredConsent } from "./analytics";
 
 // Hafif Cloudflare-first (D1) attribution katmanı - GTM/GA4'ün YERİNE değil, ONUNLA BİRLİKTE.
 // Amaç: hangi sosyal medya UTM linkinin WhatsApp/rezervasyon/iletişim dönüşümüne yol açtığını,
@@ -62,6 +63,12 @@ export type TrackableConversionEvent = "page_view" | "whatsapp_click" | "booking
 // Best-effort: başarısızlık kullanıcı deneyimini ASLA engellemez (navigasyonu geciktirmez/bloklamaz).
 export function beaconConversionEvent(eventName: TrackableConversionEvent, villaId?: VillaId): void {
   if (typeof window === "undefined") return;
+  // GTM/GA4 consent kapısıyla AYNI karar: kullanıcı analytics'e izin vermediyse (veya henüz karar
+  // vermediyse - banner ilk yüklemede kapalı başlar) bu ilk-taraf D1 attribution çağrısı da
+  // ATILMAZ. UTM/landing path düşük-PII olsa da IP ile eşleşen davranışsal veri sayılabileceği için
+  // aynı onay durumuna tabi tutulur - analytics.ts'teki applyConsentDecision ile aynı kaynak.
+  const consent = readStoredConsent();
+  if (!consent?.analytics) return;
   try {
     const attribution = readStoredAttribution();
     const payload = {
