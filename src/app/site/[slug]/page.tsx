@@ -6,6 +6,7 @@ import InstallmentCampaignBanner from "@/components/InstallmentCampaignBanner";
 import VillaGalleryLightbox from "@/components/VillaGalleryLightbox";
 import { getVillaLocations, listPriceRanges, listReservations } from "@/lib/db";
 import { computeSchemaOrgPriceRange } from "@/lib/price-engine";
+import { socialDriveMedia } from "@/lib/social-drive-media";
 import { getInstallmentCampaignReadiness } from "@/lib/payments/installment-campaign";
 import { getPaytrReadiness } from "@/lib/payments/paytr/config";
 import { VILLAS, getFaqItems, REGION_INFO, formatAddress, type VillaSlug } from "@/lib/villa-content";
@@ -63,6 +64,10 @@ export default async function VillaDetailPage({ params, searchParams }: { params
   const villaFuturePrices = prices.filter((price) => price.villa === villa.villa && price.endDate >= todayIso);
   const schemaPriceRange = computeSchemaOrgPriceRange(villaFuturePrices);
   const priceRangeSchema = schemaPriceRange ? { priceRange: schemaPriceRange } : {};
+  // Gerçek, işletme sahibinin yüklediği tanıtım videosu (REAL_UPLOAD, sosyal yayında da kullanılan
+  // AYNI dosya - bkz. social-drive-media.ts) - villada video yoksa (ör. ileride yeni bir villa)
+  // bölüm hiç render edilmez, sahte/placeholder bir video gösterilmez.
+  const introVideo = socialDriveMedia.find((asset) => asset.villa === villa.villa && asset.mediaKind === "video");
   const structuredData = {
     "@context": "https://schema.org",
     "@graph": [
@@ -129,6 +134,18 @@ export default async function VillaDetailPage({ params, searchParams }: { params
           { "@type": "ListItem", position: 2, name: villa.name, item: canonical },
         ],
       },
+      ...(introVideo
+        ? [{
+            // uploadDate KASITLI OLARAK eklenmedi - Drive'daki gerçek yükleme tarihi güvenilir
+            // şekilde doğrulanamadı, tahmini bir tarih vermek yerine alan hiç eklenmedi.
+            "@type": "VideoObject",
+            "@id": `${canonical}/#video`,
+            name: `${villa.name} tanıtım videosu`,
+            description: `${villa.name} - gerçek çekim, havuz ve yaşam alanlarının tanıtım videosu.`,
+            thumbnailUrl: `${ORIGIN}${villa.cover}`,
+            contentUrl: `${ORIGIN}${introVideo.proxyPath}`,
+          }]
+        : []),
       {
         "@type": "FAQPage",
         "@id": `${canonical}#faq`,
@@ -218,6 +235,22 @@ export default async function VillaDetailPage({ params, searchParams }: { params
       <section className={styles.section} style={{ paddingTop: 0 }}>
         <VillaGalleryLightbox images={villa.gallery} villaName={villa.name} villaId={toVillaId(villa.villa)} />
       </section>
+
+      {introVideo ? (
+        <section className={styles.section} style={{ paddingTop: 0 }}>
+          <span className={styles.kicker}>TANITIM VİDEOSU</span>
+          <h2>{villa.name}’ı görüntülü keşfedin</h2>
+          <video
+            controls
+            preload="none"
+            poster={villa.cover}
+            style={{ width: "100%", maxWidth: 960, borderRadius: 16, display: "block" }}
+            aria-label={`${villa.name} tanıtım videosu`}
+          >
+            <source src={introVideo.proxyPath} type="video/mp4" />
+          </video>
+        </section>
+      ) : null}
 
       <section className={styles.locationDetail} id="konum">
         <span className={styles.kicker}>KONUM & ULAŞIM</span>

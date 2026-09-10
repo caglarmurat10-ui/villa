@@ -10,6 +10,26 @@ function proxyUrl(fileId: string, origin = ALLOWED_ORIGINS[0]) {
   return `${origin}/api/media/drive/${fileId}`;
 }
 
+describe("socialDriveMedia — envanter bütünlüğü", () => {
+  it("hiçbir fileId tekrar etmiyor (2026-09-10'da elle eklenen 102 yeni kayıtta kopya yok)", () => {
+    const ids = socialDriveMedia.map((asset) => asset.fileId);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it("hiçbir fileName aynı villa içinde tekrar etmiyor", () => {
+    const keys = socialDriveMedia.map((asset) => `${asset.villa}:${asset.fileName}`);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
+  it("Safira ve Destan'ın her ikisinin de en az bir video ve çok sayıda gerçek fotoğrafı var", () => {
+    for (const villa of ["Safira", "Destan"] as const) {
+      const villaAssets = socialDriveMedia.filter((asset) => asset.villa === villa);
+      expect(villaAssets.filter((a) => a.mediaKind === "video").length).toBeGreaterThanOrEqual(1);
+      expect(villaAssets.filter((a) => a.mediaKind === "image").length).toBeGreaterThan(40);
+    }
+  });
+});
+
 describe("approvedProxyMediaAsset — property (villa) isolation", () => {
   it("Safira media cannot target Destan (property mismatch rejected)", () => {
     const result = approvedProxyMediaAsset("Destan", proxyUrl(safiraAsset.fileId), ALLOWED_ORIGINS);

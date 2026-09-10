@@ -11,8 +11,12 @@ const PUBLIC_API_PATHS = new Set([
   "/api/payments/checkout",
   "/api/payments/paytr/callback",
 ]);
-// Dinamik token segmenti taşıyan public API yolları - şu an yalnız OTA export feed'i.
-const PUBLIC_API_PATH_PREFIXES = ["/api/calendar/export/"];
+// Dinamik token segmenti taşıyan public API yolları - OTA export feed'i VE villa detay
+// sayfalarındaki gerçek tanıtım videosu embed'i (bkz. site/[slug]/page.tsx). İkisi de kapalı bir
+// allowlist üzerinden çalışır (resolveDriveMediaById yalnız kayıtlı REAL_UPLOAD medyayı döner) -
+// keyfi bir Drive dosyasına erişim AÇMAZ, yalnız zaten sosyal yayında da kullanılan aynı medyayı
+// halka açık villa sayfasında da oynatılabilir kılar.
+const PUBLIC_API_PATH_PREFIXES = ["/api/calendar/export/", "/api/media/drive/"];
 // /odeme/[paymentId](/basarili|/basarisiz) - src/app/odeme/... altında zaten gerçek route, rewrite
 // gerekmez.
 const PUBLIC_PASSTHROUGH_PREFIXES = ["/odeme/"];

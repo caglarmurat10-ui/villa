@@ -16,8 +16,10 @@ const PUBLIC_API_PATHS = new Set([
   "/api/payments/paytr/callback",
 ]);
 // Dinamik token segmenti taşıyan public API yolları (Set ile tam eşleşmiyor, prefix ile kontrol
-// edilir) - şu an yalnız OTA export feed'i: /api/calendar/export/<opaque-token>.ics
-const PUBLIC_API_PATH_PREFIXES = ["/api/calendar/export/"];
+// edilir) - OTA export feed'i (/api/calendar/export/<opaque-token>.ics) VE villa detay
+// sayfalarındaki gerçek tanıtım videosu embed'i (bkz. src/middleware.ts - AYNI gerekçe/senkron
+// kalmalı). İkisi de kapalı bir allowlist üzerinden çalışır, keyfi dosya erişimi açmaz.
+const PUBLIC_API_PATH_PREFIXES = ["/api/calendar/export/", "/api/media/drive/"];
 // /rehber alt sayfaları - src/lib/region-guide-pages.ts'teki REGION_GUIDE_PAGE_SLUGS ve
 // src/middleware.ts'teki REGION_GUIDE_SLUGS ile birebir aynı kalmalı (üç bağımsız kopya - custom-worker.mjs
 // Next.js "@/" alias'larını çözemediği için middleware.ts'i import edemez, bkz. dosyanın başındaki
