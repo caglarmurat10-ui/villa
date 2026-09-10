@@ -806,7 +806,7 @@ const RETRY_BACKOFF_MINUTES = [30, 60];
 // hiç SEÇİLMEMESİ (Graph API'ye hiç istek gitmemesi VE SOCIAL_AUTO_PUBLISH_LIMIT slotu
 // TÜKETİLMEMESİ) için WHERE cümlesinin bir PARÇASI - yalnız sonradan "skipped" sayılmaz, hiç
 // adaylık listesine girmez.
-const DESTAN_INSTAGRAM_HARD_BLOCKED = true;
+const DESTAN_INSTAGRAM_HARD_BLOCKED = false;
 
 async function duePosts(env, scheduledAt) {
   const clock = istanbulClock(scheduledAt);
