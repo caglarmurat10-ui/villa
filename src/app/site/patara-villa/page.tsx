@@ -15,6 +15,7 @@ import {
   buildPataraVillaStructuredData,
 } from "@/lib/patara-villa-content";
 import styles from "../site.module.css";
+import hubStyles from "./patara-villa.module.css";
 
 export const metadata: Metadata = {
   ...buildPataraVillaMetadata(),
@@ -24,31 +25,69 @@ export const metadata: Metadata = {
 
 export default function PataraVillaHubPage() {
   const structuredData = buildPataraVillaStructuredData();
+  const safira = VILLAS["villa-safira"];
+  const destan = VILLAS["villa-destan"];
 
   return (
     <main className={styles.page}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(structuredData) }} />
       <a href="#ana-icerik" className={styles.skipLink}>İçeriğe atla</a>
 
-      <section className={styles.locationBlock} id="ana-icerik" tabIndex={-1}>
-        <span className={styles.kicker}>PATARA KİRALIK VİLLA</span>
-        <h1>Patara&apos;da özel havuzlu villa: Safira &amp; Destan.</h1>
-        <p>
-          Patara/Gelemiş Mahallesi&apos;nde iki ayrı özel havuzlu villa: Villa Safira ve Villa Destan.
-          İkisi de doğrudan rezervasyona açık, canlı müsaitlik ve dönemsel net fiyatla — aracı
-          komisyonu olmadan.
-        </p>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 20 }}>
-          <a className={styles.primary} href="#karsilastir">Villaları karşılaştır</a>
-          <TrackedWhatsappLink
-            className={styles.secondary}
-            href={whatsappLink("Merhaba, Patara'da kiralık villa hakkında bilgi almak istiyorum.")}
-            target="_blank"
-            rel="noopener noreferrer"
-            ctaLocation="patara_villa_hero"
-          >
-            WhatsApp&apos;tan Sor
-          </TrackedWhatsappLink>
+      <section className={hubStyles.hubHero} id="ana-icerik" tabIndex={-1}>
+        <div className={hubStyles.heroTopline}>
+          <Link href="/">Safira &amp; Destan Villas</Link>
+          <span>Patara · Kaş · Antalya</span>
+        </div>
+
+        <div className={hubStyles.heroGrid}>
+          <div className={hubStyles.heroCopy}>
+            <span className={hubStyles.kicker}>PATARA KİRALIK VİLLA</span>
+            <h1>Patara&apos;da özel havuzlu iki villa: Safira &amp; Destan</h1>
+            <p className={hubStyles.heroLead}>
+              Patara/Gelemiş Mahallesi&apos;nde iki ayrı özel havuzlu villa. Doğrudan rezervasyon,
+              canlı müsaitlik ve dönemsel net fiyatla; aracı komisyonu olmadan.
+            </p>
+            <div className={hubStyles.heroFacts} aria-label="Öne çıkan rezervasyon özellikleri">
+              <span>Doğrudan rezervasyon</span>
+              <span>Canlı müsaitlik</span>
+              <span>Net dönemsel fiyat</span>
+            </div>
+            <div className={hubStyles.hubActions}>
+              <a className={hubStyles.primaryCta} href="#karsilastir">Villaları karşılaştır</a>
+              <TrackedWhatsappLink
+                className={hubStyles.secondaryCta}
+                href={whatsappLink("Merhaba, Patara'da kiralık villa hakkında bilgi almak istiyorum.")}
+                target="_blank"
+                rel="noopener noreferrer"
+                ctaLocation="patara_villa_hero"
+              >
+                WhatsApp&apos;tan Sor
+              </TrackedWhatsappLink>
+            </div>
+          </div>
+
+          <div className={hubStyles.heroVisual} aria-label="Villa Safira ve Villa Destan">
+            <Link href="/villa-safira" className={hubStyles.villaTile}>
+              <img src={safira.cover} alt={safira.coverAlt} fetchPriority="high" />
+              <span className={hubStyles.tileCopy}>
+                <span>
+                  <small>VILLA 01</small>
+                  <strong>Villa Safira</strong>
+                </span>
+                <b aria-hidden="true">↗</b>
+              </span>
+            </Link>
+            <Link href="/villa-destan" className={hubStyles.villaTile}>
+              <img src={destan.cover} alt={destan.coverAlt} />
+              <span className={hubStyles.tileCopy}>
+                <span>
+                  <small>VILLA 02</small>
+                  <strong>Villa Destan</strong>
+                </span>
+                <b aria-hidden="true">↗</b>
+              </span>
+            </Link>
+          </div>
         </div>
       </section>
 
