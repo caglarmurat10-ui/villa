@@ -8,22 +8,26 @@ export type MetaTarget = {
   platform: MetaPlatform;
 };
 
-// 2026-09-10: Instagram yayın mimarisi Meta'nın "Instagram API with Instagram Login" akışını
-// kullanıyor (graph.instagram.com + Instagram User access token). Bu akışta profesyonel Instagram
-// hesabının bir Facebook Page'e bağlı olması yayın için önkoşul değildir. Bu nedenle Destan'daki
-// Facebook<->Instagram Business Portfolio uyuşmazlığı ilişki teşhisi olarak gösterilmeye devam eder,
-// fakat bağımsız Instagram yayınını HARD BLOCK etmez. Eski 2026-09-05 ve öncesi Destan Instagram
-// backlog'u ayrı güvenlik kapısında korunur ve yeniden yayınlanmaz.
+// 2026-09-08 GÜNCEL DOĞRULANMIŞ META DURUMU (işletme sahibinin Meta destek/backend kontrolünden
+// gelen en güncel bilgi - önceki "OAuth doğrulandı, aktif hedef" varsayımının YERİNE geçer):
+// @villadestanpatara (Instagram Asset ID 17841439303443100) şu anda "Safira & Destan Villas" iş
+// portföyüne (Business ID 625405565257264) TAM BAĞLI/SAHİPLİ değil - Meta bu varlığın BAŞKA bir
+// Business Manager/Portföy ile ilişkili olduğunu bildiriyor, hangi işletme olduğunu güvenlik
+// nedeniyle paylaşmıyor ve mevcut kullanıcının o işletmede yönetici erişimi yok. Bu GEÇİCİ/API
+// hatası DEĞİL - dış bir mülkiyet/sahiplik sorunu, yalnız Meta tarafında elle çözülebilir. Bu
+// yüzden statik olarak bloklanır (canlı Graph API'ye tekrar tekrar sormak - "spam" - yerine).
+// Instagram hesabının kendisi Instagram uygulamasında ELLE kullanılabilir durumda (bkz.
+// social-manual-publish.ts) - yalnız BU uygulamanın Graph API ile OTOMATİK yayın yapması engelli.
 export const DESTAN_INSTAGRAM_HARD_BLOCK = {
   villa: "Destan" as const,
   platform: "Instagram" as const,
-  blocked: false as boolean,
-  reason: "@villadestanpatara doğrudan Instagram Login API ile bağımsız yayınlanır. Facebook ↔ Instagram Business Portfolio ilişkisi ayrı bir teşhis/hesap bağlantısı konusudur ve doğrudan Instagram yayını için önkoşul değildir. 5 Eylül 2026 ve öncesi eski Destan Instagram kuyruğu güvenlik nedeniyle ayrıca engelli kalır.",
+  blocked: true as boolean,
+  reason: "@villadestanpatara Instagram varlığı şu anda başka bir Meta İşletme Portföyü ile ilişkilendirilmiş görünüyor; Safira & Destan Villas işletme portföyünün tam yönetici erişimi yok. Bu, Meta'nın kendi tarafında çözülmesi gereken bir sahiplik/mülkiyet sorunu - kodumuzdaki bir hata değil. Instagram hesabı uygulamada elle kullanılabilir; otomatik (Graph API) yayın bu sorun çözülene kadar devre dışı.",
 };
 
-// Organik yayın için fiilen desteklenen Meta hedefleri. Dört hedef de birbirinden bağımsız yayın
-// hedefidir; Facebook<->Instagram ilişki sağlığı ayrı olarak izlenir ve cross-platform teşhis amacı
-// taşır, bağımsız yayın motorunu durdurmaz.
+// Organik yayın için fiilen desteklenen Meta hedefleri. Dört hedef de burada listelenir (Destan
+// Instagram dahil) - "aktif" hedef olmak "şu an sağlıklı" anlamına gelmez, yalnız "izlenen/gerçek
+// bir hedef" anlamına gelir. Sağlık durumu ayrıca DESTAN_INSTAGRAM_HARD_BLOCK ile izlenir.
 export const META_ACTIVE_TARGETS = [
   { villa: "Safira", platform: "Instagram" },
   { villa: "Safira", platform: "Facebook" },
@@ -31,6 +35,9 @@ export const META_ACTIVE_TARGETS = [
   { villa: "Destan", platform: "Instagram" },
 ] as const satisfies readonly MetaTarget[];
 
+// Sağlık ekranı SocialPost.platform (Instagram/Facebook/TikTok/WhatsApp Durum) ile çalışır.
+// Bu helper yalnız politika bayrağı tekrar açılırsa Destan+Instagram kombinasyonunu bloklar;
+// OAuth doğrulaması sonrası mevcut production politikası blocked=false olduğu için dört Meta hedefi aktiftir.
 export function isMetaTargetHardBlocked(villa: Villa, platform: SocialPlatform) {
   return DESTAN_INSTAGRAM_HARD_BLOCK.blocked && villa === DESTAN_INSTAGRAM_HARD_BLOCK.villa && platform === DESTAN_INSTAGRAM_HARD_BLOCK.platform;
 }
@@ -39,11 +46,18 @@ export function metaTargetLabel(target: MetaTarget) {
   return `${target.villa} ${target.platform}`;
 }
 
-// Facebook<->Instagram ilişki sonucu artık bağımsız organik yayın için bir gate değildir. Bu helper
-// geçmiş çağrı noktaları/teşhis ekranlarıyla geriye uyumluluk için korunur. Yalnız açık bir statik
-// hard-block varsa yayını durdurur; LINK_MISSING/MISMATCH/PERMISSION/API_ERROR sonuçları ilişki
-// teşhisi olarak döner ancak Facebook veya Instagram'ın kendi token/account doğrulaması sağlıklıysa
-// bağımsız yayın kanalını kapatmaz.
+// Bölüm 8 (2026-09-08 güncellendi): Villa Destan Instagram, kendi tarafımızda OAuth token'ı bağlı
+// görünse bile Meta'nın kendisi bu varlığın (Instagram Asset ID 17841439303443100) başka bir
+// Business Manager/Portföy ile ilişkili olduğunu bildiriyor - Facebook Sayfası <-> Instagram
+// profesyonel hesabı ilişkisi bu YÜZDEN kurulamıyor. Bu bizim kontrolümüz dışında, dış bir Meta
+// SAHİPLİK sorunu (yalnız "bağlantı eksik" değil - "bu hesap zaten başka bir işletmenin").
+// FACEBOOK_IG_LINK_MISSING/MISMATCH bu spesifik dış nedenden kaynaklandığında, Destan+Instagram
+// için ayrı ve açık bir BLOCKED_EXTERNAL_META_OWNERSHIP etiketiyle raporlanır - "bizim hatamız"
+// (PERMISSION_MISSING/SCOPE_UNAVAILABLE/API_ERROR) ile karıştırılmaz. NOT: Bu artık yalnız canlı
+// Graph API kontrolüne değil, DESTAN_INSTAGRAM_HARD_BLOCK statik bayrağına da dayanır - Meta
+// destek ekibinin doğruladığı bir sahiplik sorunu GEÇİCİ değildir, her 15 dakikada bir canlı
+// kontrol/Graph API isteği tekrarlamak (spam) yerine statik olarak bloklanır. Bayrak, admin bir
+// reconnect/health check ile sorunun çözüldüğünü doğruladıktan sonra elle false'a çevrilir.
 export type MetaPublishGateCode = FacebookInstagramRelationshipClassification["code"] | "BLOCKED_EXTERNAL_META_OWNERSHIP";
 
 export type MetaPublishGateResult = {
@@ -53,8 +67,12 @@ export type MetaPublishGateResult = {
 };
 
 const DESTAN_OWNERSHIP_LABEL =
-  "@villadestanpatara Facebook ↔ Instagram Business Portfolio ilişkisi Meta tarafında uyuşmuyor. Bu ilişki sorunu ayrı izlenir; doğrudan Instagram Login API yayınına engel değildir.";
+  "@villadestanpatara şu anda başka bir Meta İşletme Portföyü ile ilişkilendirilmiş görünüyor; Safira & Destan Villas işletme portföyünün tam yönetici erişimi yok. Bu, Meta'nın kendi tarafında çözülmesi gereken bir sahiplik/mülkiyet sorunu - kodumuzdaki bir hata değil. Instagram hesabı uygulamada elle kullanılabilir; otomatik yayın bu sorun çözülene kadar devre dışı.";
 
+// hardBlockedOverride parametresi YALNIZ testler içindir - gerçek çağrı yerleri (publish route,
+// health route) hiç geçirmez ve gerçek DESTAN_INSTAGRAM_HARD_BLOCK.blocked bayrağı kullanılır. Bu
+// sayede fonksiyon hem "şu an gerçekten bloklu" (varsayılan/production) hem "bayrak temizlendikten
+// sonra" davranışını mock/module-mutation olmadan test edebilir.
 export function metaPublishGate(
   villa: Villa,
   platform: MetaPlatform,
@@ -64,24 +82,28 @@ export function metaPublishGate(
   const isDestanInstagram = villa === "Destan" && platform === "Instagram";
   const destanInstagramHardBlocked = hardBlockedOverride ?? DESTAN_INSTAGRAM_HARD_BLOCK.blocked;
 
+  // Doğrulanmış, kalıcı dış sahiplik sorunu - canlı Graph API kontrolüne HİÇ gitmeden statik
+  // olarak bloklanır (bkz. yukarıdaki not - "do not create Graph spam").
   if (isDestanInstagram && destanInstagramHardBlocked) {
     return { blocked: true, code: "BLOCKED_EXTERNAL_META_OWNERSHIP", label: DESTAN_OWNERSHIP_LABEL };
   }
 
   if (!relationship) {
     return {
-      blocked: false,
+      blocked: true,
       code: "FACEBOOK_IG_API_ERROR",
-      label: `${villa} Facebook ↔ Instagram ilişki durumu okunamadı; bağımsız ${platform} yayını bu teşhisten etkilenmez.`,
+      label: `${villa} ${platform} ilişki durumu okunamadı; yayın güvenlik nedeniyle durduruldu.`,
     };
   }
 
+  if (isDestanInstagram && (relationship.code === "FACEBOOK_IG_LINK_MISSING" || relationship.code === "FACEBOOK_IG_LINK_MISMATCH")) {
+    return { blocked: true, code: "BLOCKED_EXTERNAL_META_OWNERSHIP", label: DESTAN_OWNERSHIP_LABEL };
+  }
+
   return {
-    blocked: false,
+    blocked: !relationship.healthy,
     code: relationship.code,
-    label: relationship.healthy === true
-      ? relationship.label
-      : `${relationship.label} · Bu ilişki uyarısı bağımsız ${platform} yayınını durdurmaz.`,
+    label: relationship.label,
   };
 }
 
