@@ -1,7 +1,8 @@
 // Bu test dosyasi calisma zamanini (Cloudflare Workers/D1) taklit etmez - src/app/api/meta/instagram/
 // publish/route.ts ve custom-worker.mjs, getCloudflareContext/D1 bağımlılığı yuzunden duz Node/vitest
-// altinda calistirilamiyor. Bunun yerine kritik yayın korumalarının kaynak kodunda mevcut olduğunu
-// doğrulayan regresyon/karakterizasyon testleri kullanılır.
+// altinda calistirilamiyor. Bunun yerine, hicbir zaman kaldirilmamasi gereken iki HARD GUARD'in kaynak
+// kodunda hala mevcut oldugunu dogrulayan bir regresyon/karakterizasyon testi: guard yanlislikla
+// silinir/zayiflatilirsa bu test kirilir. Gercek yayin davranisini degil, guard'in VARLIGINI test eder.
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -10,7 +11,7 @@ import { describe, expect, it } from "vitest";
 const HERE = dirname(fileURLToPath(import.meta.url)); // .../src/lib
 const ROOT = resolve(HERE, "..", ".."); // .../  (proje koku)
 
-describe("Destan Instagram legacy backlog güvenlik regresyonu", () => {
+describe("Destan Instagram güvenli aktivasyon regresyonu", () => {
   it("cron yalnız 2026-09-05 ve önceki Destan Instagram backlog'unu dışlıyor", () => {
     const source = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
     expect(source).toContain("NOT (villa = 'Destan' AND platform = 'Instagram' AND scheduled_date <= '2026-09-05')");
@@ -22,21 +23,12 @@ describe("Destan Instagram legacy backlog güvenlik regresyonu", () => {
       "utf-8",
     );
     expect(source).toContain('post.villa === "Destan" && post.scheduledDate <= "2026-09-05"');
+    // Guard, herhangi bir Graph API/medya cagrisindan ONCE calismali - import satirlarini degil,
+    // guard'dan SONRAKI ilk gercek publishInstagram* CAGRISINI ariyoruz (fonksiyon govdesinde).
     const guardIndex = source.indexOf('post.villa === "Destan"');
     const nextPublishCallIndex = source.indexOf("publishInstagram", guardIndex);
     expect(guardIndex).toBeGreaterThan(-1);
     expect(nextPublishCallIndex).toBeGreaterThan(guardIndex);
-  });
-
-  it("Destan Instagram publish route Facebook<->Instagram relationship gate'i kullanmıyor", () => {
-    const source = readFileSync(
-      resolve(ROOT, "src", "app", "api", "meta", "instagram", "publish", "route.ts"),
-      "utf-8",
-    );
-    expect(source).not.toContain("checkFacebookInstagramRelationshipForVilla");
-    expect(source).not.toContain("metaPublishGate(");
-    expect(source).toContain("getInstagramCredentials(post.villa)");
-    expect(source).toContain("getInstagramPublishingLimit(account.accountId, account.accessToken)");
   });
 });
 
@@ -63,25 +55,27 @@ describe("Sosyal otomatik yayin MAX_ATTEMPTS regresyonu", () => {
   });
 });
 
-describe("Cron izolasyonu regresyonu", () => {
-  it("runSocialCron her postu KENDI try/catch bloğunda işler - bir hata digerlerini durdurmaz", () => {
+describe("Cron izolasyonu regresyonu (bölüm 9/18 test 7 - bir hedefin hatası digerlerini durdurmaz)", () => {
+  it("runSocialCron her postu KENDI try/catch bloğunda işler - bir hata dongu disina cikip digerlerini iptal etmez", () => {
     const source = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
     const fnStart = source.indexOf("async function runSocialCron");
     expect(fnStart).toBeGreaterThan(-1);
     const fnBody = source.slice(fnStart, source.indexOf("\n}", fnStart));
     expect(fnBody).toContain("for (const post of posts) {");
+    // try, for'un ICINDE (her post icin ayri) olmali - for'un disinda TEK bir try/catch DEGIL.
     const forIndex = fnBody.indexOf("for (const post of posts) {");
     const tryIndex = fnBody.indexOf("try {", forIndex);
     const catchIndex = fnBody.indexOf("} catch (error) {", tryIndex);
     expect(tryIndex).toBeGreaterThan(forIndex);
     expect(catchIndex).toBeGreaterThan(tryIndex);
+    // catch bloğu döngüyü kirmiyor (break/return yok) - hata sayilip bir sonraki post'a devam edilir.
     const catchBody = fnBody.slice(catchIndex, fnBody.indexOf("}", fnBody.indexOf("errorCount += 1;", catchIndex)) + 1);
     expect(catchBody).not.toContain("break");
     expect(catchBody).not.toContain("return");
   });
 });
 
-describe("Exponential backoff regresyonu", () => {
+describe("Exponential backoff regresyonu (sabit 30dk cooldown yerine)", () => {
   it("duePosts artan bekleme (1. hata sonrasi 30dk, 2. hata sonrasi 60dk) uyguluyor", () => {
     const source = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
     expect(source).toContain("const RETRY_BACKOFF_MINUTES = [30, 60];");
@@ -90,15 +84,14 @@ describe("Exponential backoff regresyonu", () => {
   });
 });
 
-describe("DESTAN_IG doğrudan Instagram Login yayını regresyonu", () => {
-  it("worker global Destan Instagram hard-block'unu kapatır; yalnız legacy backlog filtresi kalır", () => {
+describe("DESTAN_IG = BLOCKED_EXTERNAL_META_OWNERSHIP regresyonu (2026-09-08 dogrulanan Meta sahiplik sorunu)", () => {
+  it("duePosts() Destan+Instagram'i (tarihten bagimsiz TUMU) WHERE cumlesinde eler - cron adaylik listesine hic girmez", () => {
     const source = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
-    expect(source).toContain("const DESTAN_INSTAGRAM_HARD_BLOCKED = false;");
-    expect(source).not.toContain("const DESTAN_INSTAGRAM_HARD_BLOCKED = true;");
-    expect(source).toContain("NOT (villa = 'Destan' AND platform = 'Instagram' AND scheduled_date <= '2026-09-05')");
+    expect(source).toContain("const DESTAN_INSTAGRAM_HARD_BLOCKED = true;");
+    expect(source).toContain("AND NOT (villa = 'Destan' AND platform = 'Instagram')");
   });
 
-  it("worker ve sosyal hesap politikası aynı hard-block değerini taşır", () => {
+  it("custom-worker.mjs (DESTAN_INSTAGRAM_HARD_BLOCKED) ve social-account-policy.ts (DESTAN_INSTAGRAM_HARD_BLOCK.blocked) AYNI degeri tasir", () => {
     const cronSource = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
     const policySource = readFileSync(resolve(ROOT, "src", "lib", "social-account-policy.ts"), "utf-8");
     const cronMatch = cronSource.match(/const DESTAN_INSTAGRAM_HARD_BLOCKED = (true|false);/);
@@ -106,6 +99,11 @@ describe("DESTAN_IG doğrudan Instagram Login yayını regresyonu", () => {
     expect(cronMatch).not.toBeNull();
     expect(policyMatch).not.toBeNull();
     expect(cronMatch![1]).toBe(policyMatch![1]);
-    expect(cronMatch![1]).toBe("false");
+  });
+
+  it("metaPublishGate icin BLOCKED_EXTERNAL_META_OWNERSHIP kodu kaynak kodda tanimli (eski BLOCKED_EXTERNAL_META_SETUP degil)", () => {
+    const source = readFileSync(resolve(ROOT, "src", "lib", "social-account-policy.ts"), "utf-8");
+    expect(source).toContain("BLOCKED_EXTERNAL_META_OWNERSHIP");
+    expect(source).not.toContain("BLOCKED_EXTERNAL_META_SETUP");
   });
 });
