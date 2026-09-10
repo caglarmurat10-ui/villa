@@ -21,35 +21,20 @@ jobs:
           fetch-depth: 0
 
       - name: Enable direct Destan Instagram cron target
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
-
-          path = Path("custom-worker.mjs")
-          text = path.read_text(encoding="utf-8")
-          old = "const DESTAN_INSTAGRAM_HARD_BLOCKED = true;"
-          new = "const DESTAN_INSTAGRAM_HARD_BLOCKED = false;"
+          path = Path('custom-worker.mjs')
+          text = path.read_text(encoding='utf-8')
+          old = 'const DESTAN_INSTAGRAM_HARD_BLOCKED = true;'
+          new = 'const DESTAN_INSTAGRAM_HARD_BLOCKED = false;'
           if old not in text and new not in text:
-              raise SystemExit("Expected Destan Instagram worker guard was not found")
+              raise SystemExit('Expected Destan Instagram worker guard was not found')
           if old in text:
               text = text.replace(old, new, 1)
-
-          old_comment = """// 2026-09-08: Meta, @villadestanpatara'nın başka bir İşletme Portföyü ile ilişkili olduğunu
-// bildirdi (geçici değil, dış bir sahiplik sorunu) - bu yüzden true. Bu satırların cron tarafından
-// hiç SEÇİLMEMESİ (Graph API'ye hiç istek gitmemesi VE SOCIAL_AUTO_PUBLISH_LIMIT slotu
-// TÜKETİLMEMESİ) için WHERE cümlesinin bir PARÇASI - yalnız sonradan \"skipped\" sayılmaz, hiç
-// adaylık listesine girmez.
-"""
-          new_comment = """// 2026-09-10: Instagram yayınları doğrudan Instagram API with Instagram Login akışını
-// (graph.instagram.com + Instagram User token) kullanır; Facebook Page/Business Portfolio
-// ilişkisi bu bağımsız yayın yolunun önkoşulu değildir. Bu nedenle yeni Destan Instagram
-// planları cron adayıdır. 2026-09-05 ve öncesi legacy backlog aşağıdaki ayrı SQL guard ile
-// engelli kalır.
-"""
-          if old_comment in text:
-              text = text.replace(old_comment, new_comment, 1)
-
-          path.write_text(text, encoding="utf-8")
+          path.write_text(text, encoding='utf-8')
+          PY
 
       - name: Commit worker source patch
         shell: bash
