@@ -71,7 +71,6 @@ export default function PataraVillaHubPage() {
               <img src={safira.cover} alt={safira.coverAlt} fetchPriority="high" />
               <span className={hubStyles.tileCopy}>
                 <span>
-                  <small>VILLA 01</small>
                   <strong>Villa Safira</strong>
                 </span>
                 <b aria-hidden="true">↗</b>
@@ -81,7 +80,6 @@ export default function PataraVillaHubPage() {
               <img src={destan.cover} alt={destan.coverAlt} />
               <span className={hubStyles.tileCopy}>
                 <span>
-                  <small>VILLA 02</small>
                   <strong>Villa Destan</strong>
                 </span>
                 <b aria-hidden="true">↗</b>
