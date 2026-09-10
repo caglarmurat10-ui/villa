@@ -89,11 +89,10 @@ export default function MessageCenter({ reservations, locations, checkoutReminde
     }
   }
 
-  async function savePhone(reservation: Reservation) {
-    const phone = (phoneDrafts[reservation.id] ?? "").trim();
+  async function persistPhone(reservation: Reservation, phone: string, successMessage = "WhatsApp numarası kaydedildi."): Promise<Reservation | null> {
     if (normalizeWhatsappPhone(phone).length < 10) {
       setNotice((current) => ({ ...current, [reservation.id]: "Geçerli bir WhatsApp numarası girin." }));
-      return;
+      return null;
     }
 
     setSavingPhone(reservation.id);
@@ -107,18 +106,26 @@ export default function MessageCenter({ reservations, locations, checkoutReminde
       const data = await response.json();
       if (!response.ok) throw new Error(data.error ?? "WhatsApp numarası kaydedilemedi.");
 
-      setItems((current) => current.map((item) => item.id === reservation.id ? data.reservation : item));
-      setPhoneDrafts((current) => ({ ...current, [reservation.id]: data.reservation.phone ?? phone }));
-      setNotice((current) => ({ ...current, [reservation.id]: "WhatsApp numarası kaydedildi." }));
+      const updatedReservation = data.reservation as Reservation;
+      setItems((current) => current.map((item) => item.id === reservation.id ? updatedReservation : item));
+      setPhoneDrafts((current) => ({ ...current, [reservation.id]: updatedReservation.phone ?? phone }));
+      setNotice((current) => ({ ...current, [reservation.id]: successMessage }));
+      return updatedReservation;
     } catch (error) {
       setNotice((current) => ({ ...current, [reservation.id]: error instanceof Error ? error.message : "WhatsApp numarası kaydedilemedi." }));
+      return null;
     } finally {
       setSavingPhone(null);
     }
   }
 
-  function send(reservation: Reservation, type: MessageType) {
-    const phone = (reservation.phone ?? "").trim();
+  async function savePhone(reservation: Reservation) {
+    const phone = (phoneDrafts[reservation.id] ?? "").trim();
+    await persistPhone(reservation, phone);
+  }
+
+  async function send(reservation: Reservation, type: MessageType) {
+    const phone = (phoneDrafts[reservation.id] ?? reservation.phone ?? "").trim();
     const number = normalizeWhatsappPhone(phone);
 
     if (type === "Giriş" && !locationLink(reservation, locations)) {
@@ -126,11 +133,28 @@ export default function MessageCenter({ reservations, locations, checkoutReminde
       return;
     }
     if (number.length < 10) {
-      setNotice((current) => ({ ...current, [reservation.id]: "Önce aşağıdaki alana WhatsApp numarasını girip kaydedin." }));
+      setNotice((current) => ({ ...current, [reservation.id]: "Geçerli bir WhatsApp numarası girin. Ayrıca 'Numarayı kaydet' demeniz gerekmez." }));
       return;
     }
 
-    const text = messageText(reservation, type, locations);
+    // Kullanıcı numarayı ilk kez burada yazdıysa ayrı bir "Kaydet" adımı istemiyoruz. Mesaj açılmadan
+    // ÖNCE rezervasyona kaydedilir; db.ts içindeki aynı PATCH yan etkisi çıkış hatırlatmasını da
+    // idempotent biçimde planlar/günceller. Böylece konumu ilk gönderdiğimiz telefon daha sonra
+    // otomatik çıkış hatırlatması ve manuel "Çıkış" düğmesi için hafızada kalır.
+    let currentReservation = reservation;
+    if (phone !== (reservation.phone ?? "").trim()) {
+      const saved = await persistPhone(
+        reservation,
+        phone,
+        type === "Giriş"
+          ? "Numara kaydedildi; çıkış hatırlatması da planlandı. WhatsApp açılıyor…"
+          : "Numara kaydedildi. WhatsApp açılıyor…",
+      );
+      if (!saved) return;
+      currentReservation = saved;
+    }
+
+    const text = messageText(currentReservation, type, locations);
     const url = `https://wa.me/${number}?text=${encodeURIComponent(text)}`;
     window.location.href = url;
   }
@@ -138,13 +162,13 @@ export default function MessageCenter({ reservations, locations, checkoutReminde
   return <main className="message-page">
     <div className="message-top"><a href="/">← Ana panele dön</a><span>Villa Yönetim</span></div>
     <section className="message-panel">
-      <div className="message-hero"><div><span className="eyebrow">WHATSAPP MESAJLARI</span><h1>Hazır müşteri mesajları</h1><p>Her rezervasyonda WhatsApp numarasını buradan girebilir veya değiştirebilirsiniz. Kaydettikten sonra Giriş ya da Çıkış düğmesi ilgili kişiyi doğrudan WhatsApp'ta açar.</p></div></div>
+      <div className="message-hero"><div><span className="eyebrow">WHATSAPP MESAJLARI</span><h1>Hazır müşteri mesajları</h1><p>WhatsApp numarasını bir kez yazın. Giriş & konum veya Çıkış düğmesine bastığınızda numara otomatik kaydedilir; ayrıca “Numarayı kaydet” demeniz gerekmez. Kayıt, planlı çıkış hatırlatmasını da günceller. WhatsApp otomasyonu bağlı değilse Çıkış düğmesiyle manuel göndermeye devam edebilirsiniz.</p></div></div>
       <div className="message-list">{items.length === 0 ? <div className="message-empty">Aktif rezervasyon yok.</div> : items.map((reservation) => <article className="message-card" key={reservation.id}>
         <div className={`message-villa ${reservation.villa.toLowerCase()}`}>{reservation.villa[0]}</div>
         <div className="message-info">
           <strong>{reservation.guestName}</strong>
           <span>{villaName(reservation)} · {formatDate(reservation.checkIn)} — {formatDate(reservation.checkOut)}</span>
-          <span className={reservation.phone ? "contact-ready" : "contact-missing"}>{reservation.phone ? `Kayıtlı WhatsApp: ${reservation.phone}` : "WhatsApp numarası eksik"}</span>
+          <span className={reservation.phone ? "contact-ready" : "contact-missing"}>{reservation.phone ? `Kayıtlı WhatsApp: ${reservation.phone}` : "WhatsApp numarası ilk gönderimde otomatik kaydedilecek"}</span>
           <label>
             <span>WhatsApp numarası</span>
             <input
@@ -191,8 +215,8 @@ export default function MessageCenter({ reservations, locations, checkoutReminde
         </div>
         <div className="message-actions">
           <button className="phone-save" disabled={savingPhone === reservation.id} onClick={() => void savePhone(reservation)}>{savingPhone === reservation.id ? "Kaydediliyor…" : "Numarayı kaydet"}</button>
-          <button className="checkin" onClick={() => send(reservation, "Giriş")}>Giriş & konum</button>
-          <button className="checkout" onClick={() => send(reservation, "Çıkış")}>Çıkış</button>
+          <button className="checkin" disabled={savingPhone === reservation.id} onClick={() => void send(reservation, "Giriş")}>{savingPhone === reservation.id ? "Kaydediliyor…" : "Giriş & konum"}</button>
+          <button className="checkout" disabled={savingPhone === reservation.id} onClick={() => void send(reservation, "Çıkış")}>{savingPhone === reservation.id ? "Kaydediliyor…" : "Çıkış"}</button>
         </div>
       </article>)}</div>
     </section>
