@@ -15,8 +15,6 @@ import {
 } from "@/lib/social-db";
 import { approvedProxyMediaAsset } from "@/lib/social-drive-media";
 import { listSocialPostMedia, type SocialPostMediaItem } from "@/lib/social-media-store";
-import { checkFacebookInstagramRelationshipForVilla } from "@/lib/facebook-instagram-relationship-live";
-import { metaPublishGate } from "@/lib/social-account-policy";
 
 const schema = z.object({
   postId: z.string().trim().min(1, "Paylaşım kimliği gerekli."),
@@ -44,27 +42,20 @@ export async function POST(request: Request) {
   if (post.platform !== "Instagram") return Response.json({ error: "Bu endpoint yalnızca Instagram paylaşımları içindir." }, { status: 400 });
   if (post.status !== "Planlandı") return Response.json({ error: "Bu paylaşım daha önce yayınlanmış." }, { status: 409 });
   if (post.approvalStatus !== "Onaylandı") return Response.json({ error: "Instagram yayını için önce insan onayı verilmelidir." }, { status: 409 });
-  // HARD GATE: Destan Instagram'ın Business Portfolio ownership sorunu çözülmedi - hem otomatik
-  // cron hem manuel "Şimdi yayınla" için, Graph API'ye hiçbir istek gitmeden burada durur. Cron
-  // tarafı aynı gate'i custom-worker.mjs'in duePosts() sorgusunda ayrıca uyguluyor (bu satırın cron
-  // tarafından hiç seçilmemesi için); bu ikinci katman, endpoint'in doğrudan çağrılmasına karşı.
+
+  // Eski Destan Instagram backlog'u yeniden canlandırılmaz. 2026-09-05 ve öncesindeki kayıtlar,
+  // önceki Meta bağlantı sorunları döneminden kaldığı için burada kalıcı güvenlik sınırı olarak
+  // korunur. Yeni kayıtlar (2026-09-06 ve sonrası) doğrudan Instagram Login API akışıyla normal
+  // şekilde yayınlanabilir.
   if (post.villa === "Destan" && post.scheduledDate <= "2026-09-05") {
     return Response.json({ error: "Villa Destan Instagram eski bekleyen içerikleri güvenlik nedeniyle yeniden yayınlanmaz. 6 Eylül 2026 ve sonrası planlar aktiftir." }, { status: 409 });
   }
 
-  // BLOCKED_EXTERNAL_META_OWNERSHIP gate: Villa Destan Instagram için, gerçek/canlı Facebook<->Instagram
-  // ilişki durumu Meta'nın kendisinden doğrulanmadan HİÇBİR Graph API yayın isteği gönderilmez. Bu
-  // statik bir bayrak değil - dış Meta yapılandırması düzeltildiğinde otomatik olarak açılır (bkz.
-  // social-account-policy.ts metaPublishGate). Diğer üç hedefi (SAFIRA_IG, SAFIRA_FB, DESTAN_FB)
-  // etkilemez - yalnız villa==="Destan" && platform==="Instagram" için çalışır.
-  if (post.villa === "Destan") {
-    const relationship = await checkFacebookInstagramRelationshipForVilla("Destan").catch(() => null);
-    const gate = metaPublishGate("Destan", "Instagram", relationship);
-    if (gate.blocked) {
-      return Response.json({ error: gate.label, code: gate.code }, { status: 409 });
-    }
-  }
-
+  // Instagram tarafı Meta'nın doğrudan "Instagram API with Instagram Login" akışını kullanır
+  // (graph.instagram.com + Instagram User access token). Bu akış Facebook Page bağlantısı
+  // gerektirmediğinden Facebook<->Instagram relationship/Business Portfolio sonucu burada yayın
+  // gate'i değildir. Gerçek güvenlik kapısı aşağıdaki Instagram credential/account-id/quota/media
+  // doğrulamalarıdır.
   const allowedOrigins = [new URL(request.url).origin, "https://villa-yonetim.caglarmurat10.workers.dev"];
   let media: SocialPostMediaItem[] = await listSocialPostMedia(post.id);
   if (media.length === 0 && post.mediaUrl) {
