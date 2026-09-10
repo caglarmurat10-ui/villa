@@ -2,7 +2,6 @@ import { getFacebookPageProfile } from "@/lib/facebook";
 import { getInstagramProfile, getInstagramPublishingLimit } from "@/lib/meta";
 import { getFacebookCredentials, getInstagramCredentials, listMetaAccounts } from "@/lib/meta-store";
 import { brandProfiles } from "@/lib/brand-profiles";
-import { DESTAN_INSTAGRAM_HARD_BLOCK, isMetaTargetHardBlocked, metaPublishGate } from "@/lib/social-account-policy";
 import { checkFacebookInstagramRelationships } from "@/lib/facebook-instagram-relationship-live";
 import type { Villa } from "@/lib/types";
 
@@ -61,13 +60,15 @@ export async function GET() {
 
   const [checks, relationships] = await Promise.all([
     Promise.all(villas.flatMap((villa) => [
-      ...(isMetaTargetHardBlocked(villa, "Instagram") ? [] : [(async () => {
+      (async () => {
         const isConnected = connected.has(`${villa}:Instagram`);
         if (!isConnected) return { villa, platform: "Instagram" as const, connected: false, healthy: false, label: "Bağlı değil" };
         try {
           const account = await getInstagramCredentials(villa);
           if (!account) return { villa, platform: "Instagram" as const, connected: false, healthy: false, label: "Bağlı değil" };
 
+          // Instagram API with Instagram Login doğrudan Instagram token/account-id doğrulaması.
+          // Facebook Page ilişki sonucu burada Instagram yayın sağlığına dahil edilmez.
           const profile = await getInstagramProfile(account.accessToken);
           const healthy = profile.id === account.accountId;
           if (!healthy) {
@@ -103,7 +104,7 @@ export async function GET() {
         } catch (error) {
           return { villa, platform: "Instagram" as const, connected: true, healthy: false, ...safeFailure(error, "Instagram") };
         }
-      })()]),
+      })(),
       (async () => {
         const isConnected = connected.has(`${villa}:Facebook`);
         if (!isConnected) return { villa, platform: "Facebook" as const, connected: false, healthy: false, label: "Bağlı değil" };
@@ -153,14 +154,15 @@ export async function GET() {
     checkFacebookInstagramRelationships(),
   ]);
 
-  // Ham FACEBOOK_IG_LINK_MISSING/MISMATCH kodları, Villa Destan Instagram için özellikle dış Meta
-  // Business Suite yapılandırma eksikliğini gösteriyorsa (bkz. metaPublishGate) BLOCKED_EXTERNAL_META_OWNERSHIP
-  // olarak yeniden etiketlenir - panel "bizim hatamız" ile "Meta'da elle düzeltilmesi gereken dış sorun"
-  // ayrımını net gösterir. Diğer üç hedef için (Safira IG/FB, Destan FB) davranış DEĞİŞMEZ.
-  const gatedRelationships = relationships.map((item) => {
-    const gate = metaPublishGate(item.villa, "Instagram", item);
-    return { ...item, code: gate.code, label: gate.label };
-  });
+  // Facebook ↔ Instagram ilişki sağlığı artık bağımsız yayın kanallarının gate'i değildir.
+  // Eşleşme/ownership uyarıları görünür kalır; kullanıcı daha sonra Meta tarafında ilişkiyi
+  // düzelttiğinde cross-platform yönetim de temizlenir.
+  const relationshipDiagnostics = relationships.map((item) => ({
+    ...item,
+    label: item.healthy === true
+      ? item.label
+      : `${item.label} · Bağımsız Facebook/Instagram yayını bu ilişki uyarısından etkilenmez.`,
+  }));
 
   return Response.json({
     checkedAt: new Date().toISOString(),
@@ -168,12 +170,8 @@ export async function GET() {
     relationshipsHealthy: relationships.every((item) => item.healthy === true),
     connectedCount: checks.filter((item) => item.connected).length,
     expectedCount: checks.length,
-    blocked: DESTAN_INSTAGRAM_HARD_BLOCK.blocked ? [{
-      villa: DESTAN_INSTAGRAM_HARD_BLOCK.villa,
-      platform: DESTAN_INSTAGRAM_HARD_BLOCK.platform,
-      label: DESTAN_INSTAGRAM_HARD_BLOCK.reason,
-    }] : [],
-    relationships: gatedRelationships,
+    blocked: [],
+    relationships: relationshipDiagnostics,
     checks,
   }, {
     headers: { "Cache-Control": "no-store" },
