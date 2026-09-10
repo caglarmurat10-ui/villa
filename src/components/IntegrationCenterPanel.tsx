@@ -75,7 +75,7 @@ function buildServiceRows(snapshot: IntegrationCenterSnapshot): ServiceRow[] {
   };
 
   const paytrStatus: ServiceState = snapshot.paytr.state === "PAYTR_READY" ? "READY" : snapshot.paytr.state === "PAYTR_TEST_MODE_ONLY" ? "WARNING" : "WAITING_USER_ACTION";
-  const metaOrganicOk = snapshot.metaOrganic.safiraInstagramConnected && snapshot.metaOrganic.safiraFacebookConnected && snapshot.metaOrganic.destanFacebookConnected;
+  const metaOrganicOk = snapshot.metaOrganic.safiraInstagramConnected && snapshot.metaOrganic.safiraFacebookConnected && snapshot.metaOrganic.destanFacebookConnected && snapshot.metaOrganic.destanInstagramConnected && !snapshot.metaOrganic.destanInstagramHardBlocked;
 
   return [
     { name: "Worker", status: snapshot.workerVersionId ? "PASS" : "WARNING", lastSuccess: now, lastCheck: now, lastError: null, actionRequired: snapshot.workerVersionId ? null : "CF_VERSION_METADATA binding eksik" },
