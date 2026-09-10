@@ -6,6 +6,7 @@ import { listOtaConnectionsStatus } from "@/lib/ota/status";
 import { checkHubReadiness, isHubActivated } from "@/lib/ota/hub";
 import { getIntegrationCenterSnapshot } from "@/lib/integration-center";
 import { getWhatsappEmbeddedSignupConfig } from "@/lib/whatsapp/embedded-signup-config";
+import { WHATSAPP_TARGET_DISPLAY_NAME } from "@/lib/whatsapp/display-name";
 
 export const dynamic = "force-dynamic";
 
@@ -36,6 +37,15 @@ export default async function EntegrasyonlarPage() {
             Google hesabındaki doğrulanmış işletmeleri salt-okunur keşfeder. İsim benzerliğiyle otomatik eşleştirme yapılmaz; Villa Safira ve Villa Destan konumlarını aşağıdan açıkça seçin.
           </p>
           <GbpLocationPicker />
+        </div>
+      </section>
+      <section style={{ maxWidth: 1250, margin: "0 auto 10px", padding: "0 20px" }}>
+        <div style={{ border: "1px solid #1f5f3b", borderRadius: 14, background: "#071b16", padding: "12px 14px", color: "#bbf7d0" }}>
+          <small style={{ display: "block", fontSize: 9, fontWeight: 900, letterSpacing: 1.3, color: "#86efac" }}>WHATSAPP GÖNDEREN ADI HEDEFİ</small>
+          <strong style={{ display: "block", marginTop: 5, color: "#fff", fontSize: 16 }}>{WHATSAPP_TARGET_DISPLAY_NAME}</strong>
+          <p style={{ margin: "5px 0 0", fontSize: 10, lineHeight: 1.55 }}>
+            Mesajlaşma ekranında mümkün olduğunda telefon numarası yerine bu işletme adı kullanılacak. Telefon numarası işletme profili ve iletişim bilgilerinde korunur. Coexistence tamamlandıktan sonra sistem mevcut Meta görünen adını ve onay durumunu denetler; ad değişikliği gerekiyorsa yalnız WhatsApp Manager onay akışı kullanılır, numara taşınmaz veya deregister edilmez.
+          </p>
         </div>
       </section>
       <WhatsappEmbeddedSignupPanel config={whatsappEmbeddedSignupConfig} />
