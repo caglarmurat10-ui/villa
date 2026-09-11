@@ -13,7 +13,7 @@ type GbpLocation = {
   hasHours: boolean;
 };
 
-type DiscoveryState = "WAITING_API_ACCESS" | "ACCESS_DENIED" | "WAITING_OWNER_ACCESS" | "NO_LOCATIONS" | "READY_READ_ONLY";
+type DiscoveryState = "WAITING_API_ACCESS" | "ACCESS_DENIED" | "RATE_LIMITED" | "WAITING_OWNER_ACCESS" | "NO_LOCATIONS" | "READY_READ_ONLY";
 
 type DiscoveryResponse = {
   discovery: { state: DiscoveryState; accounts: Array<{ accountName: string }>; locations: GbpLocation[]; error: string | null };
@@ -22,7 +22,8 @@ type DiscoveryResponse = {
 
 const STATE_LABEL: Record<DiscoveryState, string> = {
   WAITING_API_ACCESS: "Henüz bağlı değil — önce yukarıdan GBP'ye bağlanın",
-  ACCESS_DENIED: "Erişim reddedildi — Google Cloud projesinde Business Profile API'sini kontrol edin",
+  ACCESS_DENIED: "Erişim reddedildi — Google Cloud projesinde Business Profile API'sini ve OAuth kapsamını kontrol edin",
+  RATE_LIMITED: "Geçici kota/hız sınırı — erişim reddedilmedi; kısa süre sonra tekrar deneyin",
   WAITING_OWNER_ACCESS: "Bağlantı başarılı ama bu Google hesabına bağlı hiçbir işletme profili yok — Safira/Destan'ın gerçek sahibi hesapla bağlanmanız gerekebilir",
   NO_LOCATIONS: "Hesap bulundu ama hiçbir location yok",
   READY_READ_ONLY: "Hazır — aşağıdan villa başına doğru location'ı seçin",
@@ -33,6 +34,7 @@ const STATE_LABEL: Record<DiscoveryState, string> = {
 export default function GbpLocationPicker() {
   const [loading, setLoading] = useState(false);
   const [data, setData] = useState<DiscoveryResponse | null>(null);
+  const [mappings, setMappings] = useState<DiscoveryResponse["mappings"]>({ Safira: null, Destan: null });
   const [error, setError] = useState("");
   const [saving, setSaving] = useState<Villa | null>(null);
   const [notice, setNotice] = useState("");
@@ -47,7 +49,9 @@ export default function GbpLocationPicker() {
         setError(body.error ?? "GBP keşfi başarısız.");
         return;
       }
-      setData(body as DiscoveryResponse);
+      const nextData = body as DiscoveryResponse;
+      setData(nextData);
+      setMappings(nextData.mappings);
     } catch {
       setError("GBP keşfine ulaşılamadı.");
     } finally {
@@ -55,15 +59,18 @@ export default function GbpLocationPicker() {
     }
   }
 
-  // Faz 6.1 bölüm 3 - mevcut kalıcı eşleme sayfa yüklendiğinde (browser refresh dahil) manuel
-  // "Keşfet" tıklaması beklemeden görünmeli - "seçim persist oldu mu" sorusu bir buton tıklamasına
-  // bağımlı kalmamalı.
+  // Sayfa yüklenirken yalnız kendi kalıcı villa→location eşlememizi okuruz. Google GBP API
+  // probe'u artık otomatik değildir; böylece /sosyal refresh'leri accounts.list kotasını tüketmez.
+  // Gerçek GBP keşfi yalnız kullanıcının "Keşfet" düğmesine açıkça basmasıyla yapılır.
   useEffect(() => {
-    // queueMicrotask: discover()'ın kendi ilk satırı senkron bir setState (setLoading(true)) -
-    // doğrudan çağrılırsa "effect içinde senkron setState" derleyici uyarısı üretir. Mikro-görev
-    // kuyruğuna erteleme, kullanıcı için algılanamayacak kadar kısa bir gecikmeyle AYNI davranışı
-    // korurken bu analiz sınırını (senkron ulaşılabilirlik) kırar.
-    queueMicrotask(() => { discover(); });
+    queueMicrotask(() => {
+      void fetch("/api/admin/google/gbp/locations?mappingsOnly=1", { cache: "no-store" })
+        .then(async (response) => response.ok ? await response.json() : null)
+        .then((body: { mappings?: DiscoveryResponse["mappings"] } | null) => {
+          if (body?.mappings) setMappings(body.mappings);
+        })
+        .catch(() => undefined);
+    });
   }, []);
 
   async function selectLocation(villa: Villa, locationName: string) {
@@ -108,6 +115,10 @@ export default function GbpLocationPicker() {
       {error ? <p style={{ marginTop: 6, fontSize: 10, color: "#fca5a5" }}>{error}</p> : null}
       {notice ? <p style={{ marginTop: 6, fontSize: 10, color: "#bfdbfe" }}>{notice}</p> : null}
 
+      {(mappings.Safira || mappings.Destan) ? <div style={{ marginTop: 7, display: "grid", gap: 3 }}>
+        {(["Safira", "Destan"] as const).map((villa) => mappings[villa] ? <small key={villa} style={{ color: "#86efac" }}>✓ Villa {villa}: {mappings[villa]!.locationTitle}</small> : null)}
+      </div> : null}
+
       {data ? (
         <div style={{ marginTop: 8 }}>
           <p style={{ fontSize: 10, color: "#9fb0c5" }}>{STATE_LABEL[data.discovery.state]}</p>
@@ -116,7 +127,7 @@ export default function GbpLocationPicker() {
           {data.discovery.state === "READY_READ_ONLY" ? (
             <div style={{ display: "grid", gap: 8, marginTop: 8 }}>
               {(["Safira", "Destan"] as const).map((villa) => {
-                const currentMapping = data.mappings[villa];
+                const currentMapping = mappings[villa];
                 return (
                   <div key={villa} style={{ padding: "8px 10px", border: "1px solid #223a57", borderRadius: 9, background: "#0b1728" }}>
                     <b style={{ fontSize: 10, color: "#dbeafe" }}>Villa {villa}</b>

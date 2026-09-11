@@ -13,6 +13,7 @@ const LOCATION_READ_MASK = "name,title,storefrontAddress,phoneNumbers,websiteUri
 export type GbpReadinessState =
   | "WAITING_API_ACCESS" // OAuth hic yapilmamis veya token yenilenemiyor
   | "ACCESS_DENIED" // OAuth var ama API 401/403 donuyor (scope/API etkin degil)
+  | "RATE_LIMITED" // OAuth/API erisimi var olabilir; Google 429 kota/hiz siniri donuyor
   | "WAITING_OWNER_ACCESS" // OAuth var, API calisiyor, ama bu Google hesabina bagli hicbir Business Profile hesabi yok
   | "NO_LOCATIONS" // hesap var ama hicbir location yok
   | "READY_READ_ONLY"; // account+location bulundu, yalniz okuma yapilabilir
@@ -95,6 +96,15 @@ export async function discoverGbpAccountsAndLocations(): Promise<GbpDiscoveryRes
   const accountsResponse = await fetch(`${ACCOUNT_MANAGEMENT_BASE}/accounts`, { headers: { Authorization: `Bearer ${accessToken}` } });
   if (accountsResponse.status === 401 || accountsResponse.status === 403) {
     return { state: "ACCESS_DENIED", accounts: [], locations: [], error: `Business Profile API erişimi reddedildi (HTTP ${accountsResponse.status}) - Google Cloud projesinde API etkin mi ve OAuth kapsamı doğru mu kontrol edin.` };
+  }
+  if (accountsResponse.status === 429) {
+    console.warn("[GBP] accounts.list HTTP 429 - kota/hız sınırı; erişim reddi olarak sınıflandırılmadı.");
+    return {
+      state: "RATE_LIMITED",
+      accounts: [],
+      locations: [],
+      error: "Business Profile API şu anda kota/hız sınırına takıldı (HTTP 429). Bu bir hesap yetki reddi değildir; Google Cloud Business Profile API kota/erişim limitini kontrol edip daha sonra tekrar deneyin.",
+    };
   }
   if (!accountsResponse.ok) {
     console.error(`[GBP] accounts.list HTTP ${accountsResponse.status}`);

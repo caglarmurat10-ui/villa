@@ -36,6 +36,18 @@ describe("Social Growth Agent - Public Web Scout cron kablolaması", () => {
     expect(branchIndex).toBeLessThan(fallbackIndex);
   });
 
+  it("Scout anahtarları yoksa route çağrısından önce sessizce döner ve günlük PENDING_CONFIGURATION üretmez", () => {
+    const source = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
+    const fnStart = source.indexOf("async function runPublicScoutIfDue(env, ctx)");
+    const fnBody = source.slice(fnStart, fnStart + 2200);
+    const gateIndex = fnBody.indexOf("!env.SOCIAL_SCOUT_SEARCH_API_KEY || !env.SOCIAL_SCOUT_SEARCH_ENGINE_ID");
+    const routeIndex = fnBody.indexOf("/api/social-growth/public-scout/run");
+    expect(gateIndex).toBeGreaterThan(-1);
+    expect(routeIndex).toBeGreaterThan(-1);
+    expect(gateIndex).toBeLessThan(routeIndex);
+    expect(fnBody).toContain("DB geçmişine PENDING_CONFIGURATION yazılmaz");
+  });
+
   it("runPublicScoutIfDue diğer cronlarla aynı KV-korumalı 'günde bir kez' desenini kullanıyor", () => {
     const source = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
     expect(source).toContain('const PUBLIC_SCOUT_KV_KEY = "social_public_scout_last_run_date";');

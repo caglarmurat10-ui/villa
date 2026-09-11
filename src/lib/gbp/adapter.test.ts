@@ -64,6 +64,17 @@ describe("discoverGbpAccountsAndLocations", () => {
     expect(result.state).toBe("ACCESS_DENIED");
   });
 
+  it("accounts.list 429 donerse RATE_LIMITED doner; erisim reddi demez", async () => {
+    connectionExists = true;
+    accountsStatus = 429;
+    mockFetch();
+    const { discoverGbpAccountsAndLocations } = await import("./adapter");
+    const result = await discoverGbpAccountsAndLocations();
+    expect(result.state).toBe("RATE_LIMITED");
+    expect(result.error).toContain("kota/hız sınırına");
+    expect(result.error).toContain("yetki reddi değildir");
+  });
+
   it("bagli hesapta hicbir GBP account yoksa WAITING_OWNER_ACCESS doner", async () => {
     connectionExists = true;
     accountsBody = { accounts: [] };
