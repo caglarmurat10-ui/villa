@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const { env } = await getCloudflareContext({ async: true });
+  // Public Scout credentials are optional by design; expose only presence/missing names, never values.
   const scoutEnv = env as typeof env & {
     SOCIAL_SCOUT_SEARCH_API_KEY?: string;
     SOCIAL_SCOUT_SEARCH_ENGINE_ID?: string;
