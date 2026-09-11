@@ -52,7 +52,7 @@ function openReservationMessage(reservation: Reservation, type: MessageType, loc
     return;
   }
   const texts: Record<MessageType, string> = {
-    Giriş: `Merhaba 👋\n\n${reservation.villa} Villa rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız.\n\n📍 ${reservation.villa} Villa konumu:\n${locations[reservation.villa]}\n\n🕓 Giriş saatimiz 16.00’dır.\n\nVarış saatinizi müsait olduğunuzda bizimle paylaşabilirsiniz.\n\nVillaya sorunsuz şekilde giriş yapabilmeniz için konuma yaklaşık 15 dakika kala bize haber vermenizi rica ederiz.\n\nŞimdiden iyi yolculuklar dileriz.`,
+    Giriş: `Merhaba 👋\n\n${reservation.villa} Villa rezervasyonunuz için sizi ağırlamaktan mutluluk duyacağız.\n\n📍 ${reservation.villa} Villa konumu:\n${locations[reservation.villa]}\n\n🕓 Giriş saatimiz 16.00 ile 21.00 arasındadır.\n\nVarış saatinizi müsait olduğunuzda bizimle paylaşabilirsiniz.\n\nVillaya sorunsuz şekilde giriş yapabilmeniz için konuma yaklaşık 15 dakika kala bize haber vermenizi rica ederiz.\n\nŞimdiden iyi yolculuklar dileriz.`,
     Çıkış: `Merhaba 👋\n\nBizi tercih ettiğiniz için teşekkür ederiz.\n\n🧳 Çıkış saatimiz 10.00’dır.\n\nÇıkış saatinizde villada olacağız ve çıkış işlemlerini birlikte tamamlayacağız.\n\nGüzel anılarla ayrılmanızı diler, sizi yeniden ağırlamaktan memnuniyet duyarız.`,
   };
   window.open(whatsappUrl(reservation.phone, texts[type]), "_blank", "noopener,noreferrer");
