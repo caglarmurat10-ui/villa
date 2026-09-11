@@ -31,7 +31,7 @@ describe("sosyal medya Cuma mesajı", () => {
   it("public Cuma görseli marka footer'ına gitmeden nötr renderer ile üretilir", () => {
     const route = source("src/app/api/public/social-assets/[id]/[format]/route.tsx");
     expect(route).toContain('if (match?.kind === "friday")');
-    expect(route).toContain("renderNeutralFriday(format, FRIDAY_VISUAL_MESSAGE)");
+    expect(route).toContain("renderNeutralFriday(format, FRIDAY_VISUAL_MESSAGE, fridayVisualVariant(parsed.key, parsed.villa))");
     expect(route).toContain("Cuma; huzurun, bereketin ve duaların buluştuğu mübarek bir gündür. Dualarınızın kabul olmasını dileriz.");
 
     const neutralStart = route.indexOf("function renderNeutralFriday");
@@ -43,6 +43,9 @@ describe("sosyal medya Cuma mesajı", () => {
     expect(neutralRenderer).not.toContain("VILLA SAFIRA");
     expect(neutralRenderer).not.toContain("VILLA DESTAN");
     expect(neutralRenderer).toContain("Hayırlı Cumalar");
+    expect(neutralRenderer).toContain("FRIDAY_VISUAL_THEMES");
+    expect(route).toContain("fridayVisualVariant(parsed.key, parsed.villa)");
+    expect(route).toContain("friday-visual:v3:${parsed.key}:${parsed.villa}:${format}");
   });
 
   it("AUTO_SAFE Cuma görselini yalnız doğru villa/tarih/origin eşleşmesinde onaylar", () => {
