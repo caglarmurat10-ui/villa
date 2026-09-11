@@ -367,21 +367,45 @@ export async function applyFacebookBrandAssets(
 }
 
 export async function publishFacebookPost(pageId: string, pageAccessToken: string, message: string, imageUrl?: string) {
-  const endpoint = imageUrl ? `${META_GRAPH}/${pageId}/photos` : `${META_GRAPH}/${pageId}/feed`;
-  const body = new URLSearchParams({ access_token: pageAccessToken });
-  if (imageUrl) {
-    body.set("url", imageUrl);
-    body.set("caption", message);
-    body.set("published", "true");
-  } else {
-    body.set("message", message);
-  }
+  let response: Response;
 
-  const response = await fetch(endpoint, {
-    method: "POST",
-    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-    body,
-  });
+  if (imageUrl) {
+    // Meta'nın /photos `url=` akışı bazı first-party dinamik görsellerimizi kendi crawler'ından
+    // indirirken (#324) reddedebiliyor. Aynı problem profil/kapak görsellerinde de canlıda görüldü
+    // ve binary multipart upload ile çözüldü. Feed fotoğraflarında da URL'yi Worker kendisi indirip
+    // Meta'ya `source` Blob olarak gönderiyoruz; böylece crawler/self-fetch bağımlılığı kalkıyor.
+    const imageResponse = await fetch(imageUrl, { method: "GET", headers: { "Cache-Control": "no-cache" } });
+    if (!imageResponse.ok) {
+      throw new Error(`Facebook görseli indirilemedi (HTTP ${imageResponse.status}).`);
+    }
+    const contentType = (imageResponse.headers.get("content-type") ?? "").split(";")[0].trim().toLowerCase();
+    if (!contentType.startsWith("image/")) {
+      throw new Error("Facebook görseli geçerli bir image MIME türü döndürmedi.");
+    }
+    const declaredSize = Number.parseInt(imageResponse.headers.get("content-length") ?? "0", 10);
+    if (Number.isFinite(declaredSize) && declaredSize > 10 * 1024 * 1024) {
+      throw new Error("Facebook görseli 10 MB sınırını aşıyor.");
+    }
+    const bytes = await imageResponse.arrayBuffer();
+    if (bytes.byteLength === 0 || bytes.byteLength > 10 * 1024 * 1024) {
+      throw new Error("Facebook görseli boş veya 10 MB sınırını aşıyor.");
+    }
+
+    const form = new FormData();
+    form.set("access_token", pageAccessToken);
+    form.set("caption", message);
+    form.set("published", "true");
+    const extension = contentType === "image/jpeg" ? "jpg" : contentType === "image/webp" ? "webp" : "png";
+    form.set("source", new Blob([bytes], { type: contentType }), `social-post.${extension}`);
+    response = await fetch(`${META_GRAPH}/${pageId}/photos`, { method: "POST", body: form });
+  } else {
+    const body = new URLSearchParams({ access_token: pageAccessToken, message });
+    response = await fetch(`${META_GRAPH}/${pageId}/feed`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    });
+  }
 
   const data = (await response.json().catch(() => ({}))) as { id?: string; post_id?: string; error?: { code?: number } };
   if (!response.ok || (!data.id && !data.post_id)) {
