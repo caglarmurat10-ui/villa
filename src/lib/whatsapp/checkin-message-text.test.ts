@@ -29,3 +29,25 @@ describe("WhatsApp giriş mesajı - giriş saati metni", () => {
     });
   }
 });
+
+describe("WhatsApp villa adı sırası", () => {
+  it("Mesaj Merkezi Villa Safira / Villa Destan biçimini üretir", () => {
+    const source = readFileSync(`${root}src/components/MessageCenter.tsx`, "utf8");
+    expect(source).toContain("return `Villa ${reservation.villa}`;");
+    expect(source).not.toContain("`${reservation.villa} Villa`");
+  });
+
+  it("Ana panelde WhatsApp metinleri Villa <ad> biçimindedir", () => {
+    const source = readFileSync(`${root}src/components/Dashboard.tsx`, "utf8");
+    expect(source).toContain("Villa ${reservation.villa} rezervasyonunuz");
+    expect(source).toContain("Villa ${r.villa} rezervasyonunuzla ilgili");
+    expect(source).not.toContain("${reservation.villa} Villa");
+    expect(source).not.toContain("${r.villa} Villa");
+  });
+
+  it("Takvim çalışma alanında WhatsApp metni Villa <ad> biçimindedir", () => {
+    const source = readFileSync(`${root}src/components/VillaCalendarWorkspace.tsx`, "utf8");
+    expect(source).toContain("Villa ${item.villa} rezervasyonunuz");
+    expect(source).not.toContain("${item.villa} Villa");
+  });
+});
