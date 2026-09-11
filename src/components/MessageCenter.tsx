@@ -14,7 +14,7 @@ const MAP_LINKS = {
 } as const;
 
 function villaName(reservation: Reservation) {
-  return `${reservation.villa} Villa`;
+  return `Villa ${reservation.villa}`;
 }
 
 function locationLink(reservation: Reservation, locations: VillaLocations) {
