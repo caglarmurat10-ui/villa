@@ -14,14 +14,71 @@ function eventDateLabel(startIso: string, endIso: string | null): string {
 
 function renderNeutralFriday(format: Format, message: string): Response {
   const dimensions = format === "story" ? { width: 1080, height: 1920 } : { width: 1080, height: 1350 };
+  const isStory = format === "story";
   return new ImageResponse(
-    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", background: "#061a33", color: "#f4e1b4", padding: 76, fontFamily: "serif" }}>
-      <div style={{ display: "flex", flexDirection: "column", marginTop: format === "story" ? 60 : 20 }}>
-        <div style={{ fontFamily: "sans-serif", fontSize: 24, letterSpacing: 8, color: "#d8b36a" }}>CUMA MESAJI</div>
-        <div style={{ width: 90, height: 3, background: "#d8b36a", margin: "28px 0 34px" }} />
-        <div style={{ fontSize: 66, lineHeight: 1.12, fontWeight: 500, color: "#f4e1b4" }}>Hayırlı Cumalar</div>
-        <div style={{ fontFamily: "sans-serif", fontSize: 27, lineHeight: 1.6, color: "#c9b98e", marginTop: 40, maxWidth: dimensions.width - 152 }}>{message}</div>
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        position: "relative",
+        overflow: "hidden",
+        fontFamily: "serif",
+        background: "linear-gradient(180deg,#f4dfc2 0%,#f8c884 38%,#ef9650 67%,#6d493d 100%)",
+        color: "#3d281d",
+      }}
+    >
+      <div style={{ position: "absolute", inset: 0, display: "flex", background: "radial-gradient(circle at 50% 65%, rgba(255,241,182,.75) 0%, rgba(255,190,95,.18) 28%, rgba(80,39,29,.08) 72%)" }} />
+
+      {/* İnce İslami geometrik doku - yalnız dekoratif, marka içermez. */}
+      <div style={{ position: "absolute", right: -90, top: -70, width: 390, height: 390, border: "3px solid rgba(255,247,223,.30)", transform: "rotate(45deg)", display: "flex" }} />
+      <div style={{ position: "absolute", right: 18, top: 10, width: 230, height: 230, border: "2px solid rgba(255,247,223,.25)", transform: "rotate(45deg)", display: "flex" }} />
+      <div style={{ position: "absolute", left: 55, top: 70, width: 4, height: isStory ? 520 : 365, background: "rgba(105,63,41,.22)", display: "flex" }} />
+      <div style={{ position: "absolute", left: 55, top: 70, width: 220, height: 4, background: "rgba(105,63,41,.22)", display: "flex" }} />
+
+      {/* Ana mesaj. */}
+      <div
+        style={{
+          position: "absolute",
+          left: 100,
+          right: 100,
+          top: isStory ? 300 : 170,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          textAlign: "center",
+        }}
+      >
+        <div style={{ fontFamily: "sans-serif", fontSize: 22, letterSpacing: 8, color: "#8b5a38", display: "flex" }}>CUMA MESAJI</div>
+        <div style={{ marginTop: 24, fontSize: isStory ? 100 : 86, lineHeight: 1.03, fontWeight: 500, letterSpacing: -2, display: "flex" }}>Hayırlı Cumalar</div>
+        <div style={{ width: 240, height: 2, background: "#8b5a38", margin: "34px 0 30px", display: "flex" }} />
+        <div style={{ fontFamily: "sans-serif", maxWidth: 780, fontSize: isStory ? 33 : 29, lineHeight: 1.58, color: "#513629", display: "flex" }}>{message}</div>
       </div>
+
+      {/* Güneş ve sakin ufuk. */}
+      <div style={{ position: "absolute", left: 470, bottom: isStory ? 505 : 320, width: 116, height: 116, borderRadius: 999, background: "#fff2bd", boxShadow: "0 0 60px rgba(255,224,137,.7)", display: "flex" }} />
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: isStory ? 410 : 245, height: 150, background: "linear-gradient(180deg,rgba(92,61,51,.05),rgba(54,45,45,.42))", display: "flex" }} />
+
+      {/* Cami silüeti: kubbeler ve minareler. */}
+      <div style={{ position: "absolute", right: 118, bottom: isStory ? 365 : 200, width: 360, height: 190, display: "flex", alignItems: "flex-end", justifyContent: "center", opacity: .88 }}>
+        <div style={{ position: "absolute", left: 34, bottom: 0, width: 22, height: 165, background: "#3f3434", display: "flex" }} />
+        <div style={{ position: "absolute", left: 27, bottom: 158, width: 36, height: 12, borderRadius: 8, background: "#3f3434", display: "flex" }} />
+        <div style={{ position: "absolute", left: 40, bottom: 170, width: 10, height: 34, background: "#3f3434", transform: "rotate(3deg)", display: "flex" }} />
+        <div style={{ position: "absolute", right: 34, bottom: 0, width: 22, height: 165, background: "#3f3434", display: "flex" }} />
+        <div style={{ position: "absolute", right: 27, bottom: 158, width: 36, height: 12, borderRadius: 8, background: "#3f3434", display: "flex" }} />
+        <div style={{ position: "absolute", right: 40, bottom: 170, width: 10, height: 34, background: "#3f3434", transform: "rotate(-3deg)", display: "flex" }} />
+        <div style={{ position: "absolute", left: 94, bottom: 0, width: 174, height: 85, borderRadius: "90px 90px 8px 8px", background: "#433637", display: "flex" }} />
+        <div style={{ position: "absolute", left: 121, bottom: 66, width: 120, height: 102, borderRadius: "80px 80px 8px 8px", background: "#433637", display: "flex" }} />
+        <div style={{ position: "absolute", left: 174, bottom: 157, width: 12, height: 34, background: "#433637", display: "flex" }} />
+      </div>
+
+      {/* Fener / tesbih hissi veren sıcak ön plan detayı. */}
+      <div style={{ position: "absolute", left: 80, bottom: isStory ? 250 : 105, width: 125, height: 215, border: "7px solid #392a27", borderRadius: "50px 50px 20px 20px", background: "linear-gradient(180deg,rgba(255,214,125,.85),rgba(116,67,39,.75))", boxShadow: "0 0 34px rgba(255,196,92,.52)", display: "flex" }} />
+      <div style={{ position: "absolute", left: 122, bottom: isStory ? 458 : 313, width: 42, height: 24, borderRadius: "50% 50% 0 0", background: "#392a27", display: "flex" }} />
+      <div style={{ position: "absolute", left: 98, bottom: isStory ? 330 : 185, width: 88, height: 3, background: "rgba(57,42,39,.65)", transform: "rotate(58deg)", display: "flex" }} />
+      <div style={{ position: "absolute", left: 98, bottom: isStory ? 330 : 185, width: 88, height: 3, background: "rgba(57,42,39,.65)", transform: "rotate(-58deg)", display: "flex" }} />
+
+      <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, height: isStory ? 270 : 120, background: "linear-gradient(180deg,rgba(49,40,38,.05),rgba(42,34,33,.82))", display: "flex" }} />
     </div>,
     dimensions,
   );
