@@ -6,6 +6,8 @@ import { getSpecialDayForDate } from "@/lib/special-days";
 export const runtime = "nodejs";
 
 const EVENT_DATE_FMT = new Intl.DateTimeFormat("tr-TR", { day: "2-digit", month: "long" });
+const FRIDAY_VISUAL_MESSAGE = "Cuma; huzurun, bereketin ve duaların buluştuğu mübarek bir gündür. Dualarınızın kabul olmasını dileriz.";
+
 function eventDateLabel(startIso: string, endIso: string | null): string {
   const start = EVENT_DATE_FMT.format(new Date(`${startIso}T00:00:00Z`));
   if (!endIso || endIso === startIso) return start;
@@ -30,13 +32,11 @@ function renderNeutralFriday(format: Format, message: string): Response {
     >
       <div style={{ position: "absolute", inset: 0, display: "flex", background: "radial-gradient(circle at 50% 65%, rgba(255,241,182,.75) 0%, rgba(255,190,95,.18) 28%, rgba(80,39,29,.08) 72%)" }} />
 
-      {/* İnce İslami geometrik doku - yalnız dekoratif, marka içermez. */}
       <div style={{ position: "absolute", right: -90, top: -70, width: 390, height: 390, border: "3px solid rgba(255,247,223,.30)", transform: "rotate(45deg)", display: "flex" }} />
       <div style={{ position: "absolute", right: 18, top: 10, width: 230, height: 230, border: "2px solid rgba(255,247,223,.25)", transform: "rotate(45deg)", display: "flex" }} />
       <div style={{ position: "absolute", left: 55, top: 70, width: 4, height: isStory ? 520 : 365, background: "rgba(105,63,41,.22)", display: "flex" }} />
       <div style={{ position: "absolute", left: 55, top: 70, width: 220, height: 4, background: "rgba(105,63,41,.22)", display: "flex" }} />
 
-      {/* Ana mesaj. */}
       <div
         style={{
           position: "absolute",
@@ -55,11 +55,9 @@ function renderNeutralFriday(format: Format, message: string): Response {
         <div style={{ fontFamily: "sans-serif", maxWidth: 780, fontSize: isStory ? 33 : 29, lineHeight: 1.58, color: "#513629", display: "flex" }}>{message}</div>
       </div>
 
-      {/* Güneş ve sakin ufuk. */}
       <div style={{ position: "absolute", left: 470, bottom: isStory ? 505 : 320, width: 116, height: 116, borderRadius: 999, background: "#fff2bd", boxShadow: "0 0 60px rgba(255,224,137,.7)", display: "flex" }} />
       <div style={{ position: "absolute", left: 0, right: 0, bottom: isStory ? 410 : 245, height: 150, background: "linear-gradient(180deg,rgba(92,61,51,.05),rgba(54,45,45,.42))", display: "flex" }} />
 
-      {/* Cami silüeti: kubbeler ve minareler. */}
       <div style={{ position: "absolute", right: 118, bottom: isStory ? 365 : 200, width: 360, height: 190, display: "flex", alignItems: "flex-end", justifyContent: "center", opacity: .88 }}>
         <div style={{ position: "absolute", left: 34, bottom: 0, width: 22, height: 165, background: "#3f3434", display: "flex" }} />
         <div style={{ position: "absolute", left: 27, bottom: 158, width: 36, height: 12, borderRadius: 8, background: "#3f3434", display: "flex" }} />
@@ -72,7 +70,6 @@ function renderNeutralFriday(format: Format, message: string): Response {
         <div style={{ position: "absolute", left: 174, bottom: 157, width: 12, height: 34, background: "#433637", display: "flex" }} />
       </div>
 
-      {/* Fener / tesbih hissi veren sıcak ön plan detayı. */}
       <div style={{ position: "absolute", left: 80, bottom: isStory ? 250 : 105, width: 125, height: 215, border: "7px solid #392a27", borderRadius: "50px 50px 20px 20px", background: "linear-gradient(180deg,rgba(255,214,125,.85),rgba(116,67,39,.75))", boxShadow: "0 0 34px rgba(255,196,92,.52)", display: "flex" }} />
       <div style={{ position: "absolute", left: 122, bottom: isStory ? 458 : 313, width: 42, height: 24, borderRadius: "50% 50% 0 0", background: "#392a27", display: "flex" }} />
       <div style={{ position: "absolute", left: 98, bottom: isStory ? 330 : 185, width: 88, height: 3, background: "rgba(57,42,39,.65)", transform: "rotate(58deg)", display: "flex" }} />
@@ -105,14 +102,10 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   const parsed = parseTemplateId(id);
   if (!parsed) return new Response("Şablon bulunamadı.", { status: 404 });
 
-  // Cuma paylaşımı iki villa hesabında yayınlansa da içerik marka/villa bağlantısından bağımsızdır.
-  // Bu nedenle public Meta görselinde Villa Safira / Villa Destan footer'ı kullanılmaz. D1'deki
-  // villa alanı yalnız hangi sosyal hesaba gönderileceğini seçmeye devam eder; görünür içeriğe
-  // taşınmaz. Resmi/dini özel günler mevcut markalı özel-gün tasarımını korur.
   if (parsed.type === "special-day") {
     const match = getSpecialDayForDate(parsed.key);
     if (match?.kind === "friday") {
-      const response = renderNeutralFriday(format, match.message);
+      const response = renderNeutralFriday(format, FRIDAY_VISUAL_MESSAGE);
       const headers = new Headers(response.headers);
       headers.set("Cache-Control", "public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000");
       headers.set("X-Content-Type-Options", "nosniff");
@@ -120,10 +113,6 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
     }
   }
 
-  // LOCAL EVENT - içerik D1'deki admin-onaylı aday kaydına dayanır (bkz. local-events.ts), bu
-  // yüzden diğer TÜM tiplerin aksine burada bir D1 okuması var. Yalnız status IN
-  // ('approved','published') olan bir kayıt render edilir - pending_review/rejected bir aday
-  // (henüz insan tarafından doğrulanmamış/reddedilmiş) hiçbir zaman görsele dönüşmez.
   if (parsed.type === "local-event") {
     const candidate = await getLocalEventCandidate(parsed.key);
     if (!candidate || (candidate.status !== "approved" && candidate.status !== "published")) {
