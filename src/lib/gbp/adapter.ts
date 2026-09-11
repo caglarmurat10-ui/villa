@@ -5,6 +5,7 @@ import { getGoogleAccessToken, hasGoogleConnection } from "../google-api";
 // oauth/start/route.ts) - bu dosya, o OAuth akisi tamamlandiktan SONRA gercek API'yi cagirir.
 // Safira/Destan eslesmesi ASLA isim benzerligiyle otomatik yapilmaz - yalniz admin'in acikca
 // sectigi location kaydedilir (bkz. mapping.ts).
+// 429 ayrı bir kota/hız durumu olarak ele alınır; yetki reddi gibi gösterilmez.
 
 const ACCOUNT_MANAGEMENT_BASE = "https://mybusinessaccountmanagement.googleapis.com/v1";
 const BUSINESS_INFO_BASE = "https://mybusinessbusinessinformation.googleapis.com/v1";
