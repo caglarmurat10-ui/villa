@@ -1,0 +1,139 @@
+name: Temporary GBP Scout Fix 20260911
+
+on:
+  push:
+    branches:
+      - maintenance/gbp-scout-fix-20260911
+
+permissions:
+  contents: write
+
+jobs:
+  fix-test-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Patch production branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin agent/cloudflare-migration
+          git checkout -B agent/cloudflare-migration origin/agent/cloudflare-migration
+          python3 - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str):
+              p = Path(path)
+              s = p.read_text()
+              if old not in s:
+                  raise SystemExit(f"marker not found in {path}: {old[:100]!r}")
+              p.write_text(s.replace(old, new, 1))
+
+          # GBP: distinguish quota/rate limiting from access denial.
+          replace_once(
+              "src/lib/gbp/adapter.ts",
+              '  | "ACCESS_DENIED" // OAuth var ama API 401/403 donuyor (scope/API etkin degil)\n',
+              '  | "ACCESS_DENIED" // OAuth var ama API 401/403 donuyor (scope/API etkin degil)\n  | "RATE_LIMITED" // OAuth/API erisimi var olabilir; Google 429 kota/hiz siniri donuyor\n',
+          )
+          replace_once(
+              "src/lib/gbp/adapter.ts",
+              '  if (!accountsResponse.ok) {\n    console.error(`[GBP] accounts.list HTTP ${accountsResponse.status}`);\n    return { state: "ACCESS_DENIED", accounts: [], locations: [], error: `Business Profile hesap listesi alınamadı (HTTP ${accountsResponse.status}).` };\n  }\n',
+              '  if (accountsResponse.status === 429) {\n    console.warn("[GBP] accounts.list HTTP 429 - kota/hız sınırı; erişim reddi olarak sınıflandırılmadı.");\n    return {\n      state: "RATE_LIMITED",\n      accounts: [],\n      locations: [],\n      error: "Business Profile API şu anda kota/hız sınırına takıldı (HTTP 429). Bu bir hesap yetki reddi değildir; Google Cloud Business Profile API kota/erişim limitini kontrol edip daha sonra tekrar deneyin.",\n    };\n  }\n  if (!accountsResponse.ok) {\n    console.error(`[GBP] accounts.list HTTP ${accountsResponse.status}`);\n    return { state: "ACCESS_DENIED", accounts: [], locations: [], error: `Business Profile hesap listesi alınamadı (HTTP ${accountsResponse.status}).` };\n  }\n',
+          )
+
+          # Regression test for the exact live 429 case.
+          replace_once(
+              "src/lib/gbp/adapter.test.ts",
+              '  it("accounts.list 403 donerse ACCESS_DENIED doner", async () => {\n    connectionExists = true;\n    accountsStatus = 403;\n    mockFetch();\n    const { discoverGbpAccountsAndLocations } = await import("./adapter");\n    const result = await discoverGbpAccountsAndLocations();\n    expect(result.state).toBe("ACCESS_DENIED");\n  });\n\n',
+              '  it("accounts.list 403 donerse ACCESS_DENIED doner", async () => {\n    connectionExists = true;\n    accountsStatus = 403;\n    mockFetch();\n    const { discoverGbpAccountsAndLocations } = await import("./adapter");\n    const result = await discoverGbpAccountsAndLocations();\n    expect(result.state).toBe("ACCESS_DENIED");\n  });\n\n  it("accounts.list 429 donerse RATE_LIMITED doner; erisim reddi demez", async () => {\n    connectionExists = true;\n    accountsStatus = 429;\n    mockFetch();\n    const { discoverGbpAccountsAndLocations } = await import("./adapter");\n    const result = await discoverGbpAccountsAndLocations();\n    expect(result.state).toBe("RATE_LIMITED");\n    expect(result.error).toContain("kota/hız sınırına");\n    expect(result.error).toContain("yetki reddi değildir");\n  });\n\n',
+          )
+
+          # GBP picker: do not hit Google Business Profile API automatically on every /sosyal page load.
+          replace_once(
+              "src/components/GbpLocationPicker.tsx",
+              'type DiscoveryState = "WAITING_API_ACCESS" | "ACCESS_DENIED" | "WAITING_OWNER_ACCESS" | "NO_LOCATIONS" | "READY_READ_ONLY";\n',
+              'type DiscoveryState = "WAITING_API_ACCESS" | "ACCESS_DENIED" | "RATE_LIMITED" | "WAITING_OWNER_ACCESS" | "NO_LOCATIONS" | "READY_READ_ONLY";\n',
+          )
+          replace_once(
+              "src/components/GbpLocationPicker.tsx",
+              '  ACCESS_DENIED: "Erişim reddedildi — Google Cloud projesinde Business Profile API\'sini kontrol edin",\n',
+              '  ACCESS_DENIED: "Erişim reddedildi — Google Cloud projesinde Business Profile API\'sini ve OAuth kapsamını kontrol edin",\n  RATE_LIMITED: "Geçici kota/hız sınırı — erişim reddedilmedi; kısa süre sonra tekrar deneyin",\n',
+          )
+          replace_once(
+              "src/components/GbpLocationPicker.tsx",
+              '  const [data, setData] = useState<DiscoveryResponse | null>(null);\n',
+              '  const [data, setData] = useState<DiscoveryResponse | null>(null);\n  const [mappings, setMappings] = useState<DiscoveryResponse["mappings"]>({ Safira: null, Destan: null });\n',
+          )
+          replace_once(
+              "src/components/GbpLocationPicker.tsx",
+              '      setData(body as DiscoveryResponse);\n',
+              '      const nextData = body as DiscoveryResponse;\n      setData(nextData);\n      setMappings(nextData.mappings);\n',
+          )
+          old_effect = '''  // Faz 6.1 bölüm 3 - mevcut kalıcı eşleme sayfa yüklendiğinde (browser refresh dahil) manuel\n  // "Keşfet" tıklaması beklemeden görünmeli - "seçim persist oldu mu" sorusu bir buton tıklamasına\n  // bağımlı kalmamalı.\n  useEffect(() => {\n    // queueMicrotask: discover()'ın kendi ilk satırı senkron bir setState (setLoading(true)) -\n    // doğrudan çağrılırsa "effect içinde senkron setState" derleyici uyarısı üretir. Mikro-görev\n    // kuyruğuna erteleme, kullanıcı için algılanamayacak kadar kısa bir gecikmeyle AYNI davranışı\n    // korurken bu analiz sınırını (senkron ulaşılabilirlik) kırar.\n    queueMicrotask(() => { discover(); });\n  }, []);\n'''
+          new_effect = '''  // Sayfa yüklenirken yalnız kendi kalıcı villa→location eşlememizi okuruz. Google GBP API\n  // probe'u artık otomatik değildir; böylece /sosyal refresh'leri accounts.list kotasını tüketmez.\n  // Gerçek GBP keşfi yalnız kullanıcının "Keşfet" düğmesine açıkça basmasıyla yapılır.\n  useEffect(() => {\n    queueMicrotask(() => {\n      void fetch("/api/admin/google/gbp/locations?mappingsOnly=1", { cache: "no-store" })\n        .then(async (response) => response.ok ? await response.json() : null)\n        .then((body: { mappings?: DiscoveryResponse["mappings"] } | null) => {\n          if (body?.mappings) setMappings(body.mappings);\n        })\n        .catch(() => undefined);\n    });\n  }, []);\n'''
+          replace_once("src/components/GbpLocationPicker.tsx", old_effect, new_effect)
+          replace_once(
+              "src/components/GbpLocationPicker.tsx",
+              '                const currentMapping = data.mappings[villa];\n',
+              '                const currentMapping = mappings[villa];\n',
+          )
+          replace_once(
+              "src/components/GbpLocationPicker.tsx",
+              '      {notice ? <p style={{ marginTop: 6, fontSize: 10, color: "#bfdbfe" }}>{notice}</p> : null}\n\n      {data ? (\n',
+              '      {notice ? <p style={{ marginTop: 6, fontSize: 10, color: "#bfdbfe" }}>{notice}</p> : null}\n\n      {(mappings.Safira || mappings.Destan) ? <div style={{ marginTop: 7, display: "grid", gap: 3 }}>\n        {(["Safira", "Destan"] as const).map((villa) => mappings[villa] ? <small key={villa} style={{ color: "#86efac" }}>✓ Villa {villa}: {mappings[villa]!.locationTitle}</small> : null)}\n      </div> : null}\n\n      {data ? (\n',
+          )
+
+          # Route supports a mappings-only read that never calls Google.
+          Path("src/app/api/admin/google/gbp/locations/route.ts").write_text('''import { discoverGbpAccountsAndLocations } from "@/lib/gbp/adapter";\nimport { getAllGbpLocationMappings } from "@/lib/gbp/mapping";\n\nexport const dynamic = "force-dynamic";\n\n// admin.safiradestan.com'da adminAuthGate tarafından korunuyor. mappingsOnly=1 yalnız bizim\n// GOOGLE_PRIVATE KV eşlememizi okur ve Google GBP API'sine hiç istek atmaz. Gerçek account/location\n// keşfi yalnız admin'in açık "Keşfet" aksiyonunda çalışır; böylece sayfa refresh'leri 429 üretmez.\nexport async function GET(request: Request) {\n  const mappings = await getAllGbpLocationMappings();\n  const url = new URL(request.url);\n  if (url.searchParams.get("mappingsOnly") === "1") {\n    return Response.json({ mappings });\n  }\n\n  const discovery = await discoverGbpAccountsAndLocations();\n  return Response.json({ discovery, mappings });\n}\n''')
+
+          # Scheduled Public Scout: missing optional config is a clean skip, not a daily DB history row.
+          replace_once(
+              "custom-worker.mjs",
+              'async function runPublicScoutIfDue(env, ctx) {\n  const today = istanbulClock(new Date()).date;\n',
+              'async function runPublicScoutIfDue(env, ctx) {\n  if (!env.SOCIAL_SCOUT_SEARCH_API_KEY || !env.SOCIAL_SCOUT_SEARCH_ENGINE_ID) {\n    console.log("[Social Growth Scout] Yapılandırma yok; zamanlanmış tarama sessizce atlandı (DB geçmişine PENDING_CONFIGURATION yazılmaz).");\n    return;\n  }\n\n  const today = istanbulClock(new Date()).date;\n',
+          )
+          replace_once(
+              "custom-worker.mjs",
+              '// sorgular (bkz. src/lib/social-growth-public-scout.ts). SOCIAL_SCOUT_SEARCH_API_KEY tanımlı\n// değilse route hiçbir dış istek atmadan PENDING_CONFIGURATION olarak durur - bu cron\'un\n// eklenmesi deploy\'u bloklamaz, hiçbir yeni secret ZORUNLU kılınmaz (PayTR ile aynı desen).\n',
+              '// sorgular (bkz. src/lib/social-growth-public-scout.ts). SOCIAL_SCOUT_SEARCH_API_KEY / ENGINE_ID\n// tanımlı değilse cron route\'u çağırmadan sessizce atlanır; böylece her gün aynı\n// PENDING_CONFIGURATION audit satırı üretilmez. Secret\'lar yine opsiyoneldir ve deploy\'u bloklamaz.\n',
+          )
+
+          replace_once(
+              "src/lib/social-growth-cron-wiring.test.ts",
+              '  it("runPublicScoutIfDue diğer cronlarla aynı KV-korumalı \'günde bir kez\' desenini kullanıyor", () => {\n',
+              '  it("Scout anahtarları yoksa route çağrısından önce sessizce döner ve günlük PENDING_CONFIGURATION üretmez", () => {\n    const source = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");\n    const fnStart = source.indexOf("async function runPublicScoutIfDue(env, ctx)");\n    const fnBody = source.slice(fnStart, fnStart + 2200);\n    const gateIndex = fnBody.indexOf("!env.SOCIAL_SCOUT_SEARCH_API_KEY || !env.SOCIAL_SCOUT_SEARCH_ENGINE_ID");\n    const routeIndex = fnBody.indexOf("/api/social-growth/public-scout/run");\n    expect(gateIndex).toBeGreaterThan(-1);\n    expect(routeIndex).toBeGreaterThan(-1);\n    expect(gateIndex).toBeLessThan(routeIndex);\n    expect(fnBody).toContain("DB geçmişine PENDING_CONFIGURATION yazılmaz");\n  });\n\n  it("runPublicScoutIfDue diğer cronlarla aynı KV-korumalı \'günde bir kez\' desenini kullanıyor", () => {\n',
+          )
+          PY
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Targeted regression tests
+        run: npx vitest run src/lib/gbp/adapter.test.ts src/lib/social-growth-cron-wiring.test.ts
+
+      - name: Full test suite
+        run: npm test
+
+      - name: Production build check
+        run: npm run build
+
+      - name: Commit and push production fix
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/lib/gbp/adapter.ts src/lib/gbp/adapter.test.ts src/components/GbpLocationPicker.tsx src/app/api/admin/google/gbp/locations/route.ts custom-worker.mjs src/lib/social-growth-cron-wiring.test.ts
+          git diff --cached --check
+          git commit -m "Fix GBP 429 handling and quiet unconfigured scout"
+          git push origin HEAD:agent/cloudflare-migration
