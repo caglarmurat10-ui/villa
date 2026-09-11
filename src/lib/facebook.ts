@@ -374,7 +374,22 @@ export async function publishFacebookPost(pageId: string, pageAccessToken: strin
     // indirirken (#324) reddedebiliyor. Aynı problem profil/kapak görsellerinde de canlıda görüldü
     // ve binary multipart upload ile çözüldü. Feed fotoğraflarında da URL'yi Worker kendisi indirip
     // Meta'ya `source` Blob olarak gönderiyoruz; böylece crawler/self-fetch bağımlılığı kalkıyor.
-    const imageResponse = await fetch(imageUrl, { method: "GET", headers: { "Cache-Control": "no-cache" } });
+    const parsedImageUrl = new URL(imageUrl);
+      let imageResponse: Response;
+      if (parsedImageUrl.pathname.startsWith("/social/friday/")) {
+        try {
+          const { env } = await getCloudflareContext({ async: true });
+          const cfResponse = await env.ASSETS.fetch(parsedImageUrl);
+          imageResponse = new Response(await cfResponse.arrayBuffer(), {
+            status: cfResponse.status,
+            headers: { "Content-Type": cfResponse.headers.get("content-type") ?? "image/png" },
+          });
+        } catch {
+          imageResponse = await fetch(imageUrl, { method: "GET", headers: { "Cache-Control": "no-cache" } });
+        }
+      } else {
+        imageResponse = await fetch(imageUrl, { method: "GET", headers: { "Cache-Control": "no-cache" } });
+      }
     if (!imageResponse.ok) {
       throw new Error(`Facebook görseli indirilemedi (HTTP ${imageResponse.status}).`);
     }

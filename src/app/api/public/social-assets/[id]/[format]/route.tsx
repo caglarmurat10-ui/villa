@@ -1,8 +1,8 @@
 import { ImageResponse } from "next/og";
-import { getCloudflareContext } from "@opennextjs/cloudflare";
 import { isFormat, parseTemplateId, renderLocalEvent, renderTemplate, type Format } from "@/lib/social-design-templates";
 import { getLocalEventCandidate } from "@/lib/local-events";
 import { getSpecialDayForDate } from "@/lib/special-days";
+import { fridayVisualPath } from "@/lib/friday-visual";
 
 export const runtime = "nodejs";
 
@@ -133,27 +133,8 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
   if (parsed.type === "special-day") {
     const match = getSpecialDayForDate(parsed.key);
     if (match?.kind === "friday") {
-      const cacheKey = `friday-visual:v3:${parsed.key}:${parsed.villa}:${format}`;
-      const { env } = await getCloudflareContext({ async: true });
-      const cached = await env.SOCIAL_ASSET_CACHE.get(cacheKey, { type: "arrayBuffer" });
-      if (cached) {
-        return new Response(cached, {
-          status: 200,
-          headers: {
-            "Content-Type": "image/png",
-            "Cache-Control": "public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000",
-            "X-Content-Type-Options": "nosniff",
-          },
-        });
-      }
-      const response = renderNeutralFriday(format, FRIDAY_VISUAL_MESSAGE, fridayVisualVariant(parsed.key, parsed.villa));
-      const bytes = await response.arrayBuffer();
-      await env.SOCIAL_ASSET_CACHE.put(cacheKey, bytes, { expirationTtl: 60 * 60 * 24 * 120 });
-      const headers = new Headers(response.headers);
-      headers.set("Cache-Control", "public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000");
-      headers.set("X-Content-Type-Options", "nosniff");
-      return new Response(bytes, { status: response.status, headers });
-
+      const destination = new URL(fridayVisualPath(parsed.key, parsed.villa), _request.url);
+      return Response.redirect(destination, 307);
     }
   }
 

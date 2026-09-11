@@ -1,5 +1,6 @@
 import { classifySpecialDaySafety, getSpecialDayForDate } from "./special-days";
 import type { Villa } from "./types";
+import { fridayVisualVariant } from "./friday-visual";
 
 export type ApprovedSpecialDayMedia = {
   mediaKind: "image";
@@ -24,6 +25,18 @@ export function approvedSpecialDayMedia(
   try {
     const parsed = new URL(url);
     if (!allowedOrigins.includes(parsed.origin)) return null;
+
+    const fridayStatic = parsed.pathname.match(/^\/social\/friday\/variant-(\d{2})\.png$/);
+    if (fridayStatic) {
+      const date = parsed.searchParams.get("date");
+      const villaParam = parsed.searchParams.get("villa");
+      if (!date || date !== post.scheduledDate || villaParam !== villaSlug(post.villa)) return null;
+      const specialDay = getSpecialDayForDate(date);
+      if (!specialDay || specialDay.kind !== "friday") return null;
+      if (classifySpecialDaySafety(specialDay).automationClass !== "AUTO_SAFE") return null;
+      if (Number(fridayStatic[1]) !== fridayVisualVariant(date, post.villa)) return null;
+      return { mediaKind: "image", format: "feed" };
+    }
 
     const match = parsed.pathname.match(
       /^\/api\/public\/social-assets\/(safira|destan)_special-day_(\d{4}-\d{2}-\d{2})\/(feed|story)$/,

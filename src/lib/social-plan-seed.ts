@@ -10,6 +10,7 @@ import type { RecentPost } from "./social-duplicate-guard";
 import { buildVirtualTemplates } from "./social-content-virtual-templates";
 import { isClosedSeasonDate } from "./season-policy";
 import { classifySpecialDaySafety, getSpecialDayForDate, type SpecialDayMatch } from "./special-days";
+import { fridayVisualPath } from "./friday-visual";
 import type { Villa } from "./types";
 
 function istanbulToday() {
@@ -283,7 +284,8 @@ export async function ensureSpecialDayPosts(): Promise<{ created: number; update
     for (const villa of villas) {
       const caption = specialDayCaption(match, villa);
       const villaSlug = villa === "Safira" ? "safira" : "destan";
-      const mediaUrl = new URL(`/api/public/social-assets/${villaSlug}_special-day_${date}/feed`, `${baseUrl}/`).toString();
+      const mediaPath = match.kind === "friday" ? fridayVisualPath(date, villa) : `/api/public/social-assets/${villaSlug}_special-day_${date}/feed`;
+      const mediaUrl = new URL(mediaPath, `${baseUrl}/`).toString();
 
       // Her iki villa için Instagram + Facebook özel gün içeriği üretilebilir. AUTO_SAFE özel günler
       // doğrudan Onaylandı olarak oluşturulur ve mevcut yayın cron'u plan tarihinde otomatik gönderir.

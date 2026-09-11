@@ -28,24 +28,13 @@ describe("sosyal medya Cuma mesajı", () => {
     expect(worker).toContain("await reconcileLegacyFridayPosts(env, scheduledAt)");
   });
 
-  it("public Cuma görseli marka footer'ına gitmeden nötr renderer ile üretilir", () => {
+  it("public Cuma görseli runtime render yerine statik dönen görsele yönlenir", () => {
     const route = source("src/app/api/public/social-assets/[id]/[format]/route.tsx");
+    const planner = source("src/lib/social-plan-seed.ts");
     expect(route).toContain('if (match?.kind === "friday")');
-    expect(route).toContain("renderNeutralFriday(format, FRIDAY_VISUAL_MESSAGE, fridayVisualVariant(parsed.key, parsed.villa))");
-    expect(route).toContain("Cuma; huzurun, bereketin ve duaların buluştuğu mübarek bir gündür. Dualarınızın kabul olmasını dileriz.");
-
-    const neutralStart = route.indexOf("function renderNeutralFriday");
-    const neutralEnd = route.indexOf("// FAZ 5 bölüm 9", neutralStart);
-    expect(neutralStart).toBeGreaterThan(-1);
-    expect(neutralEnd).toBeGreaterThan(neutralStart);
-    const neutralRenderer = route.slice(neutralStart, neutralEnd);
-    expect(neutralRenderer).not.toContain("BrandFooter");
-    expect(neutralRenderer).not.toContain("VILLA SAFIRA");
-    expect(neutralRenderer).not.toContain("VILLA DESTAN");
-    expect(neutralRenderer).toContain("Hayırlı Cumalar");
-    expect(neutralRenderer).toContain("FRIDAY_VISUAL_THEMES");
-    expect(route).toContain("fridayVisualVariant(parsed.key, parsed.villa)");
-    expect(route).toContain("friday-visual:v3:${parsed.key}:${parsed.villa}:${format}");
+    expect(route).toContain("fridayVisualPath(parsed.key, parsed.villa)");
+    expect(route).toContain("Response.redirect(destination, 307)");
+    expect(planner).toContain('match.kind === "friday" ? fridayVisualPath(date, villa)');
   });
 
   it("AUTO_SAFE Cuma görselini yalnız doğru villa/tarih/origin eşleşmesinde onaylar", () => {
