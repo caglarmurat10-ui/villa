@@ -14,6 +14,7 @@ import {
   markSocialPublishSuccess,
 } from "@/lib/social-db";
 import { approvedProxyMediaAsset } from "@/lib/social-drive-media";
+import { approvedSpecialDayMedia } from "@/lib/special-day-media";
 import { listSocialPostMedia, type SocialPostMediaItem } from "@/lib/social-media-store";
 
 const schema = z.object({
@@ -31,6 +32,16 @@ function safePublicError(error: unknown) {
     )
     .replace(/[A-Za-z0-9._~-]{80,}/g, "[REDACTED]")
     .slice(0, 360);
+}
+
+function approvedMediaKind(
+  post: { villa: "Safira" | "Destan"; scheduledDate: string },
+  url: string,
+  allowedOrigins: string[],
+) {
+  const specialDay = approvedSpecialDayMedia(post, url, allowedOrigins);
+  if (specialDay) return specialDay.mediaKind;
+  return approvedProxyMediaAsset(post.villa, url, allowedOrigins)?.mediaKind ?? null;
 }
 
 export async function POST(request: Request) {
@@ -59,14 +70,14 @@ export async function POST(request: Request) {
   const allowedOrigins = [new URL(request.url).origin, "https://villa-yonetim.caglarmurat10.workers.dev"];
   let media: SocialPostMediaItem[] = await listSocialPostMedia(post.id);
   if (media.length === 0 && post.mediaUrl) {
-    const asset = approvedProxyMediaAsset(post.villa, post.mediaUrl, allowedOrigins);
-    if (asset) media = [{ position: 0, mediaUrl: post.mediaUrl, kind: asset.mediaKind }];
+    const kind = approvedMediaKind(post, post.mediaUrl, allowedOrigins);
+    if (kind) media = [{ position: 0, mediaUrl: post.mediaUrl, kind }];
   }
 
   if (media.length === 0) return Response.json({ error: "Instagram yayını için doğrulanmış medya gerekli." }, { status: 409 });
   for (const item of media) {
-    const asset = approvedProxyMediaAsset(post.villa, item.mediaUrl, allowedOrigins);
-    if (!asset || asset.mediaKind !== item.kind) {
+    const kind = approvedMediaKind(post, item.mediaUrl, allowedOrigins);
+    if (!kind || kind !== item.kind) {
       return Response.json({ error: `Villa ${post.villa} için doğrulanmamış veya medya türü değişmiş dosya Instagram'a gönderilemez.` }, { status: 409 });
     }
   }
