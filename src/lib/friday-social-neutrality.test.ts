@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
+import { approvedSpecialDayMedia } from "./special-day-media";
 import { classifySpecialDaySafety, getSpecialDayForDate } from "./special-days";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -40,6 +41,33 @@ describe("sosyal medya Cuma mesajı", () => {
     expect(neutralRenderer).not.toContain("BrandFooter");
     expect(neutralRenderer).not.toContain("VILLA SAFIRA");
     expect(neutralRenderer).not.toContain("VILLA DESTAN");
+    expect(neutralRenderer).toContain("Hayırlı Cumalar");
+  });
+
+  it("AUTO_SAFE Cuma görselini yalnız doğru villa/tarih/origin eşleşmesinde onaylar", () => {
+    const origins = ["https://admin.safiradestan.com"];
+    expect(approvedSpecialDayMedia(
+      { villa: "Safira", scheduledDate: "2026-09-11" },
+      "https://admin.safiradestan.com/api/public/social-assets/safira_special-day_2026-09-11/feed",
+      origins,
+    )).toEqual({ mediaKind: "image", format: "feed" });
+    expect(approvedSpecialDayMedia(
+      { villa: "Destan", scheduledDate: "2026-09-11" },
+      "https://admin.safiradestan.com/api/public/social-assets/safira_special-day_2026-09-11/feed",
+      origins,
+    )).toBeNull();
+    expect(approvedSpecialDayMedia(
+      { villa: "Safira", scheduledDate: "2026-09-11" },
+      "https://example.com/api/public/social-assets/safira_special-day_2026-09-11/feed",
+      origins,
+    )).toBeNull();
+  });
+
+  it("Instagram ve Facebook yayın kapıları doğrulanmış special-day renderer'ını kabul eder", () => {
+    const instagram = source("src/app/api/meta/instagram/publish/route.ts");
+    const facebook = source("src/app/api/meta/facebook/publish/route.ts");
+    expect(instagram).toContain("approvedSpecialDayMedia");
+    expect(facebook).toContain("approvedSpecialDayMedia");
   });
 });
 
@@ -54,6 +82,11 @@ describe("dini ve resmi gün otomasyonu", () => {
     const match = getSpecialDayForDate("2027-04-23");
     expect(match?.kind).toBe("fixed");
     expect(classifySpecialDaySafety(match!).automationClass).toBe("AUTO_SAFE");
+    expect(approvedSpecialDayMedia(
+      { villa: "Destan", scheduledDate: "2027-04-23" },
+      "https://admin.safiradestan.com/api/public/social-assets/destan_special-day_2027-04-23/feed",
+      ["https://admin.safiradestan.com"],
+    )).toEqual({ mediaKind: "image", format: "feed" });
   });
 
   it("günlük sosyal planlayıcı özel günleri de üretir ve AUTO_SAFE kayıtları otomatik onaylar", () => {
