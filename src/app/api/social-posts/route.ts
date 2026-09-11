@@ -2,10 +2,12 @@ import { createSocialPost, listSocialPosts } from "@/lib/social-db";
 import { socialPostSchema } from "@/lib/schema";
 import { approvedProxyMediaAsset } from "@/lib/social-drive-media";
 import { replaceSocialPostMedia } from "@/lib/social-media-store";
+import { reconcileLegacyFridayPosts } from "@/lib/social-friday-reconcile";
 
 export const dynamic = "force-dynamic";
 
 export async function GET() {
+  await reconcileLegacyFridayPosts();
   return Response.json({ posts: await listSocialPosts() });
 }
 

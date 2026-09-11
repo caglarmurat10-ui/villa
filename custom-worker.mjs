@@ -810,8 +810,38 @@ const RETRY_BACKOFF_MINUTES = [30, 60];
 // adaylık listesine girmez.
 const DESTAN_INSTAGRAM_HARD_BLOCKED = false;
 
+async function reconcileLegacyFridayPosts(env, scheduledAt) {
+  // 2026-09-11 geçiş düzeltmesi: nötr Cuma kuralından önce 30 günlük ufka seed edilen
+  // Cuma satırlarının eski "Villa ... · Patara" caption ekini kaldır. Yalnız bu eski pencere,
+  // cuma günü ve special-day medyası hedeflenir; resmi/dini özel günlere dokunulmaz.
+  const now = scheduledAt.toISOString();
+  const result = await env.DB.prepare(`UPDATE social_posts
+    SET caption = trim(substr(caption, 1, instr(caption, char(10) || char(10)) - 1)),
+        publish_attempt_count = 0,
+        last_publish_attempt_at = NULL,
+        last_publish_error = NULL,
+        publish_lock_token = NULL,
+        publish_lock_expires_at = NULL,
+        updated_at = ?
+    WHERE status = 'Planlandı'
+      AND scheduled_date >= '2026-09-11'
+      AND scheduled_date < '2026-10-11'
+      AND strftime('%w', scheduled_date) = '5'
+      AND media_url LIKE '%_special-day_%'
+      AND instr(caption, char(10) || char(10) || 'Villa ') > 0
+      AND caption LIKE '%#patara%'
+      AND caption LIKE '%#kaş%'
+      AND caption LIKE '%#antalya%'`)
+    .bind(now)
+    .run();
+  const changed = Number(result.meta?.changes ?? 0);
+  if (changed > 0) console.log(`[Social Cron] ${changed} eski Cuma satırı nötr metne uzlaştırıldı.`);
+  return changed;
+}
+
 async function duePosts(env, scheduledAt) {
   const clock = istanbulClock(scheduledAt);
+  await reconcileLegacyFridayPosts(env, scheduledAt);
   const publishTime = safeTime(env.SOCIAL_AUTO_PUBLISH_TIME);
   const limit = safeLimit(env.SOCIAL_AUTO_PUBLISH_LIMIT);
   const [cooldownAfter1st, cooldownAfter2nd] = RETRY_BACKOFF_MINUTES.map(

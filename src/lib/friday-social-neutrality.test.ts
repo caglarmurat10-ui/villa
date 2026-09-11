@@ -15,6 +15,18 @@ describe("sosyal medya Cuma mesajı", () => {
     expect(planner).toContain('if (match.kind === "friday") return match.message;');
   });
 
+  it("önceden seed edilmiş Cuma satırlarını hem UI hem cron yolunda nötrleştirir", () => {
+    const helper = source("src/lib/social-friday-reconcile.ts");
+    const route = source("src/app/api/social-posts/route.ts");
+    const worker = source("custom-worker.mjs");
+    expect(helper).toContain("scheduled_date >= '2026-09-11'");
+    expect(helper).toContain("scheduled_date < '2026-10-11'");
+    expect(helper).toContain("strftime('%w', scheduled_date) = '5'");
+    expect(helper).toContain("media_url LIKE '%_special-day_%'");
+    expect(route).toContain("await reconcileLegacyFridayPosts()");
+    expect(worker).toContain("await reconcileLegacyFridayPosts(env, scheduledAt)");
+  });
+
   it("public Cuma görseli marka footer'ına gitmeden nötr renderer ile üretilir", () => {
     const route = source("src/app/api/public/social-assets/[id]/[format]/route.tsx");
     expect(route).toContain('if (match?.kind === "friday")');
