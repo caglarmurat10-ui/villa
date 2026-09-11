@@ -3,7 +3,8 @@ import { getCloudflareContext } from "@opennextjs/cloudflare";
 /**
  * 2026-09-11 nötr Cuma geçişinden önce üretilmiş planlı Cuma satırlarını yerinde düzeltir.
  * Sabit pencere yalnız o anda mevcut 30 günlük legacy seed'leri kapsar; yeni kayıtlar zaten
- * social-plan-seed.ts üzerinden nötr caption ile üretilir.
+ * social-plan-seed.ts üzerinden nötr caption ile üretilir. Sosyal medya ekranının GET'i bu
+ * uzlaştırmayı hemen çalıştırır; 15 dakikalık yayın cron'u da bağımsız bir ikinci güvenlik katmanıdır.
  */
 export async function reconcileLegacyFridayPosts() {
   const { env } = await getCloudflareContext({ async: true });
