@@ -31,7 +31,8 @@ describe("sosyal medya Cuma mesajı", () => {
   it("public Cuma görseli marka footer'ına gitmeden nötr renderer ile üretilir", () => {
     const route = source("src/app/api/public/social-assets/[id]/[format]/route.tsx");
     expect(route).toContain('if (match?.kind === "friday")');
-    expect(route).toContain("renderNeutralFriday(format, match.message)");
+    expect(route).toContain("renderNeutralFriday(format, FRIDAY_VISUAL_MESSAGE)");
+    expect(route).toContain("Cuma; huzurun, bereketin ve duaların buluştuğu mübarek bir gündür. Dualarınızın kabul olmasını dileriz.");
 
     const neutralStart = route.indexOf("function renderNeutralFriday");
     const neutralEnd = route.indexOf("// FAZ 5 bölüm 9", neutralStart);
