@@ -26,7 +26,7 @@ type FridayVisualTheme = {
 };
 
 const FRIDAY_VISUAL_THEMES: FridayVisualTheme[] = [
-  { background: theme.background, glow: "radial-gradient(circle at 50% 65%,rgba(255,241,182,.75) 0%,rgba(255,190,95,.18) 28%,rgba(80,39,29,.08) 72%)", text: "#3d281d", muted: "#513629", accent: "#8b5a38", silhouette: "#433637", line: "rgba(105,63,41,.22)" },
+  { background: "linear-gradient(180deg,#f4dfc2 0%,#f8c884 38%,#ef9650 67%,#6d493d 100%)", glow: "radial-gradient(circle at 50% 65%,rgba(255,241,182,.75) 0%,rgba(255,190,95,.18) 28%,rgba(80,39,29,.08) 72%)", text: "#3d281d", muted: "#513629", accent: "#8b5a38", silhouette: "#433637", line: "rgba(105,63,41,.22)" },
   { background: "linear-gradient(155deg,#061b38 0%,#0a3760 42%,#17667b 72%,#d8a855 100%)", glow: "radial-gradient(circle at 72% 30%,rgba(255,221,139,.42) 0%,rgba(44,139,160,.18) 31%,rgba(4,21,45,.04) 72%)", text: "#fff6df", muted: "#e8e7de", accent: "#efc774", silhouette: "#071b2c", line: "rgba(239,199,116,.30)" },
   { background: "linear-gradient(155deg,#07372f 0%,#0d5848 43%,#b98b50 78%,#f0d9aa 100%)", glow: "radial-gradient(circle at 30% 66%,rgba(255,231,168,.48) 0%,rgba(25,104,82,.16) 34%,rgba(3,42,35,.03) 73%)", text: "#fff9e8", muted: "#f0eadb", accent: "#e3bd78", silhouette: "#12352f", line: "rgba(227,189,120,.30)" },
   { background: "linear-gradient(160deg,#40203b 0%,#703b57 38%,#c57d72 70%,#f0c79d 100%)", glow: "radial-gradient(circle at 66% 64%,rgba(255,226,180,.52) 0%,rgba(186,105,111,.17) 35%,rgba(64,32,59,.03) 72%)", text: "#fff7e9", muted: "#f6e5d8", accent: "#f0c684", silhouette: "#40283a", line: "rgba(240,198,132,.30)" },
