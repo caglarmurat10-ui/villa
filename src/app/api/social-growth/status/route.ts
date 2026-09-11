@@ -8,16 +8,14 @@ export async function GET() {
   const { env } = await getCloudflareContext({ async: true });
   // Public Scout credentials are optional by design; expose only presence/missing names, never values.
   const scoutEnv = env as typeof env & {
-    SOCIAL_SCOUT_SEARCH_API_KEY?: string;
-    SOCIAL_SCOUT_SEARCH_ENGINE_ID?: string;
+    SOCIAL_SCOUT_TAVILY_API_KEY?: string;
   };
   const [runs, summary] = await Promise.all([
     listAgentRuns(6),
     Promise.resolve(growthCapabilitiesSummary()),
   ]);
   const missingPublicScout = [
-    !scoutEnv.SOCIAL_SCOUT_SEARCH_API_KEY ? "SOCIAL_SCOUT_SEARCH_API_KEY" : null,
-    !scoutEnv.SOCIAL_SCOUT_SEARCH_ENGINE_ID ? "SOCIAL_SCOUT_SEARCH_ENGINE_ID" : null,
+    !scoutEnv.SOCIAL_SCOUT_TAVILY_API_KEY ? "SOCIAL_SCOUT_TAVILY_API_KEY" : null,
   ].filter((value): value is string => Boolean(value));
   return Response.json({
     capabilities: GROWTH_CAPABILITIES,

@@ -995,16 +995,14 @@ async function runDailySocialPlannerIfDue(env, ctx) {
   }
 }
 
-// Social Growth Agent - Public Web Scout. Meta API'ye hiç dokunmaz, Instagram'a login/scraping
-// YAPMAZ - yalnız (varsa) Google Custom Search JSON API üzerinden herkese açık web sonuçlarını
-// sorgular (bkz. src/lib/social-growth-public-scout.ts). SOCIAL_SCOUT_SEARCH_API_KEY / ENGINE_ID
-// tanımlı değilse cron route'u çağırmadan sessizce atlanır; böylece her gün aynı
-// PENDING_CONFIGURATION audit satırı üretilmez. Secret'lar yine opsiyoneldir ve deploy'u bloklamaz.
-// Yayın-kritik */15 cron'undan BİLEREK ayrı bir invocation (bkz. runDailySocialPlannerIfDue notu).
+// Social Growth Agent - Public Web Scout. No Meta API calls, Instagram login, or scraping.
+// Uses Tavily Search for public web results. If SOCIAL_SCOUT_TAVILY_API_KEY is missing,
+// skip silently before calling the route so no repeated PENDING_CONFIGURATION audit noise is created.
+// The secret remains optional and does not block deployment.
 const PUBLIC_SCOUT_KV_KEY = "social_public_scout_last_run_date";
 
 async function runPublicScoutIfDue(env, ctx) {
-  if (!env.SOCIAL_SCOUT_SEARCH_API_KEY || !env.SOCIAL_SCOUT_SEARCH_ENGINE_ID) {
+  if (!env.SOCIAL_SCOUT_TAVILY_API_KEY) {
     console.log("[Social Growth Scout] Yapılandırma yok; zamanlanmış tarama sessizce atlandı (DB geçmişine PENDING_CONFIGURATION yazılmaz).");
     return;
   }

@@ -56,7 +56,7 @@
   // BİLEREK ayrı bir invocation'da çalışır (bkz. custom-worker.mjs scheduled() - Error 1102 sonrası
   // kaynak izolasyonu). 03:00 UTC = 06:00 İstanbul, düşük trafik saati.
   // "0 5 * * *" - Social Growth Agent Public Web Scout, günde bir kez, 05:00 UTC = 08:00 İstanbul.
-  // SOCIAL_SCOUT_SEARCH_API_KEY tanımlı değilse (bkz. secrets notu) hiçbir dış istek atmadan
+  // SOCIAL_SCOUT_TAVILY_API_KEY tanımlı değilse (bkz. secrets notu) hiçbir dış istek atmadan
   // PENDING_CONFIGURATION olarak durur - bu satır deploy'u bloklamaz.
   // "0 7 * * 1,4" - GBP (Google Business Profile) otomatik gönderi, haftada 2 kez (Pazartesi ve
   // Perşembe), 07:00 UTC = 10:00 İstanbul. Kullanıcının açık isteğiyle eklendi (bkz.

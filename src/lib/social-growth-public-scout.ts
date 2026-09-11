@@ -3,16 +3,10 @@ import { upsertProspect, type ProspectCategory } from "./social-growth-store";
 import { computeScores } from "./social-growth-scoring";
 import { TARGET_LOCATIONS } from "./social-growth-constants";
 
-// Public Web Scout - Meta API'ye HİÇ dokunmaz, Instagram'a login/cookie/scraping YAPMAZ. Yalnız
-// Google Programmable Search Engine'in resmi Custom Search JSON API'siyle, herkese açık web
-// arama sonuçlarını (indexlenmiş sayfalar) sorgular ve instagram.com profil linklerini ayıklar.
-// Bu, ToS-uyumlu, resmi bir arama API'sidir - "public web search/index sonuçları" talebini
-// tam olarak karşılar.
-//
-// GÜVENLİ VARSAYILAN: SOCIAL_SCOUT_SEARCH_API_KEY / SOCIAL_SCOUT_SEARCH_ENGINE_ID Cloudflare'de
-// tanımlı DEĞİLSE bu modül hiçbir dış HTTP isteği ATMAZ (bkz. runPublicWebScout ilk kontrol).
-// wrangler.jsonc secrets.required listesine BİLİNÇLİ olarak eklenmedi - PayTR ile aynı desen
-// (dormant-by-design, deploy'u bloklamaz).
+// Public Web Scout never calls Meta APIs and never logs into or scrapes Instagram.
+// It uses Tavily Search over public web results and extracts instagram.com profile URLs.
+// If SOCIAL_SCOUT_TAVILY_API_KEY is absent, it exits before making any external request.
+// The secret stays optional so missing Scout configuration never blocks production deploys.
 
 export { TARGET_LOCATIONS };
 
@@ -33,13 +27,12 @@ const SCOUT_MATRIX: ScoutQuery[] = TARGET_LOCATIONS.flatMap((location) =>
   (Object.entries(SCOUT_CATEGORY_QUERY_HINTS) as [ProspectCategory, string][]).map(([category, hint]) => ({
     location,
     category,
-    q: `"${hint}" "${location}" instagram`,
+    q: `instagram ${location} ${hint}`,
   })),
 );
 
-// Bir çalıştırmada tüm 72 kombinasyonu değil, sırayla küçük bir dilim denenir - hem Google Custom
-// Search günlük ücretsiz kotasını (100 sorgu/gün) korur hem "aynı gün tüm kombinasyonlar" yerine
-// zamana yayılmış, çeşitli bir keşif sağlar.
+// Run only a rotating slice of the matrix each day. This limits Tavily credit usage and
+// spreads discovery across locations and categories instead of exhausting the matrix at once.
 export function buildScoutQueries(cursorIndex: number, count: number): { queries: ScoutQuery[]; nextCursor: number } {
   const safeCount = Math.max(1, Math.min(SCOUT_MATRIX.length, count));
   const start = ((cursorIndex % SCOUT_MATRIX.length) + SCOUT_MATRIX.length) % SCOUT_MATRIX.length;
@@ -50,7 +43,7 @@ export function buildScoutQueries(cursorIndex: number, count: number): { queries
   return { queries, nextCursor: (start + safeCount) % SCOUT_MATRIX.length };
 }
 
-export type GoogleSearchItem = { title?: string; link?: string; snippet?: string; displayLink?: string };
+export type PublicSearchItem = { title?: string; link?: string; snippet?: string; displayLink?: string };
 export type ParsedCandidate = {
   username: string;
   profileUrl: string;
@@ -64,7 +57,7 @@ const NON_PROFILE_PATH_SEGMENTS = new Set(["p", "reel", "reels", "explore", "tv"
 
 // Yalnız gerçek profil linklerini (instagram.com/<username>/) alır - /p/, /reel/ gibi tekil
 // gönderi linklerini profil sanıp yanlış username çıkarmaz.
-export function parseSearchResultsToCandidates(items: GoogleSearchItem[], category: ProspectCategory, locationHint: string): ParsedCandidate[] {
+export function parseSearchResultsToCandidates(items: PublicSearchItem[], category: ProspectCategory, locationHint: string): ParsedCandidate[] {
   const seen = new Set<string>();
   const results: ParsedCandidate[] = [];
   for (const item of items) {
@@ -93,20 +86,40 @@ export function parseSearchResultsToCandidates(items: GoogleSearchItem[], catego
   return results;
 }
 
-type GoogleSearchResponse = { items?: GoogleSearchItem[]; error?: { message?: string } };
+type TavilySearchResult = { title?: string; url?: string; content?: string };
+type TavilySearchResponse = {
+  results?: TavilySearchResult[];
+  detail?: { error?: string } | string;
+};
 
-async function searchGoogle(apiKey: string, engineId: string, query: string): Promise<GoogleSearchItem[]> {
-  const url = new URL("https://www.googleapis.com/customsearch/v1");
-  url.searchParams.set("key", apiKey);
-  url.searchParams.set("cx", engineId);
-  url.searchParams.set("q", query);
-  url.searchParams.set("siteSearch", "instagram.com");
-  url.searchParams.set("siteSearchFilter", "i");
-  url.searchParams.set("num", "10");
-  const response = await fetch(url.toString());
-  const payload = (await response.json().catch(() => ({}))) as GoogleSearchResponse;
-  if (!response.ok) throw new Error(payload.error?.message ?? `Google Custom Search HTTP ${response.status}`);
-  return payload.items ?? [];
+async function searchTavily(apiKey: string, query: string): Promise<PublicSearchItem[]> {
+  const response = await fetch("https://api.tavily.com/search", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      query,
+      search_depth: "basic",
+      max_results: 10,
+      topic: "general",
+      include_answer: false,
+      include_raw_content: false,
+      include_images: false,
+      safe_search: true,
+    }),
+  });
+  const payload = (await response.json().catch(() => ({}))) as TavilySearchResponse;
+  if (!response.ok) {
+    const detail = typeof payload.detail === "string" ? payload.detail : payload.detail?.error;
+    throw new Error(detail ?? `Tavily Search HTTP ${response.status}`);
+  }
+  return (payload.results ?? []).map((item) => ({
+    title: item.title,
+    link: item.url,
+    snippet: item.content,
+  }));
 }
 
 export type PublicScoutRunResult =
@@ -118,15 +131,13 @@ const MAX_QUERIES_PER_RUN = 10;
 
 export async function runPublicWebScout(env: {
   META_PRIVATE: KVNamespace;
-  SOCIAL_SCOUT_SEARCH_API_KEY?: string;
-  SOCIAL_SCOUT_SEARCH_ENGINE_ID?: string;
+  SOCIAL_SCOUT_TAVILY_API_KEY?: string;
 }, dailyCap = 20): Promise<PublicScoutRunResult> {
-  const apiKey = env.SOCIAL_SCOUT_SEARCH_API_KEY;
-  const engineId = env.SOCIAL_SCOUT_SEARCH_ENGINE_ID;
-  if (!apiKey || !engineId) {
+  const apiKey = env.SOCIAL_SCOUT_TAVILY_API_KEY;
+  if (!apiKey) {
     return {
       configured: false,
-      reason: "SOCIAL_SCOUT_SEARCH_API_KEY / SOCIAL_SCOUT_SEARCH_ENGINE_ID tanımlı değil (Google Programmable Search Engine). Public web scout hiçbir dış istek yapmadan durdu.",
+      reason: "SOCIAL_SCOUT_TAVILY_API_KEY is not configured; Public Web Scout made no external request.",
     };
   }
 
@@ -141,7 +152,7 @@ export async function runPublicWebScout(env: {
   for (const query of queries) {
     if (inserted >= dailyCap) break;
     try {
-      const items = await searchGoogle(apiKey, engineId, query.q);
+      const items = await searchTavily(apiKey, query.q);
       const candidates = parseSearchResultsToCandidates(items, query.category, query.location);
       candidatesFound += candidates.length;
       for (const candidate of candidates) {

@@ -5,7 +5,7 @@ import { recordAgentRun } from "@/lib/social-growth-store";
 export const dynamic = "force-dynamic";
 
 // Günlük cron (custom-worker.mjs runPublicScoutIfDue) tarafından in-process çağrılır. Hiçbir
-// Meta API'sine dokunmaz; SOCIAL_SCOUT_SEARCH_API_KEY tanımlı değilse hiçbir dış istek atmadan
+// Meta API'sine dokunmaz; SOCIAL_SCOUT_TAVILY_API_KEY tanımlı değilse hiçbir dış istek atmadan
 // PENDING_CONFIGURATION olarak kaydeder (bkz. social-growth-public-scout.ts).
 export async function POST() {
   const { env } = await getCloudflareContext({ async: true });

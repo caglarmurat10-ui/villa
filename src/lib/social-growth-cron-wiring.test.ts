@@ -18,10 +18,10 @@ describe("Social Growth Agent - Public Web Scout cron kablolaması", () => {
     expect(source).toContain('"0 5 * * *"');
   });
 
-  it("SOCIAL_SCOUT_SEARCH_API_KEY wrangler.jsonc secrets.required listesine EKLENMEMİŞ (deploy'u bloklamamalı)", () => {
+  it("SOCIAL_SCOUT_TAVILY_API_KEY wrangler.jsonc secrets.required listesine EKLENMEMİŞ (deploy'u bloklamamalı)", () => {
     const source = readFileSync(resolve(ROOT, "wrangler.jsonc"), "utf-8");
     const requiredBlockMatch = source.match(/"required":\s*\[[\s\S]*?\]/);
-    expect(requiredBlockMatch?.[0] ?? "").not.toContain("SOCIAL_SCOUT_SEARCH_API_KEY");
+    expect(requiredBlockMatch?.[0] ?? "").not.toContain("SOCIAL_SCOUT_TAVILY_API_KEY");
   });
 
   it("custom-worker.mjs '0 5 * * *' için runPublicScoutIfDue'yu çağırıyor ve runSocialCron fallback'inden ÖNCE return ediyor", () => {
@@ -40,7 +40,7 @@ describe("Social Growth Agent - Public Web Scout cron kablolaması", () => {
     const source = readFileSync(resolve(ROOT, "custom-worker.mjs"), "utf-8");
     const fnStart = source.indexOf("async function runPublicScoutIfDue(env, ctx)");
     const fnBody = source.slice(fnStart, fnStart + 2200);
-    const gateIndex = fnBody.indexOf("!env.SOCIAL_SCOUT_SEARCH_API_KEY || !env.SOCIAL_SCOUT_SEARCH_ENGINE_ID");
+    const gateIndex = fnBody.indexOf("!env.SOCIAL_SCOUT_TAVILY_API_KEY");
     const routeIndex = fnBody.indexOf("/api/social-growth/public-scout/run");
     expect(gateIndex).toBeGreaterThan(-1);
     expect(routeIndex).toBeGreaterThan(-1);

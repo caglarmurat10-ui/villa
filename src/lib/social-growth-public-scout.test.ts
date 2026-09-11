@@ -79,21 +79,20 @@ describe("runPublicWebScout", () => {
     vi.unstubAllGlobals();
   });
 
-  it("SOCIAL_SCOUT_SEARCH_API_KEY tanımlı değilse hiçbir dış istek atmadan configured:false döner", async () => {
+  it("SOCIAL_SCOUT_TAVILY_API_KEY tanımlı değilse hiçbir dış istek atmadan configured:false döner", async () => {
     const result = await runPublicWebScout({ META_PRIVATE: fakeKv as never });
     expect(result.configured).toBe(false);
     expect(global.fetch).not.toHaveBeenCalled();
   });
 
-  it("anahtar tanımlıysa Google Custom Search'e istek atar ve adayları ekler", async () => {
+  it("anahtar tanımlıysa Tavily Search'e istek atar ve adayları ekler", async () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
-      json: async () => ({ items: [{ link: "https://www.instagram.com/kas_gezgini/", snippet: "Patara gezi rehberi" }] }),
+      json: async () => ({ results: [{ url: "https://www.instagram.com/kas_gezgini/", content: "Patara gezi rehberi" }] }),
     });
     const result = await runPublicWebScout({
       META_PRIVATE: fakeKv as never,
-      SOCIAL_SCOUT_SEARCH_API_KEY: "test-key",
-      SOCIAL_SCOUT_SEARCH_ENGINE_ID: "test-engine",
+      SOCIAL_SCOUT_TAVILY_API_KEY: "tvly-test-key",
     });
     expect(result.configured).toBe(true);
     if (result.configured) {
@@ -106,13 +105,12 @@ describe("runPublicWebScout", () => {
     (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
       ok: true,
       json: async () => ({
-        items: Array.from({ length: 10 }, (_, i) => ({ link: `https://www.instagram.com/user_${i}_x/` })),
+        results: Array.from({ length: 10 }, (_, i) => ({ url: `https://www.instagram.com/user_${i}_x/` })),
       }),
     });
     const result = await runPublicWebScout({
       META_PRIVATE: fakeKv as never,
-      SOCIAL_SCOUT_SEARCH_API_KEY: "test-key",
-      SOCIAL_SCOUT_SEARCH_ENGINE_ID: "test-engine",
+      SOCIAL_SCOUT_TAVILY_API_KEY: "tvly-test-key",
     }, 3);
     expect(result.configured).toBe(true);
     if (result.configured) expect(result.inserted).toBeLessThanOrEqual(3);
@@ -121,11 +119,10 @@ describe("runPublicWebScout", () => {
   it("bir sorgu hata verirse diğerlerini denemeye devam eder, çökmez", async () => {
     (global.fetch as ReturnType<typeof vi.fn>)
       .mockRejectedValueOnce(new Error("network error"))
-      .mockResolvedValue({ ok: true, json: async () => ({ items: [] }) });
+      .mockResolvedValue({ ok: true, json: async () => ({ results: [] }) });
     const result = await runPublicWebScout({
       META_PRIVATE: fakeKv as never,
-      SOCIAL_SCOUT_SEARCH_API_KEY: "test-key",
-      SOCIAL_SCOUT_SEARCH_ENGINE_ID: "test-engine",
+      SOCIAL_SCOUT_TAVILY_API_KEY: "tvly-test-key",
     });
     expect(result.configured).toBe(true);
     if (result.configured) expect(result.errors).toBeGreaterThanOrEqual(1);
