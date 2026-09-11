@@ -100,6 +100,8 @@ export default function SocialGrowthAgentPanel() {
   const [addForm, setAddForm] = useState({ platform: "Instagram", username: "", displayName: "", profileUrl: "", category: "travel_creator" as ProspectCategory, locationHint: "", notes: "" });
   const [addError, setAddError] = useState("");
   const [addSubmitting, setAddSubmitting] = useState(false);
+  const [scoutRunning, setScoutRunning] = useState(false);
+  const [scoutMessage, setScoutMessage] = useState("");
 
   useEffect(() => {
     void fetchJson<StatusResponse>("/api/social-growth/status").then((data) => { if (data) setStatus(data); });
@@ -168,6 +170,38 @@ export default function SocialGrowthAgentPanel() {
     setOpportunities(opportunitiesRes?.opportunities ?? []);
   }
 
+  async function runPublicScoutNow() {
+    setScoutRunning(true);
+    setScoutMessage("");
+    try {
+      const response = await fetch("/api/social-growth/public-scout/run", { method: "POST" });
+      const data = await response.json().catch(() => null) as {
+        result?: { configured: boolean; queriesRun?: number; candidatesFound?: number; inserted?: number; errors?: number; reason?: string };
+        error?: string;
+      } | null;
+      if (!response.ok) {
+        setScoutMessage(data?.error ?? `Tarama ba\u015flat\u0131lamad\u0131 (HTTP ${response.status}).`);
+        return;
+      }
+      if (!data?.result?.configured) {
+        setScoutMessage(data?.result?.reason ?? "Public Web Scout yap\u0131land\u0131r\u0131lmam\u0131\u015f.");
+        return;
+      }
+      setScoutMessage(`Tarama tamamland\u0131 | ${data.result.queriesRun ?? 0} sorgu | ${data.result.candidatesFound ?? 0} aday bulundu | ${data.result.inserted ?? 0} kay\u0131t eklendi | ${data.result.errors ?? 0} hata`);
+      const [statusRes, runsRes] = await Promise.all([
+        fetchJson<StatusResponse>("/api/social-growth/status"),
+        fetchJson<{ runs: AgentRun[] }>("/api/social-growth/agent-runs"),
+        reloadProspects(),
+      ]);
+      if (statusRes) setStatus(statusRes);
+      if (runsRes) setAgentRuns(runsRes.runs);
+    } catch {
+      setScoutMessage("Tarama s\u0131ras\u0131nda a\u011f hatas\u0131 olu\u015ftu.");
+    } finally {
+      setScoutRunning(false);
+    }
+  }
+
   async function submitAddForm(event: React.FormEvent) {
     event.preventDefault();
     setAddError("");
@@ -217,8 +251,14 @@ export default function SocialGrowthAgentPanel() {
           ))}
         </div>
         {status?.publicScout ? <div style={{ marginTop: 8, padding: "9px 11px", border: `1px solid ${status.publicScout.configured ? "#1f5f3b" : "#a1620755"}`, borderRadius: 9, background: status.publicScout.configured ? "#071b16" : "#241a06", fontSize: 10 }}>
-          <b style={{ color: status.publicScout.configured ? "#86efac" : "#fbbf24" }}>Public Web Scout: {status.publicScout.configured ? "hazır" : "yapılandırılmadı"}</b>
-          {!status.publicScout.configured ? <span style={{ display: "block", marginTop: 3, color: "#9fb0c5" }}>Eksik: {status.publicScout.missing.join(" + ")}. Zamanlanmış görev sessizce atlanır; yeni PENDING_CONFIGURATION kaydı oluşturulmaz.</span> : null}
+          <div style={{ display: "flex", justifyContent: "space-between", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+            <b style={{ color: status.publicScout.configured ? "#86efac" : "#fbbf24" }}>Public Web Scout: {status.publicScout.configured ? "haz\u0131r" : "yap\u0131land\u0131r\u0131lmad\u0131"}</b>
+            {status.publicScout.configured ? <button type="button" onClick={() => void runPublicScoutNow()} disabled={scoutRunning} style={{ ...smallButtonStyle, borderColor: "#1f5f3b", color: "#86efac", opacity: scoutRunning ? 0.6 : 1 }}>
+              {scoutRunning ? "Taran\u0131yor\u2026" : "\u015eimdi Tara"}
+            </button> : null}
+          </div>
+          {!status.publicScout.configured ? <span style={{ display: "block", marginTop: 3, color: "#9fb0c5" }}>Eksik: {status.publicScout.missing.join(" + ")}. {"Zamanlanm\u0131\u015f g\u00f6rev sessizce atlan\u0131r; yeni PENDING_CONFIGURATION kayd\u0131 olu\u015fturulmaz."}</span> : null}
+          {scoutMessage ? <span style={{ display: "block", marginTop: 5, color: scoutMessage.includes("hata") || scoutMessage.includes("ba\u015flat\u0131lamad\u0131") ? "#fca5a5" : "#9fb0c5" }}>{scoutMessage}</span> : null}
         </div> : null}
       </div>
 
