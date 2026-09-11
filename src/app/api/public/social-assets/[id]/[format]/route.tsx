@@ -1,5 +1,7 @@
+import { ImageResponse } from "next/og";
 import { isFormat, parseTemplateId, renderLocalEvent, renderTemplate, type Format } from "@/lib/social-design-templates";
 import { getLocalEventCandidate } from "@/lib/local-events";
+import { getSpecialDayForDate } from "@/lib/special-days";
 
 export const runtime = "nodejs";
 
@@ -8,6 +10,21 @@ function eventDateLabel(startIso: string, endIso: string | null): string {
   const start = EVENT_DATE_FMT.format(new Date(`${startIso}T00:00:00Z`));
   if (!endIso || endIso === startIso) return start;
   return `${start} – ${EVENT_DATE_FMT.format(new Date(`${endIso}T00:00:00Z`))}`;
+}
+
+function renderNeutralFriday(format: Format, message: string): Response {
+  const dimensions = format === "story" ? { width: 1080, height: 1920 } : { width: 1080, height: 1350 };
+  return new ImageResponse(
+    <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "center", background: "#061a33", color: "#f4e1b4", padding: 76, fontFamily: "serif" }}>
+      <div style={{ display: "flex", flexDirection: "column", marginTop: format === "story" ? 60 : 20 }}>
+        <div style={{ fontFamily: "sans-serif", fontSize: 24, letterSpacing: 8, color: "#d8b36a" }}>CUMA MESAJI</div>
+        <div style={{ width: 90, height: 3, background: "#d8b36a", margin: "28px 0 34px" }} />
+        <div style={{ fontSize: 66, lineHeight: 1.12, fontWeight: 500, color: "#f4e1b4" }}>Hayırlı Cumalar</div>
+        <div style={{ fontFamily: "sans-serif", fontSize: 27, lineHeight: 1.6, color: "#c9b98e", marginTop: 40, maxWidth: dimensions.width - 152 }}>{message}</div>
+      </div>
+    </div>,
+    dimensions,
+  );
 }
 
 // FAZ 5 bölüm 9 - Meta/Facebook'un Graph API'sinin, oturum çerezi OLMADAN kendi sunucularından
@@ -30,6 +47,21 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
 
   const parsed = parseTemplateId(id);
   if (!parsed) return new Response("Şablon bulunamadı.", { status: 404 });
+
+  // Cuma paylaşımı iki villa hesabında yayınlansa da içerik marka/villa bağlantısından bağımsızdır.
+  // Bu nedenle public Meta görselinde Villa Safira / Villa Destan footer'ı kullanılmaz. D1'deki
+  // villa alanı yalnız hangi sosyal hesaba gönderileceğini seçmeye devam eder; görünür içeriğe
+  // taşınmaz. Resmi/dini özel günler mevcut markalı özel-gün tasarımını korur.
+  if (parsed.type === "special-day") {
+    const match = getSpecialDayForDate(parsed.key);
+    if (match?.kind === "friday") {
+      const response = renderNeutralFriday(format, match.message);
+      const headers = new Headers(response.headers);
+      headers.set("Cache-Control", "public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000");
+      headers.set("X-Content-Type-Options", "nosniff");
+      return new Response(response.body, { status: response.status, headers });
+    }
+  }
 
   // LOCAL EVENT - içerik D1'deki admin-onaylı aday kaydına dayanır (bkz. local-events.ts), bu
   // yüzden diğer TÜM tiplerin aksine burada bir D1 okuması var. Yalnız status IN
