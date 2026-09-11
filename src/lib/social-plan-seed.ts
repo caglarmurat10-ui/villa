@@ -247,6 +247,9 @@ export async function ensureRolling30DayPlan(dailyTarget = 1) {
 const SPECIAL_DAY_HORIZON_DAYS = 30;
 
 function specialDayCaption(match: SpecialDayMatch, villa: Villa): string {
+  // Cuma mesajı bilinçli olarak villa/konum/hashtag bağlantısı taşımaz. Aynı nötr içerik her iki
+  // hesabın kendi yayın kanalından çıkar; `villa` yalnız hedef hesabı seçmek için D1'de tutulur.
+  if (match.kind === "friday") return match.message;
   return [match.message, `Villa ${villa} · Patara`, "#patara #kaş #antalya"].join("\n\n");
 }
 
@@ -282,8 +285,8 @@ export async function ensureSpecialDayPosts(): Promise<{ created: number; update
       const villaSlug = villa === "Safira" ? "safira" : "destan";
       const mediaUrl = new URL(`/api/public/social-assets/${villaSlug}_special-day_${date}/feed`, `${baseUrl}/`).toString();
 
-      // Her iki villa için Instagram + Facebook özel gün içeriği üretilebilir; insan onayı ve
-      // normal yayın güvenlik katmanları aynen geçerlidir.
+      // Her iki villa için Instagram + Facebook özel gün içeriği üretilebilir. AUTO_SAFE özel günler
+      // doğrudan Onaylandı olarak oluşturulur ve mevcut yayın cron'u plan tarihinde otomatik gönderir.
       inputs.push({ villa, platform: "Instagram", contentType: "Gönderi", scheduledDate: date, caption, mediaUrl, mediaUrls: [mediaUrl] });
       inputs.push({ villa, platform: "Facebook", contentType: "Gönderi", scheduledDate: date, caption, mediaUrl, mediaUrls: [mediaUrl] });
     }
