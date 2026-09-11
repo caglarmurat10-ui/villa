@@ -23,7 +23,7 @@ type DiscoveryResponse = {
 const STATE_LABEL: Record<DiscoveryState, string> = {
   WAITING_API_ACCESS: "Henüz bağlı değil — önce yukarıdan GBP'ye bağlanın",
   ACCESS_DENIED: "Erişim reddedildi — Google Cloud projesinde Business Profile API'sini ve OAuth kapsamını kontrol edin",
-  RATE_LIMITED: "Geçici kota/hız sınırı — erişim reddedilmedi; kısa süre sonra tekrar deneyin",
+  RATE_LIMITED: "Google Cloud Business Profile API kota/erişim limiti — OAuth bağlantısı çalışıyor; QPM durumunu Google Cloud Console’dan kontrol edin",
   WAITING_OWNER_ACCESS: "Bağlantı başarılı ama bu Google hesabına bağlı hiçbir işletme profili yok — Safira/Destan'ın gerçek sahibi hesapla bağlanmanız gerekebilir",
   NO_LOCATIONS: "Hesap bulundu ama hiçbir location yok",
   READY_READ_ONLY: "Hazır — aşağıdan villa başına doğru location'ı seçin",
@@ -123,6 +123,15 @@ export default function GbpLocationPicker() {
         <div style={{ marginTop: 8 }}>
           <p style={{ fontSize: 10, color: "#9fb0c5" }}>{STATE_LABEL[data.discovery.state]}</p>
           {data.discovery.error ? <p style={{ fontSize: 10, color: "#fca5a5" }}>{data.discovery.error}</p> : null}
+
+          {data.discovery.state === "RATE_LIMITED" ? <div style={{ margin: "8px 0", padding: "9px 10px", border: "1px solid #a1620755", borderRadius: 9, background: "#241a06", fontSize: 10, color: "#dbeafe", lineHeight: 1.55 }}>
+            <b style={{ color: "#fbbf24" }}>Google Cloud tarafında kontrol edilmesi gereken nokta</b>
+            <p style={{ margin: "4px 0" }}>Google&apos;ın GBP dokümantasyonuna göre proje kotası 0 QPM ise API erişimi henüz onaylanmamıştır; 300 QPM ise standart erişim onaylıdır. 0 QPM durumunda kota artırımı değil, Basic API Access başvurusu yapılmalıdır.</p>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <a href="https://developers.google.com/my-business/content/prereqs" target="_blank" rel="noreferrer" style={{ color: "#93c5fd", fontWeight: 800 }}>Basic API Access gereksinimleri →</a>
+              <a href="https://developers.google.com/my-business/content/limits" target="_blank" rel="noreferrer" style={{ color: "#93c5fd", fontWeight: 800 }}>GBP kota açıklaması →</a>
+            </div>
+          </div> : null}
 
           {data.discovery.state === "READY_READ_ONLY" ? (
             <div style={{ display: "grid", gap: 8, marginTop: 8 }}>

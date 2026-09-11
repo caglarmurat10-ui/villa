@@ -5,7 +5,7 @@ import type { Villa } from "@/lib/types";
 
 type CapabilityStatus = { key: string; label: string; available: boolean; requiredPermission: string };
 type AgentRun = { id: string; agentType: string; startedAt: string; status: string; candidateCount: number; requiredPermission: string | null; notes: string | null };
-type StatusResponse = { capabilities: CapabilityStatus[]; summary: { total: number; available: number; pending: number }; recentRuns: AgentRun[] };
+type StatusResponse = { capabilities: CapabilityStatus[]; summary: { total: number; available: number; pending: number }; recentRuns: AgentRun[]; publicScout?: { configured: boolean; missing: string[] } };
 
 type ProspectCategory =
   | "travel_creator" | "local_creator" | "tourism_page" | "local_business"
@@ -135,6 +135,18 @@ export default function SocialGrowthAgentPanel() {
   );
   const watchlist = useMemo(() => prospects.filter((p) => p.status === "WATCHLIST"), [prospects]);
   const followed = useMemo(() => prospects.filter((p) => p.status === "FOLLOWED_MANUALLY"), [prospects]);
+  const agentRunDisplay = useMemo(() => {
+    let keptScoutPendingConfiguration = false;
+    let hidden = 0;
+    const visible: AgentRun[] = [];
+    for (const run of agentRuns) {
+      const legacyScoutNoise = run.agentType === "SCOUT" && run.status === "PENDING_CONFIGURATION";
+      if (legacyScoutNoise && keptScoutPendingConfiguration) { hidden += 1; continue; }
+      if (legacyScoutNoise) keptScoutPendingConfiguration = true;
+      visible.push(run);
+    }
+    return { visible, hidden };
+  }, [agentRuns]);
 
   async function markProspect(id: string, next: string) {
     const response = await fetch(`/api/social-growth/prospects/${id}`, {
@@ -204,6 +216,10 @@ export default function SocialGrowthAgentPanel() {
             </div>
           ))}
         </div>
+        {status?.publicScout ? <div style={{ marginTop: 8, padding: "9px 11px", border: `1px solid ${status.publicScout.configured ? "#1f5f3b" : "#a1620755"}`, borderRadius: 9, background: status.publicScout.configured ? "#071b16" : "#241a06", fontSize: 10 }}>
+          <b style={{ color: status.publicScout.configured ? "#86efac" : "#fbbf24" }}>Public Web Scout: {status.publicScout.configured ? "hazır" : "yapılandırılmadı"}</b>
+          {!status.publicScout.configured ? <span style={{ display: "block", marginTop: 3, color: "#9fb0c5" }}>Eksik: {status.publicScout.missing.join(" + ")}. Zamanlanmış görev sessizce atlanır; yeni PENDING_CONFIGURATION kaydı oluşturulmaz.</span> : null}
+        </div> : null}
       </div>
 
       <div style={{ marginTop: 14 }}>
@@ -283,8 +299,9 @@ export default function SocialGrowthAgentPanel() {
 
       <div style={{ marginTop: 14 }}>
         <b style={subHeadStyle}>Agent Geçmişi</b>
-        {agentRuns.length === 0 ? <p style={{ color: "#94a3b8", fontSize: 11, marginTop: 6 }}>Henüz bir agent çalıştırması kaydedilmedi.</p> : <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
-          {agentRuns.map((run) => <div key={run.id} style={{ ...cardStyle, padding: "8px 12px" }}>
+        {agentRunDisplay.hidden > 0 ? <p style={{ margin: "6px 0 0", fontSize: 10, color: "#8fa4bd" }}>{agentRunDisplay.hidden} eski tekrarlı SCOUT/PENDING_CONFIGURATION kaydı arayüzde özetlendi; audit verisi silinmedi. Yeni günlük tekrarlar artık oluşturulmuyor.</p> : null}
+        {agentRunDisplay.visible.length === 0 ? <p style={{ color: "#94a3b8", fontSize: 11, marginTop: 6 }}>Henüz bir agent çalıştırması kaydedilmedi.</p> : <div style={{ display: "grid", gap: 6, marginTop: 8 }}>
+          {agentRunDisplay.visible.map((run) => <div key={run.id} style={{ ...cardStyle, padding: "8px 12px" }}>
             <small style={{ color: "#94a3b8" }}>{new Date(run.startedAt).toLocaleString("tr-TR")} · {run.agentType}</small>
             <div style={{ fontSize: 12 }}>{run.status === "OK" ? "✓" : run.status === "ERROR" ? "!" : "🟡"} {run.status}{run.candidateCount ? ` · ${run.candidateCount} aday` : ""}</div>
             {run.notes ? <small style={{ color: "#64748b" }}>{run.notes}</small> : null}
