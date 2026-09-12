@@ -1,0 +1,15 @@
+{
+  "protocol": "savarona-agent/0.1",
+  "project_id": "villa",
+  "name": "Villa Yonetim",
+  "environment": "production",
+  "version_source": "git",
+  "health_path": "/api/health",
+  "capabilities": ["repo", "health", "errors", "social_publish"],
+  "risk_profile": "critical",
+  "automation": {
+    "read_only": "automatic",
+    "low_risk_changes": "branch_test_pr",
+    "high_risk_changes": "human_approval_required"
+  }
+}
