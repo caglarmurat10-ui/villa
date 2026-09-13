@@ -93,6 +93,8 @@ export async function publishInstagramSingleImage(
   const params: Record<string, string> = { image_url: imageUrl, caption };
   if (altText) params.alt_text = altText.slice(0, 1000);
   const containerId = await createContainer(accountId, accessToken, params);
+  // Single-image containers can also return transient 9007 while still processing.
+  await waitUntilReady(containerId, accessToken);
   return publishContainer(accountId, accessToken, containerId);
 }
 

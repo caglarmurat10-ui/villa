@@ -24,32 +24,29 @@ export const ITINERARY_DEFINITIONS: ItineraryDefinition[] = [
   {
     id: "kas-1-gun",
     title: "Kaş Çevresinde 1 Gün",
-    frame: "Kaş merkezini ve yakın çevresini bir günde deneyimlemek isteyenler için genel bir rota fikri.",
+    frame: "Kaş merkezini ve yakın çevresini aynı gün içinde görmek isteyenler için öne çıkan duraklar.",
     placeIds: ["kas-merkez", "kaputas-plaji"],
   },
   {
     id: "patara-kas-kalkan-3-gun",
     title: "3 Günlük Patara – Kaş – Kalkan Fikri",
-    frame: "Bölgeyi daha geniş bir zaman diliminde, üç ayrı karaktere sahip durağıyla tanımak isteyenler için genel bir rota fikri.",
+    frame: "Patara, Kaş ve Kalkan’ın birbirinden farklı havasını birkaç güne yayarak görmek isteyenler için öne çıkan duraklar.",
     placeIds: ["patara-antik-kenti", "patara-plaji", "kas-merkez", "kaputas-plaji", "kalkan"],
   },
   {
     id: "ciftler-rota",
     title: "Çiftler İçin Rota Fikri",
-    frame: "Sakin ve manzaraya odaklı bir gün geçirmek isteyen çiftler için, bölgenin öne çıkan noktalarından derlenen genel bir rota fikri.",
+    frame: "Sakin, manzaralı ve acele etmeden geçirilecek bir gün için bölgeden birkaç durak.",
     placeIds: ["kaputas-plaji", "kalkan", "likya-yolu"],
   },
   {
     id: "aileler-rota",
     title: "Aileler İçin Rota Fikri",
-    frame: "Geniş, düz bir sahil şeridi ve tarihî alanları bir arada deneyimlemek isteyen aileler için genel bir rota fikri.",
+    frame: "Sahil ve tarihî alanları bir arada görmek isteyen aileler için bölgeden birkaç durak.",
     placeIds: ["patara-plaji", "patara-antik-kenti", "kas-merkez"],
   },
 ];
 
-function villaSlug(villa: Villa): "safira" | "destan" {
-  return villa === "Safira" ? "safira" : "destan";
-}
 
 // Her tanımın constituent place'lerini GERÇEKTEN GUIDE_PLACES'te doğrular - kayıp/yanlış yazılmış
 // bir id sessizce görmezden gelinmez, o rota tanımı HİÇ üretilmez (fabrikasyon riskini kod
@@ -60,17 +57,11 @@ export function resolveItineraryPlaces(definition: ItineraryDefinition): GuidePl
   return places as GuidePlace[];
 }
 
-export function itineraryCaption(definition: ItineraryDefinition, places: GuidePlace[], villa: Villa): { hook: string; caption: string } {
-  const stops = places.map((p) => p.name).join(", ");
+export function itineraryCaption(definition: ItineraryDefinition, places: GuidePlace[], _villa: Villa): { hook: string; caption: string } {
+  void _villa; // hesap hedefi için parametre korunur; organik bölge metnine villa adı sızdırılmaz.
   const body = places.map((p) => `${p.name}: ${p.description}`).join("\n\n");
   return {
     hook: definition.frame,
-    caption: [
-      `${definition.title}\n\n${definition.frame}`,
-      `Durak fikirleri: ${stops}.`,
-      body,
-      `Villa ${villa} konumundan bu rotayı değerlendirebilirsiniz.`,
-      `#${villaSlug(villa)}patara #patara #kaş #kalkan #gezirehberi #likya`,
-    ].join("\n\n"),
+    caption: [`${definition.title}\n\n${definition.frame}`, body, "Yola çıkmadan önce güncel giriş, ulaşım ve ziyaret koşullarını kontrol etmek iyi olur.", "#patara #kaş #kalkan #gezirehberi #likya #antalya"].join("\n\n"),
   };
 }

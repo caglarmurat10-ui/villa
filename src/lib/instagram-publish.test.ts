@@ -81,6 +81,30 @@ describe("publishInstagramStory (2026-09-02 HTTP 400/9007 regresyon fix testi)",
   });
 });
 
+describe("publishInstagramSingleImage readiness", () => {
+  const originalFetch = global.fetch;
+  afterEach(() => { global.fetch = originalFetch; });
+
+  it("tek gorselde media_publish oncesi FINISHED durumunu kontrol eder", async () => {
+    const calls: string[] = [];
+    global.fetch = vi.fn(async (url: string | URL, init?: RequestInit) => {
+      const href = url.toString();
+      const method = init?.method ?? "GET";
+      calls.push(`${method} ${href}`);
+      if (method === "POST" && href.endsWith("/media")) return Response.json({ id: "single-ready" });
+      if (method === "GET" && href.includes("/single-ready")) return Response.json({ status_code: "FINISHED" });
+      if (method === "POST" && href.endsWith("/media_publish")) return Response.json({ id: "post-ready" });
+      throw new Error(`beklenmeyen istek: ${method} ${href}`);
+    }) as unknown as typeof fetch;
+
+    await expect(publishInstagramSingleImage("acc-1", "token-1", "https://example.com/a.jpg", "caption")).resolves.toBe("post-ready");
+    const statusIndex = calls.findIndex((item) => item.startsWith("GET "));
+    const publishIndex = calls.findIndex((item) => item.includes("/media_publish"));
+    expect(statusIndex).toBeGreaterThan(-1);
+    expect(statusIndex).toBeLessThan(publishIndex);
+  });
+});
+
 describe("Instagram media_publish 9007 retry", () => {
   const originalFetch = global.fetch;
 
@@ -99,6 +123,9 @@ describe("Instagram media_publish 9007 retry", () => {
       const method = init?.method ?? "GET";
       if (method === "POST" && href.endsWith("/media")) {
         return new Response(JSON.stringify({ id: "container-9007" }), { status: 200 });
+      }
+      if (method === "GET" && href.includes("/container-9007")) {
+        return new Response(JSON.stringify({ status_code: "FINISHED" }), { status: 200 });
       }
       if (method === "POST" && href.endsWith("/media_publish")) {
         publishAttempts += 1;
@@ -127,6 +154,9 @@ describe("Instagram media_publish 9007 retry", () => {
       const method = init?.method ?? "GET";
       if (method === "POST" && href.endsWith("/media")) {
         return new Response(JSON.stringify({ id: "container-token" }), { status: 200 });
+      }
+      if (method === "GET" && href.includes("/container-token")) {
+        return new Response(JSON.stringify({ status_code: "FINISHED" }), { status: 200 });
       }
       if (method === "POST" && href.endsWith("/media_publish")) {
         publishAttempts += 1;

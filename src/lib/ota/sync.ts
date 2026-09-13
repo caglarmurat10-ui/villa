@@ -50,7 +50,7 @@ async function hasDirectReservationConflict(db: D1Database, villa: Villa, start:
 async function hasOtherSourceConflict(db: D1Database, villa: Villa, source: OtaPlatform, start: string, end: string): Promise<boolean> {
   const row = await db.prepare(`
     SELECT id FROM external_blocks
-    WHERE villa = ? AND source != ? AND status IN ('active','needs_review') AND start_date < ? AND end_date > ?
+    WHERE villa = ? AND source != ? AND status = 'active' AND start_date < ? AND end_date > ?
     LIMIT 1
   `).bind(villa, source, end, start).first();
   return Boolean(row);

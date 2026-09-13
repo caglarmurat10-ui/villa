@@ -48,8 +48,13 @@ function compactCaption(value: string) {
   return normalized.length > 120 ? `${normalized.slice(0, 117)}…` : normalized;
 }
 
+function istanbulDate(value?: string | null) {
+  if (!value) return "";
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date(value));
+}
+
 function todayIstanbul() {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Istanbul" }).format(new Date());
+  return istanbulDate(new Date().toISOString());
 }
 
 export default function SocialPublishHealth({ posts, autoPublishEnabled, contentLibrarySummary, cronHeartbeat }: { posts: SocialPost[]; autoPublishEnabled: boolean; contentLibrarySummary: ContentLibrarySummary; cronHeartbeat: SocialCronHeartbeat | null }) {
@@ -69,7 +74,8 @@ export default function SocialPublishHealth({ posts, autoPublishEnabled, content
   const dueReady = ready.filter((post) => post.scheduledDate <= today);
   const failed = activeItems.filter((post) => post.status === "Planlandı" && Boolean(post.lastPublishError));
   const todayScheduled = activeItems.filter((post) => post.status === "Planlandı" && post.scheduledDate === today);
-  const todayPublished = activeItems.filter((post) => post.status === "Yayınlandı" && (post.publishedAt ?? "").slice(0, 10) === today);
+  const todayPublished = activeItems.filter((post) => post.status === "Yayınlandı" && istanbulDate(post.publishedAt) === today);
+  const failedToday = failed.filter((post) => istanbulDate(post.lastPublishAttemptAt) === today);
   const destanIgWaiting = items.filter((post) => isMetaTargetHardBlocked(post.villa, post.platform) && post.status === "Planlandı");
   const attempted = activeItems.filter((post) => (post.publishAttemptCount ?? 0) > 0);
   const publishedTracked = activeItems.filter((post) => post.status === "Yayınlandı" && Boolean(post.platformPostId));
@@ -168,7 +174,7 @@ export default function SocialPublishHealth({ posts, autoPublishEnabled, content
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(140px,1fr))",gap:8,marginTop:8,fontSize:10}}>
           <div style={{padding:"8px 10px",border:"1px solid #223a57",borderRadius:9,background:"#0b1728"}}>Zamanlandı<br /><b style={{fontSize:15}}>{todayScheduled.length}</b></div>
           <div style={{padding:"8px 10px",border:"1px solid #1f5f3b",borderRadius:9,background:"#071b16",color:"#86efac"}}>Yayınlandı<br /><b style={{fontSize:15}}>{todayPublished.length}</b></div>
-          <div style={{padding:"8px 10px",border:"1px solid #451a1a",borderRadius:9,background:"#2a0a0a",color:"#fca5a5"}}>Hatalı<br /><b style={{fontSize:15}}>{failed.length}</b></div>
+          <div style={{padding:"8px 10px",border:"1px solid #451a1a",borderRadius:9,background:"#2a0a0a",color:"#fca5a5"}}>Bugün hatalı<br /><b style={{fontSize:15}}>{failedToday.length}</b></div>
           {destanIgWaiting.length > 0 ? <div style={{padding:"8px 10px",border:"1px solid #a16207",borderRadius:9,background:"#241a06",color:"#fbbf24"}}>HARD BLOCK (Destan IG)<br /><b style={{fontSize:15}}>{destanIgWaiting.length}</b></div> : null}
           <div style={{padding:"8px 10px",border:"1px solid #47617f",borderRadius:9,background:"#102238",color:"#dbeafe"}}>İnceleme gerekiyor<br /><b style={{fontSize:15}}>{contentLibrarySummary.reviewRequired}</b></div>
           <div style={{padding:"8px 10px",border:"1px solid #451a1a",borderRadius:9,background:"#1a0a0a",color:"#f87171"}}>Bloklandı<br /><b style={{fontSize:15}}>{contentLibrarySummary.blocked}</b></div>

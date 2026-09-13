@@ -227,6 +227,17 @@ export function approvedProxyMediaAsset(villa: Villa, url: string, allowedOrigin
   }
 }
 
+export function instagramStoryImageUrlForApprovedProxy(
+  villa: Villa,
+  url: string,
+  allowedOrigins: string[],
+  publicOrigin: string,
+) {
+  const asset = approvedProxyMediaAsset(villa, url, allowedOrigins);
+  if (!asset || asset.mediaKind !== "image") return null;
+  return new URL(`/social/story/${asset.fileId}.jpg`, publicOrigin).toString();
+}
+
 export function isApprovedProxyMediaUrl(villa: Villa, url: string, allowedOrigins: string[]) {
   return Boolean(approvedProxyMediaAsset(villa, url, allowedOrigins));
 }

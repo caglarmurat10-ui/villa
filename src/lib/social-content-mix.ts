@@ -16,16 +16,15 @@ export type ContentMixCategory =
   | "Doğrudan Rezervasyon/Güven"
   | "Müsaitlik/Kampanya";
 
-// 2026-09-04 organik büyüme ayarı: keşif/yerel içerik payı %65'ten %70'e çıkarıldı. Villa reklamı
-// görünümünü azaltmak için yalnız Villa/Konaklama 20 -> 15, Yerel Yaşam/Yemek/İpucu 10 -> 15
-// kaydırıldı. Güven ve gerçek müsaitlik payları korunur; satış baskısı artırılmaz.
+// 2026-09-13 organik yayın ayarı: akışın %80’i bölge/gezi/tarih-kültür/yerel yaşam;
+// villa vitrini %10 ile sınırlı, doğrudan satış/güven + müsaitlik toplam %10.
 export const CONTENT_MIX_TARGETS: Record<ContentMixCategory, number> = {
   "Destinasyon/Bölge": 25,
-  "Aktivite/Gezi": 20,
-  "Villa/Konaklama": 15,
-  "Tarih/Kültür/Doğa": 10,
-  "Yerel Yaşam/Yemek/İpucu": 15,
-  "Doğrudan Rezervasyon/Güven": 10,
+  "Aktivite/Gezi": 15,
+  "Villa/Konaklama": 10,
+  "Tarih/Kültür/Doğa": 20,
+  "Yerel Yaşam/Yemek/İpucu": 20,
+  "Doğrudan Rezervasyon/Güven": 5,
   "Müsaitlik/Kampanya": 5,
 };
 

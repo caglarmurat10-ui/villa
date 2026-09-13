@@ -145,6 +145,22 @@ describe("syncOneConnection (gercek SQLite entegrasyon testi)", () => {
     expect(row?.status).toBe("needs_review");
   });
 
+  it("needs_review karantina blogu diger OTA'daki temiz blogu needs_review'e ZORLAMAZ", async () => {
+    await seedConnection("Destan", "booking");
+    const now = new Date().toISOString();
+    await db.prepare(
+      `INSERT INTO external_blocks (id, villa, source, external_uid, start_date, end_date, status, last_synced_at, created_at, updated_at)
+       VALUES (?, 'Destan', 'airbnb', 'evt-quarantine', '2027-07-10', '2027-07-17', 'needs_review', ?, ?, ?)`
+    ).bind(crypto.randomUUID(), now, now, now).run();
+
+    icsResponses["booking"] = ics(vevent("evt-clean-booking", "20270712", "20270715"));
+    const { syncOneConnection } = await import("./sync");
+    await syncOneConnection("Destan", "booking");
+
+    const row = await db.prepare("SELECT status FROM external_blocks WHERE external_uid = 'evt-clean-booking'").first<{ status: string }>();
+    expect(row?.status).toBe("active");
+  });
+
   it("checkout gunu yeni check-in icin musait sayilir (start<end, end<=start ihlali yok)", async () => {
     await seedConnection("Safira", "booking");
     icsResponses["booking"] = ics(vevent("evt-checkout", "20260901", "20260908"));

@@ -42,22 +42,18 @@ function appendDiscoveryGrowthCta(id: string, theme: string, caption: string): s
   return `${caption}\n\n${pickCtaLine(style, seed)}`;
 }
 
-function guideCaption(place: GuidePlace, villa: Villa): { hook: string; caption: string } {
-  const categoryLabel = GUIDE_CATEGORIES.find((c) => c.slug === place.category)?.label ?? "";
-  const hook = `${place.name} - Patara ve Kaş çevresinde keşfedilecek bir yer.`;
-  const caption = [
-    `${place.name}\n\n${place.description}`,
-    `Villa ${villa} konumundan bölgeyi keşfetmek isteyenler için ${categoryLabel.toLowerCase()} kategorisinde gerçek bir öneri.`,
-    `#${villaSlug(villa)}patara #patara #kaş #antalya #likya #gezirehberi`,
-  ].join("\n\n");
-  return { hook, caption };
+function guideCaption(place: GuidePlace, _villa: Villa): { hook: string; caption: string } {
+  void _villa; // hedef hesabı seçmek için korunur; organik bölge metnine villa adı eklenmez.
+  const categoryLabel = GUIDE_CATEGORIES.find((c) => c.slug === place.category)?.label ?? "Bölge";
+  return {
+    hook: `${place.name} — Patara ve Kaş çevresinden bir not.`,
+    caption: [`${place.name}\n\n${place.description}`, `${categoryLabel} meraklılarının bölge listesine ekleyebileceği duraklardan biri.`, "#patara #kaş #antalya #likya #gezirehberi"].join("\n\n"),
+  };
 }
 
-function tipCaption(tip: string, villa: Villa): { hook: string; caption: string } {
-  return {
-    hook: "Bölgeyi keşfederken işinize yarayabilecek bir ipucu.",
-    caption: [tip, `Villa ${villa} · Patara`, `#${villaSlug(villa)}patara #patara #kaş #antalya #geziipucu`].join("\n\n"),
-  };
+function tipCaption(tip: string, _villa: Villa): { hook: string; caption: string } {
+  void _villa; // hedef hesabı seçmek için korunur; organik ipucu metnine villa adı eklenmez.
+  return { hook: "Bölgeyi gezerken işinize yarayabilecek küçük bir not.", caption: [tip, "#patara #kaş #antalya #geziipucu #akdeniz"].join("\n\n") };
 }
 
 function trustCaption(claim: string, villa: Villa): { hook: string; caption: string } {

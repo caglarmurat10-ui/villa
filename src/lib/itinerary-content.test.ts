@@ -57,13 +57,13 @@ describe("itineraryCaption - hiçbir değişken bilgi (saat/ücret/mesafe/hava) 
     }
   });
 
-  it("Safira ve Destan icin ayri, villa adi dogru gecen caption'lar uretir", () => {
+  it("organik rota caption'ı villa reklamına dönüşmez; iki hesapta da aynı bölge metni kullanılabilir", () => {
     const definition = ITINERARY_DEFINITIONS[0];
     const places = resolveItineraryPlaces(definition)!;
     const safira = itineraryCaption(definition, places, "Safira");
     const destan = itineraryCaption(definition, places, "Destan");
-    expect(safira.caption).toContain("Villa Safira");
-    expect(destan.caption).toContain("Villa Destan");
-    expect(safira.caption).not.toBe(destan.caption);
+    expect(safira.caption).not.toContain("Villa Safira");
+    expect(destan.caption).not.toContain("Villa Destan");
+    expect(safira.caption).toBe(destan.caption);
   });
 });

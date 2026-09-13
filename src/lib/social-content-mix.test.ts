@@ -23,7 +23,7 @@ describe("computeContentMix", () => {
 
     const villa = report.entries.find((e) => e.category === "Villa/Konaklama")!;
     expect(villa.count).toBe(30); // 24 Villa + 6 Özel
-    expect(villa.actualPercent).toBe(50); // 30/60 = %50, organik büyüme hedefi %15 - ASIRI TEMSIL EDILMIS
+    expect(villa.actualPercent).toBe(50); // 30/60 = %50, organik yayın hedefi %10 - ASIRI TEMSIL EDILMIS
     expect(villa.overrepresented).toBe(true);
 
     const region = report.entries.find((e) => e.category === "Destinasyon/Bölge")!;
@@ -41,14 +41,14 @@ describe("computeContentMix", () => {
     expect(report.dominantCategoryWarning).toContain("reklam");
   });
 
-  it("2026-09-04 organik büyüme karması dengeliyse hiçbir kategori overrepresented olmaz", () => {
+  it("2026-09-13 organik yayın karması dengeliyse hiçbir kategori overrepresented olmaz", () => {
     const templates = [
       ...Array(25).fill({ theme: "Bölge" }),
-      ...Array(20).fill({ theme: "Gezi" }),
-      ...Array(15).fill({ theme: "Villa" }),
-      ...Array(10).fill({ theme: "Tarih-Doğa" }),
-      ...Array(15).fill({ theme: "Yerel İpucu" }),
-      ...Array(10).fill({ theme: "Güven" }),
+      ...Array(15).fill({ theme: "Gezi" }),
+      ...Array(10).fill({ theme: "Villa" }),
+      ...Array(20).fill({ theme: "Tarih-Doğa" }),
+      ...Array(20).fill({ theme: "Yerel İpucu" }),
+      ...Array(5).fill({ theme: "Güven" }),
       ...Array(5).fill({ theme: "Müsaitlik" }),
     ];
     const report = computeContentMix(templates);

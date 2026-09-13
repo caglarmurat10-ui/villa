@@ -3,6 +3,7 @@ import type { Villa } from "./types";
 import type { FacebookPageCandidate } from "./facebook-private-store";
 import { brandProfiles } from "./brand-profiles";
 import { getBrandImageBytes } from "./social-brand-images";
+import { resolveDriveMediaById } from "./social-drive-media";
 
 const META_GRAPH_VERSION = "v26.0";
 const META_GRAPH = `https://graph.facebook.com/${META_GRAPH_VERSION}`;
@@ -375,21 +376,29 @@ export async function publishFacebookPost(pageId: string, pageAccessToken: strin
     // ve binary multipart upload ile çözüldü. Feed fotoğraflarında da URL'yi Worker kendisi indirip
     // Meta'ya `source` Blob olarak gönderiyoruz; böylece crawler/self-fetch bağımlılığı kalkıyor.
     const parsedImageUrl = new URL(imageUrl);
-      let imageResponse: Response;
-      if (parsedImageUrl.pathname.startsWith("/social/friday/")) {
-        try {
-          const { env } = await getCloudflareContext({ async: true });
-          const cfResponse = await env.ASSETS.fetch(parsedImageUrl);
-          imageResponse = new Response(await cfResponse.arrayBuffer(), {
-            status: cfResponse.status,
-            headers: { "Content-Type": cfResponse.headers.get("content-type") ?? "image/png" },
-          });
-        } catch {
-          imageResponse = await fetch(imageUrl, { method: "GET", headers: { "Cache-Control": "no-cache" } });
-        }
-      } else {
+    let imageResponse: Response;
+    const driveProxyMatch = parsedImageUrl.pathname.match(/^\/api\/media\/drive\/([^/]+)$/);
+    const driveAsset = driveProxyMatch ? resolveDriveMediaById(decodeURIComponent(driveProxyMatch[1])) : null;
+    if (driveAsset?.mediaKind === "image") {
+      imageResponse = await fetch(driveAsset.sourceUrl, { method: "GET", redirect: "follow" });
+      const directType = (imageResponse.headers.get("content-type") ?? "").toLowerCase();
+      if (!imageResponse.ok || !directType.startsWith("image/")) {
+        imageResponse = await fetch(driveAsset.previewUrl.replace("sz=w1600", "sz=w2400"), { method: "GET", redirect: "follow" });
+      }
+    } else if (parsedImageUrl.pathname.startsWith("/social/friday/")) {
+      try {
+        const { env } = await getCloudflareContext({ async: true });
+        const cfResponse = await env.ASSETS.fetch(parsedImageUrl);
+        imageResponse = new Response(await cfResponse.arrayBuffer(), {
+          status: cfResponse.status,
+          headers: { "Content-Type": cfResponse.headers.get("content-type") ?? "image/png" },
+        });
+      } catch {
         imageResponse = await fetch(imageUrl, { method: "GET", headers: { "Cache-Control": "no-cache" } });
       }
+    } else {
+      imageResponse = await fetch(imageUrl, { method: "GET", headers: { "Cache-Control": "no-cache" } });
+    }
     if (!imageResponse.ok) {
       throw new Error(`Facebook görseli indirilemedi (HTTP ${imageResponse.status}).`);
     }

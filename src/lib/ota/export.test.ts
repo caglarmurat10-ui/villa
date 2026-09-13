@@ -84,12 +84,12 @@ describe("buildExportEvents - Villa Destan cross-channel blocking + feedback-loo
     expect(bookingFeed).toHaveLength(0);
   });
 
-  it("needs_review durumundaki bir blok da (henuz insan onayi beklese bile) cift-rezervasyonu onlemek icin export feed'inde gorunur - yalniz PUBLIC site'ta gizlenir, OTA export'ta DEGIL", async () => {
+  it("needs_review karantina blogu karsi OTA export feed'ine YAYILMAZ", async () => {
     await insertBlock("Destan", "airbnb", "2027-08-01", "2027-08-05", "needs_review");
     const { buildExportEvents } = await import("./export");
 
     const bookingFeed = await buildExportEvents("Destan", "booking");
-    expect(bookingFeed).toHaveLength(1);
+    expect(bookingFeed).toHaveLength(0);
   });
 
   it("status='removed' (iptal edilmis) bir blok hicbir export feed'inde GORUNMEZ", async () => {

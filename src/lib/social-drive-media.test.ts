@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { approvedProxyMediaAsset, socialDriveMedia } from "./social-drive-media";
+import { approvedProxyMediaAsset, instagramStoryImageUrlForApprovedProxy, socialDriveMedia } from "./social-drive-media";
 
 const ALLOWED_ORIGINS = ["https://safiradestan.com", "https://villa-yonetim.caglarmurat10.workers.dev"];
 
@@ -100,6 +100,29 @@ describe("approvedProxyMediaAsset — media provenance gate (source_origin)", ()
 describe("approvedProxyMediaAsset — origin allowlist", () => {
   it("rejects a proxy URL served from an origin outside the allowlist", () => {
     const result = approvedProxyMediaAsset("Safira", proxyUrl(safiraAsset.fileId, "https://evil.example.com"), ALLOWED_ORIGINS);
+    expect(result).toBeNull();
+  });
+});
+
+
+describe("Instagram Story 9:16 media adapter", () => {
+  it("approved REAL_UPLOAD image gets a static 1080x1920 story asset URL", () => {
+    const result = instagramStoryImageUrlForApprovedProxy(
+      "Safira",
+      proxyUrl(safiraAsset.fileId),
+      ALLOWED_ORIGINS,
+      "https://admin.safiradestan.com",
+    );
+    expect(result).toBe(`https://admin.safiradestan.com/social/story/${safiraAsset.fileId}.jpg`);
+  });
+
+  it("villa mismatch fails closed and cannot get a story derivative", () => {
+    const result = instagramStoryImageUrlForApprovedProxy(
+      "Destan",
+      proxyUrl(safiraAsset.fileId),
+      ALLOWED_ORIGINS,
+      "https://admin.safiradestan.com",
+    );
     expect(result).toBeNull();
   });
 });

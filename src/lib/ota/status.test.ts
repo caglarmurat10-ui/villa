@@ -148,6 +148,16 @@ describe("listOtaConnectionsStatus - conflictCount (FALSE POSITIVE OTA CONFLICT 
     expect(row.conflictCount).toBe(1);
   });
 
+  it("120 gunden uzun needs_review unavailable blogu conflictCount'a girmez", async () => {
+    await seedConnection("Safira", "airbnb", new Date().toISOString());
+    await seedNeedsReviewBlock("Safira", "airbnb", "2026-09-11", "2027-09-14");
+
+    const { listOtaConnectionsStatus } = await import("./status");
+    const rows = await listOtaConnectionsStatus();
+    const row = rows.find((r) => r.villa === "Safira" && r.platform === "airbnb")!;
+    expect(row.conflictCount).toBe(0);
+  });
+
   it("yalniz kapali-sezon needs_review blogu (rezervasyon olmasa bile) conflictCount'a girmez", async () => {
     await seedConnection("Destan", "airbnb", new Date().toISOString());
     await seedNeedsReviewBlock("Destan", "airbnb", "2026-10-01", "2027-03-01");

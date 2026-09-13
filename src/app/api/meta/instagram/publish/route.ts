@@ -13,7 +13,7 @@ import {
   markSocialPublishFailure,
   markSocialPublishSuccess,
 } from "@/lib/social-db";
-import { approvedProxyMediaAsset } from "@/lib/social-drive-media";
+import { approvedProxyMediaAsset, instagramStoryImageUrlForApprovedProxy } from "@/lib/social-drive-media";
 import { approvedSpecialDayMedia } from "@/lib/special-day-media";
 import { listSocialPostMedia, type SocialPostMediaItem } from "@/lib/social-media-store";
 
@@ -119,7 +119,18 @@ export async function POST(request: Request) {
     if (post.contentType === "Reels") {
       mediaId = await publishInstagramReel(account.accountId, account.accessToken, media[0].mediaUrl, post.caption);
     } else if (post.contentType === "Hikâye") {
-      mediaId = await publishInstagramStory(account.accountId, account.accessToken, media[0]);
+      const storyItem = media[0].kind === "image"
+        ? {
+            ...media[0],
+            mediaUrl: instagramStoryImageUrlForApprovedProxy(
+              post.villa,
+              media[0].mediaUrl,
+              allowedOrigins,
+              new URL(request.url).origin,
+            ) ?? media[0].mediaUrl,
+          }
+        : media[0];
+      mediaId = await publishInstagramStory(account.accountId, account.accessToken, storyItem);
     } else if (media.length > 1) {
       mediaId = await publishInstagramCarousel(account.accountId, account.accessToken, media, post.caption);
     } else {

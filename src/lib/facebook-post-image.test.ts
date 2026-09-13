@@ -33,6 +33,29 @@ describe("publishFacebookPost image upload", () => {
     expect(calls[1].url).toContain("/page_1/photos");
   });
 
+  it("managed Drive proxy URL'sinde Worker self-fetch yerine Drive kaynagini kullanir", async () => {
+    const calls: string[] = [];
+    globalThis.fetch = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      calls.push(url);
+      if (url.startsWith("https://drive.google.com/uc?export=download&id=1PGdf22BGfwu_WcUMzL_dJIMMznsp4XLn")) {
+        return new Response(new Uint8Array([255, 216, 255]), { status: 200, headers: { "Content-Type": "image/jpeg" } });
+      }
+      const form = init?.body as FormData;
+      expect(form.get("source")).toBeInstanceOf(Blob);
+      return Response.json({ id: "photo_drive", post_id: "page_1_drive" });
+    }) as typeof fetch;
+
+    await expect(publishFacebookPost(
+      "page_1",
+      "secret-token",
+      "Drive test",
+      "https://villa-yonetim.caglarmurat10.workers.dev/api/media/drive/1PGdf22BGfwu_WcUMzL_dJIMMznsp4XLn",
+    )).resolves.toBe("page_1_drive");
+    expect(calls.some((url) => url.includes("workers.dev/api/media/drive"))).toBe(false);
+    expect(calls[0]).toContain("drive.google.com/uc?export=download");
+  });
+
   it("metin-only paylaşımı eski /feed akışını korur", async () => {
     globalThis.fetch = vi.fn(async (_input: string | URL | Request, init?: RequestInit) => {
       expect(init?.body).toBeInstanceOf(URLSearchParams);

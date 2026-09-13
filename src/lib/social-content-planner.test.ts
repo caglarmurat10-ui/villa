@@ -8,7 +8,7 @@ import { isClosedSeasonDate } from "./season-policy";
 function template(overrides: Partial<SocialContentTemplate> & { id: string }): SocialContentTemplate {
   return {
     scheduledDate: "2026-09-10", villa: "Safira", format: "Feed", contentType: "Gönderi",
-    theme: "Bölge", mediaFile: `${overrides.id}.jpg`, hook: "hook", caption: "caption metni", mediaResolved: true,
+    theme: "Bölge", mediaFile: `${overrides.id}.jpg`, hook: "Doğal başlık", caption: "Doğal paylaşım metni", mediaResolved: true,
     mediaKind: "image", driveFileId: "f1", driveViewUrl: "", previewUrl: "", mediaUrl: "/x.jpg", mediaUrls: ["/x.jpg"],
     ...overrides,
   };
@@ -32,6 +32,11 @@ describe("classifyContentSafety", () => {
 
   it("hava durumu geçen caption REVIEW_REQUIRED döner", () => {
     expect(classifyContentSafety(template({ id: "X4", caption: "Bugün hava durumu 28 derece, güneşli." })).automationClass).toBe("REVIEW_REQUIRED");
+  });
+
+  it("editöryal şablon dili otomatik yayına sızamaz", () => {
+    const result = classifyContentSafety(template({ id: "X-EDITORIAL", caption: "Örnek akış: sabah sahil, öğleden sonra dinlenme." }));
+    expect(result.automationClass).toBe("BLOCKED");
   });
 
   it("sabit, değişken bilgi içermeyen içerik AUTO_SAFE döner", () => {

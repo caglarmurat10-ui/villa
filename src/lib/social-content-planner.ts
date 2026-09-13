@@ -40,6 +40,21 @@ const VARIABLE_INFO_PATTERNS: RegExp[] = [
 // hiçbir zaman olduğu gibi yayınlanamaz. Kaynak veri (content01-06.json) elle değiştirilmiyor -
 // yalnız bu bilinen kayıt kimliği kalıcı olarak BLOCKED sayılıyor.
 const HARD_BLOCKED_TEMPLATE_IDS = new Set(["SM050"]);
+const EDITORIAL_LEAK_PATTERNS: RegExp[] = [
+  /örnek\s+(akış|rota|metin|paylaşım)/i,
+  /bu içerik yayınlanırken/i,
+  /hazırladığımız bu içerikte/i,
+  /bölge içeriklerinde/i,
+  /buradaki amaç/i,
+  /bu gönderi satış baskısı/i,
+  /paylaştığımız tüm villa içeriklerinde/i,
+  /metni bilinçli olarak/i,
+  /marka algısını/i,
+  /hesabı daha güçlü/i,
+  /görseli taşıyan bir metin/i,
+  /\b(caption|hook|prompt|taslak|şablon)\b/i,
+  /carousel(?:'|’)deki görseller/i,
+];
 
 function hasVariableInfo(text: string): boolean {
   return VARIABLE_INFO_PATTERNS.some((pattern) => pattern.test(text));
@@ -50,6 +65,10 @@ export function classifyContentSafety(
 ): { automationClass: AutomationClass; reason: string } {
   if (HARD_BLOCKED_TEMPLATE_IDS.has(template.id)) {
     return { automationClass: "BLOCKED", reason: `${template.id} kalıcı olarak engellendi - caption gerçek içerik değil, editöryal talimat metni sızıntısı içeriyor.` };
+  }
+  const copy = `${template.hook}\n${template.caption}`;
+  if (EDITORIAL_LEAK_PATTERNS.some((pattern) => pattern.test(copy))) {
+    return { automationClass: "BLOCKED", reason: "Editöryal/şablon dili gerçek gönderiye sızmış; otomatik yayın engellendi." };
   }
   if (!template.mediaResolved) {
     return { automationClass: "BLOCKED", reason: "Medya çözümlenemedi (Drive dosyası bulunamadı)." };

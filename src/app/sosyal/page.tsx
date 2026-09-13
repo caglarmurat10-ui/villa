@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import MetaConnections from "@/components/MetaConnections";
 import MetaDiagnostics from "@/components/MetaDiagnostics";
@@ -91,8 +92,9 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
   const googleScope = firstParam(params.scope);
 
   const today = istanbulToday();
-  const [posts, initialAccounts, reservations, contentLibrarySummary, googleSnapshot, stats7, stats30, cronHeartbeat, conversionWindow7d, conversionWindow28d, contentPackages, mapPresenceEntries] = await Promise.all([
+  const [posts, healthPosts, initialAccounts, reservations, contentLibrarySummary, googleSnapshot, stats7, stats30, cronHeartbeat, conversionWindow7d, conversionWindow28d, contentPackages, mapPresenceEntries] = await Promise.all([
     listSocialPosts(30),
+    listSocialPosts(),
     listMetaAccounts(),
     listReservations(),
     getContentLibrarySummary(),
@@ -162,7 +164,7 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
             <h2 style={{margin:"5px 0 4px",fontSize:19}}>Safira ve Destan Facebook Sayfaları</h2>
             <p style={{margin:0,color:"#b8c6d8",fontSize:12}}>Facebook iki villa için tek Meta yetkilendirme oturumunda bağlanır. Safira ve Destan Sayfalarını aynı seçim ekranında açıkça eşleştiririz; iki Page tokenı birlikte güncellenir.</p>
           </div>
-          <a href="/api/meta/facebook/connect?villa=Safira" style={{display:"inline-block",padding:"10px 13px",borderRadius:10,background:"#1877f2",color:"#fff",fontSize:11,fontWeight:900,textDecoration:"none"}}>İki Facebook Sayfasını birlikte bağla / yenile</a>
+          <Link href="/api/meta/facebook/connect?villa=Safira" style={{display:"inline-block",padding:"10px 13px",borderRadius:10,background:"#1877f2",color:"#fff",fontSize:11,fontWeight:900,textDecoration:"none"}}>İki Facebook Sayfasını birlikte bağla / yenile</Link>
         </div>
         <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(240px,1fr))",gap:10,marginTop:13}}>
           {villas.map((villa) => {
@@ -171,10 +173,10 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
               <strong style={{display:"block",marginBottom:5}}>Villa {villa} · Facebook</strong>
               {account ? <>
                 <span style={{display:"block",color:"#86efac",fontSize:11,fontWeight:800}}>✓ Bağlı · {account.username}</span>
-                <a href="/sosyal/marka" style={{display:"inline-block",marginTop:9,color:"#93c5fd",fontSize:11,fontWeight:800,textDecoration:"none"}}>Marka ayarlarını kontrol et →</a>
+                <Link href="/sosyal/marka" style={{display:"inline-block",marginTop:9,color:"#93c5fd",fontSize:11,fontWeight:800,textDecoration:"none"}}>Marka ayarlarını kontrol et →</Link>
               </> : <>
                 <span style={{display:"block",color:"#fbbf24",fontSize:11}}>Henüz bağlı değil</span>
-                <a href="/api/meta/facebook/connect?villa=Safira" style={{display:"inline-block",marginTop:9,padding:"9px 12px",borderRadius:9,background:"#1877f2",color:"#fff",fontSize:11,fontWeight:900,textDecoration:"none"}}>İki Sayfayı birlikte bağla</a>
+                <Link href="/api/meta/facebook/connect?villa=Safira" style={{display:"inline-block",marginTop:9,padding:"9px 12px",borderRadius:9,background:"#1877f2",color:"#fff",fontSize:11,fontWeight:900,textDecoration:"none"}}>İki Sayfayı birlikte bağla</Link>
               </>}
             </article>;
           })}
@@ -184,15 +186,15 @@ export default async function SocialPage({ searchParams }: SocialPageProps) {
 
     <MetaConnections initialAccounts={accounts} />
     <MetaPublishTestCenter />
-    <SocialPublishHealth posts={posts} autoPublishEnabled={autoPublishEnabled} contentLibrarySummary={contentLibrarySummary} cronHeartbeat={cronHeartbeat} />
+    <SocialPublishHealth posts={healthPosts} autoPublishEnabled={autoPublishEnabled} contentLibrarySummary={contentLibrarySummary} cronHeartbeat={cronHeartbeat} />
     <div style={{maxWidth:1250,margin:"12px auto",padding:"0 20px"}}>
       <div style={{marginBottom:10,padding:"10px 13px",border:"1px solid #22c55e55",borderRadius:12,background:"#071b16",color:"#bbf7d0",fontSize:11,fontWeight:700}}>
         ✓ Drive medya otomasyonu aktif · İlk ekranda en yakın 30 sosyal plan gösteriliyor. Ağır içerik kütüphanesi ve takvim tarayıcı tarafında yüklenir; Worker CPU bütçesi korunur.
       </div>
-      <a href="/sosyal/marka" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,padding:"14px 16px",border:"1px solid #d5aa5855",borderRadius:14,background:"linear-gradient(135deg,#13233a,#081522)",color:"#f8fafc",textDecoration:"none",fontWeight:800}}>
+      <Link href="/sosyal/marka" style={{display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,padding:"14px 16px",border:"1px solid #d5aa5855",borderRadius:14,background:"linear-gradient(135deg,#13233a,#081522)",color:"#f8fafc",textDecoration:"none",fontWeight:800}}>
         <span><small style={{display:"block",color:"#d5aa58",fontSize:9,letterSpacing:1.5}}>MARKA + HEDEF KİTLE</small>Logo, Facebook kapağı, Instagram öne çıkanları ve Meta kitle merkezi</span>
         <span style={{color:"#d5aa58"}}>Aç →</span>
-      </a>
+      </Link>
     </div>
     <SocialDeferredContent posts={posts} gaps={gaps} />
     <PlanRefreshButton />

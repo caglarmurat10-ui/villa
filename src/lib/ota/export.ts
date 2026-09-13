@@ -17,6 +17,7 @@ async function database(): Promise<D1Database> {
 // excludeSource: bu feed'in gönderileceği platform - o platformdan zaten import edilmiş block'lar
 // tekrar aynı platforma geri gönderilmez (loop prevention). Yalnız UID/tarih döner - misafir
 // adı/telefon/e-posta/fiyat/not hiçbir zaman bu sorgulara dahil değil.
+// needs_review karantina kayıtları karşı OTA'ya aktarılmaz; yalnız status=active yayılır.
 export async function buildExportEvents(villa: Villa, excludeSource: OtaPlatform): Promise<ExportEvent[]> {
   const db = await database();
 
@@ -26,7 +27,7 @@ export async function buildExportEvents(villa: Villa, excludeSource: OtaPlatform
 
   const blocks = await db.prepare(`
     SELECT id, start_date, end_date FROM external_blocks
-    WHERE villa = ? AND source != ? AND status IN ('active','needs_review')
+    WHERE villa = ? AND source != ? AND status = 'active'
   `).bind(villa, excludeSource).all<{ id: string; start_date: string; end_date: string }>();
 
   const events: ExportEvent[] = [];
