@@ -3,6 +3,7 @@ import { EVERGREEN_TIPS, TRUST_CLAIMS } from "@/lib/social-design-templates";
 import { ITINERARY_DEFINITIONS, itineraryCaption, resolveItineraryPlaces } from "@/lib/itinerary-content";
 import { ctaStyleForTheme, pickCtaLine } from "@/lib/social-engagement";
 import { socialDriveMedia, type DriveMediaAsset } from "@/lib/social-drive-media";
+import { approvedRegionPhotoUrl, regionPhotoForPlace } from "@/lib/region-photo-library";
 import { VILLAS as VILLA_CONTENT, type VillaSlug } from "@/lib/villa-content";
 import type { SocialContentTemplate } from "@/lib/social-content-library";
 import type { Villa } from "@/lib/types";
@@ -63,12 +64,12 @@ function trustCaption(claim: string, villa: Villa): { hook: string; caption: str
   };
 }
 
-function baseTemplate(id: string, villa: Villa, theme: string, hook: string, caption: string, publicPath: string): SocialContentTemplate {
-  const mediaUrl = `/api/public/social-assets/${publicPath}`;
-  const finalCaption = appendDiscoveryGrowthCta(id, theme, caption);
+function baseTemplate(id: string, villa: Villa, theme: string, hook: string, caption: string, mediaUrl: string, creditLine = ""): SocialContentTemplate {
+  const organicCaption = appendDiscoveryGrowthCta(id, theme, caption);
+  const finalCaption = creditLine ? `${organicCaption}\n\n${creditLine}` : organicCaption;
   return {
     id, scheduledDate: new Date().toISOString().slice(0, 10), villa, format: "Feed", contentType: "Gönderi",
-    theme, mediaFile: publicPath, hook, caption: finalCaption,
+    theme, mediaFile: mediaUrl, hook, caption: finalCaption,
     mediaResolved: true, mediaKind: "image", driveFileId: "", driveViewUrl: "", previewUrl: "",
     mediaUrl, mediaUrls: [mediaUrl],
   };
@@ -198,63 +199,93 @@ function guideTheme(category: GuidePlace["category"]): string {
   return "Bölge";
 }
 
-export function approvedVirtualTemplateMedia(villa: Villa, url: string, allowedOrigins: string[]) {
-  try {
-    const parsed = new URL(url);
-    if (!allowedOrigins.includes(parsed.origin)) return null;
-    const template = buildVirtualTemplates().find((item) =>
-      item.villa === villa &&
-      item.mediaResolved &&
-      item.mediaKind === "image" &&
-      new URL(item.mediaUrl, parsed.origin).pathname === parsed.pathname,
-    );
-    return template ? { mediaKind: "image" as const } : null;
-  } catch {
-    return null;
-  }
+export function approvedVirtualTemplateMedia(_villa: Villa, url: string, allowedOrigins: string[]) {
+  const photo = approvedRegionPhotoUrl(url, allowedOrigins);
+  return photo ? { mediaKind: "image" as const } : null;
+}
+
+const TIP_PHOTO_PLACE_IDS = ["patara-plaji", "kas-merkez", "likya-yolu", "patara-antik-kenti"] as const;
+
+function singleVillaPhoto(villa: Villa, index: number): DriveMediaAsset | null {
+  const pool = socialDriveMedia.filter((asset) => asset.villa === villa && asset.mediaKind === "image");
+  if (!pool.length) return null;
+  return pool[index % pool.length] ?? null;
 }
 
 export function buildVirtualTemplates(): SocialContentTemplate[] {
   const templates: SocialContentTemplate[] = [];
 
+  // B?lge/k?lt?r i?erikleri art?k grafik kart DE??L: yaln?z ger?ek ve kayna?? do?rulanm?? foto?raf?
+  // bulunan yerler otomatik havuza girer. Foto?raf? olmayan yer sessizce atlan?r; uydurma/generic
+  // g?rsel ya da villa foto?raf? bir destinasyonmu? gibi kullan?lmaz.
   for (const place of GUIDE_PLACES) {
+    const photo = regionPhotoForPlace(place.id);
+    if (!photo) continue;
     const theme = guideTheme(place.category);
-    const kickerType = place.category === "gezi" ? "activity" : "destination";
     for (const villa of VILLA_NAMES) {
       const { hook, caption } = guideCaption(place, villa);
-      const publicPath = `${villaSlug(villa)}_${kickerType}_${place.id}/feed`;
-      templates.push(baseTemplate(`guide-${villaSlug(villa)}-${place.id}`, villa, theme, hook, caption, publicPath));
+      templates.push(baseTemplate(
+        `guide-${villaSlug(villa)}-${place.id}`,
+        villa,
+        theme,
+        hook,
+        caption,
+        photo.publicPath,
+        photo.creditLine,
+      ));
     }
   }
 
   EVERGREEN_TIPS.forEach((tip, index) => {
+    const photo = regionPhotoForPlace(TIP_PHOTO_PLACE_IDS[index] ?? "");
+    if (!photo) return;
     for (const villa of VILLA_NAMES) {
       const { hook, caption } = tipCaption(tip, villa);
-      const publicPath = `${villaSlug(villa)}_travel-tip_${index}/feed`;
-      templates.push(baseTemplate(`tip-${villaSlug(villa)}-${index}`, villa, "Yerel İpucu", hook, caption, publicPath));
+      templates.push(baseTemplate(
+        `tip-${villaSlug(villa)}-${index}`,
+        villa,
+        "Yerel ?pucu",
+        hook,
+        caption,
+        photo.publicPath,
+        photo.creditLine,
+      ));
     }
   });
 
+  // G?ven i?erikleri de metin kart? yerine ilgili villan?n ger?ek Drive foto?raf?n? kullan?r.
   TRUST_CLAIMS.forEach((claim, index) => {
     for (const villa of VILLA_NAMES) {
+      const asset = singleVillaPhoto(villa, index);
+      if (!asset) continue;
       const { hook, caption } = trustCaption(claim, villa);
-      const publicPath = `${villaSlug(villa)}_trust_${index}/feed`;
-      templates.push(baseTemplate(`trust-${villaSlug(villa)}-${index}`, villa, "Güven", hook, caption, publicPath));
+      const template = baseTemplate(`trust-${villaSlug(villa)}-${index}`, villa, "G?ven", hook, caption, asset.proxyPath);
+      template.driveFileId = asset.fileId;
+      template.driveViewUrl = asset.viewUrl;
+      template.previewUrl = asset.previewUrl;
+      templates.push(template);
     }
   });
 
   for (const definition of ITINERARY_DEFINITIONS) {
     const places = resolveItineraryPlaces(definition);
     if (!places) continue;
+    const photo = places.map((place) => regionPhotoForPlace(place.id)).find((item) => item !== null) ?? null;
+    if (!photo) continue;
     for (const villa of VILLA_NAMES) {
       const { hook, caption } = itineraryCaption(definition, places, villa);
-      const publicPath = `${villaSlug(villa)}_itinerary_${definition.id}/feed`;
-      templates.push(baseTemplate(`itinerary-${villaSlug(villa)}-${definition.id}`, villa, "Rota", hook, caption, publicPath));
+      templates.push(baseTemplate(
+        `itinerary-${villaSlug(villa)}-${definition.id}`,
+        villa,
+        "Rota",
+        hook,
+        caption,
+        photo.publicPath,
+        photo.creditLine,
+      ));
     }
   }
 
-  // Kaydetme/paylaşma potansiyeli yüksek, yalnız gerçek villa fotoğraflarından oluşan carousel'ler.
   for (const villa of VILLA_NAMES) templates.push(...villaCarouselTemplates(villa));
-
   return templates;
 }
