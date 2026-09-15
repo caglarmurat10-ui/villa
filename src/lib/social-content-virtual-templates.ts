@@ -198,6 +198,22 @@ function guideTheme(category: GuidePlace["category"]): string {
   return "Bölge";
 }
 
+export function approvedVirtualTemplateMedia(villa: Villa, url: string, allowedOrigins: string[]) {
+  try {
+    const parsed = new URL(url);
+    if (!allowedOrigins.includes(parsed.origin)) return null;
+    const template = buildVirtualTemplates().find((item) =>
+      item.villa === villa &&
+      item.mediaResolved &&
+      item.mediaKind === "image" &&
+      new URL(item.mediaUrl, parsed.origin).pathname === parsed.pathname,
+    );
+    return template ? { mediaKind: "image" as const } : null;
+  } catch {
+    return null;
+  }
+}
+
 export function buildVirtualTemplates(): SocialContentTemplate[] {
   const templates: SocialContentTemplate[] = [];
 

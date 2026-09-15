@@ -15,6 +15,7 @@ import {
 } from "@/lib/social-db";
 import { approvedProxyMediaAsset, instagramStoryImageUrlForApprovedProxy } from "@/lib/social-drive-media";
 import { approvedSpecialDayMedia } from "@/lib/special-day-media";
+import { approvedVirtualTemplateMedia } from "@/lib/social-content-virtual-templates";
 import { listSocialPostMedia, type SocialPostMediaItem } from "@/lib/social-media-store";
 
 const schema = z.object({
@@ -41,6 +42,8 @@ function approvedMediaKind(
 ) {
   const specialDay = approvedSpecialDayMedia(post, url, allowedOrigins);
   if (specialDay) return specialDay.mediaKind;
+  const virtualTemplate = approvedVirtualTemplateMedia(post.villa, url, allowedOrigins);
+  if (virtualTemplate) return virtualTemplate.mediaKind;
   return approvedProxyMediaAsset(post.villa, url, allowedOrigins)?.mediaKind ?? null;
 }
 

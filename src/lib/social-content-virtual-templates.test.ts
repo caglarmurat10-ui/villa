@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildVirtualTemplates } from "./social-content-virtual-templates";
+import { approvedVirtualTemplateMedia, buildVirtualTemplates } from "./social-content-virtual-templates";
 
 describe("buildVirtualTemplates organic growth variety", () => {
   const templates = buildVirtualTemplates();
@@ -44,4 +44,12 @@ describe("buildVirtualTemplates organic growth variety", () => {
       expect(template.caption.toLocaleLowerCase("tr-TR")).not.toMatch(/whatsapp|\bdm\b/);
     }
   });
+  it("yalniz bilinen first-party sanal sablon medyasini onaylar", () => {
+    const origins = ["https://admin.safiradestan.com"];
+    expect(approvedVirtualTemplateMedia("Destan", "https://admin.safiradestan.com/api/public/social-assets/destan_destination_letoon-antik-kenti/feed", origins)?.mediaKind).toBe("image");
+    expect(approvedVirtualTemplateMedia("Safira", "https://admin.safiradestan.com/api/public/social-assets/destan_destination_letoon-antik-kenti/feed", origins)).toBeNull();
+    expect(approvedVirtualTemplateMedia("Destan", "https://evil.example/api/public/social-assets/destan_destination_letoon-antik-kenti/feed", origins)).toBeNull();
+    expect(approvedVirtualTemplateMedia("Destan", "https://admin.safiradestan.com/api/public/social-assets/destan_destination_uydurma/feed", origins)).toBeNull();
+  });
+
 });
