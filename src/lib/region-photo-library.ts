@@ -16,6 +16,7 @@ const PHOTOS: RegionPhoto[] = [
   { placeId: "kalkan", publicPath: "/social/region/feed/kalkan.jpg", creditLine: "Fotoğraf: Mustafa Yumrutaş / Wikimedia Commons · CC BY-SA 4.0 · yayın için oran korunarak işlendi." },
   { placeId: "letoon-antik-kenti", publicPath: "/social/region/feed/letoon-antik-kenti.jpg", creditLine: "Fotoğraf: nafi durmuş / Unsplash · Unsplash License." },
   { placeId: "likya-yolu", publicPath: "/social/region/feed/likya-yolu.jpg", creditLine: "Fotoğraf: JahlilMA / Wikimedia Commons · CC BY-SA 4.0 · yayın için oran korunarak işlendi." },
+  { placeId: "kas-cuma-pazari", publicPath: "/social/region/feed/kas-cuma-pazari.jpg", creditLine: "Fotoğraf: Wusel007 / Wikimedia Commons · CC BY-SA 3.0 · yayın için oran korunarak işlendi." },
 ];
 
 export const REGION_PHOTOS = PHOTOS;
