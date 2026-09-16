@@ -1,7 +1,8 @@
-import { App } from "@capacitor/app";
+﻿import { App } from "@capacitor/app";
 import { Browser } from "@capacitor/browser";
 import { Capacitor } from "@capacitor/core";
 import { API_BASE } from "../api/client";
+import { compareVersions } from "./versionCompare";
 
 export type PlatformRelease = {
   version: string;
@@ -17,15 +18,6 @@ export type UpdateInfo = {
   canOpenUpdate: boolean;
 };
 
-export function compareVersions(left: string, right: string): number {
-  const a = left.split(".").map((part) => Number.parseInt(part, 10) || 0);
-  const b = right.split(".").map((part) => Number.parseInt(part, 10) || 0);
-  for (let index = 0; index < Math.max(a.length, b.length); index += 1) {
-    const diff = (a[index] ?? 0) - (b[index] ?? 0);
-    if (diff !== 0) return diff;
-  }
-  return 0;
-}
 export async function checkForAppUpdate(): Promise<UpdateInfo | null> {
   try {
     const [appInfo, response] = await Promise.all([
@@ -54,3 +46,5 @@ export async function checkForAppUpdate(): Promise<UpdateInfo | null> {
 export async function openAppUpdate(url: string) {
   await Browser.open({ url });
 }
+
+
