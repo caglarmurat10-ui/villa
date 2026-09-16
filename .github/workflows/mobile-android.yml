@@ -46,18 +46,18 @@ jobs:
       - name: Sync Capacitor Android
         run: npx cap sync android
 
-      - name: Build unsigned release APK and AAB
+      - name: Build signed sideload APK and unsigned release AAB
         run: |
           chmod +x android/gradlew
           cd android
-          ./gradlew assembleRelease bundleRelease --stacktrace
+          ./gradlew assembleSideload bundleRelease --stacktrace
 
-      - name: Upload unsigned release artifacts
+      - name: Upload Android release artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Villa-Yonetim-Android-1.1.0-unsigned
+          name: Villa-Yonetim-Android-1.2.0
           path: |
-            mobile/android/app/build/outputs/apk/release/app-release-unsigned.apk
+            mobile/android/app/build/outputs/apk/sideload/app-sideload.apk
             mobile/android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 3

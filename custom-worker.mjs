@@ -76,6 +76,10 @@ const MOBILE_LOGOUT_API = "/api/mobile/v1/auth/logout";
 // Kod üretimi admin cookie auth'u ile korunan o route'ta yapılır - bu dosya yalnız tüketim
 // (pairing) tarafını yönetir.
 const MOBILE_PAIR_API = "/api/mobile/v1/auth/pair";
+const MOBILE_VERSION_API = "/api/mobile/v1/version";
+const MOBILE_LATEST_VERSION = "1.2.0";
+const MOBILE_LATEST_BUILD = 7;
+const MOBILE_ANDROID_APK_URL = "https://github.com/caglarmurat10-ui/villa/releases/download/villa-mobile-v1.2.0/Villa-Yonetim-1.2.0.apk";
 // Capacitor'ın varsayılan WebView origin'leri (Android: https://localhost, iOS: capacitor://localhost)
 // + yerel geliştirme. "*" KULLANILMIYOR - yalnız bu tam eşleşen origin'lere CORS izni verilir.
 const MOBILE_ALLOWED_ORIGINS = new Set([
@@ -780,6 +784,14 @@ async function mobileAuthGate(request, env) {
   if (url.pathname === "/api/mobile/v1/health") {
     // Auth öncesi bağlantı kontrolü için bilerek public - hiçbir hassas veri döndürmez.
     return withMobileCors(jsonResponse({ ok: true, service: "villa-yonetim" }), request);
+  }
+  if (url.pathname === MOBILE_VERSION_API) {
+    const iosStoreUrl = String(env.IOS_STORE_URL ?? "").trim() || null;
+    return withMobileCors(jsonResponse({
+      ok: true,
+      android: { version: MOBILE_LATEST_VERSION, build: MOBILE_LATEST_BUILD, url: MOBILE_ANDROID_APK_URL },
+      ios: { version: MOBILE_LATEST_VERSION, build: MOBILE_LATEST_BUILD, url: iosStoreUrl },
+    }), request);
   }
   if (url.pathname === MOBILE_LOGOUT_API) {
     const authenticated = await verifyMobileBearer(request, env);

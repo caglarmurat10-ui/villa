@@ -1,6 +1,8 @@
+import { useEffect, useState } from "react";
 import { HashRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth/AuthContext";
 import { useOnline } from "./lib/useOnline";
+import { checkForAppUpdate, openAppUpdate, type UpdateInfo } from "./lib/appUpdate";
 import { BottomNav } from "./components/BottomNav";
 import { PairDeviceScreen } from "./screens/PairDeviceScreen";
 import { LockScreen } from "./screens/LockScreen";
@@ -19,9 +21,27 @@ import { MoreScreen } from "./screens/MoreScreen";
 
 function AuthedShell() {
   const online = useOnline();
+  const [updateInfo, setUpdateInfo] = useState<UpdateInfo | null>(null);
+
+  useEffect(() => {
+    checkForAppUpdate().then((info) => {
+      if (info?.updateAvailable) setUpdateInfo(info);
+    });
+  }, []);
+
   return (
     <div className="app-shell">
       {!online && <div className="offline-banner">Çevrimdışı — gösterilen veri güncel olmayabilir</div>}
+      {updateInfo && (
+        <div className="offline-banner" style={{ background: "#7a5b13", color: "#fff7dc", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10 }}>
+          <span>Yeni sürüm {updateInfo.latest.version} hazır.</span>
+          {updateInfo.latest.url ? (
+            <button className="btn" onClick={() => openAppUpdate(updateInfo.latest.url!)}>Güncelle</button>
+          ) : (
+            <span>App Store/TestFlight dağıtımı bekleniyor.</span>
+          )}
+        </div>
+      )}
       <Routes>
         <Route path="/" element={<DashboardScreen />} />
         <Route path="/rezervasyonlar" element={<ReservationsScreen />} />
@@ -34,8 +54,7 @@ function AuthedShell() {
         <Route path="/daha-fazla" element={<MoreScreen />} />
         <Route path="/villalar" element={<VillasScreen />} />
         <Route path="/google-gorunurluk" element={<GoogleVisibilityScreen />} />
-        <Route path="/ayarlar" element={<SettingsScreen />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/ayarlar" element={<SettingsScreen />} />        <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <BottomNav />
     </div>

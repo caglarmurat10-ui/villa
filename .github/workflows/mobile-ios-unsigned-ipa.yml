@@ -58,12 +58,12 @@ jobs:
           mkdir -p ios/ipa-stage/Payload
           cp -R ios/device-build/Build/Products/Release-iphoneos/App.app ios/ipa-stage/Payload/
           cd ios/ipa-stage
-          zip -qry ../Villa-Yonetim-iOS-unsigned.ipa Payload
+          zip -qry ../Villa-Yonetim-iOS-1.2.0-unsigned.ipa Payload
 
       - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: Villa-Yonetim-iOS-unsigned
-          path: mobile/ios/Villa-Yonetim-iOS-unsigned.ipa
+          name: Villa-Yonetim-iOS-1.2.0-unsigned
+          path: mobile/ios/Villa-Yonetim-iOS-1.2.0-unsigned.ipa
           if-no-files-found: error
           retention-days: 3

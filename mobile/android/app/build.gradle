@@ -7,8 +7,8 @@ android {
         applicationId "com.safiradestan.villayonetim"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 6
-        versionName "1.1.0"
+        versionCode 7
+        versionName "1.2.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -22,6 +22,13 @@ android {
             // to this public repository; the final APK/AAB is signed after this build step.
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+        sideload {
+            initWith release
+            // Private side-load channel: preserve the existing debug certificate so installed
+            // APKs can update in place, while the Play/App Bundle release stays externally signed.
+            signingConfig signingConfigs.debug
+            matchingFallbacks = ['release']
         }
     }
 }

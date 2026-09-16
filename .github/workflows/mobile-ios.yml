@@ -54,7 +54,7 @@ jobs:
       - name: Upload simulator app artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Villa-Yonetim-iOS-simulator
+          name: Villa-Yonetim-iOS-1.2.0-simulator
           path: mobile/ios/build/Build/Products/Debug-iphonesimulator/App.app
           if-no-files-found: error
           retention-days: 14
