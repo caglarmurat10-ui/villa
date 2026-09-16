@@ -25,7 +25,7 @@ jobs:
       BUNDLE_ID: com.safiradestan.villayonetim
       APPLE_TEAM_ID: ${{ vars.APPLE_TEAM_ID }}
       EXPECTED_MARKETING_VERSION: "1.2.0"
-      EXPECTED_BUILD_NUMBER: "7"
+      EXPECTED_BUILD_NUMBER: "8"
 
     steps:
       - name: Checkout
@@ -200,7 +200,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: Villa-Yonetim-iOS-1.2.0-build7-signed
+          name: Villa-Yonetim-iOS-1.2.0-build8-signed
           path: mobile/ios/build-ipa/*.ipa
           if-no-files-found: warn
           retention-days: 14
@@ -235,5 +235,5 @@ jobs:
           APPSTORE_ISSUER_ID: ${{ vars.APPSTORE_ISSUER_ID }}
           APPSTORE_API_KEY_ID: ${{ vars.APPSTORE_API_KEY_ID }}
           APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
-          BUILD_VERSION: "7"
+          BUILD_VERSION: "8"
         run: .tf-venv/bin/python scripts/testflight-post-upload.py

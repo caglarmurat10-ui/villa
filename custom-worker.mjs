@@ -78,7 +78,12 @@ const MOBILE_LOGOUT_API = "/api/mobile/v1/auth/logout";
 const MOBILE_PAIR_API = "/api/mobile/v1/auth/pair";
 const MOBILE_VERSION_API = "/api/mobile/v1/version";
 const MOBILE_LATEST_VERSION = "1.2.0";
-const MOBILE_LATEST_BUILD = 7;
+// Build numaralari platform BAZINDA ayridir. Ortak tek sabit kullanmak, yalniz bir platform
+// icin yeni build cikildiginda digerini de "guncelleme var" durumuna dusurup var olmayan bir
+// surume yonlendiriyordu. Android APK'si hala build 7 (villa-mobile-v1.2.0 release'i), iOS ise
+// TestFlight'ta build 8. Bir platformun build'ini yukseltirken digerine DOKUNULMAZ.
+const MOBILE_ANDROID_LATEST_BUILD = 7;
+const MOBILE_IOS_LATEST_BUILD = 8;
 const MOBILE_ANDROID_APK_URL = "https://github.com/caglarmurat10-ui/villa/releases/download/villa-mobile-v1.2.0/Villa-Yonetim-1.2.0.apk";
 // Capacitor'ın varsayılan WebView origin'leri (Android: https://localhost, iOS: capacitor://localhost)
 // + yerel geliştirme. "*" KULLANILMIYOR - yalnız bu tam eşleşen origin'lere CORS izni verilir.
@@ -808,8 +813,8 @@ async function mobileAuthGate(request, env) {
     const iosStoreUrl = String(env.IOS_STORE_URL ?? "").trim() || null;
     return withMobileCors(jsonResponse({
       ok: true,
-      android: { version: MOBILE_LATEST_VERSION, build: MOBILE_LATEST_BUILD, url: MOBILE_ANDROID_APK_URL },
-      ios: { version: MOBILE_LATEST_VERSION, build: MOBILE_LATEST_BUILD, url: iosStoreUrl },
+      android: { version: MOBILE_LATEST_VERSION, build: MOBILE_ANDROID_LATEST_BUILD, url: MOBILE_ANDROID_APK_URL },
+      ios: { version: MOBILE_LATEST_VERSION, build: MOBILE_IOS_LATEST_BUILD, url: iosStoreUrl },
     }), request);
   }
   if (url.pathname === MOBILE_LOGOUT_API) {
