@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+﻿import { describe, expect, it } from "vitest";
 import { approvedVirtualTemplateMedia, buildVirtualTemplates } from "./social-content-virtual-templates";
 
 describe("buildVirtualTemplates organic growth variety", () => {
@@ -53,13 +53,15 @@ describe("buildVirtualTemplates organic growth variety", () => {
 
   it("places without a verified real photo are not auto-template candidates", () => {
     expect(templates.some((template) => template.id.includes("patara-kum-tepeleri"))).toBe(false);
-    expect(templates.some((template) => template.id.includes("kas-cuma-pazari"))).toBe(false);
+    expect(templates.some((template) => template.id.includes("kas-cuma-pazari"))).toBe(true);
   });
 
   it("virtual media allowlist accepts only curated first-party region photos", () => {
     expect(approvedVirtualTemplateMedia("Destan", "https://admin.safiradestan.com/social/region/feed/letoon-antik-kenti.jpg", ["https://admin.safiradestan.com"])).toEqual({ mediaKind: "image" });
+    expect(approvedVirtualTemplateMedia("Destan", "https://admin.safiradestan.com/social/region/feed/kas-cuma-pazari.jpg", ["https://admin.safiradestan.com"])).toEqual({ mediaKind: "image" });
     expect(approvedVirtualTemplateMedia("Destan", "https://admin.safiradestan.com/api/public/social-assets/destan_destination_letoon-antik-kenti/feed", ["https://admin.safiradestan.com"])).toBeNull();
     expect(approvedVirtualTemplateMedia("Destan", "https://evil.example/letoon.jpg", ["https://admin.safiradestan.com"])).toBeNull();
   });
 
 });
+
