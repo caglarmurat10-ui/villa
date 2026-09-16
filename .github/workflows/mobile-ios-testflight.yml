@@ -219,7 +219,14 @@ jobs:
 
       - name: Install post-upload dependencies
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.upload_to_testflight }}
-        run: python3 -m pip install --quiet --disable-pip-version-check pyjwt cryptography
+        working-directory: ${{ github.workspace }}
+        # macOS runner'in Python'u Homebrew tarafindan yonetiliyor (PEP 668), sisteme
+        # dogrudan pip kurulumu reddediliyor. Izole bir venv kullaniyoruz.
+        run: |
+          set -euo pipefail
+          python3 -m venv .tf-venv
+          .tf-venv/bin/python -m pip install --quiet --upgrade pip
+          .tf-venv/bin/python -m pip install --quiet pyjwt cryptography
 
       - name: Export compliance and internal TestFlight group
         if: ${{ github.event_name != 'workflow_dispatch' || inputs.upload_to_testflight }}
@@ -229,4 +236,4 @@ jobs:
           APPSTORE_API_KEY_ID: ${{ vars.APPSTORE_API_KEY_ID }}
           APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
           BUILD_VERSION: "7"
-        run: python3 scripts/testflight-post-upload.py
+        run: .tf-venv/bin/python scripts/testflight-post-upload.py

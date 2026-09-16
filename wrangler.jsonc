@@ -20,7 +20,13 @@
     "INSTAGRAM_OAUTH_BASE_URL": "https://admin.safiradestan.com",
     "SOCIAL_AUTO_PUBLISH_ENABLED": "true",
     "SOCIAL_AUTO_PUBLISH_TIME": "12:00",
-    "SOCIAL_AUTO_PUBLISH_LIMIT": "2"
+    "SOCIAL_AUTO_PUBLISH_LIMIT": "2",
+    // iOS guncelleme yonlendirmesi (custom-worker.mjs -> /api/mobile/v1/version).
+    // Uygulama su an yalnizca TestFlight uzerinden dagitiliyor, App Store'da henuz
+    // yayinda degil; bu yuzden TestFlight deep link'i kullaniliyor (Apple app id
+    // 6812871637). Uygulama App Store'da yayinlandiginda buradaki tek satir
+    // "https://apps.apple.com/app/id6812871637" ile degistirilmeli.
+    "IOS_STORE_URL": "https://beta.itunes.apple.com/v1/app/6812871637"
   },
   // NOT: PAYTR_MERCHANT_ID/KEY/SALT bilerek "required" listesine EKLENMEDİ - bu liste wrangler'da
   // salt bir uyarı değil, sağlanmadan deploy'u tamamen ENGELLEYEN sert bir kapı (canlı test edildi:
