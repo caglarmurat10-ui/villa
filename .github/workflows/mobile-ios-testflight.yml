@@ -216,3 +216,17 @@ jobs:
           api-private-key: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
           uses-non-exempt-encryption: 'false'
           wait-for-processing: 'true'
+
+      - name: Install post-upload dependencies
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.upload_to_testflight }}
+        run: python3 -m pip install --quiet --disable-pip-version-check pyjwt cryptography
+
+      - name: Export compliance and internal TestFlight group
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.upload_to_testflight }}
+        working-directory: ${{ github.workspace }}
+        env:
+          APPSTORE_ISSUER_ID: ${{ vars.APPSTORE_ISSUER_ID }}
+          APPSTORE_API_KEY_ID: ${{ vars.APPSTORE_API_KEY_ID }}
+          APPSTORE_API_PRIVATE_KEY: ${{ secrets.APPSTORE_API_PRIVATE_KEY }}
+          BUILD_VERSION: "7"
+        run: python3 scripts/testflight-post-upload.py
