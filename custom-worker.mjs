@@ -618,6 +618,20 @@ function bearerToken(request) {
   return header.startsWith("Bearer ") ? header.slice(7).trim() : "";
 }
 
+// src/lib/mobile-pairing.ts -> resolvePlatform ile aynı mantık. Worker bu dosyadan import
+// edemediği için (ayrı bundle) küçük bir kopya; davranışı mobile-pairing.test.ts'te test edilir.
+function resolveMobilePlatform(explicit, userAgent) {
+  if (typeof explicit === "string") {
+    const value = explicit.trim().toLowerCase();
+    if (value === "ios" || value === "android") return value;
+  }
+  const ua = (userAgent ?? "").toLowerCase();
+  if (!ua) return null;
+  if (ua.includes("android")) return "android";
+  if (ua.includes("iphone") || ua.includes("ipad") || ua.includes("ios")) return "ios";
+  return null;
+}
+
 async function verifyMobileBearer(request, env) {
   const token = bearerToken(request);
   if (!token || token.length < 32) return false;
@@ -709,6 +723,11 @@ async function handleMobilePair(request, env) {
     const payload = await request.json().catch(() => null);
     const code = typeof payload?.code === "string" ? payload.code.replace(/\D/g, "") : "";
     const deviceLabel = typeof payload?.deviceLabel === "string" ? payload.deviceLabel.slice(0, 80) : null;
+    // Platform önce payload'dan, yoksa User-Agent'tan çıkarılır - böylece hâlihazırda yayında olan
+    // mobil sürümler (platform göndermeyenler) için de yeni build gerekmeden doldurulur.
+    const platform = resolveMobilePlatform(payload?.platform, request.headers.get("user-agent"));
+    const appVersion = typeof payload?.appVersion === "string" ? payload.appVersion.slice(0, 32) : null;
+    const appBuild = typeof payload?.appBuild === "string" ? payload.appBuild.slice(0, 32) : null;
     if (code.length !== 6) {
       await recordAuthFailure(env, ip, "MOBILE_PAIR");
       await authDelay(ADMIN_RATE_LIMIT_DELAY_MS);
@@ -739,9 +758,9 @@ async function handleMobilePair(request, env) {
     const sessionId = crypto.randomUUID();
 
     await env.DB.prepare(
-      `INSERT INTO mobile_sessions (id, token_hash, credential_version, device_label, created_at, expires_at, last_seen_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    ).bind(sessionId, tokenHash, credential.credentialVersion, deviceLabel, nowIso, expiresAt, nowIso).run();
+      `INSERT INTO mobile_sessions (id, token_hash, credential_version, device_label, platform, app_version, app_build, created_at, expires_at, last_seen_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(sessionId, tokenHash, credential.credentialVersion, deviceLabel, platform, appVersion, appBuild, nowIso, expiresAt, nowIso).run();
 
     return jsonResponse({ ok: true, token: rawToken, expiresIn: MOBILE_SESSION_TTL_SECONDS });
   } catch (error) {

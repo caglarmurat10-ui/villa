@@ -43,7 +43,7 @@ export function PairDeviceScreen() {
         </button>
       </form>
       <p style={{ fontSize: 10, color: "#6b7787", textAlign: "center", marginTop: 24 }}>
-        Kodu Villa Yönetim yönetim panelinden "Ayarlar → Mobil Cihaz Ekle" ile alabilirsiniz. Kod 10 dakika geçerlidir ve yalnız bir kez kullanılabilir.
+        Kodu Villa Yönetim yönetim panelinden "Ayarlar → Mobil Cihazlar → Yeni Cihaz Ekle" ile alabilirsiniz. Kod 10 dakika geçerlidir ve yalnız bir kez kullanılabilir.
       </p>
     </div>
   );

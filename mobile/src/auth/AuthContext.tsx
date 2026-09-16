@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import { App } from "@capacitor/app";
 import { Device } from "@capacitor/device";
-import { pairDeviceRequest, logoutRequest, setAuthToken, PREVIEW_MODE } from "../api/client";
+import { pairDeviceRequest, logoutRequest, setAuthToken, PREVIEW_MODE, type PairDeviceMeta } from "../api/client";
 import { clearToken, loadToken, saveToken } from "../lib/secureStorage";
 import { isBiometricEnabled, requestBiometricUnlock, setBiometricEnabled } from "../lib/biometric";
 
@@ -46,13 +47,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setPairError(null);
     try {
       let deviceLabel = "Villa Yönetim Mobil";
+      const meta: PairDeviceMeta = {};
       try {
         const info = await Device.getInfo();
         deviceLabel = `${info.manufacturer ?? ""} ${info.model ?? ""}`.trim() || deviceLabel;
+        // Panelin "Mobil Cihazlar" listesinde platform/sürüm gösterilebilsin diye gönderilir.
+        // Sunucu bunu göndermeyen eski sürümler için User-Agent'tan da çıkarabilir.
+        meta.platform = info.platform;
       } catch {
         // Device bilgisi opsiyonel - alınamazsa varsayılan etiket kullanılır.
       }
-      const result = await pairDeviceRequest(code, deviceLabel);
+      try {
+        const appInfo = await App.getInfo();
+        meta.appVersion = appInfo.version;
+        meta.appBuild = String(appInfo.build);
+      } catch {
+        // Web/preview ortamında App.getInfo desteklenmez - sürüm bilgisi atlanır.
+      }
+      const result = await pairDeviceRequest(code, deviceLabel, meta);
       await saveToken(result.token);
       setAuthToken(result.token);
       setStatus("signedIn");

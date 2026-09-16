@@ -87,11 +87,13 @@ export async function loginRequest(password: string, deviceLabel: string) {
 // Backend henüz production'a deploy edilmedi (bkz. custom-worker.mjs handleMobilePair,
 // migrations/0017) - bu fonksiyon şimdiden hazır, ama gerçek cihazda çağrıldığında backend
 // yayınlanana kadar 404 dönecektir. Preview modunda hiç çağrılmaz (auth tamamen bypass edilir).
-export async function pairDeviceRequest(code: string, deviceLabel: string) {
+export type PairDeviceMeta = { platform?: string; appVersion?: string; appBuild?: string };
+
+export async function pairDeviceRequest(code: string, deviceLabel: string, meta: PairDeviceMeta = {}) {
   const response = await fetch(`${API_BASE}/auth/pair`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ code, deviceLabel }),
+    body: JSON.stringify({ code, deviceLabel, ...meta }),
   });
   const data = await response.json().catch(() => null);
   if (!response.ok) throw new ApiError(response.status, data?.error ?? "Eşleştirme başarısız.");
