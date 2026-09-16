@@ -7,6 +7,12 @@ on:
         description: "App Store Connect'e yukle (app kaydi mevcut olmali)"
         type: boolean
         default: true
+  # Surum etiketi atildiginda otomatik signed build + TestFlight yuklemesi.
+  # Her push'ta tetiklenmez: build numarasi projede sabit oldugu icin ayni build'i
+  # tekrar yuklemek App Store Connect tarafinda "duplicate build" hatasi verir.
+  push:
+    tags:
+      - "villa-mobile-v*"
 
 permissions:
   contents: read
@@ -200,7 +206,8 @@ jobs:
           retention-days: 14
 
       - name: Upload to TestFlight
-        if: ${{ inputs.upload_to_testflight }}
+        # Etiket tetiklemesinde her zaman yukle; manuel calistirmada girdiye uy.
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.upload_to_testflight }}
         uses: apple-actions/upload-testflight-build@v4
         with:
           app-path: ${{ env.IPA_PATH }}
