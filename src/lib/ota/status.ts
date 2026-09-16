@@ -1,8 +1,8 @@
 import { getCloudflareContext } from "@opennextjs/cloudflare";
 import type { D1Database } from "@cloudflare/workers-types";
 import { OTA_PLATFORMS, OTA_VILLAS, type OtaConnectionStatus, type OtaSyncHealth } from "./types";
-import { evaluateOtaConflictDisposition, type ReservationRangeLike } from "./conflict-disposition";
-import { isAnomalousBlockDuration } from "./anomaly";
+import { type ReservationRangeLike } from "./conflict-disposition";
+import { requiresOperatorReview } from "./review-classification";
 
 // Takvim senkronu gerçek-zamanlı bir API değil - bizim cron'umuz 30 dk'da bir, Airbnb'nin kendi
 // import yenilemesi ise (kendi Help Center'ına göre) ~3 saatte bir çalışıyor. Eşikler buna göre:
@@ -156,13 +156,12 @@ export async function listOtaConnectionsStatus(): Promise<OtaConnectionStatus[]>
     function conflictCountFor(villa: string, source: string): number {
       return needsReviewBlocks.results.filter((row) => {
         if (row.villa !== villa || row.source !== source) return false;
-        // Long (>120 day) single OTA unavailable/closed records are quarantine anomalies, not booking conflicts.
-        // Keep them in needs_review, but do not inflate conflictCount.
-        if (isAnomalousBlockDuration(row.start_date, row.end_date)) return false;
-        return evaluateOtaConflictDisposition(
-          { startDate: row.start_date, endDateExclusive: row.end_date },
+        // Sınıflandırma tek kaynaktan gelir (review-classification.ts): uzun (>120 gün) karantina
+        // anomalileri ve bilinen rezervasyon yansımaları conflictCount'u şişirmez.
+        return requiresOperatorReview(
+          { status: "needs_review", startDate: row.start_date, endDateExclusive: row.end_date },
           reservationsByVilla.get(row.villa) ?? [],
-        ) === "REVIEW_REQUIRED";
+        );
       }).length;
     }
 

@@ -1,6 +1,7 @@
 import { listReservations } from "@/lib/db";
 import { listSocialPosts } from "@/lib/social-db";
 import { listExternalBlocksForAdmin } from "@/lib/ota/availability";
+import { requiresOperatorReview } from "@/lib/ota/review-classification";
 import type { Reservation } from "@/lib/types";
 import { DESTAN_INSTAGRAM_HARD_BLOCK } from "@/lib/social-account-policy";
 
@@ -32,7 +33,22 @@ export async function GET() {
   const socialScheduledToday = posts.filter((p) => p.status === "Planlandı" && p.scheduledDate === today);
   const socialPublishedToday = posts.filter((p) => p.status === "Yayınlandı" && (p.publishedAt ?? "").slice(0, 10) === today);
 
-  const needsReview = otaBlocks.filter((b) => b.status === "needs_review");
+  // Uyarı YALNIZ gerçekten operatör aksiyonu gerektiren bloklar için gösterilir. Ham needs_review
+  // sayımı, karantinaya alınmış uzun (>120 gün) import anomalilerini ve bilinen rezervasyon
+  // yansımalarını da sayarak yanlış pozitif "N OTA bloğu incelenmeyi bekliyor" uyarısı üretiyordu.
+  // Web panelinin (ota/status.ts) kullandığı sınıflandırmanın aynısı burada da uygulanır.
+  const reservationsByVilla = new Map<string, { checkIn: string; checkOut: string }[]>();
+  for (const reservation of reservations) {
+    const list = reservationsByVilla.get(reservation.villa) ?? [];
+    list.push({ checkIn: reservation.checkIn, checkOut: reservation.checkOut });
+    reservationsByVilla.set(reservation.villa, list);
+  }
+  const needsReview = otaBlocks.filter((b) =>
+    requiresOperatorReview(
+      { status: b.status, startDate: b.startDate, endDateExclusive: b.endDate },
+      reservationsByVilla.get(b.villa) ?? [],
+    ),
+  );
 
   return Response.json({
     today,

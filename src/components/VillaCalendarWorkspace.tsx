@@ -5,7 +5,8 @@ import Link from "next/link";
 import type { Reservation, Villa, VillaLocations } from "@/lib/types";
 import type { AdminExternalBlock } from "@/lib/ota/types";
 import { evaluateOtaBlockAgainstSeason, isPrePolicyConfirmedException, PRE_POLICY_EXCEPTION_LABEL } from "@/lib/season-policy";
-import { evaluateOtaConflictDisposition } from "@/lib/ota/conflict-disposition";
+import { classifyOtaReviewBlock } from "@/lib/ota/review-classification";
+import { blockDurationDays } from "@/lib/ota/anomaly";
 
 const villas: Villa[] = ["Safira", "Destan"];
 const SOURCE_LABEL: Record<AdminExternalBlock["source"], string> = { airbnb: "Airbnb", booking: "Booking.com", manual: "Manuel blok" };
@@ -83,10 +84,17 @@ function DetailSheet({ selection, locations, reservations, onClose }: { selectio
   // sezona taşan her gecesi zaten bilinen, active bir rezervasyon tarafından açıklanıyorsa yalnız
   // BİLGİLENDİRME amaçlıdır (kırmızı "kontrol gerekli" alarmı yanıltıcı olur) - bkz.
   // conflict-disposition.ts. Yalnız DEĞERLENDİRME/GÖSTERİM amaçlı: b.status'ü hiç DEĞİŞTİRMEZ.
-  const isMirror = b.status === "needs_review" && evaluateOtaConflictDisposition(
-    { startDate: b.startDate, endDateExclusive: b.endDate },
-    reservations.filter((r) => r.villa === selection.villa).map((r) => ({ checkIn: r.checkIn, checkOut: r.checkOut })),
-  ) === "EXPECTED_RESERVATION_MIRROR";
+  // Sınıflandırma tek kaynaktan (review-classification.ts) gelir - panel ve mobil uyarı ile birebir
+  // aynı ölçüt. Uzun (>120 gün) karantina anomalileri "kontrol gerekli" alarmı ÜRETMEZ; needs_review
+  // olarak kalırlar ama operatörden aksiyon beklenmez.
+  const classification = b.status === "needs_review"
+    ? classifyOtaReviewBlock(
+        { status: b.status, startDate: b.startDate, endDateExclusive: b.endDate },
+        reservations.filter((r) => r.villa === selection.villa).map((r) => ({ checkIn: r.checkIn, checkOut: r.checkOut })),
+      )
+    : null;
+  const isQuarantined = classification === "QUARANTINED_ANOMALY";
+  const isMirror = classification === "EXPECTED_RESERVATION_MIRROR";
   return <div className="calendar-sheet-backdrop" onClick={onClose}>
     <div className="calendar-sheet" onClick={(event) => event.stopPropagation()}>
       <div className="calendar-sheet-head">
@@ -98,13 +106,17 @@ function DetailSheet({ selection, locations, reservations, onClose }: { selectio
         <div>Kaynak<br /><b>{SOURCE_LABEL[b.source]}</b></div>
         <div>Başlangıç<br /><b>{trDate(b.startDate)}</b></div>
         <div>Bitiş<br /><b>{trDate(b.endDate)}</b></div>
-        <div>Durum<br /><b style={{ color: b.status === "needs_review" ? (isMirror ? "#93c5fd" : "#fca5a5") : "#86efac" }}>
-          {b.status === "needs_review" ? (isMirror ? "ℹ Bilgi" : "⚠ Kontrol gerekli") : "Aktif"}
+        <div>Durum<br /><b style={{ color: b.status === "needs_review" ? (isMirror || isQuarantined ? "#93c5fd" : "#fca5a5") : "#86efac" }}>
+          {b.status === "needs_review"
+            ? (isQuarantined ? "ℹ Karantina" : isMirror ? "ℹ Bilgi" : "⚠ Kontrol gerekli")
+            : "Aktif"}
         </b></div>
       </div>
       <div className="calendar-sheet-notes">
         <p>{b.status === "needs_review"
-          ? (isMirror
+          ? (isQuarantined
+              ? `Bu blok ${SOURCE_LABEL[b.source]} takviminden tek parça halinde ${blockDurationDays(b.startDate, b.endDate)} günlük olarak geldi. Bu kadar uzun tek bloklar güvenilmez kabul edilip karantinaya alınır: müsaitlik ve rezervasyon hesaplarına dahil EDİLMEZ ve operatör aksiyonu beklenmez.`
+              : isMirror
               ? "OTA takvimindeki bu blok, sistemde kayıtlı mevcut rezervasyonla eşleşiyor. Ek işlem gerekmiyor."
               : `Bu tarih aralığı ${SOURCE_LABEL[b.source]} üzerinden yönetiliyor olabilir ve sistemdeki bir kayıtla çakışıyor - kontrol edin.`)
           : `Bu tarih aralığı ${SOURCE_LABEL[b.source]} üzerinden yönetiliyor; sistem içinde ayrı bir rezervasyon kaydı yok.`}</p>
